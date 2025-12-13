@@ -73,3 +73,24 @@ export const QUESTION_TYPE_CONFIG: Record<QuestionType, { label: string; icon: s
     description: 'Valoración con estrellas'
   }
 };
+
+export type SubmissionStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
+
+export interface FormSubmission {
+  id: string;
+  formId: string;
+  formName: string;
+  respondentName: string;
+  respondentEmail: string;
+  status: SubmissionStatus;
+  answers: Record<string, string | string[]>;
+  submittedAt: Date;
+  updatedAt: Date;
+}
+
+export const SUBMISSION_STATUS_CONFIG: Record<SubmissionStatus, { label: string; color: string }> = {
+  pending: { label: 'Pendiente', color: 'warning' },
+  in_progress: { label: 'En progreso', color: 'info' },
+  completed: { label: 'Completado', color: 'success' },
+  cancelled: { label: 'Cancelado', color: 'destructive' },
+};
