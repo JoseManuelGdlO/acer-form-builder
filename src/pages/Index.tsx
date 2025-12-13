@@ -20,6 +20,10 @@ const Index = () => {
     createForm,
     updateForm,
     deleteForm,
+    addSection,
+    updateSection,
+    deleteSection,
+    reorderSections,
     addQuestion,
     updateQuestion,
     deleteQuestion,
@@ -50,12 +54,16 @@ const Index = () => {
         form={currentForm}
         onBack={() => selectForm(null)}
         onUpdateForm={updates => updateForm(currentForm.id, updates)}
-        onAddQuestion={type => addQuestion(currentForm.id, type)}
-        onUpdateQuestion={(questionId, updates) =>
-          updateQuestion(currentForm.id, questionId, updates)
+        onAddSection={() => addSection(currentForm.id)}
+        onUpdateSection={(sectionId, updates) => updateSection(currentForm.id, sectionId, updates)}
+        onDeleteSection={sectionId => deleteSection(currentForm.id, sectionId)}
+        onReorderSections={sections => reorderSections(currentForm.id, sections)}
+        onAddQuestion={(sectionId, type) => addQuestion(currentForm.id, sectionId, type)}
+        onUpdateQuestion={(sectionId, questionId, updates) =>
+          updateQuestion(currentForm.id, sectionId, questionId, updates)
         }
-        onDeleteQuestion={questionId => deleteQuestion(currentForm.id, questionId)}
-        onReorderQuestions={questions => reorderQuestions(currentForm.id, questions)}
+        onDeleteQuestion={(sectionId, questionId) => deleteQuestion(currentForm.id, sectionId, questionId)}
+        onReorderQuestions={(sectionId, questions) => reorderQuestions(currentForm.id, sectionId, questions)}
       />
     );
   }

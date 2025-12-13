@@ -16,10 +16,11 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import { ArrowLeft, FileText } from 'lucide-react';
-import { Form, Question, QuestionType } from '@/types/form';
+import { ArrowLeft, FileText, Plus, ChevronDown, ChevronRight } from 'lucide-react';
+import { Form, FormSection, Question, QuestionType } from '@/types/form';
 import { QuestionCard } from './QuestionCard';
 import { QuestionTypePalette } from './QuestionTypePalette';
+import { SectionCard } from './SectionCard';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
@@ -28,22 +29,36 @@ interface FormEditorProps {
   form: Form;
   onBack: () => void;
   onUpdateForm: (updates: Partial<Form>) => void;
-  onAddQuestion: (type: QuestionType) => void;
-  onUpdateQuestion: (questionId: string, updates: Partial<Question>) => void;
-  onDeleteQuestion: (questionId: string) => void;
-  onReorderQuestions: (questions: Question[]) => void;
+  onAddSection: () => void;
+  onUpdateSection: (sectionId: string, updates: Partial<FormSection>) => void;
+  onDeleteSection: (sectionId: string) => void;
+  onReorderSections: (sections: FormSection[]) => void;
+  onAddQuestion: (sectionId: string, type: QuestionType) => void;
+  onUpdateQuestion: (sectionId: string, questionId: string, updates: Partial<Question>) => void;
+  onDeleteQuestion: (sectionId: string, questionId: string) => void;
+  onReorderQuestions: (sectionId: string, questions: Question[]) => void;
 }
 
 export const FormEditor = ({
   form,
   onBack,
   onUpdateForm,
+  onAddSection,
+  onUpdateSection,
+  onDeleteSection,
+  onReorderSections,
   onAddQuestion,
   onUpdateQuestion,
   onDeleteQuestion,
   onReorderQuestions,
 }: FormEditorProps) => {
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [activeSectionId, setActiveSectionId] = useState<string | null>(
+    form.sections.length > 0 ? form.sections[0].id : null
+  );
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(
+    new Set(form.sections.map(s => s.id))
+  );
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -56,6 +71,18 @@ export const FormEditor = ({
     })
   );
 
+  const toggleSection = (sectionId: string) => {
+    setExpandedSections(prev => {
+      const next = new Set(prev);
+      if (next.has(sectionId)) {
+        next.delete(sectionId);
+      } else {
+        next.add(sectionId);
+      }
+      return next;
+    });
+  };
+
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(event.active.id as string);
   };
@@ -67,27 +94,45 @@ export const FormEditor = ({
     if (!over) return;
 
     // Check if dropping a new question type
-    if (active.data.current?.isNew) {
+    if (active.data.current?.isNew && activeSectionId) {
       const type = active.data.current.type as QuestionType;
-      onAddQuestion(type);
+      onAddQuestion(activeSectionId, type);
       return;
     }
 
-    // Reorder existing questions
-    if (active.id !== over.id) {
-      const oldIndex = form.questions.findIndex(q => q.id === active.id);
-      const newIndex = form.questions.findIndex(q => q.id === over.id);
+    // Reorder sections
+    if (active.data.current?.isSection && over.data.current?.isSection) {
+      const oldIndex = form.sections.findIndex(s => s.id === active.id);
+      const newIndex = form.sections.findIndex(s => s.id === over.id);
 
-      if (oldIndex !== -1 && newIndex !== -1) {
-        const newQuestions = arrayMove(form.questions, oldIndex, newIndex);
-        onReorderQuestions(newQuestions);
+      if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
+        const newSections = arrayMove(form.sections, oldIndex, newIndex);
+        onReorderSections(newSections);
+      }
+      return;
+    }
+
+    // Reorder questions within the same section
+    const sectionId = active.data.current?.sectionId;
+    if (sectionId && active.id !== over.id) {
+      const section = form.sections.find(s => s.id === sectionId);
+      if (section) {
+        const oldIndex = section.questions.findIndex(q => q.id === active.id);
+        const newIndex = section.questions.findIndex(q => q.id === over.id);
+
+        if (oldIndex !== -1 && newIndex !== -1) {
+          const newQuestions = arrayMove(section.questions, oldIndex, newIndex);
+          onReorderQuestions(sectionId, newQuestions);
+        }
       }
     }
   };
 
   const activeQuestion = activeId
-    ? form.questions.find(q => q.id === activeId)
+    ? form.sections.flatMap(s => s.questions).find(q => q.id === activeId)
     : null;
+
+  const getTotalQuestions = () => form.sections.reduce((acc, s) => acc + s.questions.length, 0);
 
   return (
     <DndContext
@@ -118,9 +163,14 @@ export const FormEditor = ({
                   </div>
                 </div>
               </div>
-              <Button className="gradient-primary text-primary-foreground">
-                Guardar
-              </Button>
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-muted-foreground">
+                  {form.sections.length} secciones · {getTotalQuestions()} preguntas
+                </span>
+                <Button className="gradient-primary text-primary-foreground">
+                  Guardar
+                </Button>
+              </div>
             </div>
           </div>
         </header>
@@ -128,7 +178,7 @@ export const FormEditor = ({
         {/* Main Content */}
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex gap-8">
-            {/* Questions Area */}
+            {/* Sections & Questions Area */}
             <div className="flex-1 min-w-0">
               {/* Form Description */}
               <div className="bg-card rounded-xl border border-border p-6 mb-6 shadow-card">
@@ -140,42 +190,61 @@ export const FormEditor = ({
                 />
               </div>
 
-              {/* Questions List */}
+              {/* Sections List */}
               <div className="space-y-4">
                 <SortableContext
-                  items={form.questions.map(q => q.id)}
+                  items={form.sections.map(s => s.id)}
                   strategy={verticalListSortingStrategy}
                 >
-                  {form.questions.map(question => (
-                    <QuestionCard
-                      key={question.id}
-                      question={question}
-                      onUpdate={updates => onUpdateQuestion(question.id, updates)}
-                      onDelete={() => onDeleteQuestion(question.id)}
+                  {form.sections.map((section, sectionIndex) => (
+                    <SectionCard
+                      key={section.id}
+                      section={section}
+                      sectionIndex={sectionIndex}
+                      isExpanded={expandedSections.has(section.id)}
+                      isActive={activeSectionId === section.id}
+                      onToggle={() => toggleSection(section.id)}
+                      onSelect={() => setActiveSectionId(section.id)}
+                      onUpdate={updates => onUpdateSection(section.id, updates)}
+                      onDelete={() => onDeleteSection(section.id)}
+                      onUpdateQuestion={(questionId, updates) =>
+                        onUpdateQuestion(section.id, questionId, updates)
+                      }
+                      onDeleteQuestion={questionId =>
+                        onDeleteQuestion(section.id, questionId)
+                      }
+                      onReorderQuestions={questions =>
+                        onReorderQuestions(section.id, questions)
+                      }
+                      canDelete={form.sections.length > 1}
                     />
                   ))}
                 </SortableContext>
 
-                {form.questions.length === 0 && (
-                  <div className="text-center py-16 px-4">
-                    <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
-                      <FileText className="w-8 h-8 text-primary" />
-                    </div>
-                    <h3 className="text-lg font-medium text-foreground mb-2">
-                      Sin preguntas aún
-                    </h3>
-                    <p className="text-muted-foreground max-w-sm mx-auto">
-                      Arrastra un tipo de pregunta desde el panel derecho para comenzar a crear tu formulario
-                    </p>
-                  </div>
-                )}
+                {/* Add Section Button */}
+                <Button
+                  variant="outline"
+                  onClick={onAddSection}
+                  className="w-full h-14 border-dashed gap-2"
+                >
+                  <Plus className="w-5 h-5" />
+                  Agregar nueva sección
+                </Button>
               </div>
             </div>
 
             {/* Sidebar - Question Types */}
             <div className="w-72 flex-shrink-0">
               <div className="sticky top-24">
-                <QuestionTypePalette />
+                {activeSectionId ? (
+                  <QuestionTypePalette />
+                ) : (
+                  <div className="bg-card rounded-xl border border-border p-6 text-center">
+                    <p className="text-muted-foreground">
+                      Selecciona una sección para agregar preguntas
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
