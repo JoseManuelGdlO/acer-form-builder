@@ -1,8 +1,17 @@
+import { useState } from 'react';
 import { useFormStore } from '@/hooks/useFormStore';
+import { useSubmissionStore } from '@/hooks/useSubmissionStore';
 import { FormList } from '@/components/forms/FormList';
 import { FormEditor } from '@/components/forms/FormEditor';
+import { SubmissionList } from '@/components/submissions/SubmissionList';
+import { Button } from '@/components/ui/button';
+import { FileText, ClipboardList } from 'lucide-react';
+
+type View = 'forms' | 'submissions';
 
 const Index = () => {
+  const [activeView, setActiveView] = useState<View>('forms');
+  
   const {
     forms,
     currentForm,
@@ -16,6 +25,14 @@ const Index = () => {
     selectForm,
   } = useFormStore();
 
+  const {
+    submissions,
+    updateSubmissionStatus,
+    deleteSubmission,
+    getSubmissionStats,
+  } = useSubmissionStore();
+
+  // Si estamos editando un formulario, mostramos el editor
   if (currentForm) {
     return (
       <FormEditor
@@ -32,13 +49,59 @@ const Index = () => {
     );
   }
 
+  // Vista de respuestas
+  if (activeView === 'submissions') {
+    return (
+      <SubmissionList
+        submissions={submissions}
+        stats={getSubmissionStats()}
+        onUpdateStatus={updateSubmissionStatus}
+        onDelete={deleteSubmission}
+        onBack={() => setActiveView('forms')}
+      />
+    );
+  }
+
+  // Vista de formularios con navegación
   return (
-    <FormList
-      forms={forms}
-      onSelectForm={selectForm}
-      onCreateForm={createForm}
-      onDeleteForm={deleteForm}
-    />
+    <div className="min-h-screen bg-background">
+      {/* Navigation Header */}
+      <div className="border-b border-border/50 bg-card/50 backdrop-blur-sm sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="default"
+              size="sm"
+              className="gap-2"
+            >
+              <FileText className="w-4 h-4" />
+              Formularios
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setActiveView('submissions')}
+              className="gap-2"
+            >
+              <ClipboardList className="w-4 h-4" />
+              Respuestas
+              {submissions.length > 0 && (
+                <span className="ml-1 px-1.5 py-0.5 text-xs rounded-full bg-primary/20">
+                  {submissions.length}
+                </span>
+              )}
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <FormList
+        forms={forms}
+        onSelectForm={selectForm}
+        onCreateForm={createForm}
+        onDeleteForm={deleteForm}
+      />
+    </div>
   );
 };
 
