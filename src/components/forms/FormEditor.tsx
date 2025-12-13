@@ -9,6 +9,8 @@ import {
   useSensors,
   DragStartEvent,
   DragEndEvent,
+  DragOverEvent,
+  useDroppable,
 } from '@dnd-kit/core';
 import {
   arrayMove,
@@ -16,8 +18,8 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import { ArrowLeft, FileText, Plus, ChevronDown, ChevronRight } from 'lucide-react';
-import { Form, FormSection, Question, QuestionType } from '@/types/form';
+import { ArrowLeft, FileText, Plus } from 'lucide-react';
+import { Form, FormSection, Question, QuestionType, QUESTION_TYPE_CONFIG } from '@/types/form';
 import { QuestionCard } from './QuestionCard';
 import { QuestionTypePalette } from './QuestionTypePalette';
 import { SectionCard } from './SectionCard';
@@ -59,11 +61,12 @@ export const FormEditor = ({
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
     new Set(form.sections.map(s => s.id))
   );
+  const [dragOverSectionId, setDragOverSectionId] = useState<string | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 8,
+        distance: 5,
       },
     }),
     useSensor(KeyboardSensor, {
@@ -87,17 +90,40 @@ export const FormEditor = ({
     setActiveId(event.active.id as string);
   };
 
+  const handleDragOver = (event: DragOverEvent) => {
+    const { over } = event;
+    if (over?.data.current?.sectionDropzone) {
+      setDragOverSectionId(over.id as string);
+    } else {
+      setDragOverSectionId(null);
+    }
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveId(null);
+    setDragOverSectionId(null);
 
     if (!over) return;
 
-    // Check if dropping a new question type
-    if (active.data.current?.isNew && activeSectionId) {
+    // Check if dropping a new question type onto a section dropzone
+    if (active.data.current?.isNew) {
       const type = active.data.current.type as QuestionType;
-      onAddQuestion(activeSectionId, type);
-      return;
+      
+      // Check if dropped on section dropzone
+      if (over.data.current?.sectionDropzone) {
+        const sectionId = over.id as string;
+        onAddQuestion(sectionId, type);
+        // Ensure section is expanded
+        setExpandedSections(prev => new Set([...prev, sectionId]));
+        return;
+      }
+      
+      // Fallback to active section
+      if (activeSectionId) {
+        onAddQuestion(activeSectionId, type);
+        return;
+      }
     }
 
     // Reorder sections
@@ -132,6 +158,10 @@ export const FormEditor = ({
     ? form.sections.flatMap(s => s.questions).find(q => q.id === activeId)
     : null;
 
+  const activeDragType = activeId?.startsWith('new-') 
+    ? activeId.replace('new-', '') as QuestionType 
+    : null;
+
   const getTotalQuestions = () => form.sections.reduce((acc, s) => acc + s.questions.length, 0);
 
   return (
@@ -139,6 +169,7 @@ export const FormEditor = ({
       sensors={sensors}
       collisionDetection={closestCenter}
       onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
     >
       <div className="min-h-screen bg-background">
@@ -203,10 +234,12 @@ export const FormEditor = ({
                       sectionIndex={sectionIndex}
                       isExpanded={expandedSections.has(section.id)}
                       isActive={activeSectionId === section.id}
+                      isDragOver={dragOverSectionId === section.id}
                       onToggle={() => toggleSection(section.id)}
                       onSelect={() => setActiveSectionId(section.id)}
                       onUpdate={updates => onUpdateSection(section.id, updates)}
                       onDelete={() => onDeleteSection(section.id)}
+                      onAddQuestion={type => onAddQuestion(section.id, type)}
                       onUpdateQuestion={(questionId, updates) =>
                         onUpdateQuestion(section.id, questionId, updates)
                       }
@@ -236,15 +269,7 @@ export const FormEditor = ({
             {/* Sidebar - Question Types */}
             <div className="w-72 flex-shrink-0">
               <div className="sticky top-24">
-                {activeSectionId ? (
-                  <QuestionTypePalette />
-                ) : (
-                  <div className="bg-card rounded-xl border border-border p-6 text-center">
-                    <p className="text-muted-foreground">
-                      Selecciona una sección para agregar preguntas
-                    </p>
-                  </div>
-                )}
+                <QuestionTypePalette />
               </div>
             </div>
           </div>
@@ -256,6 +281,11 @@ export const FormEditor = ({
         {activeQuestion && (
           <div className="bg-card rounded-xl border border-primary p-4 shadow-xl opacity-90">
             <p className="font-medium">{activeQuestion.title}</p>
+          </div>
+        )}
+        {activeDragType && (
+          <div className="bg-card rounded-xl border border-primary p-4 shadow-xl opacity-90">
+            <p className="font-medium">{QUESTION_TYPE_CONFIG[activeDragType].label}</p>
           </div>
         )}
       </DragOverlay>
