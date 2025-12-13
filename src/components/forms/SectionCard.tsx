@@ -1,21 +1,29 @@
 import { useState } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
+import { useDroppable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import {
   SortableContext,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import { FormSection, Question } from '@/types/form';
+import { FormSection, Question, QuestionType, QUESTION_TYPE_CONFIG } from '@/types/form';
 import { QuestionCard } from './QuestionCard';
+import { QuestionTypeIcon } from './QuestionTypeIcon';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   ChevronDown,
   ChevronRight,
   GripVertical,
   Trash2,
-  FileText,
+  Plus,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -24,10 +32,12 @@ interface SectionCardProps {
   sectionIndex: number;
   isExpanded: boolean;
   isActive: boolean;
+  isDragOver: boolean;
   onToggle: () => void;
   onSelect: () => void;
   onUpdate: (updates: Partial<FormSection>) => void;
   onDelete: () => void;
+  onAddQuestion: (type: QuestionType) => void;
   onUpdateQuestion: (questionId: string, updates: Partial<Question>) => void;
   onDeleteQuestion: (questionId: string) => void;
   onReorderQuestions: (questions: Question[]) => void;
@@ -39,10 +49,12 @@ export const SectionCard = ({
   sectionIndex,
   isExpanded,
   isActive,
+  isDragOver,
   onToggle,
   onSelect,
   onUpdate,
   onDelete,
+  onAddQuestion,
   onUpdateQuestion,
   onDeleteQuestion,
   onReorderQuestions,
@@ -53,7 +65,7 @@ export const SectionCard = ({
   const {
     attributes,
     listeners,
-    setNodeRef,
+    setNodeRef: setSortableRef,
     transform,
     transition,
     isDragging,
@@ -62,19 +74,27 @@ export const SectionCard = ({
     data: { isSection: true },
   });
 
+  const { setNodeRef: setDroppableRef, isOver } = useDroppable({
+    id: section.id,
+    data: { sectionDropzone: true },
+  });
+
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
   };
 
+  const questionTypes = Object.keys(QUESTION_TYPE_CONFIG) as QuestionType[];
+
   return (
     <div
-      ref={setNodeRef}
+      ref={setSortableRef}
       style={style}
       className={cn(
         'bg-card rounded-xl border transition-all duration-200',
         isDragging && 'opacity-50',
-        isActive ? 'border-primary shadow-md' : 'border-border'
+        isActive ? 'border-primary shadow-md' : 'border-border',
+        (isDragOver || isOver) && 'border-primary border-2 bg-primary/5'
       )}
       onClick={onSelect}
     >
@@ -156,7 +176,7 @@ export const SectionCard = ({
 
       {/* Section Content */}
       {isExpanded && (
-        <div className="p-4 space-y-4">
+        <div ref={setDroppableRef} className="p-4 space-y-4">
           {/* Section Description */}
           <Textarea
             value={section.description || ''}
@@ -184,14 +204,49 @@ export const SectionCard = ({
             </div>
           </SortableContext>
 
-          {section.questions.length === 0 && (
-            <div className="text-center py-8 border-2 border-dashed border-border rounded-lg">
-              <FileText className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-              <p className="text-sm text-muted-foreground">
-                Arrastra preguntas aquí desde el panel derecho
+          {/* Add Question Area */}
+          <div className={cn(
+            'border-2 border-dashed rounded-lg p-4 transition-all',
+            (isDragOver || isOver) ? 'border-primary bg-primary/10' : 'border-border'
+          )}>
+            {(isDragOver || isOver) ? (
+              <p className="text-center text-primary font-medium">
+                Suelta aquí para agregar la pregunta
               </p>
-            </div>
-          )}
+            ) : (
+              <div className="flex items-center justify-center gap-2">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" className="gap-2">
+                      <Plus className="w-4 h-4" />
+                      Agregar pregunta
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="center" className="w-56">
+                    {questionTypes.map(type => {
+                      const config = QUESTION_TYPE_CONFIG[type];
+                      return (
+                        <DropdownMenuItem
+                          key={type}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onAddQuestion(type);
+                          }}
+                          className="gap-3"
+                        >
+                          <QuestionTypeIcon type={type} className="w-4 h-4" />
+                          <span>{config.label}</span>
+                        </DropdownMenuItem>
+                      );
+                    })}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <span className="text-sm text-muted-foreground">
+                  o arrastra desde el panel derecho
+                </span>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
