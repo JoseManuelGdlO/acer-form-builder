@@ -17,12 +17,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Shield, Eye } from 'lucide-react';
+import { Shield, Eye, EyeOff } from 'lucide-react';
 
 interface UserFormModalProps {
   open: boolean;
   onClose: () => void;
-  onSave: (name: string, email: string, role: UserRole) => void;
+  onSave: (name: string, email: string, role: UserRole, password: string) => void;
   onUpdate?: (id: string, updates: Partial<Omit<User, 'id' | 'createdAt'>>) => void;
   user?: User | null;
 }
@@ -31,27 +31,49 @@ export function UserFormModal({ open, onClose, onSave, onUpdate, user }: UserFor
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<UserRole>('reviewer');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     if (user) {
       setName(user.name);
       setEmail(user.email);
       setRole(user.role);
+      setPassword('');
+      setConfirmPassword('');
     } else {
       setName('');
       setEmail('');
       setRole('reviewer');
+      setPassword('');
+      setConfirmPassword('');
     }
+    setError('');
+    setShowPassword(false);
   }, [user, open]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !email.trim()) return;
 
+    // Validar contraseña solo para nuevos usuarios
+    if (!user) {
+      if (password.length < 6) {
+        setError('La contraseña debe tener al menos 6 caracteres');
+        return;
+      }
+      if (password !== confirmPassword) {
+        setError('Las contraseñas no coinciden');
+        return;
+      }
+    }
+
     if (user && onUpdate) {
       onUpdate(user.id, { name, email, role });
     } else {
-      onSave(name, email, role);
+      onSave(name, email, role, password);
     }
     onClose();
   };
@@ -106,6 +128,50 @@ export function UserFormModal({ open, onClose, onSave, onUpdate, user }: UserFor
               </SelectContent>
             </Select>
           </div>
+          
+          {/* Password fields - solo para nuevos usuarios */}
+          {!user && (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="password">Contraseña</Label>
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => { setPassword(e.target.value); setError(''); }}
+                    placeholder="Mínimo 6 caracteres"
+                    required
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword">Confirmar contraseña</Label>
+                <Input
+                  id="confirmPassword"
+                  type={showPassword ? 'text' : 'password'}
+                  value={confirmPassword}
+                  onChange={(e) => { setConfirmPassword(e.target.value); setError(''); }}
+                  placeholder="Repite la contraseña"
+                  required
+                />
+              </div>
+            </>
+          )}
+
+          {error && (
+            <p className="text-sm text-destructive">{error}</p>
+          )}
+
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>
               Cancelar

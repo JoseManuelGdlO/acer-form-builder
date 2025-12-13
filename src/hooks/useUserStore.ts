@@ -3,7 +3,7 @@ import { User, UserRole } from '@/types/user';
 
 interface UserStore {
   users: User[];
-  addUser: (name: string, email: string, role: UserRole) => void;
+  addUser: (name: string, email: string, role: UserRole, password: string) => void;
   updateUser: (id: string, updates: Partial<Omit<User, 'id' | 'createdAt'>>) => void;
   deleteUser: (id: string) => void;
   toggleUserStatus: (id: string) => void;
@@ -39,7 +39,8 @@ const mockUsers: User[] = [
 export const useUserStore = create<UserStore>((set) => ({
   users: mockUsers,
   
-  addUser: (name, email, role) => {
+  addUser: (name, email, role, _password) => {
+    // En producción, la contraseña se enviaría al backend
     const newUser: User = {
       id: crypto.randomUUID(),
       name,
