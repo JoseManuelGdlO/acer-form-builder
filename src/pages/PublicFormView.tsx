@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { Form, Question, QUESTION_TYPE_CONFIG } from '@/types/form';
+import { useParams } from 'react-router-dom';
+import { Form, FormSection, Question, QUESTION_TYPE_CONFIG } from '@/types/form';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -30,28 +30,48 @@ const mockForms: Form[] = [
     id: 'demo-form',
     name: 'Solicitud de Visa de Turismo',
     description: 'Complete este formulario para iniciar su proceso de visa.',
-    questions: [
-      { id: 'q1', type: 'short_text', title: '¿Cuál es su ocupación actual?', required: true },
-      { id: 'q2', type: 'long_text', title: '¿Cuál es el motivo principal de su viaje?', description: 'Sea lo más específico posible', required: true },
-      { id: 'q3', type: 'multiple_choice', title: '¿Ha viajado a Estados Unidos anteriormente?', required: true, options: [
-        { id: 'o1', label: 'Sí, una vez' },
-        { id: 'o2', label: 'Sí, varias veces' },
-        { id: 'o3', label: 'No, nunca' },
-      ]},
-      { id: 'q4', type: 'dropdown', title: '¿Qué tipo de visa necesita?', required: true, options: [
-        { id: 'v1', label: 'Visa de turista (B1/B2)' },
-        { id: 'v2', label: 'Visa de trabajo (H1B)' },
-        { id: 'v3', label: 'Visa de estudiante (F1)' },
-        { id: 'v4', label: 'Visa de negocios' },
-      ]},
-      { id: 'q5', type: 'date', title: '¿Cuándo planea realizar su viaje?', required: false },
-      { id: 'q6', type: 'checkbox', title: '¿Qué ciudades planea visitar?', required: false, options: [
-        { id: 'c1', label: 'Nueva York' },
-        { id: 'c2', label: 'Los Ángeles' },
-        { id: 'c3', label: 'Miami' },
-        { id: 'c4', label: 'Las Vegas' },
-        { id: 'c5', label: 'Chicago' },
-      ]},
+    sections: [
+      {
+        id: 's1',
+        title: 'Información Personal',
+        description: 'Datos básicos del solicitante',
+        questions: [
+          { id: 'q1', type: 'short_text', title: '¿Cuál es su ocupación actual?', required: true },
+          { id: 'q2', type: 'long_text', title: '¿Cuál es el motivo principal de su viaje?', description: 'Sea lo más específico posible', required: true },
+        ],
+      },
+      {
+        id: 's2',
+        title: 'Historial de Viajes',
+        description: 'Información sobre viajes anteriores',
+        questions: [
+          { id: 'q3', type: 'multiple_choice', title: '¿Ha viajado a Estados Unidos anteriormente?', required: true, options: [
+            { id: 'o1', label: 'Sí, una vez' },
+            { id: 'o2', label: 'Sí, varias veces' },
+            { id: 'o3', label: 'No, nunca' },
+          ]},
+          { id: 'q4', type: 'dropdown', title: '¿Qué tipo de visa necesita?', required: true, options: [
+            { id: 'v1', label: 'Visa de turista (B1/B2)' },
+            { id: 'v2', label: 'Visa de trabajo (H1B)' },
+            { id: 'v3', label: 'Visa de estudiante (F1)' },
+            { id: 'v4', label: 'Visa de negocios' },
+          ]},
+        ],
+      },
+      {
+        id: 's3',
+        title: 'Detalles del Viaje',
+        questions: [
+          { id: 'q5', type: 'date', title: '¿Cuándo planea realizar su viaje?', required: false },
+          { id: 'q6', type: 'checkbox', title: '¿Qué ciudades planea visitar?', required: false, options: [
+            { id: 'c1', label: 'Nueva York' },
+            { id: 'c2', label: 'Los Ángeles' },
+            { id: 'c3', label: 'Miami' },
+            { id: 'c4', label: 'Las Vegas' },
+            { id: 'c5', label: 'Chicago' },
+          ]},
+        ],
+      },
     ],
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -60,10 +80,9 @@ const mockForms: Form[] = [
 
 const PublicFormView = () => {
   const { formId } = useParams<{ formId: string }>();
-  const navigate = useNavigate();
   const [form, setForm] = useState<Form | null>(null);
-  const [step, setStep] = useState<'info' | 'questions' | 'success'>('info');
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [step, setStep] = useState<'info' | 'sections' | 'success'>('info');
+  const [currentSectionIndex, setCurrentSectionIndex] = useState(0);
   
   // Client info
   const [clientInfo, setClientInfo] = useState({
@@ -109,7 +128,7 @@ const PublicFormView = () => {
 
   const handleStartForm = () => {
     if (validateClientInfo()) {
-      setStep('questions');
+      setStep('sections');
     }
   };
 
@@ -118,24 +137,28 @@ const PublicFormView = () => {
     setErrors(prev => ({ ...prev, [questionId]: '' }));
   };
 
-  const validateCurrentQuestion = () => {
+  const validateCurrentSection = () => {
     if (!form) return true;
-    const question = form.questions[currentQuestionIndex];
+    const section = form.sections[currentSectionIndex];
+    const newErrors: Record<string, string> = {};
     
-    if (question.required && !answers[question.id]) {
-      setErrors(prev => ({ ...prev, [question.id]: 'Esta pregunta es obligatoria' }));
-      return false;
-    }
+    section.questions.forEach(question => {
+      if (question.required && !answers[question.id]) {
+        newErrors[question.id] = 'Esta pregunta es obligatoria';
+      }
+    });
     
-    return true;
+    setErrors(prev => ({ ...prev, ...newErrors }));
+    return Object.keys(newErrors).length === 0;
   };
 
   const handleNext = () => {
     if (!form) return;
     
-    if (validateCurrentQuestion()) {
-      if (currentQuestionIndex < form.questions.length - 1) {
-        setCurrentQuestionIndex(prev => prev + 1);
+    if (validateCurrentSection()) {
+      if (currentSectionIndex < form.sections.length - 1) {
+        setCurrentSectionIndex(prev => prev + 1);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       } else {
         handleSubmit();
       }
@@ -143,8 +166,9 @@ const PublicFormView = () => {
   };
 
   const handleBack = () => {
-    if (currentQuestionIndex > 0) {
-      setCurrentQuestionIndex(prev => prev - 1);
+    if (currentSectionIndex > 0) {
+      setCurrentSectionIndex(prev => prev - 1);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
       setStep('info');
     }
@@ -168,7 +192,7 @@ const PublicFormView = () => {
             placeholder="Escribe tu respuesta..."
             value={(value as string) || ''}
             onChange={e => handleAnswer(question.id, e.target.value)}
-            className={cn('h-12 text-lg', error && 'border-destructive')}
+            className={cn('h-12', error && 'border-destructive')}
           />
         );
 
@@ -179,7 +203,7 @@ const PublicFormView = () => {
             value={(value as string) || ''}
             onChange={e => handleAnswer(question.id, e.target.value)}
             rows={4}
-            className={cn('text-lg', error && 'border-destructive')}
+            className={cn(error && 'border-destructive')}
           />
         );
 
@@ -242,7 +266,7 @@ const PublicFormView = () => {
             value={(value as string) || ''}
             onValueChange={val => handleAnswer(question.id, val)}
           >
-            <SelectTrigger className={cn('h-12 text-lg', error && 'border-destructive')}>
+            <SelectTrigger className={cn('h-12', error && 'border-destructive')}>
               <SelectValue placeholder="Selecciona una opción" />
             </SelectTrigger>
             <SelectContent>
@@ -262,7 +286,7 @@ const PublicFormView = () => {
               <Button
                 variant="outline"
                 className={cn(
-                  'w-full h-12 justify-start text-left font-normal text-lg',
+                  'w-full h-12 justify-start text-left font-normal',
                   !value && 'text-muted-foreground',
                   error && 'border-destructive'
                 )}
@@ -343,9 +367,13 @@ const PublicFormView = () => {
     );
   }
 
+  const totalQuestions = form.sections.reduce((acc, s) => acc + s.questions.length, 0);
+  const answeredQuestions = Object.keys(answers).length;
   const progress = step === 'info' 
     ? 0 
-    : ((currentQuestionIndex + 1) / form.questions.length) * 100;
+    : ((currentSectionIndex + 1) / form.sections.length) * 100;
+
+  const currentSection = form.sections[currentSectionIndex];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
@@ -353,10 +381,10 @@ const PublicFormView = () => {
       <div className="border-b border-border/50 bg-card/80 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-4 py-4">
           <h1 className="text-lg font-semibold text-foreground">{form.name}</h1>
-          {step === 'questions' && (
+          {step === 'sections' && (
             <div className="mt-2">
               <div className="flex items-center justify-between text-sm text-muted-foreground mb-1">
-                <span>Pregunta {currentQuestionIndex + 1} de {form.questions.length}</span>
+                <span>Sección {currentSectionIndex + 1} de {form.sections.length}</span>
                 <span>{Math.round(progress)}%</span>
               </div>
               <Progress value={progress} className="h-2" />
@@ -445,36 +473,54 @@ const PublicFormView = () => {
         ) : (
           <Card>
             <CardContent className="p-6 md:p-8">
-              <div className="mb-8">
-                <div className="flex items-start gap-3 mb-4">
+              {/* Section Header */}
+              <div className="mb-8 pb-6 border-b border-border">
+                <div className="flex items-center gap-3 mb-2">
                   <span className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-primary-foreground text-sm font-medium flex items-center justify-center">
-                    {currentQuestionIndex + 1}
+                    {currentSectionIndex + 1}
                   </span>
-                  <div>
-                    <h2 className="text-xl font-semibold text-foreground">
-                      {form.questions[currentQuestionIndex].title}
-                      {form.questions[currentQuestionIndex].required && (
-                        <span className="text-destructive ml-1">*</span>
-                      )}
-                    </h2>
-                    {form.questions[currentQuestionIndex].description && (
-                      <p className="text-muted-foreground mt-1">
-                        {form.questions[currentQuestionIndex].description}
-                      </p>
-                    )}
-                  </div>
+                  <h2 className="text-xl font-bold text-foreground">
+                    {currentSection.title}
+                  </h2>
                 </div>
-
-                {renderQuestion(form.questions[currentQuestionIndex])}
-                
-                {errors[form.questions[currentQuestionIndex].id] && (
-                  <p className="text-sm text-destructive mt-2">
-                    {errors[form.questions[currentQuestionIndex].id]}
+                {currentSection.description && (
+                  <p className="text-muted-foreground ml-11">
+                    {currentSection.description}
                   </p>
                 )}
               </div>
 
-              <div className="flex items-center justify-between gap-4">
+              {/* Questions */}
+              <div className="space-y-8">
+                {currentSection.questions.map((question, index) => (
+                  <div key={question.id} className="space-y-3">
+                    <div>
+                      <h3 className="font-medium text-foreground">
+                        {index + 1}. {question.title}
+                        {question.required && (
+                          <span className="text-destructive ml-1">*</span>
+                        )}
+                      </h3>
+                      {question.description && (
+                        <p className="text-sm text-muted-foreground mt-1">
+                          {question.description}
+                        </p>
+                      )}
+                    </div>
+                    
+                    {renderQuestion(question)}
+                    
+                    {errors[question.id] && (
+                      <p className="text-sm text-destructive">
+                        {errors[question.id]}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Navigation */}
+              <div className="flex items-center justify-between gap-4 mt-10 pt-6 border-t border-border">
                 <Button
                   variant="outline"
                   onClick={handleBack}
@@ -487,14 +533,14 @@ const PublicFormView = () => {
                   onClick={handleNext}
                   className="gap-2"
                 >
-                  {currentQuestionIndex === form.questions.length - 1 ? (
+                  {currentSectionIndex === form.sections.length - 1 ? (
                     <>
                       Enviar
                       <Send className="w-4 h-4" />
                     </>
                   ) : (
                     <>
-                      Siguiente
+                      Siguiente sección
                       <ArrowRight className="w-4 h-4" />
                     </>
                   )}

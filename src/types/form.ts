@@ -22,11 +22,18 @@ export interface Question {
   options?: QuestionOption[];
 }
 
+export interface FormSection {
+  id: string;
+  title: string;
+  description?: string;
+  questions: Question[];
+}
+
 export interface Form {
   id: string;
   name: string;
   description?: string;
-  questions: Question[];
+  sections: FormSection[];
   createdAt: Date;
   updatedAt: Date;
 }

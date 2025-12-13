@@ -1,35 +1,92 @@
 import { useState, useCallback } from 'react';
-import { Form, Question, QuestionType } from '@/types/form';
+import { Form, FormSection, Question, QuestionType } from '@/types/form';
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
 export const useFormStore = () => {
   const [forms, setForms] = useState<Form[]>([
     {
-      id: '1',
+      id: 'demo-form',
       name: 'Solicitud de Visa B1/B2',
       description: 'Formulario para recopilar información de solicitantes de visa de turismo',
-      questions: [
+      sections: [
         {
-          id: 'q1',
-          type: 'short_text',
-          title: '¿Cuál es su nombre completo?',
-          required: true,
+          id: 's1',
+          title: 'Información Personal',
+          description: 'Datos básicos del solicitante',
+          questions: [
+            {
+              id: 'q1',
+              type: 'short_text',
+              title: '¿Cuál es su ocupación actual?',
+              required: true,
+            },
+            {
+              id: 'q2',
+              type: 'date',
+              title: '¿Cuál es su fecha de nacimiento?',
+              required: true,
+            },
+          ],
         },
         {
-          id: 'q2',
-          type: 'date',
-          title: '¿Cuál es su fecha de nacimiento?',
-          required: true,
+          id: 's2',
+          title: 'Historial de Viajes',
+          description: 'Información sobre viajes anteriores',
+          questions: [
+            {
+              id: 'q3',
+              type: 'multiple_choice',
+              title: '¿Ha viajado a Estados Unidos antes?',
+              required: true,
+              options: [
+                { id: 'o1', label: 'Sí, una vez' },
+                { id: 'o2', label: 'Sí, varias veces' },
+                { id: 'o3', label: 'No, nunca' },
+              ],
+            },
+            {
+              id: 'q4',
+              type: 'dropdown',
+              title: '¿Qué tipo de visa necesita?',
+              required: true,
+              options: [
+                { id: 'v1', label: 'Visa de turista (B1/B2)' },
+                { id: 'v2', label: 'Visa de trabajo (H1B)' },
+                { id: 'v3', label: 'Visa de estudiante (F1)' },
+              ],
+            },
+          ],
         },
         {
-          id: 'q3',
-          type: 'multiple_choice',
-          title: '¿Ha viajado a Estados Unidos antes?',
-          required: true,
-          options: [
-            { id: 'o1', label: 'Sí' },
-            { id: 'o2', label: 'No' },
+          id: 's3',
+          title: 'Detalles del Viaje',
+          questions: [
+            {
+              id: 'q5',
+              type: 'date',
+              title: '¿Cuándo planea realizar su viaje?',
+              required: false,
+            },
+            {
+              id: 'q6',
+              type: 'checkbox',
+              title: '¿Qué ciudades planea visitar?',
+              required: false,
+              options: [
+                { id: 'c1', label: 'Nueva York' },
+                { id: 'c2', label: 'Los Ángeles' },
+                { id: 'c3', label: 'Miami' },
+                { id: 'c4', label: 'Las Vegas' },
+              ],
+            },
+            {
+              id: 'q7',
+              type: 'long_text',
+              title: '¿Cuál es el motivo principal de su viaje?',
+              description: 'Sea lo más específico posible',
+              required: true,
+            },
           ],
         },
       ],
@@ -40,7 +97,7 @@ export const useFormStore = () => {
       id: '2',
       name: 'Documentación Adicional',
       description: 'Formulario para solicitar documentos complementarios',
-      questions: [],
+      sections: [],
       createdAt: new Date('2024-02-01'),
       updatedAt: new Date('2024-02-01'),
     },
@@ -53,7 +110,13 @@ export const useFormStore = () => {
       id: generateId(),
       name,
       description,
-      questions: [],
+      sections: [
+        {
+          id: generateId(),
+          title: 'Sección 1',
+          questions: [],
+        },
+      ],
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -81,7 +144,87 @@ export const useFormStore = () => {
     }
   }, [currentForm]);
 
-  const addQuestion = useCallback((formId: string, type: QuestionType) => {
+  // Section operations
+  const addSection = useCallback((formId: string) => {
+    const newSection: FormSection = {
+      id: generateId(),
+      title: 'Nueva sección',
+      questions: [],
+    };
+
+    setForms(prev =>
+      prev.map(form =>
+        form.id === formId
+          ? { ...form, sections: [...form.sections, newSection], updatedAt: new Date() }
+          : form
+      )
+    );
+
+    if (currentForm?.id === formId) {
+      setCurrentForm(prev =>
+        prev ? { ...prev, sections: [...prev.sections, newSection], updatedAt: new Date() } : null
+      );
+    }
+
+    return newSection;
+  }, [currentForm]);
+
+  const updateSection = useCallback((formId: string, sectionId: string, updates: Partial<FormSection>) => {
+    const updateSections = (sections: FormSection[]) =>
+      sections.map(s => (s.id === sectionId ? { ...s, ...updates } : s));
+
+    setForms(prev =>
+      prev.map(form =>
+        form.id === formId
+          ? { ...form, sections: updateSections(form.sections), updatedAt: new Date() }
+          : form
+      )
+    );
+
+    if (currentForm?.id === formId) {
+      setCurrentForm(prev =>
+        prev ? { ...prev, sections: updateSections(prev.sections), updatedAt: new Date() } : null
+      );
+    }
+  }, [currentForm]);
+
+  const deleteSection = useCallback((formId: string, sectionId: string) => {
+    const filterSections = (sections: FormSection[]) =>
+      sections.filter(s => s.id !== sectionId);
+
+    setForms(prev =>
+      prev.map(form =>
+        form.id === formId
+          ? { ...form, sections: filterSections(form.sections), updatedAt: new Date() }
+          : form
+      )
+    );
+
+    if (currentForm?.id === formId) {
+      setCurrentForm(prev =>
+        prev ? { ...prev, sections: filterSections(prev.sections), updatedAt: new Date() } : null
+      );
+    }
+  }, [currentForm]);
+
+  const reorderSections = useCallback((formId: string, sections: FormSection[]) => {
+    setForms(prev =>
+      prev.map(form =>
+        form.id === formId
+          ? { ...form, sections, updatedAt: new Date() }
+          : form
+      )
+    );
+
+    if (currentForm?.id === formId) {
+      setCurrentForm(prev =>
+        prev ? { ...prev, sections, updatedAt: new Date() } : null
+      );
+    }
+  }, [currentForm]);
+
+  // Question operations
+  const addQuestion = useCallback((formId: string, sectionId: string, type: QuestionType) => {
     const newQuestion: Question = {
       id: generateId(),
       type,
@@ -92,73 +235,95 @@ export const useFormStore = () => {
         : undefined,
     };
 
+    const updateSections = (sections: FormSection[]) =>
+      sections.map(s =>
+        s.id === sectionId
+          ? { ...s, questions: [...s.questions, newQuestion] }
+          : s
+      );
+
     setForms(prev =>
       prev.map(form =>
         form.id === formId
-          ? { ...form, questions: [...form.questions, newQuestion], updatedAt: new Date() }
+          ? { ...form, sections: updateSections(form.sections), updatedAt: new Date() }
           : form
       )
     );
 
     if (currentForm?.id === formId) {
       setCurrentForm(prev =>
-        prev ? { ...prev, questions: [...prev.questions, newQuestion], updatedAt: new Date() } : null
+        prev ? { ...prev, sections: updateSections(prev.sections), updatedAt: new Date() } : null
       );
     }
 
     return newQuestion;
   }, [currentForm]);
 
-  const updateQuestion = useCallback((formId: string, questionId: string, updates: Partial<Question>) => {
-    const updateQuestions = (questions: Question[]) =>
-      questions.map(q => (q.id === questionId ? { ...q, ...updates } : q));
+  const updateQuestion = useCallback((formId: string, sectionId: string, questionId: string, updates: Partial<Question>) => {
+    const updateSections = (sections: FormSection[]) =>
+      sections.map(s =>
+        s.id === sectionId
+          ? { ...s, questions: s.questions.map(q => q.id === questionId ? { ...q, ...updates } : q) }
+          : s
+      );
 
     setForms(prev =>
       prev.map(form =>
         form.id === formId
-          ? { ...form, questions: updateQuestions(form.questions), updatedAt: new Date() }
+          ? { ...form, sections: updateSections(form.sections), updatedAt: new Date() }
           : form
       )
     );
 
     if (currentForm?.id === formId) {
       setCurrentForm(prev =>
-        prev ? { ...prev, questions: updateQuestions(prev.questions), updatedAt: new Date() } : null
+        prev ? { ...prev, sections: updateSections(prev.sections), updatedAt: new Date() } : null
       );
     }
   }, [currentForm]);
 
-  const deleteQuestion = useCallback((formId: string, questionId: string) => {
-    const filterQuestions = (questions: Question[]) =>
-      questions.filter(q => q.id !== questionId);
+  const deleteQuestion = useCallback((formId: string, sectionId: string, questionId: string) => {
+    const updateSections = (sections: FormSection[]) =>
+      sections.map(s =>
+        s.id === sectionId
+          ? { ...s, questions: s.questions.filter(q => q.id !== questionId) }
+          : s
+      );
 
     setForms(prev =>
       prev.map(form =>
         form.id === formId
-          ? { ...form, questions: filterQuestions(form.questions), updatedAt: new Date() }
+          ? { ...form, sections: updateSections(form.sections), updatedAt: new Date() }
           : form
       )
     );
 
     if (currentForm?.id === formId) {
       setCurrentForm(prev =>
-        prev ? { ...prev, questions: filterQuestions(prev.questions), updatedAt: new Date() } : null
+        prev ? { ...prev, sections: updateSections(prev.sections), updatedAt: new Date() } : null
       );
     }
   }, [currentForm]);
 
-  const reorderQuestions = useCallback((formId: string, questions: Question[]) => {
+  const reorderQuestions = useCallback((formId: string, sectionId: string, questions: Question[]) => {
+    const updateSections = (sections: FormSection[]) =>
+      sections.map(s =>
+        s.id === sectionId
+          ? { ...s, questions }
+          : s
+      );
+
     setForms(prev =>
       prev.map(form =>
         form.id === formId
-          ? { ...form, questions, updatedAt: new Date() }
+          ? { ...form, sections: updateSections(form.sections), updatedAt: new Date() }
           : form
       )
     );
 
     if (currentForm?.id === formId) {
       setCurrentForm(prev =>
-        prev ? { ...prev, questions, updatedAt: new Date() } : null
+        prev ? { ...prev, sections: updateSections(prev.sections), updatedAt: new Date() } : null
       );
     }
   }, [currentForm]);
@@ -178,6 +343,10 @@ export const useFormStore = () => {
     createForm,
     updateForm,
     deleteForm,
+    addSection,
+    updateSection,
+    deleteSection,
+    reorderSections,
     addQuestion,
     updateQuestion,
     deleteQuestion,

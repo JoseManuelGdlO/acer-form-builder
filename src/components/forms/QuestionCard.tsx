@@ -11,11 +11,12 @@ import { cn } from '@/lib/utils';
 
 interface QuestionCardProps {
   question: Question;
+  sectionId?: string;
   onUpdate: (updates: Partial<Question>) => void;
   onDelete: () => void;
 }
 
-export const QuestionCard = ({ question, onUpdate, onDelete }: QuestionCardProps) => {
+export const QuestionCard = ({ question, sectionId, onUpdate, onDelete }: QuestionCardProps) => {
   const {
     attributes,
     listeners,
@@ -23,7 +24,10 @@ export const QuestionCard = ({ question, onUpdate, onDelete }: QuestionCardProps
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: question.id });
+  } = useSortable({ 
+    id: question.id,
+    data: { sectionId },
+  });
 
   const style = {
     transform: CSS.Transform.toString(transform),
