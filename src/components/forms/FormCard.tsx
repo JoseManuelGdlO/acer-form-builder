@@ -1,13 +1,15 @@
-import { FileText, MoreVertical, Trash2, Edit, Copy } from 'lucide-react';
+import { FileText, MoreVertical, Trash2, Edit, Copy, Link2 } from 'lucide-react';
 import { Form } from '@/types/form';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface FormCardProps {
   form: Form;
@@ -25,6 +27,13 @@ export const FormCard = ({ form, onEdit, onDelete, onDuplicate }: FormCardProps)
     }).format(date);
   };
 
+  const handleCopyLink = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const publicUrl = `${window.location.origin}/form/${form.id}`;
+    navigator.clipboard.writeText(publicUrl);
+    toast.success('Link copiado al portapapeles');
+  };
+
   return (
     <div
       className={cn(
@@ -38,34 +47,50 @@ export const FormCard = ({ form, onEdit, onDelete, onDuplicate }: FormCardProps)
         <div className="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center">
           <FileText className="w-6 h-6 text-primary-foreground" />
         </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="opacity-0 group-hover:opacity-100 transition-opacity"
-            >
-              <MoreVertical className="w-4 h-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(); }}>
-              <Edit className="w-4 h-4 mr-2" />
-              Editar
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onDuplicate(); }}>
-              <Copy className="w-4 h-4 mr-2" />
-              Duplicar
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={(e) => { e.stopPropagation(); onDelete(); }}
-              className="text-destructive focus:text-destructive"
-            >
-              <Trash2 className="w-4 h-4 mr-2" />
-              Eliminar
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleCopyLink}
+            className="opacity-0 group-hover:opacity-100 transition-opacity"
+            title="Copiar link público"
+          >
+            <Link2 className="w-4 h-4" />
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <MoreVertical className="w-4 h-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(); }}>
+                <Edit className="w-4 h-4 mr-2" />
+                Editar
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleCopyLink}>
+                <Link2 className="w-4 h-4 mr-2" />
+                Copiar link público
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onDuplicate(); }}>
+                <Copy className="w-4 h-4 mr-2" />
+                Duplicar
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={(e) => { e.stopPropagation(); onDelete(); }}
+                className="text-destructive focus:text-destructive"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Eliminar
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       <h3 className="text-lg font-semibold text-foreground mb-2 line-clamp-1">
