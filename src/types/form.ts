@@ -94,3 +94,26 @@ export const SUBMISSION_STATUS_CONFIG: Record<SubmissionStatus, { label: string;
   completed: { label: 'Completado', color: 'success' },
   cancelled: { label: 'Cancelado', color: 'destructive' },
 };
+
+// ============= Clients =============
+
+export type ClientStatus = 'active' | 'inactive' | 'pending';
+
+export interface Client {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  address?: string;
+  notes?: string;
+  status: ClientStatus;
+  formsCompleted: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export const CLIENT_STATUS_CONFIG: Record<ClientStatus, { label: string; color: string }> = {
+  active: { label: 'Activo', color: 'success' },
+  inactive: { label: 'Inactivo', color: 'destructive' },
+  pending: { label: 'Pendiente', color: 'warning' },
+};

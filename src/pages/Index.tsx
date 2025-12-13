@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import { useFormStore } from '@/hooks/useFormStore';
 import { useSubmissionStore } from '@/hooks/useSubmissionStore';
+import { useClientStore } from '@/hooks/useClientStore';
 import { FormList } from '@/components/forms/FormList';
 import { FormEditor } from '@/components/forms/FormEditor';
 import { SubmissionList } from '@/components/submissions/SubmissionList';
+import { ClientList } from '@/components/clients/ClientList';
 import { Button } from '@/components/ui/button';
-import { FileText, ClipboardList } from 'lucide-react';
+import { FileText, ClipboardList, Users } from 'lucide-react';
 
-type View = 'forms' | 'submissions';
+type View = 'forms' | 'submissions' | 'clients';
 
 const Index = () => {
   const [activeView, setActiveView] = useState<View>('forms');
@@ -31,6 +33,15 @@ const Index = () => {
     deleteSubmission,
     getSubmissionStats,
   } = useSubmissionStore();
+
+  const {
+    clients,
+    createClient,
+    updateClient,
+    deleteClient,
+    updateClientStatus,
+    getClientStats,
+  } = useClientStore();
 
   // Si estamos editando un formulario, mostramos el editor
   if (currentForm) {
@@ -62,6 +73,21 @@ const Index = () => {
     );
   }
 
+  // Vista de clientes
+  if (activeView === 'clients') {
+    return (
+      <ClientList
+        clients={clients}
+        stats={getClientStats()}
+        onUpdateStatus={updateClientStatus}
+        onDelete={deleteClient}
+        onCreate={createClient}
+        onUpdate={updateClient}
+        onBack={() => setActiveView('forms')}
+      />
+    );
+  }
+
   // Vista de formularios con navegación
   return (
     <div className="min-h-screen bg-background">
@@ -88,6 +114,20 @@ const Index = () => {
               {submissions.length > 0 && (
                 <span className="ml-1 px-1.5 py-0.5 text-xs rounded-full bg-primary/20">
                   {submissions.length}
+                </span>
+              )}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setActiveView('clients')}
+              className="gap-2"
+            >
+              <Users className="w-4 h-4" />
+              Clientes
+              {clients.length > 0 && (
+                <span className="ml-1 px-1.5 py-0.5 text-xs rounded-full bg-primary/20">
+                  {clients.length}
                 </span>
               )}
             </Button>
