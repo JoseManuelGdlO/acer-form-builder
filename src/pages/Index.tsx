@@ -1,13 +1,44 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { useFormStore } from '@/hooks/useFormStore';
+import { FormList } from '@/components/forms/FormList';
+import { FormEditor } from '@/components/forms/FormEditor';
 
 const Index = () => {
+  const {
+    forms,
+    currentForm,
+    createForm,
+    updateForm,
+    deleteForm,
+    addQuestion,
+    updateQuestion,
+    deleteQuestion,
+    reorderQuestions,
+    selectForm,
+  } = useFormStore();
+
+  if (currentForm) {
+    return (
+      <FormEditor
+        form={currentForm}
+        onBack={() => selectForm(null)}
+        onUpdateForm={updates => updateForm(currentForm.id, updates)}
+        onAddQuestion={type => addQuestion(currentForm.id, type)}
+        onUpdateQuestion={(questionId, updates) =>
+          updateQuestion(currentForm.id, questionId, updates)
+        }
+        onDeleteQuestion={questionId => deleteQuestion(currentForm.id, questionId)}
+        onReorderQuestions={questions => reorderQuestions(currentForm.id, questions)}
+      />
+    );
+  }
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="mb-4 text-4xl font-bold">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
-      </div>
-    </div>
+    <FormList
+      forms={forms}
+      onSelectForm={selectForm}
+      onCreateForm={createForm}
+      onDeleteForm={deleteForm}
+    />
   );
 };
 
