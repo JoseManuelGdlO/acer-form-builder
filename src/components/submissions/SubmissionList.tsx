@@ -1,11 +1,14 @@
 import { useState } from 'react';
-import { FormSubmission, SubmissionStatus, SUBMISSION_STATUS_CONFIG } from '@/types/form';
+import { FormSubmission, SubmissionStatus, SUBMISSION_STATUS_CONFIG, QUESTION_TYPE_CONFIG, QuestionType } from '@/types/form';
 import { SubmissionCard } from './SubmissionCard';
 import { SubmissionDetailModal } from './SubmissionDetailModal';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Search, FileText, Clock, Loader2, CheckCircle2, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { jsPDF } from 'jspdf';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 interface SubmissionListProps {
   submissions: FormSubmission[];
@@ -22,6 +25,15 @@ interface SubmissionListProps {
 }
 
 type FilterType = 'all' | SubmissionStatus;
+
+// Mock questions for demo
+const mockQuestions: { id: string; title: string; type: QuestionType }[] = [
+  { id: 'q1', title: '¿Cuál es tu nombre completo?', type: 'short_text' },
+  { id: 'q2', title: '¿Cuál es el motivo de tu viaje?', type: 'long_text' },
+  { id: 'q3', title: '¿Has viajado a Estados Unidos antes?', type: 'multiple_choice' },
+  { id: 'q4', title: '¿Qué tipo de visa necesitas?', type: 'dropdown' },
+  { id: 'q5', title: '¿Cuándo planeas viajar?', type: 'date' },
+];
 
 export const SubmissionList = ({
   submissions,
@@ -54,6 +66,83 @@ export const SubmissionList = ({
   const handleViewSubmission = (submission: FormSubmission) => {
     setSelectedSubmission(submission);
     setIsDetailOpen(true);
+  };
+
+  const handleExportPDF = (submission: FormSubmission) => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    let yPos = 20;
+
+    // Title
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Detalle de Respuesta', pageWidth / 2, yPos, { align: 'center' });
+    yPos += 15;
+
+    // Form name
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Formulario: ${submission.formName}`, 20, yPos);
+    yPos += 10;
+
+    // Respondent info
+    doc.setFont('helvetica', 'bold');
+    doc.text('Información del Solicitante', 20, yPos);
+    yPos += 8;
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Nombre: ${submission.respondentName}`, 20, yPos);
+    yPos += 6;
+    doc.text(`Email: ${submission.respondentEmail}`, 20, yPos);
+    yPos += 6;
+    doc.text(`Estado: ${SUBMISSION_STATUS_CONFIG[submission.status].label}`, 20, yPos);
+    yPos += 6;
+    doc.text(`Fecha: ${format(submission.submittedAt, "d 'de' MMMM, yyyy", { locale: es })}`, 20, yPos);
+    yPos += 15;
+
+    // Separator line
+    doc.setDrawColor(200);
+    doc.line(20, yPos, pageWidth - 20, yPos);
+    yPos += 10;
+
+    // Questions and Answers
+    doc.setFont('helvetica', 'bold');
+    doc.text('Respuestas', 20, yPos);
+    yPos += 10;
+
+    const mockAnswers: Record<string, string> = {
+      q1: submission.respondentName,
+      q2: 'Viajo por motivos de turismo, planeo visitar Nueva York, Los Ángeles y Miami durante 2 semanas.',
+      q3: 'Sí, una vez',
+      q4: 'Visa de turista (B1/B2)',
+      q5: '15 de marzo, 2024',
+    };
+
+    mockQuestions.forEach((question, index) => {
+      if (yPos > 270) {
+        doc.addPage();
+        yPos = 20;
+      }
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.text(`${index + 1}. ${question.title}`, 20, yPos);
+      yPos += 7;
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      const answer = mockAnswers[question.id] || 'Sin respuesta';
+      const splitAnswer = doc.splitTextToSize(answer, pageWidth - 50);
+      doc.text(splitAnswer, 25, yPos);
+      yPos += splitAnswer.length * 5 + 8;
+    });
+
+    // Footer
+    doc.setFontSize(8);
+    doc.setTextColor(128);
+    doc.text(`Generado el ${format(new Date(), "d 'de' MMMM, yyyy 'a las' HH:mm", { locale: es })}`, pageWidth / 2, 290, { align: 'center' });
+
+    doc.save(`respuesta-${submission.respondentName.replace(/\s+/g, '-').toLowerCase()}.pdf`);
+    toast.success('PDF exportado correctamente');
   };
 
   const filterButtons: { key: FilterType; label: string; icon: React.ReactNode; count: number }[] = [
@@ -138,6 +227,7 @@ export const SubmissionList = ({
                 onUpdateStatus={status => onUpdateStatus(submission.id, status)}
                 onDelete={() => handleDelete(submission.id)}
                 onView={() => handleViewSubmission(submission)}
+                onExportPDF={() => handleExportPDF(submission)}
               />
             ))}
           </div>
