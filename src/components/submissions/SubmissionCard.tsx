@@ -9,7 +9,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Eye, Trash2, User, Mail, FileText, Calendar } from 'lucide-react';
+import { MoreHorizontal, Eye, Trash2, User, Mail, FileText, Calendar, Download } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -18,6 +18,7 @@ interface SubmissionCardProps {
   onUpdateStatus: (status: SubmissionStatus) => void;
   onDelete: () => void;
   onView: () => void;
+  onExportPDF: () => void;
 }
 
 export const SubmissionCard = ({
@@ -25,6 +26,7 @@ export const SubmissionCard = ({
   onUpdateStatus,
   onDelete,
   onView,
+  onExportPDF,
 }: SubmissionCardProps) => {
   return (
     <Card className="group hover:shadow-card-hover transition-all duration-300 border-border/50 hover:border-primary/30">
@@ -77,6 +79,10 @@ export const SubmissionCard = ({
               <DropdownMenuItem onClick={onView}>
                 <Eye className="w-4 h-4 mr-2" />
                 Ver respuestas
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onExportPDF}>
+                <Download className="w-4 h-4 mr-2" />
+                Exportar a PDF
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => onUpdateStatus('pending')}>
