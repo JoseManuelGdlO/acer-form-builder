@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { FormSubmission, SubmissionStatus, SUBMISSION_STATUS_CONFIG } from '@/types/form';
 import { SubmissionCard } from './SubmissionCard';
+import { SubmissionDetailModal } from './SubmissionDetailModal';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Search, FileText, Clock, Loader2, CheckCircle2, XCircle } from 'lucide-react';
@@ -31,6 +32,8 @@ export const SubmissionList = ({
 }: SubmissionListProps) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
+  const [selectedSubmission, setSelectedSubmission] = useState<FormSubmission | null>(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
 
   const filteredSubmissions = submissions.filter(sub => {
     const matchesSearch =
@@ -49,7 +52,8 @@ export const SubmissionList = ({
   };
 
   const handleViewSubmission = (submission: FormSubmission) => {
-    toast.info(`Ver respuestas de ${submission.respondentName}`);
+    setSelectedSubmission(submission);
+    setIsDetailOpen(true);
   };
 
   const filterButtons: { key: FilterType; label: string; icon: React.ReactNode; count: number }[] = [
@@ -138,6 +142,12 @@ export const SubmissionList = ({
             ))}
           </div>
         )}
+
+        <SubmissionDetailModal
+          submission={selectedSubmission}
+          open={isDetailOpen}
+          onOpenChange={setIsDetailOpen}
+        />
       </div>
     </div>
   );
