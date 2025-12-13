@@ -7,6 +7,7 @@ import { FormEditor } from '@/components/forms/FormEditor';
 import { SubmissionList } from '@/components/submissions/SubmissionList';
 import { ClientList } from '@/components/clients/ClientList';
 import { UserList } from '@/components/users/UserList';
+import { AppHeader } from '@/components/layout/AppHeader';
 import { Button } from '@/components/ui/button';
 import { FileText, ClipboardList, Users, UserCog } from 'lucide-react';
 
@@ -47,6 +48,57 @@ const Index = () => {
     updateClientStatus,
     getClientStats,
   } = useClientStore();
+
+  const NavigationButtons = ({ current }: { current: View }) => (
+    <>
+      <Button
+        variant={current === 'forms' ? 'default' : 'ghost'}
+        size="sm"
+        onClick={() => setActiveView('forms')}
+        className="gap-2"
+      >
+        <FileText className="w-4 h-4" />
+        <span className="hidden sm:inline">Formularios</span>
+      </Button>
+      <Button
+        variant={current === 'submissions' ? 'default' : 'ghost'}
+        size="sm"
+        onClick={() => setActiveView('submissions')}
+        className="gap-2"
+      >
+        <ClipboardList className="w-4 h-4" />
+        <span className="hidden sm:inline">Respuestas</span>
+        {submissions.length > 0 && (
+          <span className="px-1.5 py-0.5 text-xs rounded-full bg-secondary/20 text-secondary">
+            {submissions.length}
+          </span>
+        )}
+      </Button>
+      <Button
+        variant={current === 'clients' ? 'default' : 'ghost'}
+        size="sm"
+        onClick={() => setActiveView('clients')}
+        className="gap-2"
+      >
+        <Users className="w-4 h-4" />
+        <span className="hidden sm:inline">Clientes</span>
+        {clients.length > 0 && (
+          <span className="px-1.5 py-0.5 text-xs rounded-full bg-secondary/20 text-secondary">
+            {clients.length}
+          </span>
+        )}
+      </Button>
+      <Button
+        variant={current === 'users' ? 'default' : 'ghost'}
+        size="sm"
+        onClick={() => setActiveView('users')}
+        className="gap-2"
+      >
+        <UserCog className="w-4 h-4" />
+        <span className="hidden sm:inline">Usuarios</span>
+      </Button>
+    </>
+  );
 
   // Si estamos editando un formulario, mostramos el editor
   if (currentForm) {
@@ -101,30 +153,11 @@ const Index = () => {
   if (activeView === 'users') {
     return (
       <div className="min-h-screen bg-background">
-        <div className="border-b border-border/50 bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" size="sm" onClick={() => setActiveView('forms')} className="gap-2">
-                <FileText className="w-4 h-4" />
-                Formularios
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => setActiveView('submissions')} className="gap-2">
-                <ClipboardList className="w-4 h-4" />
-                Respuestas
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => setActiveView('clients')} className="gap-2">
-                <Users className="w-4 h-4" />
-                Clientes
-              </Button>
-              <Button variant="default" size="sm" className="gap-2">
-                <UserCog className="w-4 h-4" />
-                Usuarios
-              </Button>
-            </div>
-          </div>
-        </div>
+        <AppHeader>
+          <NavigationButtons current="users" />
+        </AppHeader>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <h1 className="text-3xl font-bold mb-6">Gestión de Usuarios</h1>
+          <h1 className="text-3xl font-bold text-primary mb-6">Gestión de Usuarios</h1>
           <UserList />
         </div>
       </div>
@@ -134,58 +167,9 @@ const Index = () => {
   // Vista de formularios con navegación
   return (
     <div className="min-h-screen bg-background">
-      {/* Navigation Header */}
-      <div className="border-b border-border/50 bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-          <div className="flex items-center gap-2">
-            <Button
-              variant="default"
-              size="sm"
-              className="gap-2"
-            >
-              <FileText className="w-4 h-4" />
-              Formularios
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setActiveView('submissions')}
-              className="gap-2"
-            >
-              <ClipboardList className="w-4 h-4" />
-              Respuestas
-              {submissions.length > 0 && (
-                <span className="ml-1 px-1.5 py-0.5 text-xs rounded-full bg-primary/20">
-                  {submissions.length}
-                </span>
-              )}
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setActiveView('clients')}
-              className="gap-2"
-            >
-              <Users className="w-4 h-4" />
-              Clientes
-              {clients.length > 0 && (
-                <span className="ml-1 px-1.5 py-0.5 text-xs rounded-full bg-primary/20">
-                  {clients.length}
-                </span>
-              )}
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setActiveView('users')}
-              className="gap-2"
-            >
-              <UserCog className="w-4 h-4" />
-              Usuarios
-            </Button>
-          </div>
-        </div>
-      </div>
+      <AppHeader>
+        <NavigationButtons current="forms" />
+      </AppHeader>
 
       <FormList
         forms={forms}
