@@ -6,10 +6,11 @@ import { FormList } from '@/components/forms/FormList';
 import { FormEditor } from '@/components/forms/FormEditor';
 import { SubmissionList } from '@/components/submissions/SubmissionList';
 import { ClientList } from '@/components/clients/ClientList';
+import { UserList } from '@/components/users/UserList';
 import { Button } from '@/components/ui/button';
-import { FileText, ClipboardList, Users } from 'lucide-react';
+import { FileText, ClipboardList, Users, UserCog } from 'lucide-react';
 
-type View = 'forms' | 'submissions' | 'clients';
+type View = 'forms' | 'submissions' | 'clients' | 'users';
 
 const Index = () => {
   const [activeView, setActiveView] = useState<View>('forms');
@@ -96,6 +97,40 @@ const Index = () => {
     );
   }
 
+  // Vista de usuarios
+  if (activeView === 'users') {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="border-b border-border/50 bg-card/50 backdrop-blur-sm sticky top-0 z-50">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" onClick={() => setActiveView('forms')} className="gap-2">
+                <FileText className="w-4 h-4" />
+                Formularios
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setActiveView('submissions')} className="gap-2">
+                <ClipboardList className="w-4 h-4" />
+                Respuestas
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setActiveView('clients')} className="gap-2">
+                <Users className="w-4 h-4" />
+                Clientes
+              </Button>
+              <Button variant="default" size="sm" className="gap-2">
+                <UserCog className="w-4 h-4" />
+                Usuarios
+              </Button>
+            </div>
+          </div>
+        </div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <h1 className="text-3xl font-bold mb-6">Gestión de Usuarios</h1>
+          <UserList />
+        </div>
+      </div>
+    );
+  }
+
   // Vista de formularios con navegación
   return (
     <div className="min-h-screen bg-background">
@@ -138,6 +173,15 @@ const Index = () => {
                   {clients.length}
                 </span>
               )}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setActiveView('users')}
+              className="gap-2"
+            >
+              <UserCog className="w-4 h-4" />
+              Usuarios
             </Button>
           </div>
         </div>
