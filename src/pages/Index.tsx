@@ -7,11 +7,12 @@ import { FormEditor } from '@/components/forms/FormEditor';
 import { SubmissionList } from '@/components/submissions/SubmissionList';
 import { ClientList } from '@/components/clients/ClientList';
 import { UserList } from '@/components/users/UserList';
+import { ChatbotSettings } from '@/components/chatbot/ChatbotSettings';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { Button } from '@/components/ui/button';
-import { FileText, ClipboardList, Users, UserCog } from 'lucide-react';
+import { FileText, ClipboardList, Users, UserCog, Bot } from 'lucide-react';
 
-type View = 'forms' | 'submissions' | 'clients' | 'users';
+type View = 'forms' | 'submissions' | 'clients' | 'users' | 'chatbot';
 
 const Index = () => {
   const [activeView, setActiveView] = useState<View>('forms');
@@ -97,6 +98,15 @@ const Index = () => {
         <UserCog className="w-4 h-4" />
         <span className="hidden sm:inline">Usuarios</span>
       </Button>
+      <Button
+        variant={current === 'chatbot' ? 'default' : 'ghost'}
+        size="sm"
+        onClick={() => setActiveView('chatbot')}
+        className="gap-2"
+      >
+        <Bot className="w-4 h-4" />
+        <span className="hidden sm:inline">Chatbot</span>
+      </Button>
     </>
   );
 
@@ -159,6 +169,21 @@ const Index = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <h1 className="text-3xl font-bold text-primary mb-6">Gestión de Usuarios</h1>
           <UserList />
+        </div>
+      </div>
+    );
+  }
+
+  // Vista de chatbot
+  if (activeView === 'chatbot') {
+    return (
+      <div className="min-h-screen bg-background">
+        <AppHeader>
+          <NavigationButtons current="chatbot" />
+        </AppHeader>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <h1 className="text-3xl font-bold text-primary mb-6">Configuración del Chatbot</h1>
+          <ChatbotSettings />
         </div>
       </div>
     );
