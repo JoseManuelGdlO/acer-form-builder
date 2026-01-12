@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Client, ClientStatus } from '@/types/form';
 import { ClientCard } from './ClientCard';
 import { ClientFormModal } from './ClientFormModal';
-import { ClientDetailModal } from './ClientDetailModal';
+import { ClientProfileView } from './ClientProfileView';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Search, Users, UserCheck, UserX, Clock, Plus } from 'lucide-react';
@@ -36,8 +36,7 @@ export const ClientList = ({
 }: ClientListProps) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
-  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
-  const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [viewingClient, setViewingClient] = useState<Client | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
 
@@ -58,13 +57,19 @@ export const ClientList = ({
   };
 
   const handleViewClient = (client: Client) => {
-    setSelectedClient(client);
-    setIsDetailOpen(true);
+    setViewingClient(client);
   };
 
   const handleEditClient = (client: Client) => {
     setEditingClient(client);
     setIsFormOpen(true);
+  };
+
+  const handleEditFromProfile = () => {
+    if (viewingClient) {
+      setEditingClient(viewingClient);
+      setIsFormOpen(true);
+    }
   };
 
   const handleCreateOrUpdate = (clientData: Omit<Client, 'id' | 'createdAt' | 'updatedAt' | 'formsCompleted'>) => {
@@ -89,6 +94,36 @@ export const ClientList = ({
     { key: 'pending', label: 'Pendientes', icon: <Clock className="w-4 h-4" />, count: stats.pending },
     { key: 'inactive', label: 'Inactivos', icon: <UserX className="w-4 h-4" />, count: stats.inactive },
   ];
+
+  // Show profile view if a client is selected
+  if (viewingClient) {
+    return (
+      <>
+        <ClientProfileView
+          client={viewingClient}
+          onBack={() => setViewingClient(null)}
+          onEdit={handleEditFromProfile}
+        />
+        <ClientFormModal
+          client={editingClient}
+          open={isFormOpen}
+          onOpenChange={(open) => {
+            setIsFormOpen(open);
+            if (!open) setEditingClient(null);
+          }}
+          onSave={(data) => {
+            if (editingClient) {
+              onUpdate(editingClient.id, data);
+              // Update the viewing client with new data
+              setViewingClient({ ...viewingClient, ...data, updatedAt: new Date() });
+              toast.success('Cliente actualizado');
+            }
+            setEditingClient(null);
+          }}
+        />
+      </>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -179,12 +214,6 @@ export const ClientList = ({
             ))}
           </div>
         )}
-
-        <ClientDetailModal
-          client={selectedClient}
-          open={isDetailOpen}
-          onOpenChange={setIsDetailOpen}
-        />
 
         <ClientFormModal
           client={editingClient}
