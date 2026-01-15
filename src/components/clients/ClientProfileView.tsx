@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Client } from '@/types/form';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,6 +7,7 @@ import { ClientStatusBadge } from './ClientStatusBadge';
 import { ClientChecklist, ChecklistItem } from './ClientChecklist';
 import { ClientChat, ChatMessage } from './ClientChat';
 import { ClientFormData, ClientFormSubmission } from './ClientFormData';
+import { useSettingsStore } from '@/hooks/useSettingsStore';
 import { 
   User, Mail, Phone, MapPin, Calendar, Clock, 
   ArrowLeft, Edit2, FileText 
@@ -76,18 +77,19 @@ const getMockChatMessages = (clientId: string): ChatMessage[] => [
   },
 ];
 
-const DEFAULT_CHECKLIST: ChecklistItem[] = [
-  { id: '1', label: 'Derecho a visa', completed: false },
-  { id: '2', label: 'Cita agendada', completed: false },
-  { id: '3', label: 'Contacto cliente previo a cita', completed: false },
-  { id: '4', label: 'Pegado y listo para viaje', completed: false },
-];
-
 export const ClientProfileView = ({ client, onBack, onEdit }: ClientProfileViewProps) => {
-  const [checklist, setChecklist] = useState<ChecklistItem[]>(() => {
-    // In real app, load from database per client
-    return DEFAULT_CHECKLIST.map(item => ({ ...item }));
-  });
+  const { getActiveChecklistItems } = useSettingsStore();
+  
+  // Get checklist items from settings catalog
+  const checklistFromCatalog = useMemo(() => {
+    return getActiveChecklistItems().map(item => ({
+      id: item.id,
+      label: item.label,
+      completed: false, // In real app, load completion status from database per client
+    }));
+  }, [getActiveChecklistItems]);
+
+  const [checklist, setChecklist] = useState<ChecklistItem[]>(checklistFromCatalog);
   
   const [messages, setMessages] = useState<ChatMessage[]>(() => 
     getMockChatMessages(client.id)
