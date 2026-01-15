@@ -8,11 +8,12 @@ import { SubmissionList } from '@/components/submissions/SubmissionList';
 import { ClientList } from '@/components/clients/ClientList';
 import { UserList } from '@/components/users/UserList';
 import { ChatbotSettings } from '@/components/chatbot/ChatbotSettings';
+import { SettingsPage } from '@/components/settings/SettingsPage';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { Button } from '@/components/ui/button';
-import { FileText, ClipboardList, Users, UserCog, Bot } from 'lucide-react';
+import { FileText, ClipboardList, Users, UserCog, Bot, Settings } from 'lucide-react';
 
-type View = 'forms' | 'submissions' | 'clients' | 'users' | 'chatbot';
+type View = 'forms' | 'submissions' | 'clients' | 'users' | 'chatbot' | 'settings';
 
 const Index = () => {
   const [activeView, setActiveView] = useState<View>('forms');
@@ -107,6 +108,15 @@ const Index = () => {
         <Bot className="w-4 h-4" />
         <span className="hidden sm:inline">Chatbot</span>
       </Button>
+      <Button
+        variant={current === 'settings' ? 'default' : 'ghost'}
+        size="sm"
+        onClick={() => setActiveView('settings')}
+        className="gap-2"
+      >
+        <Settings className="w-4 h-4" />
+        <span className="hidden sm:inline">Configuración</span>
+      </Button>
     </>
   );
 
@@ -184,6 +194,20 @@ const Index = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <h1 className="text-3xl font-bold text-primary mb-6">Configuración del Chatbot</h1>
           <ChatbotSettings />
+        </div>
+      </div>
+    );
+  }
+
+  // Vista de configuración
+  if (activeView === 'settings') {
+    return (
+      <div className="min-h-screen bg-background">
+        <AppHeader>
+          <NavigationButtons current="settings" />
+        </AppHeader>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <SettingsPage />
         </div>
       </div>
     );
