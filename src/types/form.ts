@@ -115,6 +115,7 @@ export interface Client {
   notes?: string;
   status: ClientStatus;
   formsCompleted: number;
+  assignedUserId?: string; // ID del usuario asignado
   createdAt: Date;
   updatedAt: Date;
 }

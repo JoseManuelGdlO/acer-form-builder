@@ -14,6 +14,7 @@ const mockClients: Client[] = [
     notes: 'Cliente preferencial, visa de turismo',
     status: 'active',
     formsCompleted: 3,
+    assignedUserId: '2', // María Revisora
     createdAt: new Date('2024-01-15'),
     updatedAt: new Date('2024-02-20'),
   },
@@ -24,6 +25,7 @@ const mockClients: Client[] = [
     phone: '+52 33 9876 5432',
     status: 'active',
     formsCompleted: 2,
+    assignedUserId: '2', // María Revisora
     createdAt: new Date('2024-02-01'),
     updatedAt: new Date('2024-02-15'),
   },
@@ -35,6 +37,7 @@ const mockClients: Client[] = [
     notes: 'Primera vez aplicando',
     status: 'pending',
     formsCompleted: 0,
+    assignedUserId: '3', // Juan Revisor
     createdAt: new Date('2024-03-01'),
     updatedAt: new Date('2024-03-01'),
   },
@@ -44,6 +47,7 @@ const mockClients: Client[] = [
     email: 'ana.martinez@email.com',
     status: 'inactive',
     formsCompleted: 1,
+    assignedUserId: '1', // Carlos Administrador
     createdAt: new Date('2023-11-10'),
     updatedAt: new Date('2024-01-05'),
   },
