@@ -150,12 +150,16 @@ const Index = () => {
         <Settings className="w-4 h-4" />
         <span className="hidden sm:inline">Configuración</span>
       </Button>
-      <ViewAsSelector
-        users={users}
-        viewingAs={viewingAs}
-        onSelectUser={setViewingAs}
-      />
     </>
+  );
+
+  // Floating View As selector - always visible
+  const FloatingViewAs = () => (
+    <ViewAsSelector
+      users={users}
+      viewingAs={viewingAs}
+      onSelectUser={setViewingAs}
+    />
   );
 
   // Si estamos editando un formulario, mostramos el editor
@@ -182,13 +186,18 @@ const Index = () => {
   // Vista de respuestas
   if (activeView === 'submissions') {
     return (
-      <SubmissionList
-        submissions={submissions}
-        stats={getSubmissionStats()}
-        onUpdateStatus={updateSubmissionStatus}
-        onDelete={deleteSubmission}
-        onBack={() => setActiveView('forms')}
-      />
+      <>
+        <FloatingViewAs />
+        <div className={viewingAs ? 'pt-10' : ''}>
+          <SubmissionList
+            submissions={submissions}
+            stats={getSubmissionStats()}
+            onUpdateStatus={updateSubmissionStatus}
+            onDelete={deleteSubmission}
+            onBack={() => setActiveView('dashboard')}
+          />
+        </div>
+      </>
     );
   }
 
@@ -196,13 +205,7 @@ const Index = () => {
   if (activeView === 'clients') {
     return (
       <>
-        {viewingAs && (
-          <ViewAsSelector
-            users={users}
-            viewingAs={viewingAs}
-            onSelectUser={setViewingAs}
-          />
-        )}
+        <FloatingViewAs />
         <div className={viewingAs ? 'pt-10' : ''}>
           <ClientList
             clients={filteredClients}
@@ -221,44 +224,53 @@ const Index = () => {
   // Vista de usuarios
   if (activeView === 'users') {
     return (
-      <div className="min-h-screen bg-background">
-        <AppHeader>
-          <NavigationButtons current="users" />
-        </AppHeader>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <h1 className="text-3xl font-bold text-primary mb-6">Gestión de Usuarios</h1>
-          <UserList />
+      <>
+        <FloatingViewAs />
+        <div className={`min-h-screen bg-background ${viewingAs ? 'pt-10' : ''}`}>
+          <AppHeader>
+            <NavigationButtons current="users" />
+          </AppHeader>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <h1 className="text-3xl font-bold text-primary mb-6">Gestión de Usuarios</h1>
+            <UserList />
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
   // Vista de chatbot
   if (activeView === 'chatbot') {
     return (
-      <div className="min-h-screen bg-background">
-        <AppHeader>
-          <NavigationButtons current="chatbot" />
-        </AppHeader>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <h1 className="text-3xl font-bold text-primary mb-6">Configuración del Chatbot</h1>
-          <ChatbotSettings />
+      <>
+        <FloatingViewAs />
+        <div className={`min-h-screen bg-background ${viewingAs ? 'pt-10' : ''}`}>
+          <AppHeader>
+            <NavigationButtons current="chatbot" />
+          </AppHeader>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <h1 className="text-3xl font-bold text-primary mb-6">Configuración del Chatbot</h1>
+            <ChatbotSettings />
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
   // Vista de configuración
   if (activeView === 'settings') {
     return (
-      <div className="min-h-screen bg-background">
-        <AppHeader>
-          <NavigationButtons current="settings" />
-        </AppHeader>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <SettingsPage />
+      <>
+        <FloatingViewAs />
+        <div className={`min-h-screen bg-background ${viewingAs ? 'pt-10' : ''}`}>
+          <AppHeader>
+            <NavigationButtons current="settings" />
+          </AppHeader>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <SettingsPage />
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
@@ -266,20 +278,14 @@ const Index = () => {
   if (activeView === 'dashboard') {
     const formStats = {
       total: forms.length,
-      published: forms.length, // In real app, check published status
+      published: forms.length,
       draft: 0,
     };
     const submissionStats = getSubmissionStats();
 
     return (
       <>
-        {viewingAs && (
-          <ViewAsSelector
-            users={users}
-            viewingAs={viewingAs}
-            onSelectUser={setViewingAs}
-          />
-        )}
+        <FloatingViewAs />
         <div className={`min-h-screen bg-background ${viewingAs ? 'pt-10' : ''}`}>
           <AppHeader>
             <NavigationButtons current="dashboard" />
@@ -306,18 +312,21 @@ const Index = () => {
 
   // Vista de formularios con navegación
   return (
-    <div className="min-h-screen bg-background">
-      <AppHeader>
-        <NavigationButtons current="forms" />
-      </AppHeader>
+    <>
+      <FloatingViewAs />
+      <div className={`min-h-screen bg-background ${viewingAs ? 'pt-10' : ''}`}>
+        <AppHeader>
+          <NavigationButtons current="forms" />
+        </AppHeader>
 
-      <FormList
-        forms={forms}
-        onSelectForm={selectForm}
-        onCreateForm={createForm}
-        onDeleteForm={deleteForm}
-      />
-    </div>
+        <FormList
+          forms={forms}
+          onSelectForm={selectForm}
+          onCreateForm={createForm}
+          onDeleteForm={deleteForm}
+        />
+      </div>
+    </>
   );
 };
 

@@ -55,11 +55,13 @@ export const ViewAsSelector = ({ users, viewingAs, onSelectUser }: ViewAsSelecto
         </div>
       )}
 
-      {/* Selector button */}
+      {/* Floating selector button */}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogTrigger asChild>
-          <Button variant="outline" size="sm" className="gap-2">
-            <Eye className="w-4 h-4" />
+          <Button 
+            className="fixed bottom-6 right-6 z-40 gap-2 shadow-lg rounded-full h-12 px-5 bg-primary hover:bg-primary/90"
+          >
+            <Eye className="w-5 h-5" />
             <span className="hidden sm:inline">Ver como</span>
           </Button>
         </DialogTrigger>
