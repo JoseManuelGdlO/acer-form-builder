@@ -7,6 +7,7 @@ import { ClientStatusBadge } from './ClientStatusBadge';
 import { ClientChecklist, ChecklistItem } from './ClientChecklist';
 import { ClientChat, ChatMessage } from './ClientChat';
 import { ClientFormData, ClientFormSubmission } from './ClientFormData';
+import { ClientNotes, ClientNote } from './ClientNotes';
 import { useSettingsStore } from '@/hooks/useSettingsStore';
 import { 
   User, Mail, Phone, MapPin, Calendar, Clock, 
@@ -14,6 +15,20 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+
+// Mock data for client notes
+const getMockClientNotes = (clientId: string): ClientNote[] => [
+  {
+    id: '1',
+    content: 'Cliente solicita visa de turismo para familia de 4 personas. Viaje planeado para diciembre 2024.',
+    createdAt: new Date('2024-02-10T14:30:00'),
+  },
+  {
+    id: '2',
+    content: 'Documentos financieros completos. Buen historial crediticio.',
+    createdAt: new Date('2024-02-15T09:15:00'),
+  },
+];
 
 interface ClientProfileViewProps {
   client: Client;
@@ -95,7 +110,24 @@ export const ClientProfileView = ({ client, onBack, onEdit }: ClientProfileViewP
     getMockChatMessages(client.id)
   );
 
+  const [clientNotes, setClientNotes] = useState<ClientNote[]>(() =>
+    getMockClientNotes(client.id)
+  );
+
   const submissions = getMockFormSubmissions(client.id);
+
+  const handleAddNote = (content: string) => {
+    const newNote: ClientNote = {
+      id: Date.now().toString(),
+      content,
+      createdAt: new Date(),
+    };
+    setClientNotes(prev => [newNote, ...prev]);
+  };
+
+  const handleDeleteNote = (noteId: string) => {
+    setClientNotes(prev => prev.filter(note => note.id !== noteId));
+  };
 
   const handleToggleChecklist = (itemId: string) => {
     setChecklist(prev => 
@@ -198,6 +230,14 @@ export const ClientProfileView = ({ client, onBack, onEdit }: ClientProfileViewP
                 )}
               </CardContent>
             </Card>
+
+            {/* Client Notes */}
+            <ClientNotes
+              clientId={client.id}
+              notes={clientNotes}
+              onAddNote={handleAddNote}
+              onDeleteNote={handleDeleteNote}
+            />
 
             {/* Checklist */}
             <ClientChecklist 
