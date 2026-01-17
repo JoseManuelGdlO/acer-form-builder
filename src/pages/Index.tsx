@@ -9,14 +9,15 @@ import { ClientList } from '@/components/clients/ClientList';
 import { UserList } from '@/components/users/UserList';
 import { ChatbotSettings } from '@/components/chatbot/ChatbotSettings';
 import { SettingsPage } from '@/components/settings/SettingsPage';
+import { Dashboard } from '@/components/dashboard/Dashboard';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { Button } from '@/components/ui/button';
-import { FileText, ClipboardList, Users, UserCog, Bot, Settings } from 'lucide-react';
+import { LayoutDashboard, FileText, ClipboardList, Users, UserCog, Bot, Settings } from 'lucide-react';
 
-type View = 'forms' | 'submissions' | 'clients' | 'users' | 'chatbot' | 'settings';
+type View = 'dashboard' | 'forms' | 'submissions' | 'clients' | 'users' | 'chatbot' | 'settings';
 
 const Index = () => {
-  const [activeView, setActiveView] = useState<View>('forms');
+  const [activeView, setActiveView] = useState<View>('dashboard');
   
   const {
     forms,
@@ -53,6 +54,15 @@ const Index = () => {
 
   const NavigationButtons = ({ current }: { current: View }) => (
     <>
+      <Button
+        variant={current === 'dashboard' ? 'default' : 'ghost'}
+        size="sm"
+        onClick={() => setActiveView('dashboard')}
+        className="gap-2"
+      >
+        <LayoutDashboard className="w-4 h-4" />
+        <span className="hidden sm:inline">Dashboard</span>
+      </Button>
       <Button
         variant={current === 'forms' ? 'default' : 'ghost'}
         size="sm"
@@ -208,6 +218,39 @@ const Index = () => {
         </AppHeader>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <SettingsPage />
+        </div>
+      </div>
+    );
+  }
+
+  // Vista del dashboard
+  if (activeView === 'dashboard') {
+    const formStats = {
+      total: forms.length,
+      published: forms.length, // In real app, check published status
+      draft: 0,
+    };
+    const submissionStats = getSubmissionStats();
+
+    return (
+      <div className="min-h-screen bg-background">
+        <AppHeader>
+          <NavigationButtons current="dashboard" />
+        </AppHeader>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <Dashboard
+            forms={forms}
+            submissions={submissions}
+            clients={clients}
+            formStats={formStats}
+            submissionStats={{
+              total: submissionStats.total,
+              pending: submissionStats.pending,
+              reviewed: submissionStats.in_progress,
+              completed: submissionStats.completed,
+            }}
+            clientStats={getClientStats()}
+          />
         </div>
       </div>
     );
