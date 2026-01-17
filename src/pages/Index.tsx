@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useFormStore } from '@/hooks/useFormStore';
 import { useSubmissionStore } from '@/hooks/useSubmissionStore';
 import { useClientStore } from '@/hooks/useClientStore';
+import { useUserStore } from '@/hooks/useUserStore';
 import { FormList } from '@/components/forms/FormList';
 import { FormEditor } from '@/components/forms/FormEditor';
 import { SubmissionList } from '@/components/submissions/SubmissionList';
@@ -10,14 +11,17 @@ import { UserList } from '@/components/users/UserList';
 import { ChatbotSettings } from '@/components/chatbot/ChatbotSettings';
 import { SettingsPage } from '@/components/settings/SettingsPage';
 import { Dashboard } from '@/components/dashboard/Dashboard';
+import { ViewAsSelector } from '@/components/admin/ViewAsSelector';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { Button } from '@/components/ui/button';
 import { LayoutDashboard, FileText, ClipboardList, Users, UserCog, Bot, Settings } from 'lucide-react';
+import { User } from '@/types/user';
 
 type View = 'dashboard' | 'forms' | 'submissions' | 'clients' | 'users' | 'chatbot' | 'settings';
 
 const Index = () => {
   const [activeView, setActiveView] = useState<View>('dashboard');
+  const [viewingAs, setViewingAs] = useState<User | null>(null);
   
   const {
     forms,
@@ -51,6 +55,25 @@ const Index = () => {
     updateClientStatus,
     getClientStats,
   } = useClientStore();
+
+  const { users } = useUserStore();
+
+  // Filter clients based on "View As" selection
+  const filteredClients = useMemo(() => {
+    if (!viewingAs) return clients;
+    // Super admins see all, reviewers see only their assigned clients
+    if (viewingAs.role === 'super_admin') return clients;
+    return clients.filter(client => client.assignedUserId === viewingAs.id);
+  }, [clients, viewingAs]);
+
+  const filteredClientStats = useMemo(() => {
+    return {
+      total: filteredClients.length,
+      active: filteredClients.filter(c => c.status === 'active').length,
+      inactive: filteredClients.filter(c => c.status === 'inactive').length,
+      pending: filteredClients.filter(c => c.status === 'pending').length,
+    };
+  }, [filteredClients]);
 
   const NavigationButtons = ({ current }: { current: View }) => (
     <>
@@ -94,9 +117,9 @@ const Index = () => {
       >
         <Users className="w-4 h-4" />
         <span className="hidden sm:inline">Clientes</span>
-        {clients.length > 0 && (
+        {filteredClients.length > 0 && (
           <span className="px-1.5 py-0.5 text-xs rounded-full bg-secondary/20 text-secondary">
-            {clients.length}
+            {filteredClients.length}
           </span>
         )}
       </Button>
@@ -127,6 +150,11 @@ const Index = () => {
         <Settings className="w-4 h-4" />
         <span className="hidden sm:inline">Configuración</span>
       </Button>
+      <ViewAsSelector
+        users={users}
+        viewingAs={viewingAs}
+        onSelectUser={setViewingAs}
+      />
     </>
   );
 
@@ -167,15 +195,26 @@ const Index = () => {
   // Vista de clientes
   if (activeView === 'clients') {
     return (
-      <ClientList
-        clients={clients}
-        stats={getClientStats()}
-        onUpdateStatus={updateClientStatus}
-        onDelete={deleteClient}
-        onCreate={createClient}
-        onUpdate={updateClient}
-        onBack={() => setActiveView('forms')}
-      />
+      <>
+        {viewingAs && (
+          <ViewAsSelector
+            users={users}
+            viewingAs={viewingAs}
+            onSelectUser={setViewingAs}
+          />
+        )}
+        <div className={viewingAs ? 'pt-10' : ''}>
+          <ClientList
+            clients={filteredClients}
+            stats={filteredClientStats}
+            onUpdateStatus={updateClientStatus}
+            onDelete={deleteClient}
+            onCreate={createClient}
+            onUpdate={updateClient}
+            onBack={() => setActiveView('dashboard')}
+          />
+        </div>
+      </>
     );
   }
 
@@ -233,26 +272,35 @@ const Index = () => {
     const submissionStats = getSubmissionStats();
 
     return (
-      <div className="min-h-screen bg-background">
-        <AppHeader>
-          <NavigationButtons current="dashboard" />
-        </AppHeader>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <Dashboard
-            forms={forms}
-            submissions={submissions}
-            clients={clients}
-            formStats={formStats}
-            submissionStats={{
-              total: submissionStats.total,
-              pending: submissionStats.pending,
-              reviewed: submissionStats.in_progress,
-              completed: submissionStats.completed,
-            }}
-            clientStats={getClientStats()}
+      <>
+        {viewingAs && (
+          <ViewAsSelector
+            users={users}
+            viewingAs={viewingAs}
+            onSelectUser={setViewingAs}
           />
+        )}
+        <div className={`min-h-screen bg-background ${viewingAs ? 'pt-10' : ''}`}>
+          <AppHeader>
+            <NavigationButtons current="dashboard" />
+          </AppHeader>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <Dashboard
+              forms={forms}
+              submissions={submissions}
+              clients={filteredClients}
+              formStats={formStats}
+              submissionStats={{
+                total: submissionStats.total,
+                pending: submissionStats.pending,
+                reviewed: submissionStats.in_progress,
+                completed: submissionStats.completed,
+              }}
+              clientStats={filteredClientStats}
+            />
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
