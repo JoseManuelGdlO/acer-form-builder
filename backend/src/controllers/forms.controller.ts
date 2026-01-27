@@ -3,7 +3,7 @@ import { body, validationResult } from 'express-validator';
 import { Form } from '../models';
 import { AuthRequest } from '../middleware/auth.middleware';
 
-export const getAllForms = async (req: Request, res: Response): Promise<void> => {
+export const getAllForms = async (_req: Request, res: Response): Promise<void> => {
   try {
     const forms = await Form.findAll({
       order: [['created_at', 'DESC']],

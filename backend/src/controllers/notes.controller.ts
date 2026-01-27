@@ -1,4 +1,4 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import { body, validationResult } from 'express-validator';
 import { ClientNote, Client } from '../models';
 import { AuthRequest } from '../middleware/auth.middleware';

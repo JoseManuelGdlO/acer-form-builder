@@ -1,8 +1,7 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import { body, validationResult } from 'express-validator';
-import { Client, FormSubmission, ClientChecklist, ChecklistTemplate } from '../models';
+import { Client, ClientChecklist, ChecklistTemplate } from '../models';
 import { AuthRequest } from '../middleware/auth.middleware';
-import { Op } from 'sequelize';
 
 export const getAllClients = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -48,7 +47,7 @@ export const getAllClients = async (req: AuthRequest, res: Response): Promise<vo
 
     // Add checklist stats to each client
     const clientsWithStats = clients.map(client => {
-      const checklistItems = client.checklistItems || [];
+      const checklistItems = (client as any).checklistItems || [];
       const totalItems = checklistItems.length;
       const completedItems = checklistItems.filter((item: any) => item.isCompleted).length;
       const progress = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;

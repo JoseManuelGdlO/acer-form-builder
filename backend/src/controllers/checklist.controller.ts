@@ -4,7 +4,7 @@ import { ChecklistTemplate, ClientChecklist, Client } from '../models';
 import { AuthRequest } from '../middleware/auth.middleware';
 
 // Templates
-export const getAllTemplates = async (req: Request, res: Response): Promise<void> => {
+export const getAllTemplates = async (_req: Request, res: Response): Promise<void> => {
   try {
     const templates = await ChecklistTemplate.findAll({
       order: [['order', 'ASC']],
@@ -180,7 +180,7 @@ export const updateChecklistItem = [
 
       await item.update({
         isCompleted,
-        completedAt: isCompleted ? new Date() : null,
+        completedAt: isCompleted ? new Date() : (null as any),
       });
 
       res.json(item);

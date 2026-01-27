@@ -112,7 +112,7 @@ export const register = [
         role,
       });
 
-      const roles = [role];
+      const roles: UserRole[] = [role as UserRole];
       const token = generateToken({
         userId: user.id,
         email: user.email,
@@ -175,7 +175,7 @@ export const me = async (req: AuthRequest, res: Response): Promise<void> => {
   }
 };
 
-export const logout = async (req: Request, res: Response): Promise<void> => {
+export const logout = async (_req: Request, res: Response): Promise<void> => {
   // JWT is stateless, so logout is handled client-side by removing the token
   // In a production app, you might want to implement a token blacklist
   res.json({ message: 'Logged out successfully' });

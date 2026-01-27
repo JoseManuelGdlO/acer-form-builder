@@ -1,10 +1,10 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import { body, validationResult } from 'express-validator';
 import { User, UserRole } from '../models';
 import { hashPassword } from '../utils/password';
 import { AuthRequest } from '../middleware/auth.middleware';
 
-export const getAllUsers = async (req: AuthRequest, res: Response): Promise<void> => {
+export const getAllUsers = async (_req: AuthRequest, res: Response): Promise<void> => {
   try {
     const users = await User.findAll({
       include: [

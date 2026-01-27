@@ -3,7 +3,7 @@ import { body, validationResult } from 'express-validator';
 import { BotBehavior } from '../models';
 import { AuthRequest } from '../middleware/auth.middleware';
 
-export const getBotBehavior = async (req: Request, res: Response): Promise<void> => {
+export const getBotBehavior = async (_req: Request, res: Response): Promise<void> => {
   try {
     // Bot behavior is a singleton - get the first (and only) record
     let bot = await BotBehavior.findOne();
