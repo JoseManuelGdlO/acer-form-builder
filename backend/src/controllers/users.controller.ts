@@ -1,6 +1,6 @@
 import { Response } from 'express';
 import { body, validationResult } from 'express-validator';
-import { User, UserRole } from '../models';
+import { User, UserRole as UserRoleModel } from '../models';
 import { hashPassword } from '../utils/password';
 import { AuthRequest } from '../middleware/auth.middleware';
 
@@ -22,7 +22,7 @@ export const getAllUsers = async (_req: AuthRequest, res: Response): Promise<voi
       email: user.email,
       name: user.name,
       status: user.status,
-      roles: (user as any).roles?.map((r: UserRole) => r.role) || [],
+      roles: (user as any).roles?.map((r: UserRoleModel) => r.role) || [],
       createdAt: user.createdAt,
     }));
 
@@ -98,7 +98,7 @@ export const createUser = [
         status: 'active',
       });
 
-      await UserRole.create({
+      await UserRoleModel.create({
         userId: user.id,
         role,
       });
@@ -160,14 +160,14 @@ export const updateUser = [
 
       // Update role if provided
       if (role) {
-        await UserRole.destroy({ where: { userId: id } });
-        await UserRole.create({ userId: id, role });
+        await UserRoleModel.destroy({ where: { userId: id } });
+        await UserRoleModel.create({ userId: id, role });
       }
 
       const updatedUser = await User.findByPk(id, {
         include: [
           {
-            model: UserRole,
+            model: UserRoleModel,
             as: 'roles',
             attributes: ['role'],
           },

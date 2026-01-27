@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { body, validationResult } from 'express-validator';
-import { User, UserRole } from '../models';
+import { User, UserRole as UserRoleModel } from '../models';
+import { UserRole } from '../types';
 import { hashPassword, comparePassword } from '../utils/password';
 import { generateToken } from '../utils/jwt';
 import { AuthRequest } from '../middleware/auth.middleware';
@@ -22,7 +23,7 @@ export const login = [
         where: { email },
         include: [
           {
-            model: UserRole,
+            model: UserRoleModel,
             as: 'roles',
             attributes: ['role'],
           },
@@ -45,7 +46,7 @@ export const login = [
         return;
       }
 
-      const roles = (user as any).roles?.map((r: UserRole) => r.role) || [];
+      const roles = (user as any).roles?.map((r: UserRoleModel) => r.role) || [];
       const token = generateToken({
         userId: user.id,
         email: user.email,
@@ -106,13 +107,13 @@ export const register = [
       });
 
       // Assign role (first user = super_admin, others = reviewer by default)
-      const role = isFirstUser ? 'super_admin' : 'reviewer';
-      await UserRole.create({
+      const role: UserRole = isFirstUser ? 'super_admin' : 'reviewer';
+      await UserRoleModel.create({
         userId: user.id,
         role,
       });
 
-      const roles: UserRole[] = [role as UserRole];
+      const roles: UserRole[] = [role];
       const token = generateToken({
         userId: user.id,
         email: user.email,
@@ -146,7 +147,7 @@ export const me = async (req: AuthRequest, res: Response): Promise<void> => {
     const user = await User.findByPk(req.user.id, {
       include: [
         {
-          model: UserRole,
+          model: UserRoleModel,
           as: 'roles',
           attributes: ['role'],
         },

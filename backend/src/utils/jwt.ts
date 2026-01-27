@@ -4,7 +4,7 @@ import { JwtPayload } from '../types';
 
 export const generateToken = (payload: JwtPayload): string => {
   const options: SignOptions = {
-    expiresIn: config.jwt.expiresIn,
+    expiresIn: config.jwt.expiresIn as string | number,
   };
   return jwt.sign(payload, config.jwt.secret, options);
 };
