@@ -1,12 +1,12 @@
 import jwt, { SignOptions } from 'jsonwebtoken';
+import type { StringValue } from 'ms';
 import { config } from '../config/env';
 import { JwtPayload } from '../types';
 
 export const generateToken = (payload: JwtPayload): string => {
-  const options: SignOptions = {
-    expiresIn: config.jwt.expiresIn as string | number,
-  };
-  return jwt.sign(payload, config.jwt.secret, options);
+  return jwt.sign(payload, config.jwt.secret, {
+    expiresIn: config.jwt.expiresIn as StringValue | number,
+  });
 };
 
 export const verifyToken = (token: string): JwtPayload => {

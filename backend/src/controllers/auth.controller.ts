@@ -159,7 +159,7 @@ export const me = async (req: AuthRequest, res: Response): Promise<void> => {
       return;
     }
 
-    const roles = (user as any).roles?.map((r: UserRole) => r.role) || [];
+    const roles = (user as any).roles?.map((r: UserRoleModel) => r.role) || [];
 
     res.json({
       user: {

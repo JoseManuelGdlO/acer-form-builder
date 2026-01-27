@@ -7,13 +7,13 @@ import { AuthRequest } from '../middleware/auth.middleware';
 export const getAllUsers = async (_req: AuthRequest, res: Response): Promise<void> => {
   try {
     const users = await User.findAll({
-      include: [
-        {
-          model: UserRole,
-          as: 'roles',
-          attributes: ['role'],
-        },
-      ],
+        include: [
+          {
+            model: UserRoleModel,
+            as: 'roles',
+            attributes: ['role'],
+          },
+        ],
       order: [['created_at', 'DESC']],
     });
 
@@ -38,13 +38,13 @@ export const getUserById = async (req: AuthRequest, res: Response): Promise<void
     const { id } = req.params;
 
     const user = await User.findByPk(id, {
-      include: [
-        {
-          model: UserRole,
-          as: 'roles',
-          attributes: ['role'],
-        },
-      ],
+        include: [
+          {
+            model: UserRoleModel,
+            as: 'roles',
+            attributes: ['role'],
+          },
+        ],
     });
 
     if (!user) {
@@ -52,7 +52,7 @@ export const getUserById = async (req: AuthRequest, res: Response): Promise<void
       return;
     }
 
-    const roles = (user as any).roles?.map((r: UserRole) => r.role) || [];
+    const roles = (user as any).roles?.map((r: UserRoleModel) => r.role) || [];
 
     res.json({
       id: user.id,
@@ -174,7 +174,7 @@ export const updateUser = [
         ],
       });
 
-      const roles = (updatedUser as any).roles?.map((r: UserRole) => r.role) || [];
+      const roles = (updatedUser as any).roles?.map((r: UserRoleModel) => r.role) || [];
 
       res.json({
         id: updatedUser!.id,
