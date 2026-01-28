@@ -93,6 +93,8 @@ export interface FormSubmission {
   answers: Record<string, string | string[]>;
   submittedAt: Date;
   updatedAt: Date;
+  clientId?: string;
+  form?: Form; // Form data when fetched with include
 }
 
 export const SUBMISSION_STATUS_CONFIG: Record<SubmissionStatus, { label: string; color: string }> = {

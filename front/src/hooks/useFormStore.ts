@@ -1,230 +1,202 @@
 import { useState, useCallback } from 'react';
 import { Form, FormSection, Question, QuestionType } from '@/types/form';
+import { api } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
 export const useFormStore = () => {
-  const [forms, setForms] = useState<Form[]>([
-    {
-      id: 'demo-form',
-      name: 'Solicitud de Visa B1/B2',
-      description: 'Formulario para recopilar información de solicitantes de visa de turismo',
-      sections: [
-        {
-          id: 's1',
-          title: 'Información Personal',
-          description: 'Datos básicos del solicitante',
-          questions: [
-            {
-              id: 'q1',
-              type: 'short_text',
-              title: '¿Cuál es su ocupación actual?',
-              required: true,
-            },
-            {
-              id: 'q2',
-              type: 'date',
-              title: '¿Cuál es su fecha de nacimiento?',
-              required: true,
-            },
-          ],
-        },
-        {
-          id: 's2',
-          title: 'Historial de Viajes',
-          description: 'Información sobre viajes anteriores',
-          questions: [
-            {
-              id: 'q3',
-              type: 'multiple_choice',
-              title: '¿Ha viajado a Estados Unidos antes?',
-              required: true,
-              options: [
-                { id: 'o1', label: 'Sí, una vez' },
-                { id: 'o2', label: 'Sí, varias veces' },
-                { id: 'o3', label: 'No, nunca' },
-              ],
-            },
-            {
-              id: 'q4',
-              type: 'dropdown',
-              title: '¿Qué tipo de visa necesita?',
-              required: true,
-              options: [
-                { id: 'v1', label: 'Visa de turista (B1/B2)' },
-                { id: 'v2', label: 'Visa de trabajo (H1B)' },
-                { id: 'v3', label: 'Visa de estudiante (F1)' },
-              ],
-            },
-          ],
-        },
-        {
-          id: 's3',
-          title: 'Detalles del Viaje',
-          questions: [
-            {
-              id: 'q5',
-              type: 'date',
-              title: '¿Cuándo planea realizar su viaje?',
-              required: false,
-            },
-            {
-              id: 'q6',
-              type: 'checkbox',
-              title: '¿Qué ciudades planea visitar?',
-              required: false,
-              options: [
-                { id: 'c1', label: 'Nueva York' },
-                { id: 'c2', label: 'Los Ángeles' },
-                { id: 'c3', label: 'Miami' },
-                { id: 'c4', label: 'Las Vegas' },
-              ],
-            },
-            {
-              id: 'q7',
-              type: 'long_text',
-              title: '¿Cuál es el motivo principal de su viaje?',
-              description: 'Sea lo más específico posible',
-              required: true,
-            },
-          ],
-        },
-      ],
-      createdAt: new Date('2024-01-15'),
-      updatedAt: new Date('2024-01-20'),
-    },
-    {
-      id: '2',
-      name: 'Documentación Adicional',
-      description: 'Formulario para solicitar documentos complementarios',
-      sections: [],
-      createdAt: new Date('2024-02-01'),
-      updatedAt: new Date('2024-02-01'),
-    },
-  ]);
-
+  const { token } = useAuth();
+  const [forms, setForms] = useState<Form[]>([]);
   const [currentForm, setCurrentForm] = useState<Form | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const createForm = useCallback((name: string, description?: string) => {
-    const newForm: Form = {
-      id: generateId(),
-      name,
-      description,
-      sections: [
-        {
-          id: generateId(),
-          title: 'Sección 1',
-          questions: [],
-        },
-      ],
-      createdAt: new Date(),
-      updatedAt: new Date(),
+  // Helper function to map backend form data to frontend Form type
+  const mapFormData = (formData: any): Form => {
+    return {
+      id: formData.id,
+      name: formData.name,
+      description: formData.description || '',
+      sections: formData.sections || [],
+      createdAt: formData.created_at ? new Date(formData.created_at) : new Date(formData.createdAt || Date.now()),
+      updatedAt: formData.updated_at ? new Date(formData.updated_at) : new Date(formData.updatedAt || Date.now()),
     };
-    setForms(prev => [...prev, newForm]);
-    return newForm;
+  };
+
+  // Fetch all forms from API
+  const fetchForms = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const response = await api.getForms();
+      const formsData = Array.isArray(response) ? response : [];
+      const mappedForms = formsData.map(mapFormData);
+      setForms(mappedForms);
+      return mappedForms;
+    } catch (error) {
+      console.error('Failed to fetch forms:', error);
+      toast.error('Error al cargar formularios');
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
-  const updateForm = useCallback((formId: string, updates: Partial<Form>) => {
-    setForms(prev =>
-      prev.map(form =>
-        form.id === formId
-          ? { ...form, ...updates, updatedAt: new Date() }
-          : form
-      )
-    );
-    if (currentForm?.id === formId) {
-      setCurrentForm(prev => prev ? { ...prev, ...updates, updatedAt: new Date() } : null);
+  // Fetch a single form by ID
+  const fetchForm = useCallback(async (formId: string) => {
+    setIsLoading(true);
+    try {
+      const response = await api.getForm(formId);
+      const mappedForm = mapFormData(response);
+      setCurrentForm(mappedForm);
+      // Also update in forms list if it exists
+      setForms(prev => {
+        const existingIndex = prev.findIndex(f => f.id === formId);
+        if (existingIndex >= 0) {
+          const updated = [...prev];
+          updated[existingIndex] = mappedForm;
+          return updated;
+        }
+        return [...prev, mappedForm];
+      });
+      return mappedForm;
+    } catch (error) {
+      console.error('Failed to fetch form:', error);
+      toast.error('Error al cargar el formulario');
+      throw error;
+    } finally {
+      setIsLoading(false);
     }
-  }, [currentForm]);
+  }, []);
 
-  const deleteForm = useCallback((formId: string) => {
-    setForms(prev => prev.filter(form => form.id !== formId));
-    if (currentForm?.id === formId) {
-      setCurrentForm(null);
+  const createForm = useCallback(async (name: string, description?: string) => {
+    if (!token) {
+      throw new Error('No token available');
     }
-  }, [currentForm]);
+    try {
+      const formData = {
+        name,
+        description,
+        sections: [
+          {
+            id: generateId(),
+            title: 'Sección 1',
+            questions: [],
+          },
+        ],
+      };
+      const response = await api.createForm(formData, token);
+      const mappedForm = mapFormData(response);
+      setForms(prev => [...prev, mappedForm]);
+      toast.success('Formulario creado correctamente');
+      return mappedForm;
+    } catch (error) {
+      console.error('Failed to create form:', error);
+      toast.error('Error al crear el formulario');
+      throw error;
+    }
+  }, [token]);
+
+  const updateForm = useCallback(async (formId: string, updates: Partial<Form>) => {
+    if (!token) {
+      throw new Error('No token available');
+    }
+    try {
+      const formToUpdate = forms.find(f => f.id === formId) || currentForm;
+      if (!formToUpdate) {
+        throw new Error('Form not found');
+      }
+      
+      const updatedFormData = { ...formToUpdate, ...updates };
+      const response = await api.updateForm(formId, updatedFormData, token);
+      const mappedForm = mapFormData(response);
+      
+      setForms(prev =>
+        prev.map(form =>
+          form.id === formId ? mappedForm : form
+        )
+      );
+      if (currentForm?.id === formId) {
+        setCurrentForm(mappedForm);
+      }
+      toast.success('Formulario actualizado correctamente');
+      return mappedForm;
+    } catch (error) {
+      console.error('Failed to update form:', error);
+      toast.error('Error al actualizar el formulario');
+      throw error;
+    }
+  }, [currentForm, forms, token]);
+
+  const deleteForm = useCallback(async (formId: string) => {
+    if (!token) {
+      throw new Error('No token available');
+    }
+    try {
+      await api.deleteForm(formId, token);
+      setForms(prev => prev.filter(form => form.id !== formId));
+      if (currentForm?.id === formId) {
+        setCurrentForm(null);
+      }
+      toast.success('Formulario eliminado correctamente');
+    } catch (error) {
+      console.error('Failed to delete form:', error);
+      toast.error('Error al eliminar el formulario');
+      throw error;
+    }
+  }, [currentForm, token]);
 
   // Section operations
-  const addSection = useCallback((formId: string) => {
+  const addSection = useCallback(async (formId: string) => {
     const newSection: FormSection = {
       id: generateId(),
       title: 'Nueva sección',
       questions: [],
     };
 
-    setForms(prev =>
-      prev.map(form =>
-        form.id === formId
-          ? { ...form, sections: [...form.sections, newSection], updatedAt: new Date() }
-          : form
-      )
-    );
-
-    if (currentForm?.id === formId) {
-      setCurrentForm(prev =>
-        prev ? { ...prev, sections: [...prev.sections, newSection], updatedAt: new Date() } : null
-      );
+    const formToUpdate = forms.find(f => f.id === formId) || currentForm;
+    if (!formToUpdate) {
+      throw new Error('Form not found');
     }
 
-    return newSection;
-  }, [currentForm]);
+    const updatedSections = [...formToUpdate.sections, newSection];
+    await updateForm(formId, { sections: updatedSections });
 
-  const updateSection = useCallback((formId: string, sectionId: string, updates: Partial<FormSection>) => {
+    return newSection;
+  }, [currentForm, forms, updateForm]);
+
+  const updateSection = useCallback(async (formId: string, sectionId: string, updates: Partial<FormSection>) => {
+    const formToUpdate = forms.find(f => f.id === formId) || currentForm;
+    if (!formToUpdate) {
+      throw new Error('Form not found');
+    }
+
     const updateSections = (sections: FormSection[]) =>
       sections.map(s => (s.id === sectionId ? { ...s, ...updates } : s));
 
-    setForms(prev =>
-      prev.map(form =>
-        form.id === formId
-          ? { ...form, sections: updateSections(form.sections), updatedAt: new Date() }
-          : form
-      )
-    );
+    const updatedSections = updateSections(formToUpdate.sections);
+    await updateForm(formId, { sections: updatedSections });
+  }, [currentForm, forms, updateForm]);
 
-    if (currentForm?.id === formId) {
-      setCurrentForm(prev =>
-        prev ? { ...prev, sections: updateSections(prev.sections), updatedAt: new Date() } : null
-      );
+  const deleteSection = useCallback(async (formId: string, sectionId: string) => {
+    const formToUpdate = forms.find(f => f.id === formId) || currentForm;
+    if (!formToUpdate) {
+      throw new Error('Form not found');
     }
-  }, [currentForm]);
 
-  const deleteSection = useCallback((formId: string, sectionId: string) => {
     const filterSections = (sections: FormSection[]) =>
       sections.filter(s => s.id !== sectionId);
 
-    setForms(prev =>
-      prev.map(form =>
-        form.id === formId
-          ? { ...form, sections: filterSections(form.sections), updatedAt: new Date() }
-          : form
-      )
-    );
+    const updatedSections = filterSections(formToUpdate.sections);
+    await updateForm(formId, { sections: updatedSections });
+  }, [currentForm, forms, updateForm]);
 
-    if (currentForm?.id === formId) {
-      setCurrentForm(prev =>
-        prev ? { ...prev, sections: filterSections(prev.sections), updatedAt: new Date() } : null
-      );
-    }
-  }, [currentForm]);
-
-  const reorderSections = useCallback((formId: string, sections: FormSection[]) => {
-    setForms(prev =>
-      prev.map(form =>
-        form.id === formId
-          ? { ...form, sections, updatedAt: new Date() }
-          : form
-      )
-    );
-
-    if (currentForm?.id === formId) {
-      setCurrentForm(prev =>
-        prev ? { ...prev, sections, updatedAt: new Date() } : null
-      );
-    }
-  }, [currentForm]);
+  const reorderSections = useCallback(async (formId: string, sections: FormSection[]) => {
+    await updateForm(formId, { sections });
+  }, [updateForm]);
 
   // Question operations
-  const addQuestion = useCallback((formId: string, sectionId: string, type: QuestionType) => {
+  const addQuestion = useCallback(async (formId: string, sectionId: string, type: QuestionType) => {
     const newQuestion: Question = {
       id: generateId(),
       type,
@@ -235,6 +207,11 @@ export const useFormStore = () => {
         : undefined,
     };
 
+    const formToUpdate = forms.find(f => f.id === formId) || currentForm;
+    if (!formToUpdate) {
+      throw new Error('Form not found');
+    }
+
     const updateSections = (sections: FormSection[]) =>
       sections.map(s =>
         s.id === sectionId
@@ -242,24 +219,18 @@ export const useFormStore = () => {
           : s
       );
 
-    setForms(prev =>
-      prev.map(form =>
-        form.id === formId
-          ? { ...form, sections: updateSections(form.sections), updatedAt: new Date() }
-          : form
-      )
-    );
-
-    if (currentForm?.id === formId) {
-      setCurrentForm(prev =>
-        prev ? { ...prev, sections: updateSections(prev.sections), updatedAt: new Date() } : null
-      );
-    }
+    const updatedSections = updateSections(formToUpdate.sections);
+    await updateForm(formId, { sections: updatedSections });
 
     return newQuestion;
-  }, [currentForm]);
+  }, [currentForm, forms, updateForm]);
 
-  const updateQuestion = useCallback((formId: string, sectionId: string, questionId: string, updates: Partial<Question>) => {
+  const updateQuestion = useCallback(async (formId: string, sectionId: string, questionId: string, updates: Partial<Question>) => {
+    const formToUpdate = forms.find(f => f.id === formId) || currentForm;
+    if (!formToUpdate) {
+      throw new Error('Form not found');
+    }
+
     const updateSections = (sections: FormSection[]) =>
       sections.map(s =>
         s.id === sectionId
@@ -267,22 +238,16 @@ export const useFormStore = () => {
           : s
       );
 
-    setForms(prev =>
-      prev.map(form =>
-        form.id === formId
-          ? { ...form, sections: updateSections(form.sections), updatedAt: new Date() }
-          : form
-      )
-    );
+    const updatedSections = updateSections(formToUpdate.sections);
+    await updateForm(formId, { sections: updatedSections });
+  }, [currentForm, forms, updateForm]);
 
-    if (currentForm?.id === formId) {
-      setCurrentForm(prev =>
-        prev ? { ...prev, sections: updateSections(prev.sections), updatedAt: new Date() } : null
-      );
+  const deleteQuestion = useCallback(async (formId: string, sectionId: string, questionId: string) => {
+    const formToUpdate = forms.find(f => f.id === formId) || currentForm;
+    if (!formToUpdate) {
+      throw new Error('Form not found');
     }
-  }, [currentForm]);
 
-  const deleteQuestion = useCallback((formId: string, sectionId: string, questionId: string) => {
     const updateSections = (sections: FormSection[]) =>
       sections.map(s =>
         s.id === sectionId
@@ -290,22 +255,16 @@ export const useFormStore = () => {
           : s
       );
 
-    setForms(prev =>
-      prev.map(form =>
-        form.id === formId
-          ? { ...form, sections: updateSections(form.sections), updatedAt: new Date() }
-          : form
-      )
-    );
+    const updatedSections = updateSections(formToUpdate.sections);
+    await updateForm(formId, { sections: updatedSections });
+  }, [currentForm, forms, updateForm]);
 
-    if (currentForm?.id === formId) {
-      setCurrentForm(prev =>
-        prev ? { ...prev, sections: updateSections(prev.sections), updatedAt: new Date() } : null
-      );
+  const reorderQuestions = useCallback(async (formId: string, sectionId: string, questions: Question[]) => {
+    const formToUpdate = forms.find(f => f.id === formId) || currentForm;
+    if (!formToUpdate) {
+      throw new Error('Form not found');
     }
-  }, [currentForm]);
 
-  const reorderQuestions = useCallback((formId: string, sectionId: string, questions: Question[]) => {
     const updateSections = (sections: FormSection[]) =>
       sections.map(s =>
         s.id === sectionId
@@ -313,33 +272,30 @@ export const useFormStore = () => {
           : s
       );
 
-    setForms(prev =>
-      prev.map(form =>
-        form.id === formId
-          ? { ...form, sections: updateSections(form.sections), updatedAt: new Date() }
-          : form
-      )
-    );
+    const updatedSections = updateSections(formToUpdate.sections);
+    await updateForm(formId, { sections: updatedSections });
+  }, [currentForm, forms, updateForm]);
 
-    if (currentForm?.id === formId) {
-      setCurrentForm(prev =>
-        prev ? { ...prev, sections: updateSections(prev.sections), updatedAt: new Date() } : null
-      );
-    }
-  }, [currentForm]);
-
-  const selectForm = useCallback((formId: string | null) => {
+  const selectForm = useCallback(async (formId: string | null) => {
     if (formId === null) {
       setCurrentForm(null);
     } else {
       const form = forms.find(f => f.id === formId);
-      setCurrentForm(form || null);
+      if (form) {
+        setCurrentForm(form);
+      } else {
+        // If form not in list, fetch it
+        await fetchForm(formId);
+      }
     }
-  }, [forms]);
+  }, [forms, fetchForm]);
 
   return {
     forms,
     currentForm,
+    isLoading,
+    fetchForms,
+    fetchForm,
     createForm,
     updateForm,
     deleteForm,

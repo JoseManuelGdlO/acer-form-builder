@@ -22,14 +22,20 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     set({ isLoading: true });
     try {
       const templates = await api.getChecklistTemplates();
-      const checklistTemplates: ChecklistTemplate[] = templates.map((t: any) => ({
+      const mappedTemplates: ChecklistTemplate[] = templates.map((t: any) => ({
         id: t.id,
         label: t.label,
         order: t.order || 0,
         isActive: t.is_active !== undefined ? t.is_active : t.isActive !== undefined ? t.isActive : true,
         createdAt: new Date(t.created_at || t.createdAt || Date.now()),
       }));
-      set({ checklistTemplates, isLoading: false });
+      
+      // Remove duplicates by id before setting
+      const uniqueTemplates = mappedTemplates.filter((template, index, self) => 
+        index === self.findIndex(t => t.id === template.id)
+      );
+      
+      set({ checklistTemplates: uniqueTemplates, isLoading: false });
     } catch (error) {
       console.error('Failed to fetch checklist templates:', error);
       set({ isLoading: false });
@@ -51,9 +57,16 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         isActive: newTemplate.is_active !== undefined ? newTemplate.is_active : newTemplate.isActive !== undefined ? newTemplate.isActive : true,
         createdAt: new Date(newTemplate.created_at || newTemplate.createdAt || Date.now()),
       };
-      set((state) => ({
-        checklistTemplates: [...state.checklistTemplates, newItem],
-      }));
+      set((state) => {
+        // Check if item already exists to avoid duplicates
+        const exists = state.checklistTemplates.some(item => item.id === newItem.id);
+        if (exists) {
+          return state;
+        }
+        return {
+          checklistTemplates: [...state.checklistTemplates, newItem],
+        };
+      });
     } catch (error) {
       console.error('Failed to create checklist template:', error);
       throw error;

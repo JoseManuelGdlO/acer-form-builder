@@ -1,4 +1,5 @@
-import { FormSubmission, QUESTION_TYPE_CONFIG, QuestionType } from '@/types/form';
+import { useState, useEffect } from 'react';
+import { FormSubmission, QUESTION_TYPE_CONFIG, Question } from '@/types/form';
 import {
   Dialog,
   DialogContent,
@@ -9,9 +10,11 @@ import { SubmissionStatusBadge } from './SubmissionStatusBadge';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { User, Mail, Calendar, FileText, MessageSquare } from 'lucide-react';
+import { User, Mail, Calendar, FileText, MessageSquare, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { api } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface SubmissionDetailModalProps {
   submission: FormSubmission | null;
@@ -19,30 +22,88 @@ interface SubmissionDetailModalProps {
   onOpenChange: (open: boolean) => void;
 }
 
-// Simulated questions for demo - in real app this would come from the form
-const mockQuestions: { id: string; title: string; type: QuestionType }[] = [
-  { id: 'q1', title: '¿Cuál es tu nombre completo?', type: 'short_text' },
-  { id: 'q2', title: '¿Cuál es el motivo de tu viaje?', type: 'long_text' },
-  { id: 'q3', title: '¿Has viajado a Estados Unidos antes?', type: 'multiple_choice' },
-  { id: 'q4', title: '¿Qué tipo de visa necesitas?', type: 'dropdown' },
-  { id: 'q5', title: '¿Cuándo planeas viajar?', type: 'date' },
-];
-
 export const SubmissionDetailModal = ({
   submission,
   open,
   onOpenChange,
 }: SubmissionDetailModalProps) => {
+  const { token } = useAuth();
+  const [fullSubmission, setFullSubmission] = useState<FormSubmission | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    const loadFullSubmission = async () => {
+      if (!submission || !open || !token) return;
+      
+      // If submission already has form data, use it
+      if (submission.form) {
+        setFullSubmission(submission);
+        return;
+      }
+
+      // Otherwise, fetch the full submission with form data
+      setIsLoading(true);
+      try {
+        const response = await api.getSubmission(submission.id, token);
+        const mappedSubmission: FormSubmission = {
+          id: response.id,
+          formId: response.form_id || response.formId,
+          formName: response.form_name || response.formName,
+          respondentName: response.respondent_name || response.respondentName,
+          respondentEmail: response.respondent_email || response.respondentEmail,
+          status: response.status,
+          answers: response.answers || {},
+          submittedAt: response.submitted_at ? new Date(response.submitted_at) : new Date(response.submittedAt || Date.now()),
+          updatedAt: response.updated_at ? new Date(response.updated_at) : new Date(response.updatedAt || Date.now()),
+          clientId: response.client_id || response.clientId,
+          form: response.form ? {
+            id: response.form.id,
+            name: response.form.name,
+            description: response.form.description || '',
+            sections: response.form.sections || [],
+            createdAt: response.form.created_at ? new Date(response.form.created_at) : new Date(response.form.createdAt || Date.now()),
+            updatedAt: response.form.updated_at ? new Date(response.form.updated_at) : new Date(response.form.updatedAt || Date.now()),
+          } : undefined,
+        };
+        setFullSubmission(mappedSubmission);
+      } catch (error) {
+        console.error('Failed to load full submission:', error);
+        // Fallback to original submission if fetch fails
+        setFullSubmission(submission);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (open && submission) {
+      loadFullSubmission();
+    } else {
+      setFullSubmission(null);
+    }
+  }, [submission, open, token]);
+
   if (!submission) return null;
 
-  // Simulated answers for demo
-  const mockAnswers: Record<string, string | string[]> = {
-    q1: submission.respondentName,
-    q2: 'Viajo por motivos de turismo, planeo visitar Nueva York, Los Ángeles y Miami durante 2 semanas.',
-    q3: 'Sí, una vez',
-    q4: 'Visa de turista (B1/B2)',
-    q5: '15 de marzo, 2024',
+  // Get all questions from the form sections
+  const getAllQuestions = (): Question[] => {
+    const formToUse = fullSubmission?.form || submission?.form;
+    if (formToUse && formToUse.sections) {
+      console.log('Form sections:', formToUse.sections);
+      const questions = formToUse.sections.flatMap(section => section.questions || []);
+      console.log('Extracted questions:', questions);
+      return questions;
+    }
+    console.warn('No form or sections found:', { 
+      hasFullSubmission: !!fullSubmission,
+      hasForm: !!fullSubmission?.form || !!submission?.form,
+      formSections: fullSubmission?.form?.sections || submission?.form?.sections 
+    });
+    return [];
   };
+
+  const questions = getAllQuestions();
+  const answers = fullSubmission?.answers || submission?.answers || {};
+  const displaySubmission = fullSubmission || submission;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -59,27 +120,27 @@ export const SubmissionDetailModal = ({
                 </div>
                 <div>
                   <h3 className="font-semibold text-foreground">
-                    {submission.respondentName}
+                    {displaySubmission.respondentName}
                   </h3>
                   <div className="flex items-center gap-1.5 text-muted-foreground text-sm">
                     <Mail className="w-3.5 h-3.5" />
-                    <span>{submission.respondentEmail}</span>
+                    <span>{displaySubmission.respondentEmail}</span>
                   </div>
                 </div>
               </div>
             </div>
-            <SubmissionStatusBadge status={submission.status} />
+            <SubmissionStatusBadge status={displaySubmission.status} />
           </div>
 
           <div className="flex items-center gap-4 mt-4 text-sm text-muted-foreground">
             <div className="flex items-center gap-1.5">
               <FileText className="w-4 h-4" />
-              <span>{submission.formName}</span>
+              <span>{displaySubmission.formName}</span>
             </div>
             <div className="flex items-center gap-1.5">
               <Calendar className="w-4 h-4" />
               <span>
-                {format(submission.submittedAt, "d 'de' MMMM, yyyy 'a las' HH:mm", { locale: es })}
+                {format(displaySubmission.submittedAt, "d 'de' MMMM, yyyy 'a las' HH:mm", { locale: es })}
               </span>
             </div>
           </div>
@@ -89,15 +150,27 @@ export const SubmissionDetailModal = ({
 
         <ScrollArea className="max-h-[50vh]">
           <div className="p-6 space-y-6">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <MessageSquare className="w-4 h-4" />
-              <span>{mockQuestions.length} respuestas</span>
-            </div>
+            {isLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                <span className="ml-2 text-muted-foreground">Cargando detalles...</span>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <MessageSquare className="w-4 h-4" />
+                  <span>{questions.length} respuestas</span>
+                </div>
 
-            <div className="space-y-5">
-              {mockQuestions.map((question, index) => {
-                const answer = mockAnswers[question.id];
-                const typeConfig = QUESTION_TYPE_CONFIG[question.type];
+                {questions.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <p>No se encontraron preguntas para este formulario.</p>
+                  </div>
+                ) : (
+              <div className="space-y-5">
+                {questions.map((question, index) => {
+                  const answer = answers[question.id];
+                  const typeConfig = QUESTION_TYPE_CONFIG[question.type];
 
                 return (
                   <div
@@ -121,24 +194,29 @@ export const SubmissionDetailModal = ({
                     </div>
 
                     <div className="ml-9 p-3 rounded-lg bg-background border border-border/30">
-                      {Array.isArray(answer) ? (
+                      {answer === undefined || answer === null || answer === '' ? (
+                        <span className="text-muted-foreground italic">Sin respuesta</span>
+                      ) : Array.isArray(answer) ? (
                         <div className="flex flex-wrap gap-2">
                           {answer.map((item, i) => (
                             <Badge key={i} variant="secondary">
-                              {item}
+                              {String(item)}
                             </Badge>
                           ))}
                         </div>
                       ) : (
                         <p className="text-foreground whitespace-pre-wrap">
-                          {answer || <span className="text-muted-foreground italic">Sin respuesta</span>}
+                          {String(answer)}
                         </p>
                       )}
                     </div>
                   </div>
                 );
               })}
-            </div>
+                </div>
+                )}
+              </>
+            )}
           </div>
         </ScrollArea>
       </DialogContent>

@@ -116,7 +116,12 @@ export const ChecklistCatalog = () => {
     setEditLabel(item.label);
   };
 
-  const sortedItems = [...checklistTemplates].sort((a, b) => a.order - b.order);
+  // Remove duplicates by id and sort
+  const sortedItems = [...checklistTemplates]
+    .filter((template, index, self) => 
+      index === self.findIndex(t => t.id === template.id)
+    )
+    .sort((a, b) => a.order - b.order);
 
   return (
     <div className="space-y-6">

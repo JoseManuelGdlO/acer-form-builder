@@ -16,9 +16,9 @@ import { Textarea } from '@/components/ui/textarea';
 
 interface FormListProps {
   forms: Form[];
-  onSelectForm: (formId: string) => void;
-  onCreateForm: (name: string, description?: string) => void;
-  onDeleteForm: (formId: string) => void;
+  onSelectForm: (formId: string) => void | Promise<void>;
+  onCreateForm: (name: string, description?: string) => void | Promise<void>;
+  onDeleteForm: (formId: string) => void | Promise<void>;
 }
 
 export const FormList = ({ forms, onSelectForm, onCreateForm, onDeleteForm }: FormListProps) => {
@@ -33,17 +33,33 @@ export const FormList = ({ forms, onSelectForm, onCreateForm, onDeleteForm }: Fo
       form.description?.toLowerCase().includes(search.toLowerCase())
   );
 
-  const handleCreateForm = () => {
+  const handleCreateForm = async () => {
     if (newFormName.trim()) {
-      onCreateForm(newFormName.trim(), newFormDescription.trim() || undefined);
-      setNewFormName('');
-      setNewFormDescription('');
-      setIsCreateDialogOpen(false);
+      try {
+        await onCreateForm(newFormName.trim(), newFormDescription.trim() || undefined);
+        setNewFormName('');
+        setNewFormDescription('');
+        setIsCreateDialogOpen(false);
+      } catch (error) {
+        console.error('Failed to create form:', error);
+      }
     }
   };
 
-  const handleDuplicate = (form: Form) => {
-    onCreateForm(`${form.name} (copia)`, form.description);
+  const handleDuplicate = async (form: Form) => {
+    try {
+      await onCreateForm(`${form.name} (copia)`, form.description);
+    } catch (error) {
+      console.error('Failed to duplicate form:', error);
+    }
+  };
+
+  const handleDelete = async (formId: string) => {
+    try {
+      await onDeleteForm(formId);
+    } catch (error) {
+      console.error('Failed to delete form:', error);
+    }
   };
 
   return (
@@ -86,7 +102,7 @@ export const FormList = ({ forms, onSelectForm, onCreateForm, onDeleteForm }: Fo
                 key={form.id}
                 form={form}
                 onEdit={() => onSelectForm(form.id)}
-                onDelete={() => onDeleteForm(form.id)}
+                onDelete={() => handleDelete(form.id)}
                 onDuplicate={() => handleDuplicate(form)}
               />
             ))}

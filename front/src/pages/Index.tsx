@@ -29,6 +29,8 @@ const Index = () => {
   const {
     forms,
     currentForm,
+    isLoading: formsLoading,
+    fetchForms,
     createForm,
     updateForm,
     deleteForm,
@@ -45,6 +47,8 @@ const Index = () => {
 
   const {
     submissions,
+    isLoading: submissionsLoading,
+    fetchSubmissions,
     updateSubmissionStatus,
     deleteSubmission,
     getSubmissionStats,
@@ -63,12 +67,29 @@ const Index = () => {
   const { token } = useAuth();
   const { users } = useUserStore();
 
-  // Load clients when component mounts or when token changes
+  // Load data when component mounts or when token changes
   useEffect(() => {
-    if (token && clients.length === 0) {
-      fetchClients(token).catch((error) => {
-        console.error('Failed to fetch clients:', error);
-      });
+    if (token) {
+      // Load forms
+      if (forms.length === 0) {
+        fetchForms().catch((error) => {
+          console.error('Failed to fetch forms:', error);
+        });
+      }
+      
+      // Load submissions
+      if (submissions.length === 0) {
+        fetchSubmissions().catch((error) => {
+          console.error('Failed to fetch submissions:', error);
+        });
+      }
+      
+      // Load clients
+      if (clients.length === 0) {
+        fetchClients(token).catch((error) => {
+          console.error('Failed to fetch clients:', error);
+        });
+      }
     }
   }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -77,6 +98,15 @@ const Index = () => {
     if (token && activeView === 'clients') {
       fetchClients(token).catch((error) => {
         console.error('Failed to fetch clients:', error);
+      });
+    }
+  }, [activeView, token]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Load submissions when switching to submissions view
+  useEffect(() => {
+    if (token && activeView === 'submissions') {
+      fetchSubmissions().catch((error) => {
+        console.error('Failed to fetch submissions:', error);
       });
     }
   }, [activeView, token]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -225,18 +255,40 @@ const Index = () => {
     return (
       <FormEditor
         form={currentForm}
-        onBack={() => selectForm(null)}
-        onUpdateForm={updates => updateForm(currentForm.id, updates)}
-        onAddSection={() => addSection(currentForm.id)}
-        onUpdateSection={(sectionId, updates) => updateSection(currentForm.id, sectionId, updates)}
-        onDeleteSection={sectionId => deleteSection(currentForm.id, sectionId)}
-        onReorderSections={sections => reorderSections(currentForm.id, sections)}
-        onAddQuestion={(sectionId, type) => addQuestion(currentForm.id, sectionId, type)}
-        onUpdateQuestion={(sectionId, questionId, updates) =>
-          updateQuestion(currentForm.id, sectionId, questionId, updates)
-        }
-        onDeleteQuestion={(sectionId, questionId) => deleteQuestion(currentForm.id, sectionId, questionId)}
-        onReorderQuestions={(sectionId, questions) => reorderQuestions(currentForm.id, sectionId, questions)}
+        onBack={async () => {
+          await selectForm(null);
+          // Reload forms after editing
+          if (token) {
+            await fetchForms();
+          }
+        }}
+        onUpdateForm={async (updates) => {
+          await updateForm(currentForm.id, updates);
+        }}
+        onAddSection={async () => {
+          await addSection(currentForm.id);
+        }}
+        onUpdateSection={async (sectionId, updates) => {
+          await updateSection(currentForm.id, sectionId, updates);
+        }}
+        onDeleteSection={async (sectionId) => {
+          await deleteSection(currentForm.id, sectionId);
+        }}
+        onReorderSections={async (sections) => {
+          await reorderSections(currentForm.id, sections);
+        }}
+        onAddQuestion={async (sectionId, type) => {
+          await addQuestion(currentForm.id, sectionId, type);
+        }}
+        onUpdateQuestion={async (sectionId, questionId, updates) => {
+          await updateQuestion(currentForm.id, sectionId, questionId, updates);
+        }}
+        onDeleteQuestion={async (sectionId, questionId) => {
+          await deleteQuestion(currentForm.id, sectionId, questionId);
+        }}
+        onReorderQuestions={async (sectionId, questions) => {
+          await reorderQuestions(currentForm.id, sectionId, questions);
+        }}
       />
     );
   }
@@ -250,8 +302,20 @@ const Index = () => {
           <SubmissionList
             submissions={submissions}
             stats={getSubmissionStats()}
-            onUpdateStatus={updateSubmissionStatus}
-            onDelete={deleteSubmission}
+            onUpdateStatus={async (submissionId, status) => {
+              await updateSubmissionStatus(submissionId, status);
+              // Reload submissions after update
+              if (token) {
+                await fetchSubmissions();
+              }
+            }}
+            onDelete={async (submissionId) => {
+              await deleteSubmission(submissionId);
+              // Reload submissions after deletion
+              if (token) {
+                await fetchSubmissions();
+              }
+            }}
             onBack={() => setActiveView('dashboard')}
           />
         </div>
@@ -385,9 +449,23 @@ const Index = () => {
 
         <FormList
           forms={forms}
-          onSelectForm={selectForm}
-          onCreateForm={createForm}
-          onDeleteForm={deleteForm}
+          onSelectForm={async (formId) => {
+            await selectForm(formId);
+          }}
+          onCreateForm={async (name, description) => {
+            await createForm(name, description);
+            // Reload forms after creation
+            if (token) {
+              await fetchForms();
+            }
+          }}
+          onDeleteForm={async (formId) => {
+            await deleteForm(formId);
+            // Reload forms after deletion
+            if (token) {
+              await fetchForms();
+            }
+          }}
         />
       </div>
     </>

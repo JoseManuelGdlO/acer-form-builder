@@ -29,7 +29,8 @@ export const getAllSubmissions = async (req: AuthRequest, res: Response): Promis
         {
           model: Form,
           as: 'form',
-          attributes: ['id', 'name'],
+          // Include all form fields, especially sections with questions
+          // Don't limit attributes so we get sections
         },
         {
           model: Client,
@@ -103,6 +104,35 @@ export const createSubmission = [
 
       const { formId, formName, respondentName, respondentEmail, answers, clientId } = req.body;
 
+      // Debug: Log received data
+      console.log('Received submission data:', {
+        formId,
+        formName,
+        respondentName,
+        respondentEmail,
+        answers,
+        answersType: typeof answers,
+        answersIsArray: Array.isArray(answers),
+        answersKeys: answers && typeof answers === 'object' && !Array.isArray(answers) ? Object.keys(answers) : [],
+        answersLength: answers && typeof answers === 'object' && !Array.isArray(answers) ? Object.keys(answers).length : 0,
+        rawBody: JSON.stringify(req.body),
+      });
+
+      // Validate answers is an object (not array, not null, not undefined)
+      if (!answers) {
+        console.warn('Answers is null or undefined, using empty object');
+      } else if (typeof answers !== 'object' || Array.isArray(answers)) {
+        console.error('Invalid answers format:', answers, 'Type:', typeof answers);
+        res.status(400).json({ error: 'Answers must be a valid object' });
+        return;
+      }
+
+      // Ensure answers is always an object
+      const finalAnswers = answers && typeof answers === 'object' && !Array.isArray(answers) ? answers : {};
+      
+      console.log('Final answers to save:', finalAnswers);
+      console.log('Final answers keys:', Object.keys(finalAnswers));
+
       // Try to find or create client by email
       let finalClientId = clientId;
       if (!finalClientId && respondentEmail) {
@@ -122,9 +152,17 @@ export const createSubmission = [
         formName,
         respondentName,
         respondentEmail,
-        answers: answers || {},
+        answers: finalAnswers,
         clientId: finalClientId,
         status: 'pending',
+      });
+
+      console.log('Created submission:', {
+        id: submission.id,
+        answers: submission.answers,
+        answersType: typeof submission.answers,
+        answersKeys: submission.answers ? Object.keys(submission.answers) : [],
+        answersStringified: JSON.stringify(submission.answers),
       });
 
       // Update client's formsCompleted count

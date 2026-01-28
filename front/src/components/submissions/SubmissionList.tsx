@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FormSubmission, SubmissionStatus, SUBMISSION_STATUS_CONFIG, QUESTION_TYPE_CONFIG, QuestionType } from '@/types/form';
+import { FormSubmission, SubmissionStatus, SUBMISSION_STATUS_CONFIG, Question } from '@/types/form';
 import { SubmissionCard } from './SubmissionCard';
 import { SubmissionDetailModal } from './SubmissionDetailModal';
 import { Input } from '@/components/ui/input';
@@ -25,15 +25,6 @@ interface SubmissionListProps {
 }
 
 type FilterType = 'all' | SubmissionStatus;
-
-// Mock questions for demo
-const mockQuestions: { id: string; title: string; type: QuestionType }[] = [
-  { id: 'q1', title: '¿Cuál es tu nombre completo?', type: 'short_text' },
-  { id: 'q2', title: '¿Cuál es el motivo de tu viaje?', type: 'long_text' },
-  { id: 'q3', title: '¿Has viajado a Estados Unidos antes?', type: 'multiple_choice' },
-  { id: 'q4', title: '¿Qué tipo de visa necesitas?', type: 'dropdown' },
-  { id: 'q5', title: '¿Cuándo planeas viajar?', type: 'date' },
-];
 
 export const SubmissionList = ({
   submissions,
@@ -109,15 +100,18 @@ export const SubmissionList = ({
     doc.text('Respuestas', 20, yPos);
     yPos += 10;
 
-    const mockAnswers: Record<string, string> = {
-      q1: submission.respondentName,
-      q2: 'Viajo por motivos de turismo, planeo visitar Nueva York, Los Ángeles y Miami durante 2 semanas.',
-      q3: 'Sí, una vez',
-      q4: 'Visa de turista (B1/B2)',
-      q5: '15 de marzo, 2024',
+    // Get all questions from form sections
+    const getAllQuestions = (): Question[] => {
+      if (submission.form && submission.form.sections) {
+        return submission.form.sections.flatMap(section => section.questions || []);
+      }
+      return [];
     };
 
-    mockQuestions.forEach((question, index) => {
+    const questions = getAllQuestions();
+    const answers = submission.answers || {};
+
+    questions.forEach((question, index) => {
       if (yPos > 270) {
         doc.addPage();
         yPos = 20;
@@ -130,8 +124,16 @@ export const SubmissionList = ({
 
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(10);
-      const answer = mockAnswers[question.id] || 'Sin respuesta';
-      const splitAnswer = doc.splitTextToSize(answer, pageWidth - 50);
+      const answer = answers[question.id];
+      let answerText = 'Sin respuesta';
+      if (answer !== undefined && answer !== null && answer !== '') {
+        if (Array.isArray(answer)) {
+          answerText = answer.join(', ');
+        } else {
+          answerText = String(answer);
+        }
+      }
+      const splitAnswer = doc.splitTextToSize(answerText, pageWidth - 50);
       doc.text(splitAnswer, 25, yPos);
       yPos += splitAnswer.length * 5 + 8;
     });

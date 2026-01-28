@@ -19,68 +19,16 @@ import {
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
-import { User, Mail, Phone, CalendarIcon, CheckCircle2, ArrowRight, ArrowLeft, Send } from 'lucide-react';
+import { User, Mail, Phone, CalendarIcon, CheckCircle2, ArrowRight, ArrowLeft, Send, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
-
-// Mock forms - in real app this would come from database
-const mockForms: Form[] = [
-  {
-    id: 'demo-form',
-    name: 'Solicitud de Visa de Turismo',
-    description: 'Complete este formulario para iniciar su proceso de visa.',
-    sections: [
-      {
-        id: 's1',
-        title: 'Información Personal',
-        description: 'Datos básicos del solicitante',
-        questions: [
-          { id: 'q1', type: 'short_text', title: '¿Cuál es su ocupación actual?', required: true },
-          { id: 'q2', type: 'long_text', title: '¿Cuál es el motivo principal de su viaje?', description: 'Sea lo más específico posible', required: true },
-        ],
-      },
-      {
-        id: 's2',
-        title: 'Historial de Viajes',
-        description: 'Información sobre viajes anteriores',
-        questions: [
-          { id: 'q3', type: 'multiple_choice', title: '¿Ha viajado a Estados Unidos anteriormente?', required: true, options: [
-            { id: 'o1', label: 'Sí, una vez' },
-            { id: 'o2', label: 'Sí, varias veces' },
-            { id: 'o3', label: 'No, nunca' },
-          ]},
-          { id: 'q4', type: 'dropdown', title: '¿Qué tipo de visa necesita?', required: true, options: [
-            { id: 'v1', label: 'Visa de turista (B1/B2)' },
-            { id: 'v2', label: 'Visa de trabajo (H1B)' },
-            { id: 'v3', label: 'Visa de estudiante (F1)' },
-            { id: 'v4', label: 'Visa de negocios' },
-          ]},
-        ],
-      },
-      {
-        id: 's3',
-        title: 'Detalles del Viaje',
-        questions: [
-          { id: 'q5', type: 'date', title: '¿Cuándo planea realizar su viaje?', required: false },
-          { id: 'q6', type: 'checkbox', title: '¿Qué ciudades planea visitar?', required: false, options: [
-            { id: 'c1', label: 'Nueva York' },
-            { id: 'c2', label: 'Los Ángeles' },
-            { id: 'c3', label: 'Miami' },
-            { id: 'c4', label: 'Las Vegas' },
-            { id: 'c5', label: 'Chicago' },
-          ]},
-        ],
-      },
-    ],
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-];
+import { api } from '@/lib/api';
 
 const PublicFormView = () => {
   const { formId } = useParams<{ formId: string }>();
   const [form, setForm] = useState<Form | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [step, setStep] = useState<'info' | 'sections' | 'success'>('info');
   const [currentSectionIndex, setCurrentSectionIndex] = useState(0);
   
@@ -98,11 +46,29 @@ const PublicFormView = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    // In real app, fetch form from database
-    const foundForm = mockForms.find(f => f.id === formId);
-    if (foundForm) {
-      setForm(foundForm);
-    }
+    const loadForm = async () => {
+      if (!formId) return;
+      setIsLoading(true);
+      try {
+        const formData = await api.getForm(formId);
+        // Map backend data to frontend Form type
+        const mappedForm: Form = {
+          id: formData.id,
+          name: formData.name,
+          description: formData.description || '',
+          sections: formData.sections || [],
+          createdAt: formData.created_at ? new Date(formData.created_at) : new Date(formData.createdAt || Date.now()),
+          updatedAt: formData.updated_at ? new Date(formData.updated_at) : new Date(formData.updatedAt || Date.now()),
+        };
+        setForm(mappedForm);
+      } catch (error) {
+        console.error('Failed to load form:', error);
+        toast.error('Error al cargar el formulario');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadForm();
   }, [formId]);
 
   const validateClientInfo = () => {
@@ -133,7 +99,11 @@ const PublicFormView = () => {
   };
 
   const handleAnswer = (questionId: string, value: string | string[] | Date) => {
-    setAnswers(prev => ({ ...prev, [questionId]: value }));
+    setAnswers(prev => {
+      const updated = { ...prev, [questionId]: value };
+      console.log('Answer updated:', { questionId, value, allAnswers: updated });
+      return updated;
+    });
     setErrors(prev => ({ ...prev, [questionId]: '' }));
   };
 
@@ -174,11 +144,73 @@ const PublicFormView = () => {
     }
   };
 
-  const handleSubmit = () => {
-    // In real app, save to database
-    console.log('Submission:', { clientInfo, answers });
-    toast.success('Formulario enviado correctamente');
-    setStep('success');
+  const handleSubmit = async () => {
+    if (!form) return;
+    
+    try {
+      // Collect all answers from all sections
+      const allAnswers: Record<string, string | string[] | Date> = { ...answers };
+      
+      // Ensure we have answers for all questions (even if empty)
+      form.sections.forEach(section => {
+        section.questions.forEach(question => {
+          if (!(question.id in allAnswers)) {
+            // Question not answered, skip it (don't add empty values)
+          }
+        });
+      });
+
+      // Convert Date objects to ISO strings for API
+      const formattedAnswers: Record<string, string | string[]> = {};
+      Object.entries(allAnswers).forEach(([key, value]) => {
+        if (value instanceof Date) {
+          formattedAnswers[key] = value.toISOString();
+        } else if (value !== undefined && value !== null) {
+          // Include empty strings and arrays - they are valid answers
+          if (Array.isArray(value)) {
+            formattedAnswers[key] = value;
+          } else if (typeof value === 'string') {
+            formattedAnswers[key] = value;
+          }
+        }
+      });
+
+      // Debug: Log answers before sending
+      console.log('Raw answers state:', answers);
+      console.log('All answers collected:', allAnswers);
+      console.log('Formatted answers to send:', formattedAnswers);
+      console.log('Number of answers:', Object.keys(formattedAnswers).length);
+
+      // Validate we have at least some answers
+      if (Object.keys(formattedAnswers).length === 0) {
+        console.warn('No answers to send!');
+        toast.error('Por favor, completa al menos una pregunta antes de enviar.');
+        return;
+      }
+
+      const submissionData = {
+        formId: form.id,
+        formName: form.name,
+        respondentName: clientInfo.name,
+        respondentEmail: clientInfo.email,
+        answers: formattedAnswers,
+      };
+
+      console.log('Full submission data:', JSON.stringify(submissionData, null, 2));
+
+      const response = await api.createSubmission(submissionData);
+      
+      console.log('Submission response:', response);
+      console.log('Response answers:', response.answers);
+      
+      toast.success('Formulario enviado correctamente');
+      setStep('success');
+    } catch (error: any) {
+      console.error('Failed to submit form:', error);
+      console.error('Error details:', error);
+      const errorMessage = error?.message || 'Error desconocido';
+      toast.error(`Error al enviar el formulario: ${errorMessage}`);
+    }
   };
 
   const renderQuestion = (question: Question) => {
@@ -332,6 +364,17 @@ const PublicFormView = () => {
         return null;
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-primary" />
+          <p className="text-muted-foreground">Cargando formulario...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!form) {
     return (
