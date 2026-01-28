@@ -163,3 +163,45 @@
     background-clip: text;
   }
 }
+
+/* Header Navigation Animations */
+@keyframes fadeInSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Apply animations to navigation rows on medium screens */
+@media (min-width: 768px) and (max-width: 1279px) {
+  .nav-row-1 {
+    animation: fadeInSlideDown 0.3s ease-in-out 0s both;
+  }
+  
+  .nav-row-2 {
+    animation: fadeInSlideUp 0.3s ease-in-out 0.075s both;
+  }
+}
+
+/* Additional responsive utilities */
+@media (max-width: 640px) {
+  /* Ensure buttons don't overflow on small screens */
+  .flex-wrap {
+    flex-wrap: wrap;
+  }
+}
