@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { LogIn } from 'lucide-react';
+import saruLogo from '@/assets/saru-logo.png';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -35,7 +35,11 @@ const Login = () => {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <div className="flex items-center justify-center mb-4">
-            <LogIn className="w-12 h-12 text-primary" />
+            <img 
+              src={saruLogo} 
+              alt="Saru Visas Logo" 
+              className="h-20 w-auto object-contain"
+            />
           </div>
           <CardTitle className="text-2xl text-center">Iniciar Sesión</CardTitle>
           <CardDescription className="text-center">
