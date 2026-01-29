@@ -10,7 +10,7 @@ import { SubmissionStatusBadge } from './SubmissionStatusBadge';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { User, Mail, Phone, Calendar, FileText, MessageSquare, Loader2 } from 'lucide-react';
+import { User, Mail, Phone, Calendar, FileText, MessageSquare, Loader2, CheckCircle2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { api } from '@/lib/api';
@@ -96,6 +96,7 @@ export const SubmissionDetailModal = ({
     questionDescription?: string;
     answer: string | string[];
     options?: Array<{ id: string; label: string }>;
+    section: string;
   };
 
   const getQuestionAnswerPairs = (): QuestionAnswerPair[] => {
@@ -108,6 +109,18 @@ export const SubmissionDetailModal = ({
         typeof answerData === 'object' &&
         !Array.isArray(answerData) &&
         'question' in answerData;
+
+      // Find section name for this question
+      let sectionName = 'Sin sección';
+      if (formToUse?.sections) {
+        for (const section of formToUse.sections) {
+          const question = section.questions?.find((q: any) => q.id === questionId);
+          if (question) {
+            sectionName = section.title || section.label || 'Sin sección';
+            break;
+          }
+        }
+      }
 
       if (isNewFormat) {
         let answerValue = (answerData as any).answer;
@@ -124,6 +137,7 @@ export const SubmissionDetailModal = ({
           questionDescription: (answerData as any).questionDescription,
           answer: answerValue,
           options: (answerData as any).options,
+          section: sectionName,
         });
         return;
       }
@@ -144,6 +158,7 @@ export const SubmissionDetailModal = ({
         id: questionId,
         question: questionTitle,
         answer: answerValue as string | string[],
+        section: sectionName,
       });
     });
 
@@ -155,7 +170,7 @@ export const SubmissionDetailModal = ({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] p-0 overflow-hidden">
-        <DialogHeader className="p-6 pb-4 bg-gradient-to-br from-primary/5 to-transparent">
+        <DialogHeader className="p-7 pb-4 bg-gradient-to-br from-primary/5 to-transparent">
           <div className="flex items-start justify-between gap-4">
             <div className="space-y-3">
               <DialogTitle className="text-xl font-bold">
@@ -222,85 +237,69 @@ export const SubmissionDetailModal = ({
                     <p>No hay respuestas guardadas para este formulario.</p>
                   </div>
                 ) : (
-                  <div className="space-y-5">
-                    {questionAnswerPairs.map((pair, index) => {
-                      const typeConfig =
-                        pair.questionType && pair.questionType in QUESTION_TYPE_CONFIG
-                          ? QUESTION_TYPE_CONFIG[pair.questionType as keyof typeof QUESTION_TYPE_CONFIG]
-                          : null;
-                      const answer = pair.answer;
-                      const options = pair.options;
+                  (() => {
+                    // Group answers by section (same format as ClientFormData)
+                    const sections = questionAnswerPairs.reduce((acc, pair) => {
+                      if (!acc[pair.section]) {
+                        acc[pair.section] = [];
+                      }
+                      acc[pair.section].push(pair);
+                      return acc;
+                    }, {} as Record<string, typeof questionAnswerPairs>);
 
-                      const formatAnswerValue = (val: string | any): string => {
-                        // Handle non-string values
-                        if (val === null || val === undefined) {
-                          return '';
-                        }
-                        if (typeof val === 'object' && !Array.isArray(val)) {
-                          // If it's an object, try to extract meaningful data or stringify
-                          return JSON.stringify(val, null, 2);
-                        }
-                        if (Array.isArray(val)) {
-                          return val.join(', ');
-                        }
-                        const stringVal = String(val);
-                        if (options) {
-                          const opt = options.find((o) => o.id === stringVal);
-                          return opt ? opt.label : stringVal;
-                        }
-                        return stringVal;
-                      };
+                    const formatAnswerValue = (val: string | any, options?: Array<{ id: string; label: string }>): string => {
+                      // Handle non-string values
+                      if (val === null || val === undefined) {
+                        return '';
+                      }
+                      if (typeof val === 'object' && !Array.isArray(val)) {
+                        // If it's an object, try to extract meaningful data or stringify
+                        return JSON.stringify(val, null, 2);
+                      }
+                      if (Array.isArray(val)) {
+                        return val.join(', ');
+                      }
+                      const stringVal = String(val);
+                      if (options) {
+                        const opt = options.find((o) => o.id === stringVal);
+                        return opt ? opt.label : stringVal;
+                      }
+                      return stringVal;
+                    };
 
-                      return (
-                        <div
-                          key={pair.id}
-                          className="p-4 rounded-xl border border-border/50 bg-muted/20 space-y-3"
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="flex items-start gap-3">
-                              <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-medium flex items-center justify-center">
-                                {index + 1}
-                              </span>
-                              <div>
-                                <p className="font-medium text-foreground">{pair.question}</p>
-                                {pair.questionDescription && (
-                                  <p className="text-sm text-muted-foreground mt-1">
-                                    {pair.questionDescription}
+                    return (
+                      <div className="space-y-4">
+                        {Object.entries(sections).map(([sectionName, answers]) => (
+                          <div key={sectionName} className="space-y-2">
+                            <h4 className="text-sm font-medium text-primary flex items-center gap-2">
+                              <CheckCircle2 className="w-4 h-4" />
+                              {sectionName}
+                            </h4>
+                            <div className="grid gap-2 pl-6">
+                              {answers.map((pair, idx) => (
+                                <div 
+                                  key={pair.id}
+                                  className="bg-muted/30 rounded-lg p-3 border border-border/30"
+                                >
+                                  <p className="text-xs text-muted-foreground mb-1">
+                                    {pair.questionDescription || pair.question}
                                   </p>
-                                )}
-                                {typeConfig && (
-                                  <Badge variant="outline" className="mt-1.5 text-xs">
-                                    {typeConfig.label}
-                                  </Badge>
-                                )}
-                              </div>
+                                  <p className="text-sm text-foreground font-medium">
+                                    {pair.answer === undefined ||
+                                    pair.answer === null ||
+                                    pair.answer === '' ||
+                                    (Array.isArray(pair.answer) && pair.answer.length === 0)
+                                      ? 'Sin respuesta'
+                                      : formatAnswerValue(pair.answer, pair.options)}
+                                  </p>
+                                </div>
+                              ))}
                             </div>
                           </div>
-
-                          <div className="ml-9 p-3 rounded-lg bg-background border border-border/30">
-                            {answer === undefined ||
-                            answer === null ||
-                            answer === '' ||
-                            (Array.isArray(answer) && answer.length === 0) ? (
-                              <span className="text-muted-foreground italic">Sin respuesta</span>
-                            ) : Array.isArray(answer) ? (
-                              <div className="flex flex-wrap gap-2">
-                                {answer.map((item, i) => (
-                                  <Badge key={i} variant="secondary">
-                                    {formatAnswerValue(item)}
-                                  </Badge>
-                                ))}
-                              </div>
-                            ) : (
-                              <p className="text-foreground whitespace-pre-wrap">
-                                {formatAnswerValue(answer)}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                        ))}
+                      </div>
+                    );
+                  })()
                 )}
               </>
             )}

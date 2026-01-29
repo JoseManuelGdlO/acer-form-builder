@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { Form, FormSection, Question, QUESTION_TYPE_CONFIG } from '@/types/form';
 import { Button } from '@/components/ui/button';
@@ -50,6 +50,77 @@ const PublicFormView = () => {
   // Validation errors
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // Storage key for this form
+  const getStorageKey = useCallback(() => `form_progress_${formId}`, [formId]);
+
+  // Save progress to localStorage
+  const saveProgress = useCallback(() => {
+    if (!formId) return;
+    try {
+      const progress = {
+        clientInfo,
+        answers: Object.fromEntries(
+          Object.entries(answers).map(([key, value]) => [
+            key,
+            value instanceof Date ? value.toISOString() : value,
+          ])
+        ),
+        step,
+        currentSectionIndex,
+        savedAt: new Date().toISOString(),
+      };
+      localStorage.setItem(getStorageKey(), JSON.stringify(progress));
+    } catch (error) {
+      console.error('Failed to save progress:', error);
+    }
+  }, [formId, clientInfo, answers, step, currentSectionIndex, getStorageKey]);
+
+  // Load progress from localStorage
+  const loadProgress = useCallback(() => {
+    if (!formId) return null;
+    try {
+      const saved = localStorage.getItem(getStorageKey());
+      if (saved) {
+        const progress = JSON.parse(saved);
+        return {
+          clientInfo: progress.clientInfo || {
+            name: '',
+            email: '',
+            phone: '',
+            street: '',
+            streetNumber: '',
+            city: '',
+            state: '',
+            postalCode: '',
+          },
+          answers: Object.fromEntries(
+            Object.entries(progress.answers || {}).map(([key, value]) => [
+              key,
+              typeof value === 'string' && value.match(/^\d{4}-\d{2}-\d{2}T/) 
+                ? new Date(value as string)
+                : value,
+            ])
+          ),
+          step: progress.step || 'info',
+          currentSectionIndex: progress.currentSectionIndex || 0,
+        };
+      }
+    } catch (error) {
+      console.error('Failed to load progress:', error);
+    }
+    return null;
+  }, [formId, getStorageKey]);
+
+  // Clear progress from localStorage
+  const clearProgress = useCallback(() => {
+    if (!formId) return;
+    try {
+      localStorage.removeItem(getStorageKey());
+    } catch (error) {
+      console.error('Failed to clear progress:', error);
+    }
+  }, [formId, getStorageKey]);
+
   useEffect(() => {
     const loadForm = async () => {
       if (!formId) return;
@@ -66,6 +137,15 @@ const PublicFormView = () => {
           updatedAt: formData.updated_at ? new Date(formData.updated_at) : new Date(formData.updatedAt || Date.now()),
         };
         setForm(mappedForm);
+
+        // Load saved progress after form is loaded
+        const savedProgress = loadProgress();
+        if (savedProgress && savedProgress.step !== 'success') {
+          setClientInfo(savedProgress.clientInfo);
+          setAnswers(savedProgress.answers);
+          setStep(savedProgress.step);
+          setCurrentSectionIndex(savedProgress.currentSectionIndex);
+        }
       } catch (error) {
         console.error('Failed to load form:', error);
         toast.error('Error al cargar el formulario');
@@ -75,6 +155,19 @@ const PublicFormView = () => {
     };
     loadForm();
   }, [formId]);
+
+  // Save progress whenever clientInfo, answers, step, or currentSectionIndex changes
+  useEffect(() => {
+    // Don't save if we're on success step (form already submitted)
+    if (step === 'success' || !formId) return;
+    
+    // Debounce saving to avoid too frequent writes
+    const timeoutId = setTimeout(() => {
+      saveProgress();
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [clientInfo, answers, step, currentSectionIndex, saveProgress, formId]);
 
   // Format phone number with mask (XXX)-XXXX-XXXX
   const formatPhoneNumber = (value: string): string => {
@@ -237,10 +330,21 @@ const PublicFormView = () => {
               formattedValue = String(answerValue);
             }
 
+            // Get question title, ensuring it's not "Nueva pregunta" or empty
+            let questionTitle = question.title || question.label || question.text || '';
+            // If title is "Nueva pregunta" or invalid, try to get a better value
+            if (!questionTitle || 
+                questionTitle.trim() === '' || 
+                questionTitle.trim().toLowerCase() === 'nueva pregunta' ||
+                questionTitle.trim().toLowerCase() === 'nueva pregunta frecuente') {
+              // Try alternative fields
+              questionTitle = question.label || question.text || question.id || `Pregunta ${question.id.slice(0, 8)}`;
+            }
+
             // Include both the answer and question information
             formattedAnswers[question.id] = {
               questionId: question.id,
-              question: question.title,
+              question: questionTitle,
               questionType: question.type,
               questionDescription: question.description,
               answer: formattedValue,
@@ -292,6 +396,9 @@ const PublicFormView = () => {
       
       console.log('Submission response:', response);
       console.log('Response answers:', response.answers);
+      
+      // Clear progress from localStorage after successful submission
+      clearProgress();
       
       toast.success('Formulario enviado correctamente');
       setStep('success');

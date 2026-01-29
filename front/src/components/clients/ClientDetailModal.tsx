@@ -32,12 +32,12 @@ export const ClientDetailModal = ({
     { 
       icon: Calendar, 
       label: 'Fecha de registro', 
-      value: format(client.createdAt, "d 'de' MMMM, yyyy", { locale: es }) 
+      value: format(client.createdAt, "d 'de' MMMM, yyyy 'a las' HH:mm", { locale: es }) 
     },
     { 
       icon: Clock, 
       label: 'Última actualización', 
-      value: format(client.updatedAt, "d 'de' MMMM, yyyy", { locale: es }) 
+      value: format(client.updatedAt, "d 'de' MMMM, yyyy 'a las' HH:mm", { locale: es }) 
     },
   ];
 

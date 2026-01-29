@@ -104,21 +104,29 @@ export const ClientProfileView = ({ client, onBack, onEdit }: ClientProfileViewP
                 let answerValue: string | string[];
                 
                 if (isNewFormat) {
-                  // New format: use saved question text, but validate it
+                  // New format: use questionDescription as primary, question as fallback
+                  const savedQuestionDescription = answerData.questionDescription;
                   const savedQuestionText = answerData.question;
-                  // Check if saved question text is valid (not empty, not "Nueva pregunta")
-                  const isValidQuestionText = savedQuestionText && 
-                    savedQuestionText.trim() !== '' && 
-                    savedQuestionText.trim().toLowerCase() !== 'nueva pregunta';
                   
-                  if (isValidQuestionText) {
+                  // Prefer questionDescription over question
+                  if (savedQuestionDescription && 
+                      typeof savedQuestionDescription === 'string' &&
+                      savedQuestionDescription.trim() !== '') {
+                    questionText = savedQuestionDescription;
+                  } else if (savedQuestionText && 
+                             typeof savedQuestionText === 'string' &&
+                             savedQuestionText.trim() !== '' &&
+                             savedQuestionText.trim().toLowerCase() !== 'nueva pregunta' &&
+                             savedQuestionText.trim().toLowerCase() !== 'nueva pregunta frecuente') {
                     questionText = savedQuestionText;
                   } else if (foundQuestion) {
-                    // Use question from form if saved text is invalid
-                    questionText = foundQuestion.title || foundQuestion.label || foundQuestion.text || `Pregunta ${questionId.slice(0, 8)}`;
+                    // Use form question text as fallback
+                    const formQuestionText = foundQuestion.title || foundQuestion.label || foundQuestion.text;
+                    questionText = (formQuestionText && formQuestionText.trim() !== '' && formQuestionText.trim().toLowerCase() !== 'nueva pregunta')
+                      ? formQuestionText
+                      : savedQuestionDescription || savedQuestionText || `Pregunta ${questionId.slice(0, 8)}`;
                   } else {
-                    // Last resort fallback
-                    questionText = `Pregunta ${questionId.slice(0, 8)}`;
+                    questionText = savedQuestionDescription || savedQuestionText || `Pregunta ${questionId.slice(0, 8)}`;
                   }
                   
                   answerValue = answerData.answer;
@@ -274,12 +282,12 @@ export const ClientProfileView = ({ client, onBack, onEdit }: ClientProfileViewP
     { 
       icon: Calendar, 
       label: 'Registro', 
-      value: format(client.createdAt, "d MMM yyyy", { locale: es }) 
+      value: format(client.createdAt, "d MMM yyyy 'a las' HH:mm", { locale: es }) 
     },
     { 
       icon: Clock, 
       label: 'Actualización', 
-      value: format(client.updatedAt, "d MMM yyyy", { locale: es }) 
+      value: format(client.updatedAt, "d MMM yyyy 'a las' HH:mm", { locale: es }) 
     },
   ];
 
