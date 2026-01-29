@@ -19,7 +19,7 @@ import {
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
-import { User, Mail, Phone, CalendarIcon, CheckCircle2, ArrowRight, ArrowLeft, Send, Loader2 } from 'lucide-react';
+import { User, Mail, Phone, CalendarIcon, CheckCircle2, ArrowRight, ArrowLeft, Send, Loader2, MapPin, Building2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -37,6 +37,11 @@ const PublicFormView = () => {
     name: '',
     email: '',
     phone: '',
+    street: '',
+    streetNumber: '',
+    city: '',
+    state: '',
+    postalCode: '',
   });
   
   // Form answers
@@ -71,6 +76,26 @@ const PublicFormView = () => {
     loadForm();
   }, [formId]);
 
+  // Format phone number with mask (XXX)-XXXX-XXXX
+  const formatPhoneNumber = (value: string): string => {
+    // Remove all non-digit characters
+    const digits = value.replace(/\D/g, '');
+    
+    // Limit to 10 digits
+    const limitedDigits = digits.slice(0, 10);
+    
+    // Apply mask: (XXX)-XXXX-XXXX
+    if (limitedDigits.length === 0) return '';
+    if (limitedDigits.length <= 3) return `(${limitedDigits}`;
+    if (limitedDigits.length <= 6) return `(${limitedDigits.slice(0, 3)})-${limitedDigits.slice(3)}`;
+    return `(${limitedDigits.slice(0, 3)})-${limitedDigits.slice(3, 6)}-${limitedDigits.slice(6)}`;
+  };
+
+  // Get clean phone number (only digits)
+  const getCleanPhone = (phone: string): string => {
+    return phone.replace(/\D/g, '');
+  };
+
   const validateClientInfo = () => {
     const newErrors: Record<string, string> = {};
     
@@ -78,14 +103,48 @@ const PublicFormView = () => {
       newErrors.name = 'El nombre es obligatorio';
     }
     
+    // Email validation - more robust
     if (!clientInfo.email.trim()) {
       newErrors.email = 'El correo es obligatorio';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clientInfo.email)) {
-      newErrors.email = 'Ingrese un correo válido';
+    } else {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(clientInfo.email.trim())) {
+        newErrors.email = 'Ingrese un correo electrónico válido (ejemplo: correo@dominio.com)';
+      }
     }
     
-    if (!clientInfo.phone.trim()) {
+    // Phone validation - exactly 10 digits
+    const cleanPhone = getCleanPhone(clientInfo.phone);
+    if (!cleanPhone) {
       newErrors.phone = 'El teléfono es obligatorio';
+    } else if (cleanPhone.length !== 10) {
+      newErrors.phone = 'El teléfono debe tener exactamente 10 dígitos';
+    } else if (!/^\d{10}$/.test(cleanPhone)) {
+      newErrors.phone = 'El teléfono debe contener solo números';
+    }
+    
+    // Address validation
+    if (!clientInfo.street.trim()) {
+      newErrors.street = 'La calle es obligatoria';
+    }
+    
+    if (!clientInfo.streetNumber.trim()) {
+      newErrors.streetNumber = 'El número es obligatorio';
+    }
+    
+    if (!clientInfo.city.trim()) {
+      newErrors.city = 'La ciudad es obligatoria';
+    }
+    
+    if (!clientInfo.state.trim()) {
+      newErrors.state = 'El estado es obligatorio';
+    }
+    
+    // Postal code validation - 5 digits
+    if (!clientInfo.postalCode.trim()) {
+      newErrors.postalCode = 'El código postal es obligatorio';
+    } else if (!/^\d{5}$/.test(clientInfo.postalCode.trim())) {
+      newErrors.postalCode = 'El código postal debe tener 5 dígitos';
     }
     
     setErrors(newErrors);
@@ -160,19 +219,35 @@ const PublicFormView = () => {
         });
       });
 
-      // Convert Date objects to ISO strings for API
-      const formattedAnswers: Record<string, string | string[]> = {};
-      Object.entries(allAnswers).forEach(([key, value]) => {
-        if (value instanceof Date) {
-          formattedAnswers[key] = value.toISOString();
-        } else if (value !== undefined && value !== null) {
-          // Include empty strings and arrays - they are valid answers
-          if (Array.isArray(value)) {
-            formattedAnswers[key] = value;
-          } else if (typeof value === 'string') {
-            formattedAnswers[key] = value;
+      // Convert Date objects to ISO strings and include question information
+      const formattedAnswers: Record<string, any> = {};
+      form.sections.forEach(section => {
+        section.questions.forEach(question => {
+          const answerValue = allAnswers[question.id];
+          if (answerValue !== undefined && answerValue !== null) {
+            // Format the answer value
+            let formattedValue: string | string[];
+            if (answerValue instanceof Date) {
+              formattedValue = answerValue.toISOString();
+            } else if (Array.isArray(answerValue)) {
+              formattedValue = answerValue;
+            } else if (typeof answerValue === 'string') {
+              formattedValue = answerValue;
+            } else {
+              formattedValue = String(answerValue);
+            }
+
+            // Include both the answer and question information
+            formattedAnswers[question.id] = {
+              questionId: question.id,
+              question: question.title,
+              questionType: question.type,
+              questionDescription: question.description,
+              answer: formattedValue,
+              options: question.options, // Preserve options for display
+            };
           }
-        }
+        });
       });
 
       // Debug: Log answers before sending
@@ -188,11 +263,26 @@ const PublicFormView = () => {
         return;
       }
 
+      // Get clean phone number (only digits) for submission
+      const cleanPhoneNumber = getCleanPhone(clientInfo.phone);
+
+      // Build address string from address fields
+      const addressParts = [
+        clientInfo.street.trim(),
+        clientInfo.streetNumber.trim(),
+        clientInfo.city.trim(),
+        clientInfo.state.trim(),
+        clientInfo.postalCode.trim(),
+      ].filter(part => part.length > 0);
+      const fullAddress = addressParts.join(', ');
+
       const submissionData = {
         formId: form.id,
         formName: form.name,
         respondentName: clientInfo.name,
         respondentEmail: clientInfo.email,
+        respondentPhone: cleanPhoneNumber || undefined,
+        address: fullAddress || undefined,
         answers: formattedAnswers,
       };
 
@@ -477,7 +567,30 @@ const PublicFormView = () => {
                     type="email"
                     placeholder="correo@ejemplo.com"
                     value={clientInfo.email}
-                    onChange={e => setClientInfo(prev => ({ ...prev, email: e.target.value }))}
+                    onChange={e => {
+                      const emailValue = e.target.value;
+                      setClientInfo(prev => ({ ...prev, email: emailValue }));
+                      // Validate email in real-time
+                      if (emailValue.trim()) {
+                        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                        if (!emailRegex.test(emailValue.trim())) {
+                          setErrors(prev => ({ ...prev, email: 'Ingrese un correo electrónico válido (ejemplo: correo@dominio.com)' }));
+                        } else {
+                          setErrors(prev => ({ ...prev, email: '' }));
+                        }
+                      } else {
+                        setErrors(prev => ({ ...prev, email: '' }));
+                      }
+                    }}
+                    onBlur={() => {
+                      // Re-validate on blur
+                      if (clientInfo.email.trim()) {
+                        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                        if (!emailRegex.test(clientInfo.email.trim())) {
+                          setErrors(prev => ({ ...prev, email: 'Ingrese un correo electrónico válido (ejemplo: correo@dominio.com)' }));
+                        }
+                      }
+                    }}
                     className={cn('h-12', errors.email && 'border-destructive')}
                   />
                   {errors.email && (
@@ -493,14 +606,162 @@ const PublicFormView = () => {
                   <Input
                     id="phone"
                     type="tel"
-                    placeholder="+52 55 1234 5678"
+                    placeholder="(XXX)-XXXX-XXXX"
                     value={clientInfo.phone}
-                    onChange={e => setClientInfo(prev => ({ ...prev, phone: e.target.value }))}
+                    onChange={e => {
+                      const inputValue = e.target.value;
+                      // Format with mask
+                      const formatted = formatPhoneNumber(inputValue);
+                      setClientInfo(prev => ({ ...prev, phone: formatted }));
+                      
+                      // Validate in real-time
+                      const cleanPhone = getCleanPhone(formatted);
+                      if (cleanPhone.length === 0) {
+                        setErrors(prev => ({ ...prev, phone: '' }));
+                      } else if (cleanPhone.length !== 10) {
+                        setErrors(prev => ({ ...prev, phone: 'El teléfono debe tener exactamente 10 dígitos' }));
+                      } else {
+                        setErrors(prev => ({ ...prev, phone: '' }));
+                      }
+                    }}
+                    onBlur={() => {
+                      // Re-validate on blur
+                      const cleanPhone = getCleanPhone(clientInfo.phone);
+                      if (cleanPhone.length === 0) {
+                        setErrors(prev => ({ ...prev, phone: 'El teléfono es obligatorio' }));
+                      } else if (cleanPhone.length !== 10) {
+                        setErrors(prev => ({ ...prev, phone: 'El teléfono debe tener exactamente 10 dígitos' }));
+                      }
+                    }}
+                    maxLength={14} // (XXX)-XXXX-XXXX = 14 characters
                     className={cn('h-12', errors.phone && 'border-destructive')}
                   />
                   {errors.phone && (
                     <p className="text-sm text-destructive">{errors.phone}</p>
                   )}
+                </div>
+
+                {/* Address Section */}
+                <div className="pt-4 border-t border-border/50">
+                  <h3 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
+                    <MapPin className="w-4 h-4" />
+                    Dirección
+                  </h3>
+                  
+                  <div className="space-y-5">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="md:col-span-2 space-y-2">
+                        <Label htmlFor="street" className="flex items-center gap-2">
+                          <Building2 className="w-4 h-4" />
+                          Calle *
+                        </Label>
+                        <Input
+                          id="street"
+                          placeholder="Nombre de la calle"
+                          value={clientInfo.street}
+                          onChange={e => {
+                            setClientInfo(prev => ({ ...prev, street: e.target.value }));
+                            setErrors(prev => ({ ...prev, street: '' }));
+                          }}
+                          className={cn('h-12', errors.street && 'border-destructive')}
+                        />
+                        {errors.street && (
+                          <p className="text-sm text-destructive">{errors.street}</p>
+                        )}
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="streetNumber" className="flex items-center gap-2">
+                          Número *
+                        </Label>
+                        <Input
+                          id="streetNumber"
+                          placeholder="123"
+                          value={clientInfo.streetNumber}
+                          onChange={e => {
+                            setClientInfo(prev => ({ ...prev, streetNumber: e.target.value }));
+                            setErrors(prev => ({ ...prev, streetNumber: '' }));
+                          }}
+                          className={cn('h-12', errors.streetNumber && 'border-destructive')}
+                        />
+                        {errors.streetNumber && (
+                          <p className="text-sm text-destructive">{errors.streetNumber}</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="city" className="flex items-center gap-2">
+                          Ciudad *
+                        </Label>
+                        <Input
+                          id="city"
+                          placeholder="Ciudad"
+                          value={clientInfo.city}
+                          onChange={e => {
+                            setClientInfo(prev => ({ ...prev, city: e.target.value }));
+                            setErrors(prev => ({ ...prev, city: '' }));
+                          }}
+                          className={cn('h-12', errors.city && 'border-destructive')}
+                        />
+                        {errors.city && (
+                          <p className="text-sm text-destructive">{errors.city}</p>
+                        )}
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="state" className="flex items-center gap-2">
+                          Estado *
+                        </Label>
+                        <Input
+                          id="state"
+                          placeholder="Estado"
+                          value={clientInfo.state}
+                          onChange={e => {
+                            setClientInfo(prev => ({ ...prev, state: e.target.value }));
+                            setErrors(prev => ({ ...prev, state: '' }));
+                          }}
+                          className={cn('h-12', errors.state && 'border-destructive')}
+                        />
+                        {errors.state && (
+                          <p className="text-sm text-destructive">{errors.state}</p>
+                        )}
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="postalCode" className="flex items-center gap-2">
+                          Código Postal *
+                        </Label>
+                        <Input
+                          id="postalCode"
+                          placeholder="12345"
+                          value={clientInfo.postalCode}
+                          onChange={e => {
+                            const value = e.target.value.replace(/\D/g, '').slice(0, 5);
+                            setClientInfo(prev => ({ ...prev, postalCode: value }));
+                            if (value.length === 5) {
+                              setErrors(prev => ({ ...prev, postalCode: '' }));
+                            } else if (value.length > 0) {
+                              setErrors(prev => ({ ...prev, postalCode: 'El código postal debe tener 5 dígitos' }));
+                            } else {
+                              setErrors(prev => ({ ...prev, postalCode: '' }));
+                            }
+                          }}
+                          onBlur={() => {
+                            if (clientInfo.postalCode.trim() && !/^\d{5}$/.test(clientInfo.postalCode.trim())) {
+                              setErrors(prev => ({ ...prev, postalCode: 'El código postal debe tener 5 dígitos' }));
+                            }
+                          }}
+                          maxLength={5}
+                          className={cn('h-12', errors.postalCode && 'border-destructive')}
+                        />
+                        {errors.postalCode && (
+                          <p className="text-sm text-destructive">{errors.postalCode}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 

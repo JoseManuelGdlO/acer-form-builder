@@ -9,6 +9,7 @@ interface FormSubmissionAttributes {
   formName: string;
   respondentName: string;
   respondentEmail: string;
+  respondentPhone?: string;
   status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
   answers: Record<string, string | string[]>;
   clientId?: string;
@@ -25,6 +26,7 @@ export class FormSubmission extends Model<FormSubmissionAttributes, FormSubmissi
   public formName!: string;
   public respondentName!: string;
   public respondentEmail!: string;
+  public respondentPhone?: string;
   public status!: 'pending' | 'in_progress' | 'completed' | 'cancelled';
   public answers!: Record<string, string | string[]>;
   public clientId?: string;
@@ -63,6 +65,10 @@ FormSubmission.init(
       validate: {
         isEmail: true,
       },
+    },
+    respondentPhone: {
+      type: DataTypes.STRING(50),
+      allowNull: true,
     },
     status: {
       type: DataTypes.ENUM('pending', 'in_progress', 'completed', 'cancelled'),

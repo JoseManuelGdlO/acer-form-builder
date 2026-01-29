@@ -85,6 +85,10 @@ export const SubmissionList = ({
     yPos += 6;
     doc.text(`Email: ${submission.respondentEmail}`, 20, yPos);
     yPos += 6;
+    if (submission.respondentPhone) {
+      doc.text(`Teléfono: ${submission.respondentPhone}`, 20, yPos);
+      yPos += 6;
+    }
     doc.text(`Estado: ${SUBMISSION_STATUS_CONFIG[submission.status].label}`, 20, yPos);
     yPos += 6;
     doc.text(`Fecha: ${format(submission.submittedAt, "d 'de' MMMM, yyyy", { locale: es })}`, 20, yPos);
@@ -100,11 +104,32 @@ export const SubmissionList = ({
     doc.text('Respuestas', 20, yPos);
     yPos += 10;
 
-    // Get all questions from form sections
-    const getAllQuestions = (): Question[] => {
+    // Get all questions - try to use saved questions from answers first, then form sections
+    const getAllQuestions = (): Array<{ id: string; title: string; type?: string }> => {
+      const answers = submission.answers || {};
+      const savedQuestions: Array<{ id: string; title: string; type?: string }> = [];
+      
+      // First, try to extract questions from saved answers (new format)
+      Object.entries(answers).forEach(([questionId, answerData]) => {
+        if (answerData && typeof answerData === 'object' && !Array.isArray(answerData) && 'question' in answerData) {
+          savedQuestions.push({
+            id: questionId,
+            title: answerData.question,
+            type: answerData.questionType,
+          });
+        }
+      });
+      
+      // If we have saved questions, use them
+      if (savedQuestions.length > 0) {
+        return savedQuestions;
+      }
+      
+      // Otherwise, fall back to form sections
       if (submission.form && submission.form.sections) {
         return submission.form.sections.flatMap(section => section.questions || []);
       }
+      
       return [];
     };
 
@@ -124,13 +149,32 @@ export const SubmissionList = ({
 
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(10);
-      const answer = answers[question.id];
+      const answerData = answers[question.id];
+      
+      // Support both old format (direct answer) and new format (object with question info)
+      const isNewFormat = answerData && typeof answerData === 'object' && !Array.isArray(answerData) && 'question' in answerData;
+      const answer = isNewFormat ? answerData.answer : answerData;
+      
       let answerText = 'Sin respuesta';
       if (answer !== undefined && answer !== null && answer !== '') {
         if (Array.isArray(answer)) {
-          answerText = answer.join(', ');
+          // If new format with options, convert IDs to labels
+          if (isNewFormat && answerData.options) {
+            answerText = answer.map((id: string) => {
+              const option = answerData.options.find((opt: any) => opt.id === id);
+              return option ? option.label : id;
+            }).join(', ');
+          } else {
+            answerText = answer.join(', ');
+          }
         } else {
-          answerText = String(answer);
+          // If new format with options and answer is an option ID, convert to label
+          if (isNewFormat && answerData.options) {
+            const option = answerData.options.find((opt: any) => opt.id === answer);
+            answerText = option ? option.label : String(answer);
+          } else {
+            answerText = String(answer);
+          }
         }
       }
       const splitAnswer = doc.splitTextToSize(answerText, pageWidth - 50);

@@ -18,6 +18,7 @@ import {
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
 interface ClientProfileViewProps {
   client: Client;
@@ -77,18 +78,76 @@ export const ClientProfileView = ({ client, onBack, onEdit }: ClientProfileViewP
           try {
             const form = await api.getForm(sub.form_id || sub.formId);
             // Transform answers from JSON to the format expected by ClientFormData
+            // Support both old format (questionId: answer) and new format (questionId: { question, answer, ... })
+            // Iterate over saved answers directly (not form questions) to show all answered questions
             const answers: any[] = [];
-            if (form.sections && sub.answers) {
-              form.sections.forEach((section: any) => {
-                section.questions.forEach((question: any) => {
-                  const answerValue = sub.answers[question.id];
-                  if (answerValue !== undefined) {
-                    answers.push({
-                      section: section.title || section.label || 'Sin sección',
-                      question: question.label || question.text || question.id,
-                      answer: Array.isArray(answerValue) ? answerValue.join(', ') : String(answerValue),
+            if (sub.answers) {
+              Object.entries(sub.answers).forEach(([questionId, answerData]: [string, any]) => {
+                // Check if it's the new format (object with question info)
+                const isNewFormat = answerData && typeof answerData === 'object' && !Array.isArray(answerData) && 'question' in answerData;
+                
+                // Try to find question from form first (as fallback)
+                let foundQuestion: any = null;
+                let sectionName: string = 'Sin sección';
+                if (form.sections) {
+                  for (const section of form.sections) {
+                    const question = section.questions?.find((q: any) => q.id === questionId);
+                    if (question) {
+                      foundQuestion = question;
+                      sectionName = section.title || section.label || 'Sin sección';
+                      break;
+                    }
+                  }
+                }
+                
+                let questionText: string;
+                let answerValue: string | string[];
+                
+                if (isNewFormat) {
+                  // New format: use saved question text, but validate it
+                  const savedQuestionText = answerData.question;
+                  // Check if saved question text is valid (not empty, not "Nueva pregunta")
+                  const isValidQuestionText = savedQuestionText && 
+                    savedQuestionText.trim() !== '' && 
+                    savedQuestionText.trim().toLowerCase() !== 'nueva pregunta';
+                  
+                  if (isValidQuestionText) {
+                    questionText = savedQuestionText;
+                  } else if (foundQuestion) {
+                    // Use question from form if saved text is invalid
+                    questionText = foundQuestion.title || foundQuestion.label || foundQuestion.text || `Pregunta ${questionId.slice(0, 8)}`;
+                  } else {
+                    // Last resort fallback
+                    questionText = `Pregunta ${questionId.slice(0, 8)}`;
+                  }
+                  
+                  answerValue = answerData.answer;
+                  
+                  // If answer is an option ID and we have options, convert to label
+                  if (answerData.options && !Array.isArray(answerValue)) {
+                    const option = answerData.options.find((opt: any) => opt.id === answerValue);
+                    if (option) {
+                      answerValue = option.label;
+                    }
+                  } else if (Array.isArray(answerValue) && answerData.options) {
+                    // For arrays, convert option IDs to labels
+                    answerValue = answerValue.map((id: string) => {
+                      const option = answerData.options.find((opt: any) => opt.id === id);
+                      return option ? option.label : id;
                     });
                   }
+                } else {
+                  // Old format: use question from form
+                  questionText = foundQuestion 
+                    ? (foundQuestion.title || foundQuestion.label || foundQuestion.text || `Pregunta ${questionId.slice(0, 8)}`)
+                    : `Pregunta ${questionId.slice(0, 8)}`;
+                  answerValue = answerData;
+                }
+                
+                answers.push({
+                  section: sectionName,
+                  question: questionText,
+                  answer: Array.isArray(answerValue) ? answerValue.join(', ') : String(answerValue),
                 });
               });
             }
@@ -277,13 +336,19 @@ export const ClientProfileView = ({ client, onBack, onEdit }: ClientProfileViewP
               <CardContent>
                 <div className="grid sm:grid-cols-2 gap-4">
                   {infoItems.map((item, index) => (
-                    <div key={index} className="flex items-start gap-3">
+                    <div
+                      key={index}
+                      className={cn(
+                        'flex items-start gap-3',
+                        item.label === 'Dirección' && 'sm:col-span-2'
+                      )}
+                    >
                       <div className="w-9 h-9 rounded-lg bg-muted/50 flex items-center justify-center flex-shrink-0">
                         <item.icon className="w-4 h-4 text-muted-foreground" />
                       </div>
-                      <div>
+                      <div className="min-w-0 flex-1">
                         <p className="text-xs text-muted-foreground">{item.label}</p>
-                        <p className="text-sm font-medium text-foreground">{item.value}</p>
+                        <p className="text-sm font-medium text-foreground break-words">{item.value}</p>
                       </div>
                     </div>
                   ))}

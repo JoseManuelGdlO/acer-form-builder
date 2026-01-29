@@ -102,7 +102,7 @@ export const createSubmission = [
         return;
       }
 
-      const { formId, formName, respondentName, respondentEmail, answers, clientId } = req.body;
+      const { formId, formName, respondentName, respondentEmail, respondentPhone, address, answers, clientId } = req.body;
 
       // Debug: Log received data
       console.log('Received submission data:', {
@@ -130,10 +130,26 @@ export const createSubmission = [
       // Ensure answers is always an object
       const finalAnswers = answers && typeof answers === 'object' && !Array.isArray(answers) ? answers : {};
       
-      console.log('Final answers to save:', finalAnswers);
-      console.log('Final answers keys:', Object.keys(finalAnswers));
+      // Normalize answers format - support both old format (questionId: answer) 
+      // and new format (questionId: { question, answer, ... })
+      const normalizedAnswers: Record<string, any> = {};
+      Object.entries(finalAnswers).forEach(([questionId, answerData]) => {
+        // If answerData is already an object with question info, keep it
+        if (answerData && typeof answerData === 'object' && !Array.isArray(answerData) && 'question' in answerData) {
+          normalizedAnswers[questionId] = answerData;
+        } else {
+          // Old format: just the answer value, convert to new format
+          normalizedAnswers[questionId] = {
+            questionId,
+            answer: answerData,
+          };
+        }
+      });
+      
+      console.log('Final answers to save:', normalizedAnswers);
+      console.log('Final answers keys:', Object.keys(normalizedAnswers));
 
-      // Try to find or create client by email
+      // Try to find or create client by email; save/update phone and address
       let finalClientId = clientId;
       if (!finalClientId && respondentEmail) {
         let client = await Client.findOne({ where: { email: respondentEmail } });
@@ -141,8 +157,22 @@ export const createSubmission = [
           client = await Client.create({
             name: respondentName,
             email: respondentEmail,
+            phone: respondentPhone || undefined,
+            address: address || undefined,
             status: 'pending',
           });
+        } else {
+          // Update existing client with new information
+          const updateData: any = {};
+          if (respondentPhone !== undefined && respondentPhone !== null && respondentPhone !== '') {
+            updateData.phone = respondentPhone;
+          }
+          if (address !== undefined && address !== null && address !== '') {
+            updateData.address = address;
+          }
+          if (Object.keys(updateData).length > 0) {
+            await client.update(updateData);
+          }
         }
         finalClientId = client.id;
       }
@@ -152,7 +182,8 @@ export const createSubmission = [
         formName,
         respondentName,
         respondentEmail,
-        answers: finalAnswers,
+        respondentPhone: respondentPhone || undefined,
+        answers: normalizedAnswers,
         clientId: finalClientId,
         status: 'pending',
       });
@@ -165,14 +196,18 @@ export const createSubmission = [
         answersStringified: JSON.stringify(submission.answers),
       });
 
-      // Update client's formsCompleted count
+      // Update client's formsCompleted count (cuestionarios contestados = submitted, not cancelled)
       if (finalClientId) {
         const client = await Client.findByPk(finalClientId);
         if (client) {
           const count = await FormSubmission.count({
-            where: { clientId: finalClientId, status: 'completed' },
+            where: {
+              clientId: finalClientId,
+              status: { [Op.in]: ['pending', 'in_progress', 'completed'] },
+            },
           });
           await client.update({ formsCompleted: count });
+          console.log(`Updated client ${finalClientId} formsCompleted to ${count} (after creating submission ${submission.id})`);
         }
       }
 
@@ -215,15 +250,22 @@ export const updateSubmission = [
       }
 
       await submission.update(req.body);
+      
+      // Reload submission to get updated clientId if it changed
+      await submission.reload();
 
-      // Update client's formsCompleted count if status changed to completed
-      if (req.body.status === 'completed' && submission.clientId) {
+      // Update client's formsCompleted count (cuestionarios contestados)
+      if (submission.clientId) {
         const client = await Client.findByPk(submission.clientId);
         if (client) {
           const count = await FormSubmission.count({
-            where: { clientId: submission.clientId, status: 'completed' },
+            where: {
+              clientId: submission.clientId,
+              status: { [Op.in]: ['pending', 'in_progress', 'completed'] },
+            },
           });
           await client.update({ formsCompleted: count });
+          console.log(`Updated client ${submission.clientId} formsCompleted to ${count}`);
         }
       }
 

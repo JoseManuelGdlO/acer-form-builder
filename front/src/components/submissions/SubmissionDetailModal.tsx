@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FormSubmission, QUESTION_TYPE_CONFIG, Question } from '@/types/form';
+import { FormSubmission, QUESTION_TYPE_CONFIG } from '@/types/form';
 import {
   Dialog,
   DialogContent,
@@ -10,7 +10,7 @@ import { SubmissionStatusBadge } from './SubmissionStatusBadge';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { User, Mail, Calendar, FileText, MessageSquare, Loader2 } from 'lucide-react';
+import { User, Mail, Phone, Calendar, FileText, MessageSquare, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { api } from '@/lib/api';
@@ -51,6 +51,7 @@ export const SubmissionDetailModal = ({
           formName: response.form_name || response.formName,
           respondentName: response.respondent_name || response.respondentName,
           respondentEmail: response.respondent_email || response.respondentEmail,
+          respondentPhone: response.respondent_phone || response.respondentPhone,
           status: response.status,
           answers: response.answers || {},
           submittedAt: response.submitted_at ? new Date(response.submitted_at) : new Date(response.submittedAt || Date.now()),
@@ -84,26 +85,72 @@ export const SubmissionDetailModal = ({
 
   if (!submission) return null;
 
-  // Get all questions from the form sections
-  const getAllQuestions = (): Question[] => {
-    const formToUse = fullSubmission?.form || submission?.form;
-    if (formToUse && formToUse.sections) {
-      console.log('Form sections:', formToUse.sections);
-      const questions = formToUse.sections.flatMap(section => section.questions || []);
-      console.log('Extracted questions:', questions);
-      return questions;
-    }
-    console.warn('No form or sections found:', { 
-      hasFullSubmission: !!fullSubmission,
-      hasForm: !!fullSubmission?.form || !!submission?.form,
-      formSections: fullSubmission?.form?.sections || submission?.form?.sections 
-    });
-    return [];
+  const rawAnswers = fullSubmission?.answers || submission?.answers || {};
+  const displaySubmission = fullSubmission || submission;
+
+  // Build explicit question–answer pairs from saved answers (prioritise new format with embedded question text)
+  type QuestionAnswerPair = {
+    id: string;
+    question: string;
+    questionType?: string;
+    questionDescription?: string;
+    answer: string | string[];
+    options?: Array<{ id: string; label: string }>;
   };
 
-  const questions = getAllQuestions();
-  const answers = fullSubmission?.answers || submission?.answers || {};
-  const displaySubmission = fullSubmission || submission;
+  const getQuestionAnswerPairs = (): QuestionAnswerPair[] => {
+    const pairs: QuestionAnswerPair[] = [];
+    const formToUse = fullSubmission?.form || submission?.form;
+
+    Object.entries(rawAnswers).forEach(([questionId, answerData]) => {
+      const isNewFormat =
+        answerData &&
+        typeof answerData === 'object' &&
+        !Array.isArray(answerData) &&
+        'question' in answerData;
+
+      if (isNewFormat) {
+        let answerValue = (answerData as any).answer;
+        // Ensure answer is properly formatted (not an object)
+        if (answerValue && typeof answerValue === 'object' && !Array.isArray(answerValue)) {
+          // If answer is an object, try to stringify it or extract a meaningful value
+          answerValue = JSON.stringify(answerValue);
+        }
+        
+        pairs.push({
+          id: questionId,
+          question: (answerData as any).question,
+          questionType: (answerData as any).questionType,
+          questionDescription: (answerData as any).questionDescription,
+          answer: answerValue,
+          options: (answerData as any).options,
+        });
+        return;
+      }
+
+      // Old format: only answer value; get question text from form sections
+      let answerValue = answerData;
+      // Ensure answer is properly formatted (not an object)
+      if (answerValue && typeof answerValue === 'object' && !Array.isArray(answerValue)) {
+        // If answer is an object, try to stringify it or extract a meaningful value
+        answerValue = JSON.stringify(answerValue);
+      }
+      
+      const questionTitle =
+        formToUse?.sections
+          ?.flatMap((s: any) => s.questions || [])
+          .find((q: any) => q.id === questionId)?.title || `Pregunta (${questionId.slice(0, 8)}…)`;
+      pairs.push({
+        id: questionId,
+        question: questionTitle,
+        answer: answerValue as string | string[],
+      });
+    });
+
+    return pairs;
+  };
+
+  const questionAnswerPairs = getQuestionAnswerPairs();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -122,9 +169,17 @@ export const SubmissionDetailModal = ({
                   <h3 className="font-semibold text-foreground">
                     {displaySubmission.respondentName}
                   </h3>
-                  <div className="flex items-center gap-1.5 text-muted-foreground text-sm">
-                    <Mail className="w-3.5 h-3.5" />
-                    <span>{displaySubmission.respondentEmail}</span>
+                  <div className="flex flex-col gap-1 text-muted-foreground text-sm">
+                    <div className="flex items-center gap-1.5">
+                      <Mail className="w-3.5 h-3.5" />
+                      <span>{displaySubmission.respondentEmail}</span>
+                    </div>
+                    {displaySubmission.respondentPhone && (
+                      <div className="flex items-center gap-1.5">
+                        <Phone className="w-3.5 h-3.5" />
+                        <span>{displaySubmission.respondentPhone}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -159,61 +214,93 @@ export const SubmissionDetailModal = ({
               <>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <MessageSquare className="w-4 h-4" />
-                  <span>{questions.length} respuestas</span>
+                  <span>{questionAnswerPairs.length} respuestas</span>
                 </div>
 
-                {questions.length === 0 ? (
+                {questionAnswerPairs.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
-                    <p>No se encontraron preguntas para este formulario.</p>
+                    <p>No hay respuestas guardadas para este formulario.</p>
                   </div>
                 ) : (
-              <div className="space-y-5">
-                {questions.map((question, index) => {
-                  const answer = answers[question.id];
-                  const typeConfig = QUESTION_TYPE_CONFIG[question.type];
+                  <div className="space-y-5">
+                    {questionAnswerPairs.map((pair, index) => {
+                      const typeConfig =
+                        pair.questionType && pair.questionType in QUESTION_TYPE_CONFIG
+                          ? QUESTION_TYPE_CONFIG[pair.questionType as keyof typeof QUESTION_TYPE_CONFIG]
+                          : null;
+                      const answer = pair.answer;
+                      const options = pair.options;
 
-                return (
-                  <div
-                    key={question.id}
-                    className="p-4 rounded-xl border border-border/50 bg-muted/20 space-y-3"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-start gap-3">
-                        <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-medium flex items-center justify-center">
-                          {index + 1}
-                        </span>
-                        <div>
-                          <p className="font-medium text-foreground">
-                            {question.title}
-                          </p>
-                          <Badge variant="outline" className="mt-1.5 text-xs">
-                            {typeConfig.label}
-                          </Badge>
-                        </div>
-                      </div>
-                    </div>
+                      const formatAnswerValue = (val: string | any): string => {
+                        // Handle non-string values
+                        if (val === null || val === undefined) {
+                          return '';
+                        }
+                        if (typeof val === 'object' && !Array.isArray(val)) {
+                          // If it's an object, try to extract meaningful data or stringify
+                          return JSON.stringify(val, null, 2);
+                        }
+                        if (Array.isArray(val)) {
+                          return val.join(', ');
+                        }
+                        const stringVal = String(val);
+                        if (options) {
+                          const opt = options.find((o) => o.id === stringVal);
+                          return opt ? opt.label : stringVal;
+                        }
+                        return stringVal;
+                      };
 
-                    <div className="ml-9 p-3 rounded-lg bg-background border border-border/30">
-                      {answer === undefined || answer === null || answer === '' ? (
-                        <span className="text-muted-foreground italic">Sin respuesta</span>
-                      ) : Array.isArray(answer) ? (
-                        <div className="flex flex-wrap gap-2">
-                          {answer.map((item, i) => (
-                            <Badge key={i} variant="secondary">
-                              {String(item)}
-                            </Badge>
-                          ))}
+                      return (
+                        <div
+                          key={pair.id}
+                          className="p-4 rounded-xl border border-border/50 bg-muted/20 space-y-3"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-start gap-3">
+                              <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-medium flex items-center justify-center">
+                                {index + 1}
+                              </span>
+                              <div>
+                                <p className="font-medium text-foreground">{pair.question}</p>
+                                {pair.questionDescription && (
+                                  <p className="text-sm text-muted-foreground mt-1">
+                                    {pair.questionDescription}
+                                  </p>
+                                )}
+                                {typeConfig && (
+                                  <Badge variant="outline" className="mt-1.5 text-xs">
+                                    {typeConfig.label}
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="ml-9 p-3 rounded-lg bg-background border border-border/30">
+                            {answer === undefined ||
+                            answer === null ||
+                            answer === '' ||
+                            (Array.isArray(answer) && answer.length === 0) ? (
+                              <span className="text-muted-foreground italic">Sin respuesta</span>
+                            ) : Array.isArray(answer) ? (
+                              <div className="flex flex-wrap gap-2">
+                                {answer.map((item, i) => (
+                                  <Badge key={i} variant="secondary">
+                                    {formatAnswerValue(item)}
+                                  </Badge>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-foreground whitespace-pre-wrap">
+                                {formatAnswerValue(answer)}
+                              </p>
+                            )}
+                          </div>
                         </div>
-                      ) : (
-                        <p className="text-foreground whitespace-pre-wrap">
-                          {String(answer)}
-                        </p>
-                      )}
-                    </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
-                </div>
                 )}
               </>
             )}

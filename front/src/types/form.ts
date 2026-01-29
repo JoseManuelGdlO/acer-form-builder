@@ -83,14 +83,28 @@ export const QUESTION_TYPE_CONFIG: Record<QuestionType, { label: string; icon: s
 
 export type SubmissionStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
 
+// Answer format - supports both old format (direct value) and new format (object with question info)
+export type SubmissionAnswer = 
+  | string 
+  | string[] 
+  | {
+      questionId: string;
+      question: string;
+      questionType?: QuestionType;
+      questionDescription?: string;
+      answer: string | string[];
+      options?: QuestionOption[];
+    };
+
 export interface FormSubmission {
   id: string;
   formId: string;
   formName: string;
   respondentName: string;
   respondentEmail: string;
+  respondentPhone?: string;
   status: SubmissionStatus;
-  answers: Record<string, string | string[]>;
+  answers: Record<string, SubmissionAnswer>;
   submittedAt: Date;
   updatedAt: Date;
   clientId?: string;

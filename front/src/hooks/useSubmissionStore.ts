@@ -30,6 +30,7 @@ export const useSubmissionStore = () => {
       formName: submissionData.form_name || submissionData.formName,
       respondentName: submissionData.respondent_name || submissionData.respondentName,
       respondentEmail: submissionData.respondent_email || submissionData.respondentEmail,
+      respondentPhone: submissionData.respondent_phone || submissionData.respondentPhone,
       status: submissionData.status,
       answers: submissionData.answers || {},
       submittedAt: submissionData.submitted_at ? new Date(submissionData.submitted_at) : new Date(submissionData.submittedAt || Date.now()),
