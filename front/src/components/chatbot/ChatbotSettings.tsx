@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useChatbotStore } from '@/hooks/useChatbotStore';
 import { FAQ } from '@/types/chatbot';
 import { FAQCard } from './FAQCard';
@@ -16,13 +16,17 @@ import {
   Settings2,
   HelpCircle,
   CheckCircle,
-  XCircle
+  XCircle,
+  Loader2
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 export const ChatbotSettings = () => {
   const { 
     faqs, 
+    faqsLoading,
     botBehavior, 
+    fetchFAQs,
     addFAQ, 
     updateFAQ, 
     deleteFAQ, 
@@ -30,6 +34,10 @@ export const ChatbotSettings = () => {
     updateBotBehavior,
     getFAQStats 
   } = useChatbotStore();
+
+  useEffect(() => {
+    fetchFAQs();
+  }, [fetchFAQs]);
   
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -51,18 +59,41 @@ export const ChatbotSettings = () => {
     setIsModalOpen(true);
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm('¿Estás seguro de eliminar esta pregunta frecuente?')) {
-      deleteFAQ(id);
+  const handleDelete = async (id: string) => {
+    if (!confirm('¿Estás seguro de eliminar esta pregunta frecuente?')) return;
+    try {
+      await deleteFAQ(id);
+      toast.success('FAQ eliminada correctamente');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Error al eliminar la FAQ');
     }
   };
 
-  const handleSave = (question: string, answer: string, category?: string) => {
-    addFAQ(question, answer, category);
+  const handleSave = async (question: string, answer: string, category?: string) => {
+    try {
+      await addFAQ(question, answer, category);
+      toast.success('FAQ agregada correctamente');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Error al agregar la FAQ');
+    }
   };
 
-  const handleUpdate = (id: string, updates: Partial<FAQ>) => {
-    updateFAQ(id, updates);
+  const handleUpdate = async (id: string, updates: Partial<FAQ>) => {
+    try {
+      await updateFAQ(id, updates);
+      toast.success('FAQ actualizada correctamente');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Error al actualizar la FAQ');
+    }
+  };
+
+  const handleToggleStatus = async (id: string) => {
+    try {
+      await toggleFAQStatus(id);
+      toast.success('Estado actualizado');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Error al cambiar el estado');
+    }
   };
 
   const handleCloseModal = (open: boolean) => {
@@ -136,14 +167,21 @@ export const ChatbotSettings = () => {
                 className="pl-10"
               />
             </div>
-            <Button onClick={() => setIsModalOpen(true)} className="gap-2">
+            <Button onClick={() => setIsModalOpen(true)} className="gap-2" disabled={faqsLoading}>
               <Plus className="w-4 h-4" />
               Nueva FAQ
             </Button>
           </div>
 
           {/* FAQ List */}
-          {filteredFAQs.length === 0 ? (
+          {faqsLoading ? (
+            <Card className="border-dashed">
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <Loader2 className="w-10 h-10 text-muted-foreground animate-spin mb-4" />
+                <p className="text-muted-foreground">Cargando preguntas frecuentes...</p>
+              </CardContent>
+            </Card>
+          ) : filteredFAQs.length === 0 ? (
             <Card className="border-dashed">
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <Bot className="w-12 h-12 text-muted-foreground mb-4" />
@@ -165,7 +203,7 @@ export const ChatbotSettings = () => {
                   faq={faq}
                   onEdit={() => handleEdit(faq)}
                   onDelete={() => handleDelete(faq.id)}
-                  onToggleStatus={() => toggleFAQStatus(faq.id)}
+                  onToggleStatus={() => handleToggleStatus(faq.id)}
                 />
               ))}
             </div>

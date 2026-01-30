@@ -17,7 +17,8 @@ export const getAllFAQs = async (req: Request, res: Response): Promise<void> => 
       order: [['order', 'ASC']],
     });
 
-    res.json(faqs);
+    // Always return an array (never an object) for consistent API contract
+    res.json(Array.isArray(faqs) ? faqs : []);
   } catch (error) {
     console.error('Get all FAQs error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -53,7 +54,14 @@ export const createFAQ = [
         return;
       }
 
-      const faq = await FAQ.create(req.body);
+      const { question, answer, category, order } = req.body;
+      const faq = await FAQ.create({
+        question,
+        answer,
+        isActive: true,
+        order: order != null ? Number(order) : 0,
+        ...(category != null && category !== '' && { category }),
+      });
       res.status(201).json(faq);
     } catch (error) {
       console.error('Create FAQ error:', error);
