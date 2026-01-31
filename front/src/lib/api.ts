@@ -219,6 +219,34 @@ class ApiClient {
     });
   }
 
+  // Form sessions (unique link + progress in DB)
+  async createFormSession(formId: string, token?: string | null) {
+    return this.request<{ sessionId: string }>(`/forms/${formId}/sessions`, {
+      method: 'POST',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async getFormSessionProgress(formId: string, sessionId: string) {
+    return this.request<{ progress: any; status: string }>(`/forms/${formId}/sessions/${sessionId}`, {
+      method: 'GET',
+    });
+  }
+
+  async updateFormSessionProgress(formId: string, sessionId: string, progress: object) {
+    return this.request<{ progress: any }>(`/forms/${formId}/sessions/${sessionId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ progress }),
+    });
+  }
+
+  async completeFormSession(formId: string, sessionId: string) {
+    return this.request<{ status: string }>(`/forms/${formId}/sessions/${sessionId}/complete`, {
+      method: 'POST',
+    });
+  }
+
   // Submissions
   async getSubmissions(params?: { formId?: string; clientId?: string; status?: string }, token?: string | null) {
     const queryParams = new URLSearchParams(params as any).toString();

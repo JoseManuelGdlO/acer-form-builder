@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { api } from '@/lib/api';
 
 interface FormCardProps {
   form: Form;
@@ -27,11 +28,17 @@ export const FormCard = ({ form, onEdit, onDelete, onDuplicate }: FormCardProps)
     }).format(date);
   };
 
-  const handleCopyLink = (e: React.MouseEvent) => {
+  const handleCopyLink = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    const publicUrl = `${window.location.origin}/form/${form.id}`;
-    navigator.clipboard.writeText(publicUrl);
-    toast.success('Link copiado al portapapeles');
+    try {
+      const { sessionId } = await api.createFormSession(form.id);
+      const publicUrl = `${window.location.origin}/form/${form.id}?token=${sessionId}`;
+      await navigator.clipboard.writeText(publicUrl);
+      toast.success('Link único copiado al portapapeles. El progreso se guardará en la nube.');
+    } catch (err) {
+      console.error('Failed to create session or copy link:', err);
+      toast.error('No se pudo generar el enlace. Intenta de nuevo.');
+    }
   };
 
   return (

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { Form, FormSection, Question, QUESTION_TYPE_CONFIG } from '@/types/form';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,24 +25,29 @@ import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
 
+const defaultClientInfo = {
+  name: '',
+  email: '',
+  phone: '',
+  street: '',
+  streetNumber: '',
+  city: '',
+  state: '',
+  postalCode: '',
+};
+
 const PublicFormView = () => {
   const { formId } = useParams<{ formId: string }>();
+  const [searchParams] = useSearchParams();
+  const sessionToken = searchParams.get('token');
+
   const [form, setForm] = useState<Form | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [step, setStep] = useState<'info' | 'sections' | 'success'>('info');
   const [currentSectionIndex, setCurrentSectionIndex] = useState(0);
   
   // Client info
-  const [clientInfo, setClientInfo] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    street: '',
-    streetNumber: '',
-    city: '',
-    state: '',
-    postalCode: '',
-  });
+  const [clientInfo, setClientInfo] = useState(defaultClientInfo);
   
   // Form answers
   const [answers, setAnswers] = useState<Record<string, string | string[] | Date>>({});
@@ -50,12 +55,33 @@ const PublicFormView = () => {
   // Validation errors
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Storage key for this form
-  const getStorageKey = useCallback(() => `form_progress_${formId}`, [formId]);
+  // Parse progress from API into state
+  const applyProgress = useCallback((progress: any) => {
+    if (!progress) return;
+    if (progress.clientInfo) {
+      setClientInfo({ ...defaultClientInfo, ...progress.clientInfo });
+    }
+    if (progress.answers) {
+      const restored: Record<string, string | string[] | Date> = {};
+      Object.entries(progress.answers).forEach(([key, value]) => {
+        restored[key] =
+          typeof value === 'string' && (value as string).match(/^\d{4}-\d{2}-\d{2}T/)
+            ? new Date(value as string)
+            : (value as string | string[] | Date);
+      });
+      setAnswers(restored);
+    }
+    if (progress.step && progress.step !== 'success') {
+      setStep(progress.step);
+    }
+    if (typeof progress.currentSectionIndex === 'number') {
+      setCurrentSectionIndex(progress.currentSectionIndex);
+    }
+  }, []);
 
-  // Save progress to localStorage
-  const saveProgress = useCallback(() => {
-    if (!formId) return;
+  // Save progress to API (DB)
+  const saveProgress = useCallback(async () => {
+    if (!formId || !sessionToken || step === 'success') return;
     try {
       const progress = {
         clientInfo,
@@ -69,65 +95,23 @@ const PublicFormView = () => {
         currentSectionIndex,
         savedAt: new Date().toISOString(),
       };
-      localStorage.setItem(getStorageKey(), JSON.stringify(progress));
+      await api.updateFormSessionProgress(formId, sessionToken, progress);
     } catch (error) {
       console.error('Failed to save progress:', error);
     }
-  }, [formId, clientInfo, answers, step, currentSectionIndex, getStorageKey]);
-
-  // Load progress from localStorage
-  const loadProgress = useCallback(() => {
-    if (!formId) return null;
-    try {
-      const saved = localStorage.getItem(getStorageKey());
-      if (saved) {
-        const progress = JSON.parse(saved);
-        return {
-          clientInfo: progress.clientInfo || {
-            name: '',
-            email: '',
-            phone: '',
-            street: '',
-            streetNumber: '',
-            city: '',
-            state: '',
-            postalCode: '',
-          },
-          answers: Object.fromEntries(
-            Object.entries(progress.answers || {}).map(([key, value]) => [
-              key,
-              typeof value === 'string' && value.match(/^\d{4}-\d{2}-\d{2}T/) 
-                ? new Date(value as string)
-                : value,
-            ])
-          ),
-          step: progress.step || 'info',
-          currentSectionIndex: progress.currentSectionIndex || 0,
-        };
-      }
-    } catch (error) {
-      console.error('Failed to load progress:', error);
-    }
-    return null;
-  }, [formId, getStorageKey]);
-
-  // Clear progress from localStorage
-  const clearProgress = useCallback(() => {
-    if (!formId) return;
-    try {
-      localStorage.removeItem(getStorageKey());
-    } catch (error) {
-      console.error('Failed to clear progress:', error);
-    }
-  }, [formId, getStorageKey]);
+  }, [formId, sessionToken, clientInfo, answers, step, currentSectionIndex]);
 
   useEffect(() => {
     const loadForm = async () => {
       if (!formId) return;
+      if (!sessionToken) {
+        setIsLoading(false);
+        setForm(null);
+        return;
+      }
       setIsLoading(true);
       try {
         const formData = await api.getForm(formId);
-        // Map backend data to frontend Form type
         const mappedForm: Form = {
           id: formData.id,
           name: formData.name,
@@ -138,36 +122,29 @@ const PublicFormView = () => {
         };
         setForm(mappedForm);
 
-        // Load saved progress after form is loaded
-        const savedProgress = loadProgress();
-        if (savedProgress && savedProgress.step !== 'success') {
-          setClientInfo(savedProgress.clientInfo);
-          setAnswers(savedProgress.answers);
-          setStep(savedProgress.step);
-          setCurrentSectionIndex(savedProgress.currentSectionIndex);
+        const sessionData = await api.getFormSessionProgress(formId, sessionToken);
+        if (sessionData.status === 'completed') {
+          setStep('success');
+        } else if (sessionData.progress && Object.keys(sessionData.progress).length > 0) {
+          applyProgress(sessionData.progress);
         }
       } catch (error) {
-        console.error('Failed to load form:', error);
-        toast.error('Error al cargar el formulario');
+        console.error('Failed to load form or session:', error);
+        toast.error('Error al cargar el formulario o el enlace no es válido.');
       } finally {
         setIsLoading(false);
       }
     };
     loadForm();
-  }, [formId]);
+  }, [formId, sessionToken, applyProgress]);
 
-  // Save progress whenever clientInfo, answers, step, or currentSectionIndex changes
+  // Save progress only when changing step or section (navigation), not while typing
   useEffect(() => {
-    // Don't save if we're on success step (form already submitted)
-    if (step === 'success' || !formId) return;
-    
-    // Debounce saving to avoid too frequent writes
-    const timeoutId = setTimeout(() => {
-      saveProgress();
-    }, 500);
-
-    return () => clearTimeout(timeoutId);
-  }, [clientInfo, answers, step, currentSectionIndex, saveProgress, formId]);
+    if (step === 'success' || !formId || !sessionToken) return;
+    saveProgress();
+    // Intentionally only run on step/section change; saveProgress is stable enough for this effect
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, currentSectionIndex]);
 
   // Format phone number with mask (XXX)-XXXX-XXXX
   const formatPhoneNumber = (value: string): string => {
@@ -397,8 +374,9 @@ const PublicFormView = () => {
       console.log('Submission response:', response);
       console.log('Response answers:', response.answers);
       
-      // Clear progress from localStorage after successful submission
-      clearProgress();
+      if (sessionToken) {
+        await api.completeFormSession(form.id, sessionToken);
+      }
       
       toast.success('Formulario enviado correctamente');
       setStep('success');
@@ -421,6 +399,7 @@ const PublicFormView = () => {
             placeholder="Escribe tu respuesta..."
             value={(value as string) || ''}
             onChange={e => handleAnswer(question.id, e.target.value)}
+            onBlur={saveProgress}
             className={cn('h-12', error && 'border-destructive')}
           />
         );
@@ -431,6 +410,7 @@ const PublicFormView = () => {
             placeholder="Escribe tu respuesta..."
             value={(value as string) || ''}
             onChange={e => handleAnswer(question.id, e.target.value)}
+            onBlur={saveProgress}
             rows={4}
             className={cn(error && 'border-destructive')}
           />
@@ -440,7 +420,10 @@ const PublicFormView = () => {
         return (
           <RadioGroup
             value={(value as string) || ''}
-            onValueChange={val => handleAnswer(question.id, val)}
+            onValueChange={val => {
+              handleAnswer(question.id, val);
+              saveProgress();
+            }}
             className="space-y-3"
           >
             {question.options?.map(option => (
@@ -481,6 +464,7 @@ const PublicFormView = () => {
                       ? [...selectedValues, option.id]
                       : selectedValues.filter(v => v !== option.id);
                     handleAnswer(question.id, newValues);
+                    saveProgress();
                   }}
                 />
                 <span className="text-foreground">{option.label}</span>
@@ -493,7 +477,10 @@ const PublicFormView = () => {
         return (
           <Select
             value={(value as string) || ''}
-            onValueChange={val => handleAnswer(question.id, val)}
+            onValueChange={val => {
+              handleAnswer(question.id, val);
+              saveProgress();
+            }}
           >
             <SelectTrigger className={cn('h-12', error && 'border-destructive')}>
               <SelectValue placeholder="Selecciona una opción" />
@@ -528,7 +515,12 @@ const PublicFormView = () => {
               <Calendar
                 mode="single"
                 selected={value as Date}
-                onSelect={date => date && handleAnswer(question.id, date)}
+                onSelect={date => {
+                  if (date) {
+                    handleAnswer(question.id, date);
+                    saveProgress();
+                  }
+                }}
                 locale={es}
               />
             </PopoverContent>
@@ -543,7 +535,10 @@ const PublicFormView = () => {
               <button
                 key={star}
                 type="button"
-                onClick={() => handleAnswer(question.id, star.toString())}
+                onClick={() => {
+                  handleAnswer(question.id, star.toString());
+                  saveProgress();
+                }}
                 className={cn(
                   'w-12 h-12 rounded-lg border transition-all text-2xl',
                   parseInt(rating) >= star
@@ -568,6 +563,19 @@ const PublicFormView = () => {
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-primary" />
           <p className="text-muted-foreground">Cargando formulario...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!sessionToken) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="text-center max-w-md">
+          <h1 className="text-2xl font-bold text-foreground mb-2">Enlace no válido</h1>
+          <p className="text-muted-foreground">
+            Para contestar este formulario necesitas usar el enlace único que te compartieron. Cada enlace guarda tu progreso en la nube.
+          </p>
         </div>
       </div>
     );
@@ -657,6 +665,7 @@ const PublicFormView = () => {
                     placeholder="Juan Pérez García"
                     value={clientInfo.name}
                     onChange={e => setClientInfo(prev => ({ ...prev, name: e.target.value }))}
+                    onBlur={saveProgress}
                     className={cn('h-12', errors.name && 'border-destructive')}
                   />
                   {errors.name && (
@@ -690,7 +699,7 @@ const PublicFormView = () => {
                       }
                     }}
                     onBlur={() => {
-                      // Re-validate on blur
+                      saveProgress();
                       if (clientInfo.email.trim()) {
                         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
                         if (!emailRegex.test(clientInfo.email.trim())) {
@@ -732,7 +741,7 @@ const PublicFormView = () => {
                       }
                     }}
                     onBlur={() => {
-                      // Re-validate on blur
+                      saveProgress();
                       const cleanPhone = getCleanPhone(clientInfo.phone);
                       if (cleanPhone.length === 0) {
                         setErrors(prev => ({ ...prev, phone: 'El teléfono es obligatorio' }));
@@ -770,6 +779,7 @@ const PublicFormView = () => {
                             setClientInfo(prev => ({ ...prev, street: e.target.value }));
                             setErrors(prev => ({ ...prev, street: '' }));
                           }}
+                          onBlur={saveProgress}
                           className={cn('h-12', errors.street && 'border-destructive')}
                         />
                         {errors.street && (
@@ -789,6 +799,7 @@ const PublicFormView = () => {
                             setClientInfo(prev => ({ ...prev, streetNumber: e.target.value }));
                             setErrors(prev => ({ ...prev, streetNumber: '' }));
                           }}
+                          onBlur={saveProgress}
                           className={cn('h-12', errors.streetNumber && 'border-destructive')}
                         />
                         {errors.streetNumber && (
@@ -810,6 +821,7 @@ const PublicFormView = () => {
                             setClientInfo(prev => ({ ...prev, city: e.target.value }));
                             setErrors(prev => ({ ...prev, city: '' }));
                           }}
+                          onBlur={saveProgress}
                           className={cn('h-12', errors.city && 'border-destructive')}
                         />
                         {errors.city && (
@@ -829,6 +841,7 @@ const PublicFormView = () => {
                             setClientInfo(prev => ({ ...prev, state: e.target.value }));
                             setErrors(prev => ({ ...prev, state: '' }));
                           }}
+                          onBlur={saveProgress}
                           className={cn('h-12', errors.state && 'border-destructive')}
                         />
                         {errors.state && (
@@ -856,6 +869,7 @@ const PublicFormView = () => {
                             }
                           }}
                           onBlur={() => {
+                            saveProgress();
                             if (clientInfo.postalCode.trim() && !/^\d{5}$/.test(clientInfo.postalCode.trim())) {
                               setErrors(prev => ({ ...prev, postalCode: 'El código postal debe tener 5 dígitos' }));
                             }

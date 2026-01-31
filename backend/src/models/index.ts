@@ -3,6 +3,7 @@ import { User } from './User';
 import { UserRole } from './UserRole';
 import { Client } from './Client';
 import { Form } from './Form';
+import { FormSession } from './FormSession';
 import { FormSubmission } from './FormSubmission';
 import { ChecklistTemplate } from './ChecklistTemplate';
 import { ClientChecklist } from './ClientChecklist';
@@ -38,6 +39,9 @@ Client.hasMany(ClientMessage, { foreignKey: 'clientId', as: 'messages' });
 ClientMessage.belongsTo(Client, { foreignKey: 'clientId', as: 'client' });
 
 // Form relationships
+Form.hasMany(FormSession, { foreignKey: 'formId', as: 'sessions' });
+FormSession.belongsTo(Form, { foreignKey: 'formId', as: 'form' });
+
 Form.hasMany(FormSubmission, { foreignKey: 'formId', as: 'submissions' });
 FormSubmission.belongsTo(Form, { foreignKey: 'formId', as: 'form' });
 
@@ -51,6 +55,7 @@ export {
   UserRole,
   Client,
   Form,
+  FormSession,
   FormSubmission,
   ChecklistTemplate,
   ClientChecklist,
