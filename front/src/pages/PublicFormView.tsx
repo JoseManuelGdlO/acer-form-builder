@@ -19,11 +19,17 @@ import {
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
-import { User, Mail, Phone, CalendarIcon, CheckCircle2, ArrowRight, ArrowLeft, Send, Loader2, MapPin, Building2 } from 'lucide-react';
+import { User, Mail, Phone, CalendarIcon, CheckCircle2, ArrowRight, ArrowLeft, Send, Loader2, MapPin, Building2, Upload, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
+
+export type FileAnswerValue = { fileName: string; mimeType: string; data: string };
+
+const ACCEPTED_FILE_TYPES = 'image/*,.pdf,application/pdf';
+const MAX_FILE_SIZE_MB = 10;
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
 const defaultClientInfo = {
   name: '',
@@ -49,8 +55,8 @@ const PublicFormView = () => {
   // Client info
   const [clientInfo, setClientInfo] = useState(defaultClientInfo);
   
-  // Form answers
-  const [answers, setAnswers] = useState<Record<string, string | string[] | Date>>({});
+  // Form answers (string | string[] | Date | FileAnswerValue for file_upload)
+  const [answers, setAnswers] = useState<Record<string, string | string[] | Date | FileAnswerValue>>({});
   
   // Validation errors
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -62,12 +68,15 @@ const PublicFormView = () => {
       setClientInfo({ ...defaultClientInfo, ...progress.clientInfo });
     }
     if (progress.answers) {
-      const restored: Record<string, string | string[] | Date> = {};
+      const restored: Record<string, string | string[] | Date | FileAnswerValue> = {};
       Object.entries(progress.answers).forEach(([key, value]) => {
-        restored[key] =
-          typeof value === 'string' && (value as string).match(/^\d{4}-\d{2}-\d{2}T/)
-            ? new Date(value as string)
-            : (value as string | string[] | Date);
+        if (value && typeof value === 'object' && !Array.isArray(value) && 'data' in value && 'fileName' in value) {
+          restored[key] = value as FileAnswerValue;
+        } else if (typeof value === 'string' && (value as string).match(/^\d{4}-\d{2}-\d{2}T/)) {
+          restored[key] = new Date(value as string);
+        } else {
+          restored[key] = value as string | string[] | Date;
+        }
       });
       setAnswers(restored);
     }
@@ -88,7 +97,11 @@ const PublicFormView = () => {
         answers: Object.fromEntries(
           Object.entries(answers).map(([key, value]) => [
             key,
-            value instanceof Date ? value.toISOString() : value,
+            value instanceof Date
+              ? value.toISOString()
+              : typeof value === 'object' && value !== null && !Array.isArray(value) && 'data' in value
+                ? value
+                : value,
           ])
         ),
         step,
@@ -227,7 +240,7 @@ const PublicFormView = () => {
     }
   };
 
-  const handleAnswer = (questionId: string, value: string | string[] | Date) => {
+  const handleAnswer = (questionId: string, value: string | string[] | Date | FileAnswerValue) => {
     setAnswers(prev => {
       const updated = { ...prev, [questionId]: value };
       console.log('Answer updated:', { questionId, value, allAnswers: updated });
@@ -278,7 +291,7 @@ const PublicFormView = () => {
     
     try {
       // Collect all answers from all sections
-      const allAnswers: Record<string, string | string[] | Date> = { ...answers };
+      const allAnswers: Record<string, string | string[] | Date | FileAnswerValue> = { ...answers };
       
       // Ensure we have answers for all questions (even if empty)
       form.sections.forEach(section => {
@@ -295,14 +308,16 @@ const PublicFormView = () => {
         section.questions.forEach(question => {
           const answerValue = allAnswers[question.id];
           if (answerValue !== undefined && answerValue !== null) {
-            // Format the answer value
-            let formattedValue: string | string[];
+            // Format the answer value (file_upload stays as object with fileName, mimeType, data)
+            let formattedValue: string | string[] | FileAnswerValue;
             if (answerValue instanceof Date) {
               formattedValue = answerValue.toISOString();
             } else if (Array.isArray(answerValue)) {
               formattedValue = answerValue;
             } else if (typeof answerValue === 'string') {
               formattedValue = answerValue;
+            } else if (typeof answerValue === 'object' && answerValue !== null && 'data' in answerValue && 'fileName' in answerValue) {
+              formattedValue = answerValue as FileAnswerValue;
             } else {
               formattedValue = String(answerValue);
             }
@@ -551,6 +566,88 @@ const PublicFormView = () => {
             ))}
           </div>
         );
+
+      case 'file_upload': {
+        const fileValue = value as FileAnswerValue | undefined;
+        const readFileAsBase64 = (file: File): Promise<FileAnswerValue> => {
+          return new Promise((resolve, reject) => {
+            if (file.size > MAX_FILE_SIZE_BYTES) {
+              reject(new Error(`El archivo no debe superar ${MAX_FILE_SIZE_MB} MB`));
+              return;
+            }
+            const reader = new FileReader();
+            reader.onload = () => {
+              const data = reader.result as string;
+              resolve({ fileName: file.name, mimeType: file.type, data });
+            };
+            reader.onerror = () => reject(reader.error);
+            reader.readAsDataURL(file);
+          });
+        };
+        const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          const isImage = file.type.startsWith('image/');
+          const isPdf = file.type === 'application/pdf';
+          if (!isImage && !isPdf) {
+            toast.error('Solo se permiten imágenes (JPG, PNG, etc.) y archivos PDF.');
+            return;
+          }
+          try {
+            const fileAnswer = await readFileAsBase64(file);
+            handleAnswer(question.id, fileAnswer);
+            saveProgress();
+          } catch (err) {
+            toast.error(err instanceof Error ? err.message : 'Error al leer el archivo');
+          }
+          e.target.value = '';
+        };
+        return (
+          <div className="space-y-3">
+            <label className={cn(
+              'flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-xl cursor-pointer transition-colors',
+              error ? 'border-destructive bg-destructive/5' : 'border-border hover:border-primary/50 hover:bg-muted/50'
+            )}>
+              <input
+                type="file"
+                accept={ACCEPTED_FILE_TYPES}
+                onChange={handleFileChange}
+                className="hidden"
+              />
+              <Upload className="w-8 h-8 text-muted-foreground mb-2" />
+              <span className="text-sm text-muted-foreground text-center px-2">
+                {fileValue ? fileValue.fileName : 'Haz clic o arrastra imagen o PDF (máx. 10 MB)'}
+              </span>
+            </label>
+            {fileValue && (
+              <div className="flex items-center justify-between gap-2 p-3 rounded-lg bg-muted/50">
+                <span className="text-sm truncate">{fileValue.fileName}</span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="shrink-0 h-8 w-8"
+                  onClick={() => {
+                    setAnswers(prev => {
+                      const next = { ...prev };
+                      delete next[question.id];
+                      return next;
+                    });
+                    setErrors(prev => ({ ...prev, [question.id]: '' }));
+                    saveProgress();
+                  }}
+                  title="Quitar archivo"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+            )}
+            {errors[question.id] && (
+              <p className="text-sm text-destructive">{errors[question.id]}</p>
+            )}
+          </div>
+        );
+      }
 
       default:
         return null;

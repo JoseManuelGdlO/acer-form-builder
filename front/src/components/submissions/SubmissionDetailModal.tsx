@@ -89,15 +89,19 @@ export const SubmissionDetailModal = ({
   const displaySubmission = fullSubmission || submission;
 
   // Build explicit question–answer pairs from saved answers (prioritise new format with embedded question text)
+  type FileAnswerObj = { fileName: string; mimeType?: string; data: string };
   type QuestionAnswerPair = {
     id: string;
     question: string;
     questionType?: string;
     questionDescription?: string;
-    answer: string | string[];
+    answer: string | string[] | FileAnswerObj;
     options?: Array<{ id: string; label: string }>;
     section: string;
   };
+
+  const isFileAnswerObj = (val: unknown): val is FileAnswerObj =>
+    typeof val === 'object' && val !== null && 'fileName' in val && 'data' in val;
 
   const getQuestionAnswerPairs = (): QuestionAnswerPair[] => {
     const pairs: QuestionAnswerPair[] = [];
@@ -116,48 +120,49 @@ export const SubmissionDetailModal = ({
         for (const section of formToUse.sections) {
           const question = section.questions?.find((q: any) => q.id === questionId);
           if (question) {
-            sectionName = section.title || section.label || 'Sin sección';
+            sectionName = section.title || 'Sin sección';
             break;
           }
         }
       }
 
       if (isNewFormat) {
-        let answerValue = (answerData as any).answer;
-        // Ensure answer is properly formatted (not an object)
+        let answerValue: string | string[] | FileAnswerObj = (answerData as { answer: string | string[] | FileAnswerObj }).answer;
+        // Keep file answers as object; stringify other plain objects
         if (answerValue && typeof answerValue === 'object' && !Array.isArray(answerValue)) {
-          // If answer is an object, try to stringify it or extract a meaningful value
-          answerValue = JSON.stringify(answerValue);
+          if (!isFileAnswerObj(answerValue)) {
+            answerValue = JSON.stringify(answerValue) as string;
+          }
         }
         
         pairs.push({
           id: questionId,
-          question: (answerData as any).question,
-          questionType: (answerData as any).questionType,
-          questionDescription: (answerData as any).questionDescription,
+          question: (answerData as { question: string }).question,
+          questionType: (answerData as { questionType?: string }).questionType,
+          questionDescription: (answerData as { questionDescription?: string }).questionDescription,
           answer: answerValue,
-          options: (answerData as any).options,
+          options: (answerData as { options?: Array<{ id: string; label: string }> }).options,
           section: sectionName,
         });
         return;
       }
 
       // Old format: only answer value; get question text from form sections
-      let answerValue = answerData;
-      // Ensure answer is properly formatted (not an object)
+      let answerValue: string | string[] | FileAnswerObj = answerData as string | string[] | FileAnswerObj;
       if (answerValue && typeof answerValue === 'object' && !Array.isArray(answerValue)) {
-        // If answer is an object, try to stringify it or extract a meaningful value
-        answerValue = JSON.stringify(answerValue);
+        if (!isFileAnswerObj(answerValue)) {
+          answerValue = JSON.stringify(answerValue) as string;
+        }
       }
       
       const questionTitle =
         formToUse?.sections
-          ?.flatMap((s: any) => s.questions || [])
-          .find((q: any) => q.id === questionId)?.title || `Pregunta (${questionId.slice(0, 8)}…)`;
+          ?.flatMap((s: { questions?: { id: string; title?: string }[] }) => s.questions || [])
+          .find((q: { id: string; title?: string }) => q.id === questionId)?.title || `Pregunta (${questionId.slice(0, 8)}…)`;
       pairs.push({
         id: questionId,
         question: questionTitle,
-        answer: answerValue as string | string[],
+        answer: answerValue,
         section: sectionName,
       });
     });
@@ -247,18 +252,14 @@ export const SubmissionDetailModal = ({
                       return acc;
                     }, {} as Record<string, typeof questionAnswerPairs>);
 
-                    const formatAnswerValue = (val: string | any, options?: Array<{ id: string; label: string }>): string => {
-                      // Handle non-string values
-                      if (val === null || val === undefined) {
-                        return '';
-                      }
-                      if (typeof val === 'object' && !Array.isArray(val)) {
-                        // If it's an object, try to extract meaningful data or stringify
-                        return JSON.stringify(val, null, 2);
-                      }
-                      if (Array.isArray(val)) {
-                        return val.join(', ');
-                      }
+                    const isFileAnswer = (val: unknown): val is { fileName: string; mimeType?: string; data: string } =>
+                      typeof val === 'object' && val !== null && 'fileName' in val && 'data' in val;
+
+                    const formatAnswerValue = (val: string | unknown, options?: Array<{ id: string; label: string }>): string => {
+                      if (val === null || val === undefined) return '';
+                      if (isFileAnswer(val)) return val.fileName;
+                      if (typeof val === 'object' && !Array.isArray(val)) return JSON.stringify(val, null, 2);
+                      if (Array.isArray(val)) return val.join(', ');
                       const stringVal = String(val);
                       if (options) {
                         const opt = options.find((o) => o.id === stringVal);
@@ -290,7 +291,18 @@ export const SubmissionDetailModal = ({
                                     pair.answer === '' ||
                                     (Array.isArray(pair.answer) && pair.answer.length === 0)
                                       ? 'Sin respuesta'
-                                      : formatAnswerValue(pair.answer, pair.options)}
+                                      : isFileAnswer(pair.answer) ? (
+                                          <a
+                                            href={(pair.answer as { data: string }).data}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-primary underline hover:no-underline"
+                                          >
+                                            {(pair.answer as { fileName: string }).fileName} (abrir)
+                                          </a>
+                                        ) : (
+                                          formatAnswerValue(pair.answer, pair.options)
+                                        )}
                                   </p>
                                 </div>
                               ))}
