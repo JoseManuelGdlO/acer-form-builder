@@ -9,6 +9,7 @@ import notesRoutes from './notes.routes';
 import messagesRoutes from './messages.routes';
 import faqsRoutes from './faqs.routes';
 import botRoutes from './bot.routes';
+import conversacionesChatRoutes from './conversations.routes';
 
 const router = Router();
 
@@ -22,5 +23,6 @@ router.use('/notes', notesRoutes);
 router.use('/messages', messagesRoutes);
 router.use('/faqs', faqsRoutes);
 router.use('/bot', botRoutes);
+router.use('/addChat', conversacionesChatRoutes);
 
 export default router;

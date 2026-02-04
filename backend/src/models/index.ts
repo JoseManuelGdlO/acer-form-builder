@@ -11,6 +11,7 @@ import { ClientNote } from './ClientNote';
 import { ClientMessage } from './ClientMessage';
 import { FAQ } from './FAQ';
 import { BotBehavior } from './BotBehavior';
+import { Conversations } from './Conversation';
 
 // User relationships
 User.hasMany(UserRole, { foreignKey: 'userId', as: 'roles' });
@@ -63,4 +64,5 @@ export {
   ClientMessage,
   FAQ,
   BotBehavior,
+  Conversations,
 };
