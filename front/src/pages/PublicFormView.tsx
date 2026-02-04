@@ -19,11 +19,12 @@ import {
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
-import { User, Mail, Phone, CalendarIcon, CheckCircle2, ArrowRight, ArrowLeft, Send, Loader2, MapPin, Building2, Upload, X } from 'lucide-react';
+import { User, Mail, Phone, CalendarIcon, CheckCircle2, ArrowRight, ArrowLeft, Send, Loader2, Upload, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
+import saruLogo from '@/assets/saru-logo.png';
 
 export type FileAnswerValue = { fileName: string; mimeType: string; data: string };
 
@@ -33,16 +34,11 @@ const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
 const defaultClientInfo = {
   name: '',
-  email: '',
   phone: '',
-  street: '',
-  streetNumber: '',
-  city: '',
-  state: '',
-  postalCode: '',
+  email: '',
 };
 
-const PublicFormView = () => {
+export default function PublicFormView() {
   const { formId } = useParams<{ formId: string }>();
   const [searchParams] = useSearchParams();
   const sessionToken = searchParams.get('token');
@@ -186,16 +182,6 @@ const PublicFormView = () => {
       newErrors.name = 'El nombre es obligatorio';
     }
     
-    // Email validation - more robust
-    if (!clientInfo.email.trim()) {
-      newErrors.email = 'El correo es obligatorio';
-    } else {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(clientInfo.email.trim())) {
-        newErrors.email = 'Ingrese un correo electrónico válido (ejemplo: correo@dominio.com)';
-      }
-    }
-    
     // Phone validation - exactly 10 digits
     const cleanPhone = getCleanPhone(clientInfo.phone);
     if (!cleanPhone) {
@@ -206,28 +192,12 @@ const PublicFormView = () => {
       newErrors.phone = 'El teléfono debe contener solo números';
     }
     
-    // Address validation
-    if (!clientInfo.street.trim()) {
-      newErrors.street = 'La calle es obligatoria';
-    }
-    
-    if (!clientInfo.streetNumber.trim()) {
-      newErrors.streetNumber = 'El número es obligatorio';
-    }
-    
-    if (!clientInfo.city.trim()) {
-      newErrors.city = 'La ciudad es obligatoria';
-    }
-    
-    if (!clientInfo.state.trim()) {
-      newErrors.state = 'El estado es obligatorio';
-    }
-    
-    // Postal code validation - 5 digits
-    if (!clientInfo.postalCode.trim()) {
-      newErrors.postalCode = 'El código postal es obligatorio';
-    } else if (!/^\d{5}$/.test(clientInfo.postalCode.trim())) {
-      newErrors.postalCode = 'El código postal debe tener 5 dígitos';
+    // Email optional - only validate format if provided
+    if (clientInfo.email.trim()) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(clientInfo.email.trim())) {
+        newErrors.email = 'Ingrese un correo electrónico válido (ejemplo: correo@dominio.com)';
+      }
     }
     
     setErrors(newErrors);
@@ -362,23 +332,13 @@ const PublicFormView = () => {
       // Get clean phone number (only digits) for submission
       const cleanPhoneNumber = getCleanPhone(clientInfo.phone);
 
-      // Build address string from address fields
-      const addressParts = [
-        clientInfo.street.trim(),
-        clientInfo.streetNumber.trim(),
-        clientInfo.city.trim(),
-        clientInfo.state.trim(),
-        clientInfo.postalCode.trim(),
-      ].filter(part => part.length > 0);
-      const fullAddress = addressParts.join(', ');
-
       const submissionData = {
         formId: form.id,
         formName: form.name,
         respondentName: clientInfo.name,
-        respondentEmail: clientInfo.email,
+        respondentEmail: clientInfo.email.trim() || undefined,
         respondentPhone: cleanPhoneNumber || undefined,
-        address: fullAddress || undefined,
+        address: undefined,
         answers: formattedAnswers,
       };
 
@@ -656,7 +616,14 @@ const PublicFormView = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
+        <div className="flex items-center gap-3 mb-6">
+          <img src={saruLogo} alt="Saru Visas" className="h-10 w-auto" />
+          <div>
+            <h1 className="text-lg font-bold text-primary leading-none">SARU</h1>
+            <p className="text-xs text-muted-foreground">Visa y Pasaporte</p>
+          </div>
+        </div>
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-primary" />
           <p className="text-muted-foreground">Cargando formulario...</p>
@@ -667,7 +634,14 @@ const PublicFormView = () => {
 
   if (!sessionToken) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
+        <div className="flex items-center gap-3 mb-6">
+          <img src={saruLogo} alt="Saru Visas" className="h-10 w-auto" />
+          <div>
+            <h1 className="text-lg font-bold text-primary leading-none">SARU</h1>
+            <p className="text-xs text-muted-foreground">Visa y Pasaporte</p>
+          </div>
+        </div>
         <div className="text-center max-w-md">
           <h1 className="text-2xl font-bold text-foreground mb-2">Enlace no válido</h1>
           <p className="text-muted-foreground">
@@ -680,7 +654,14 @@ const PublicFormView = () => {
 
   if (!form) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
+        <div className="flex items-center gap-3 mb-6">
+          <img src={saruLogo} alt="Saru Visas" className="h-10 w-auto" />
+          <div>
+            <h1 className="text-lg font-bold text-primary leading-none">SARU</h1>
+            <p className="text-xs text-muted-foreground">Visa y Pasaporte</p>
+          </div>
+        </div>
         <div className="text-center">
           <h1 className="text-2xl font-bold text-foreground mb-2">Formulario no encontrado</h1>
           <p className="text-muted-foreground">El enlace que has seguido no es válido o ha expirado.</p>
@@ -691,7 +672,14 @@ const PublicFormView = () => {
 
   if (step === 'success') {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
+        <div className="flex items-center gap-3 mb-6">
+          <img src={saruLogo} alt="Saru Visas" className="h-10 w-auto" />
+          <div>
+            <h1 className="text-lg font-bold text-primary leading-none">SARU</h1>
+            <p className="text-xs text-muted-foreground">Visa y Pasaporte</p>
+          </div>
+        </div>
         <Card className="max-w-md w-full">
           <CardContent className="p-8 text-center">
             <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-success/10 flex items-center justify-center">
@@ -725,7 +713,16 @@ const PublicFormView = () => {
       {/* Header */}
       <div className="border-b border-border/50 bg-card/80 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-4 py-4">
-          <h1 className="text-lg font-semibold text-foreground">{form.name}</h1>
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-3 shrink-0">
+              <img src={saruLogo} alt="Saru Visas" className="h-8 w-auto" />
+              <div>
+                <h1 className="text-lg font-bold text-primary leading-none">SARU</h1>
+                <p className="text-xs text-muted-foreground">Visa y Pasaporte</p>
+              </div>
+            </div>
+            <h2 className="text-lg font-semibold text-foreground">{form.name}</h2>
+          </div>
           {step === 'sections' && (
             <div className="mt-2">
               <div className="flex items-center justify-between text-sm text-muted-foreground mb-1">
@@ -771,9 +768,49 @@ const PublicFormView = () => {
                 </div>
 
                 <div className="space-y-2">
+                  <Label htmlFor="phone" className="flex items-center gap-2">
+                    <Phone className="w-4 h-4" />
+                    Número de teléfono *
+                  </Label>
+                  <Input
+                    id="phone"
+                    type="tel"
+                    placeholder="(XXX)-XXXX-XXXX"
+                    value={clientInfo.phone}
+                    onChange={e => {
+                      const inputValue = e.target.value;
+                      const formatted = formatPhoneNumber(inputValue);
+                      setClientInfo(prev => ({ ...prev, phone: formatted }));
+                      const cleanPhone = getCleanPhone(formatted);
+                      if (cleanPhone.length === 0) {
+                        setErrors(prev => ({ ...prev, phone: '' }));
+                      } else if (cleanPhone.length !== 10) {
+                        setErrors(prev => ({ ...prev, phone: 'El teléfono debe tener exactamente 10 dígitos' }));
+                      } else {
+                        setErrors(prev => ({ ...prev, phone: '' }));
+                      }
+                    }}
+                    onBlur={() => {
+                      saveProgress();
+                      const cleanPhone = getCleanPhone(clientInfo.phone);
+                      if (cleanPhone.length === 0) {
+                        setErrors(prev => ({ ...prev, phone: 'El teléfono es obligatorio' }));
+                      } else if (cleanPhone.length !== 10) {
+                        setErrors(prev => ({ ...prev, phone: 'El teléfono debe tener exactamente 10 dígitos' }));
+                      }
+                    }}
+                    maxLength={14}
+                    className={cn('h-12', errors.phone && 'border-destructive')}
+                  />
+                  {errors.phone && (
+                    <p className="text-sm text-destructive">{errors.phone}</p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
                   <Label htmlFor="email" className="flex items-center gap-2">
                     <Mail className="w-4 h-4" />
-                    Correo electrónico *
+                    Correo electrónico (opcional)
                   </Label>
                   <Input
                     id="email"
@@ -783,7 +820,6 @@ const PublicFormView = () => {
                     onChange={e => {
                       const emailValue = e.target.value;
                       setClientInfo(prev => ({ ...prev, email: emailValue }));
-                      // Validate email in real-time
                       if (emailValue.trim()) {
                         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
                         if (!emailRegex.test(emailValue.trim())) {
@@ -809,177 +845,6 @@ const PublicFormView = () => {
                   {errors.email && (
                     <p className="text-sm text-destructive">{errors.email}</p>
                   )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="phone" className="flex items-center gap-2">
-                    <Phone className="w-4 h-4" />
-                    Número de teléfono *
-                  </Label>
-                  <Input
-                    id="phone"
-                    type="tel"
-                    placeholder="(XXX)-XXXX-XXXX"
-                    value={clientInfo.phone}
-                    onChange={e => {
-                      const inputValue = e.target.value;
-                      // Format with mask
-                      const formatted = formatPhoneNumber(inputValue);
-                      setClientInfo(prev => ({ ...prev, phone: formatted }));
-                      
-                      // Validate in real-time
-                      const cleanPhone = getCleanPhone(formatted);
-                      if (cleanPhone.length === 0) {
-                        setErrors(prev => ({ ...prev, phone: '' }));
-                      } else if (cleanPhone.length !== 10) {
-                        setErrors(prev => ({ ...prev, phone: 'El teléfono debe tener exactamente 10 dígitos' }));
-                      } else {
-                        setErrors(prev => ({ ...prev, phone: '' }));
-                      }
-                    }}
-                    onBlur={() => {
-                      saveProgress();
-                      const cleanPhone = getCleanPhone(clientInfo.phone);
-                      if (cleanPhone.length === 0) {
-                        setErrors(prev => ({ ...prev, phone: 'El teléfono es obligatorio' }));
-                      } else if (cleanPhone.length !== 10) {
-                        setErrors(prev => ({ ...prev, phone: 'El teléfono debe tener exactamente 10 dígitos' }));
-                      }
-                    }}
-                    maxLength={14} // (XXX)-XXXX-XXXX = 14 characters
-                    className={cn('h-12', errors.phone && 'border-destructive')}
-                  />
-                  {errors.phone && (
-                    <p className="text-sm text-destructive">{errors.phone}</p>
-                  )}
-                </div>
-
-                {/* Address Section */}
-                <div className="pt-4 border-t border-border/50">
-                  <h3 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
-                    <MapPin className="w-4 h-4" />
-                    Dirección
-                  </h3>
-                  
-                  <div className="space-y-5">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="md:col-span-2 space-y-2">
-                        <Label htmlFor="street" className="flex items-center gap-2">
-                          <Building2 className="w-4 h-4" />
-                          Calle *
-                        </Label>
-                        <Input
-                          id="street"
-                          placeholder="Nombre de la calle"
-                          value={clientInfo.street}
-                          onChange={e => {
-                            setClientInfo(prev => ({ ...prev, street: e.target.value }));
-                            setErrors(prev => ({ ...prev, street: '' }));
-                          }}
-                          onBlur={saveProgress}
-                          className={cn('h-12', errors.street && 'border-destructive')}
-                        />
-                        {errors.street && (
-                          <p className="text-sm text-destructive">{errors.street}</p>
-                        )}
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <Label htmlFor="streetNumber" className="flex items-center gap-2">
-                          Número *
-                        </Label>
-                        <Input
-                          id="streetNumber"
-                          placeholder="123"
-                          value={clientInfo.streetNumber}
-                          onChange={e => {
-                            setClientInfo(prev => ({ ...prev, streetNumber: e.target.value }));
-                            setErrors(prev => ({ ...prev, streetNumber: '' }));
-                          }}
-                          onBlur={saveProgress}
-                          className={cn('h-12', errors.streetNumber && 'border-destructive')}
-                        />
-                        {errors.streetNumber && (
-                          <p className="text-sm text-destructive">{errors.streetNumber}</p>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="city" className="flex items-center gap-2">
-                          Ciudad *
-                        </Label>
-                        <Input
-                          id="city"
-                          placeholder="Ciudad"
-                          value={clientInfo.city}
-                          onChange={e => {
-                            setClientInfo(prev => ({ ...prev, city: e.target.value }));
-                            setErrors(prev => ({ ...prev, city: '' }));
-                          }}
-                          onBlur={saveProgress}
-                          className={cn('h-12', errors.city && 'border-destructive')}
-                        />
-                        {errors.city && (
-                          <p className="text-sm text-destructive">{errors.city}</p>
-                        )}
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <Label htmlFor="state" className="flex items-center gap-2">
-                          Estado *
-                        </Label>
-                        <Input
-                          id="state"
-                          placeholder="Estado"
-                          value={clientInfo.state}
-                          onChange={e => {
-                            setClientInfo(prev => ({ ...prev, state: e.target.value }));
-                            setErrors(prev => ({ ...prev, state: '' }));
-                          }}
-                          onBlur={saveProgress}
-                          className={cn('h-12', errors.state && 'border-destructive')}
-                        />
-                        {errors.state && (
-                          <p className="text-sm text-destructive">{errors.state}</p>
-                        )}
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <Label htmlFor="postalCode" className="flex items-center gap-2">
-                          Código Postal *
-                        </Label>
-                        <Input
-                          id="postalCode"
-                          placeholder="12345"
-                          value={clientInfo.postalCode}
-                          onChange={e => {
-                            const value = e.target.value.replace(/\D/g, '').slice(0, 5);
-                            setClientInfo(prev => ({ ...prev, postalCode: value }));
-                            if (value.length === 5) {
-                              setErrors(prev => ({ ...prev, postalCode: '' }));
-                            } else if (value.length > 0) {
-                              setErrors(prev => ({ ...prev, postalCode: 'El código postal debe tener 5 dígitos' }));
-                            } else {
-                              setErrors(prev => ({ ...prev, postalCode: '' }));
-                            }
-                          }}
-                          onBlur={() => {
-                            saveProgress();
-                            if (clientInfo.postalCode.trim() && !/^\d{5}$/.test(clientInfo.postalCode.trim())) {
-                              setErrors(prev => ({ ...prev, postalCode: 'El código postal debe tener 5 dígitos' }));
-                            }
-                          }}
-                          maxLength={5}
-                          className={cn('h-12', errors.postalCode && 'border-destructive')}
-                        />
-                        {errors.postalCode && (
-                          <p className="text-sm text-destructive">{errors.postalCode}</p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
                 </div>
               </div>
 
@@ -1074,6 +939,4 @@ const PublicFormView = () => {
       </div>
     </div>
   );
-};
-
-export default PublicFormView;
+}

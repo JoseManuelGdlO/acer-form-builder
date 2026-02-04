@@ -92,7 +92,7 @@ export const createSubmission = [
   body('formId').notEmpty().withMessage('Form ID is required'),
   body('formName').notEmpty().withMessage('Form name is required'),
   body('respondentName').notEmpty().withMessage('Respondent name is required'),
-  body('respondentEmail').isEmail().normalizeEmail(),
+  body('respondentEmail').optional({ checkFalsy: true }).isEmail().normalizeEmail(),
   body('answers').isObject().withMessage('Answers must be an object'),
   async (req: Request, res: Response): Promise<void> => {
     try {
@@ -102,7 +102,12 @@ export const createSubmission = [
         return;
       }
 
-      const { formId, formName, respondentName, respondentEmail, respondentPhone, address, answers, clientId } = req.body;
+      let { formId, formName, respondentName, respondentEmail, respondentPhone, address, answers, clientId } = req.body;
+      // Email is optional; use placeholder for DB when not provided (column is NOT NULL)
+      const emailPlaceholder = 'sin-correo@formulario.local';
+      if (!respondentEmail || typeof respondentEmail !== 'string' || !respondentEmail.trim()) {
+        respondentEmail = emailPlaceholder;
+      }
 
       // Debug: Log received data
       console.log('Received submission data:', {
@@ -149,9 +154,9 @@ export const createSubmission = [
       console.log('Final answers to save:', normalizedAnswers);
       console.log('Final answers keys:', Object.keys(normalizedAnswers));
 
-      // Try to find or create client by email; save/update phone and address
+      // Try to find or create client by email; save/update phone and address (skip when email is placeholder)
       let finalClientId = clientId;
-      if (!finalClientId && respondentEmail) {
+      if (!finalClientId && respondentEmail && respondentEmail !== emailPlaceholder) {
         let client = await Client.findOne({ where: { email: respondentEmail } });
         if (!client) {
           client = await Client.create({
