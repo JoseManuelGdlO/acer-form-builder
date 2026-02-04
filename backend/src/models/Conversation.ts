@@ -1,5 +1,5 @@
 import { DataTypes, Model, Optional } from 'sequelize';
-import sequelize from '../config/database';
+import sequelizePg from '../config/database-pg';
 
 interface ConversationsAttributes {
   id: number;
@@ -42,7 +42,7 @@ Conversations.init(
       primaryKey: true,
     },
     fkid_clients: {
-      type: DataTypes.STRING(50),
+      type: DataTypes.STRING(20),
       allowNull: false,
     },
     fecha: {
@@ -57,6 +57,7 @@ Conversations.init(
       type: DataTypes.ENUM('usuario', 'bot'),
       allowNull: false,
       defaultValue: 'usuario',
+      field: 'from',
     },
     mensaje: {
       type: DataTypes.TEXT,
@@ -69,7 +70,7 @@ Conversations.init(
     },
   },
   {
-    sequelize,
+    sequelize: sequelizePg,
     tableName: 'conversations',
     timestamps: true,
     underscored: true,

@@ -12,6 +12,13 @@ export const config = {
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || '',
   },
+  pg: {
+    host: process.env.PG_HOST || 'localhost',
+    port: parseInt(process.env.PG_PORT || '5432', 10),
+    name: process.env.PG_NAME || '',
+    user: process.env.PG_USER || '',
+    password: process.env.PG_PASSWORD || '',
+  },
   jwt: {
     secret: process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-this-in-production',
     expiresIn: process.env.JWT_EXPIRES_IN || '7d',

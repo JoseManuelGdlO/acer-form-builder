@@ -22,21 +22,34 @@ const addConv = [
 
       const now = new Date();
       const fecha = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const hora = new Date(1970, 0, 1, now.getHours(), now.getMinutes(), now.getSeconds());
+      const hora = [
+        now.getHours().toString().padStart(2, '0'),
+        now.getMinutes().toString().padStart(2, '0'),
+        now.getSeconds().toString().padStart(2, '0'),
+      ].join(':');
 
       const record = await Conversations.create({
         fkid_clients: phone,
         mensaje,
         from,
         fecha,
-        hora,
+        hora: hora as unknown as Date,
         baja_logica: false,
       });
 
       res.status(201).json(record);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('addConv error:', error);
-      res.status(500).json({ error: 'Internal server error' });
+      const err = error as { name?: string; code?: string; original?: { code?: string } };
+      const isConnectionError =
+        err?.name === 'SequelizeConnectionRefusedError' ||
+        err?.code === 'ECONNREFUSED' ||
+        err?.original?.code === 'ECONNREFUSED';
+      const message =
+        process.env.NODE_ENV === 'development' && isConnectionError
+          ? 'No se pudo conectar a la base de datos PostgreSQL. Comprueba que esté en ejecución y que PG_HOST, PG_PORT, PG_NAME, PG_USER, PG_PASSWORD en .env sean correctos.'
+          : 'Internal server error';
+      res.status(500).json({ error: message });
     }
   },
 ];
