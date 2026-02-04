@@ -17,7 +17,7 @@ export const requireRole = (...allowedRoles: UserRole[]) => {
       console.log('[role.middleware] 403: permisos insuficientes', {
         path: req.originalUrl,
         method: req.method,
-        userId: req.user.userId,
+        userId: req.user.id,
         userRoles,
         allowedRoles,
       });

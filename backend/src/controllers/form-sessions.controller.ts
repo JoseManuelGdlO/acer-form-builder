@@ -9,7 +9,7 @@ import { AuthRequest } from '../middleware/auth.middleware';
  */
 export const createFormSession = async (req: AuthRequest, res: Response): Promise<void> => {
   const formId = req.params.id;
-  const userId = req.user?.userId;
+  const userId = req.user?.id;
   const userEmail = req.user?.email;
 
   console.log('[form-sessions] createFormSession: inicio', { formId, userId, userEmail });
