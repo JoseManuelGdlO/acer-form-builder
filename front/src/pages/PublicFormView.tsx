@@ -55,7 +55,7 @@ const range = (start: number, end: number) => {
   return result;
 };
 
-const years = range(1950, getYear(new Date()) + 10);
+const years = range(1920, getYear(new Date()) + 10);
 
 // Componente CustomHeader para el DatePicker
 const CustomHeader = ({
