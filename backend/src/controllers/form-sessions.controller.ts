@@ -8,14 +8,21 @@ import { AuthRequest } from '../middleware/auth.middleware';
  * Returns sessionId to use as token in URL: /form/:formId?token=:sessionId
  */
 export const createFormSession = async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
-    const formId = req.params.id;
+  const formId = req.params.id;
+  const userId = req.user?.userId;
+  const userEmail = req.user?.email;
 
+  console.log('[form-sessions] createFormSession: inicio', { formId, userId, userEmail });
+
+  try {
     const form = await Form.findByPk(formId);
     if (!form) {
+      console.log('[form-sessions] createFormSession: formulario no encontrado', { formId });
       res.status(404).json({ error: 'Form not found' });
       return;
     }
+
+    console.log('[form-sessions] createFormSession: formulario encontrado', { formId, formName: form.name });
 
     const session = await FormSession.create({
       formId,
@@ -23,9 +30,14 @@ export const createFormSession = async (req: AuthRequest, res: Response): Promis
       status: 'in_progress',
     });
 
+    console.log('[form-sessions] createFormSession: sesión creada OK', {
+      formId,
+      sessionId: session.id,
+      userId,
+    });
     res.status(201).json({ sessionId: session.id });
   } catch (error) {
-    console.error('Create form session error:', error);
+    console.error('[form-sessions] createFormSession: error', { formId, userId, error });
     res.status(500).json({ error: 'Internal server error' });
   }
 };
