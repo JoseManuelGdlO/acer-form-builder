@@ -1,0 +1,59 @@
+/* Custom styles for react-datepicker to match Tailwind theme */
+.react-datepicker {
+  @apply border border-border rounded-lg shadow-lg bg-background;
+  font-family: inherit;
+}
+
+.react-datepicker__header {
+  @apply bg-muted/30 border-b border-border rounded-t-lg pt-0;
+}
+
+.react-datepicker__current-month {
+  @apply text-foreground font-semibold hidden;
+}
+
+.react-datepicker__day-name {
+  @apply text-muted-foreground font-medium text-xs;
+}
+
+.react-datepicker__day {
+  @apply text-foreground hover:bg-primary/10 rounded-md transition-colors;
+}
+
+.react-datepicker__day--selected,
+.react-datepicker__day--keyboard-selected {
+  @apply bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground;
+}
+
+.react-datepicker__day--today {
+  @apply font-bold border border-primary text-primary;
+}
+
+.react-datepicker__day--disabled {
+  @apply text-muted-foreground opacity-40 cursor-not-allowed hover:bg-transparent;
+}
+
+.react-datepicker__navigation {
+  @apply hidden;
+}
+
+.react-datepicker__month {
+  @apply m-2;
+}
+
+.react-datepicker__triangle {
+  @apply hidden;
+}
+
+/* Estilos para los selectores del custom header */
+.react-datepicker select {
+  @apply cursor-pointer;
+}
+
+.react-datepicker select:focus {
+  @apply ring-offset-background;
+}
+
+.react-datepicker__header__dropdown {
+  @apply hidden;
+}

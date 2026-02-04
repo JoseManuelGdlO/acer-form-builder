@@ -7,8 +7,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Select,
   SelectContent,
@@ -19,12 +17,104 @@ import {
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
-import { User, Mail, Phone, CalendarIcon, CheckCircle2, ArrowRight, ArrowLeft, Send, Loader2, Upload, X } from 'lucide-react';
-import { format } from 'date-fns';
+import { User, Mail, Phone, CalendarIcon, CheckCircle2, ArrowRight, ArrowLeft, Send, Loader2, Upload, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { format, getYear, getMonth } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
 import saruLogo from '@/assets/saru-logo.png';
+import DatePicker, { registerLocale, ReactDatePickerCustomHeaderProps } from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
+import '@/styles/datepicker.css';
+
+// Registrar locale español para react-datepicker
+registerLocale('es', es);
+
+// Meses en español
+const MONTHS = [
+  "Enero",
+  "Febrero",
+  "Marzo",
+  "Abril",
+  "Mayo",
+  "Junio",
+  "Julio",
+  "Agosto",
+  "Septiembre",
+  "Octubre",
+  "Noviembre",
+  "Diciembre",
+] as const;
+
+// Generar rango de años (desde 1950 hasta año actual + 10)
+const range = (start: number, end: number) => {
+  const result = [];
+  for (let i = start; i <= end; i++) {
+    result.push(i);
+  }
+  return result;
+};
+
+const years = range(1950, getYear(new Date()) + 10);
+
+// Componente CustomHeader para el DatePicker
+const CustomHeader = ({
+  date,
+  changeYear,
+  changeMonth,
+  decreaseMonth,
+  increaseMonth,
+  prevMonthButtonDisabled,
+  nextMonthButtonDisabled,
+}: ReactDatePickerCustomHeaderProps) => (
+  <div className="flex items-center justify-between px-4 py-2">
+    <button
+      type="button"
+      onClick={decreaseMonth}
+      disabled={prevMonthButtonDisabled}
+      className="p-1 hover:bg-muted rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+    >
+      <ChevronLeft className="w-5 h-5 text-foreground" />
+    </button>
+    
+    <div className="flex gap-2">
+      <select
+        value={getYear(date)}
+        onChange={({ target: { value } }) => changeYear(+value)}
+        className="px-2 py-1 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+      >
+        {years.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
+
+      <select
+        value={MONTHS[getMonth(date)]}
+        onChange={({ target: { value } }) =>
+          changeMonth(MONTHS.indexOf(value as (typeof MONTHS)[number]))
+        }
+        className="px-2 py-1 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+      >
+        {MONTHS.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
+    </div>
+
+    <button
+      type="button"
+      onClick={increaseMonth}
+      disabled={nextMonthButtonDisabled}
+      className="p-1 hover:bg-muted rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+    >
+      <ChevronRight className="w-5 h-5 text-foreground" />
+    </button>
+  </div>
+);
 
 export type FileAnswerValue = { fileName: string; mimeType: string; data: string };
 
@@ -470,37 +560,34 @@ export default function PublicFormView() {
           </Select>
         );
 
-      case 'date':
+      case 'date': {
         return (
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                className={cn(
-                  'w-full h-12 justify-start text-left font-normal',
-                  !value && 'text-muted-foreground',
-                  error && 'border-destructive'
-                )}
-              >
-                <CalendarIcon className="mr-2 h-5 w-5" />
-                {value ? format(value as Date, "d 'de' MMMM, yyyy", { locale: es }) : 'Selecciona una fecha'}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={value as Date}
-                onSelect={date => {
-                  if (date) {
-                    handleAnswer(question.id, date);
-                    saveProgress();
-                  }
-                }}
-                locale={es}
-              />
-            </PopoverContent>
-          </Popover>
+          <div className={cn('relative', error && 'rounded-lg')}>
+            <DatePicker
+              selected={value as Date | null}
+              onChange={(date: Date | null) => {
+                if (date) {
+                  handleAnswer(question.id, date);
+                  saveProgress();
+                }
+              }}
+              renderCustomHeader={CustomHeader}
+              dateFormat="dd/MM/yyyy"
+              placeholderText="Selecciona una fecha"
+              locale="es"
+              showYearDropdown
+              showMonthDropdown
+              dropdownMode="select"
+              className={cn(
+                'w-full h-12 px-4 rounded-lg border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary',
+                error && 'border-destructive'
+              )}
+              wrapperClassName="w-full"
+              calendarClassName="shadow-lg rounded-lg border border-border"
+            />
+          </div>
         );
+      }
 
       case 'rating':
         const rating = (value as string) || '0';
