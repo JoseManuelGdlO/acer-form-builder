@@ -294,10 +294,18 @@ export default function PublicFormView() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleStartForm = () => {
-    if (validateClientInfo()) {
-      setStep('sections');
+  // Al avanzar desde la pantalla de datos (nombre, teléfono, correo), se pausa la conversación
+  // con el agente para ese teléfono (baja lógica). Si falla la llamada, el usuario puede seguir.
+  const handleStartForm = async () => {
+    if (!validateClientInfo()) return;
+    const cleanPhone = getCleanPhone(clientInfo.phone);
+    try {
+      await api.pauseConversationByPhone(cleanPhone, true);
+    } catch (err) {
+      console.error('No se pudo pausar la conversación con el asistente:', err);
+      toast.warning('No se pudo pausar la conversación con el asistente, pero puedes continuar con el formulario.');
     }
+    setStep('sections');
   };
 
   const handleAnswer = (questionId: string, value: string | string[] | Date | FileAnswerValue) => {

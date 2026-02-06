@@ -247,6 +247,18 @@ class ApiClient {
     });
   }
 
+  /**
+   * Pause conversation with the agent for the given phone (baja lógica).
+   * Phone must be the same format as fkid_clients in Conversations (e.g. 10 digits).
+   * No auth required; used when user starts filling the public form.
+   */
+  async pauseConversationByPhone(phone: string, bajaLogica = true) {
+    return this.request<any>(`/addChat/${encodeURIComponent(phone)}/baja`, {
+      method: 'PATCH',
+      body: JSON.stringify({ baja_logica: bajaLogica }),
+    });
+  }
+
   // Submissions
   async getSubmissions(params?: { formId?: string; clientId?: string; status?: string }, token?: string | null) {
     const queryParams = new URLSearchParams(params as any).toString();
