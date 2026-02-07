@@ -22,6 +22,8 @@ export interface FormSessionProgress {
 interface FormSessionAttributes {
   id: string;
   formId: string;
+  clientId?: string;
+  submissionId?: string;
   progress: FormSessionProgress;
   status: 'in_progress' | 'completed';
   createdAt?: Date;
@@ -33,6 +35,8 @@ interface FormSessionCreationAttributes extends Optional<FormSessionAttributes, 
 export class FormSession extends Model<FormSessionAttributes, FormSessionCreationAttributes> implements FormSessionAttributes {
   public id!: string;
   public formId!: string;
+  public clientId?: string;
+  public submissionId?: string;
   public progress!: FormSessionProgress;
   public status!: 'in_progress' | 'completed';
   public readonly createdAt!: Date;
@@ -54,6 +58,24 @@ FormSession.init(
         key: 'id',
       },
       onDelete: 'CASCADE',
+    },
+    clientId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      references: {
+        model: 'clients',
+        key: 'id',
+      },
+      onDelete: 'SET NULL',
+    },
+    submissionId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      references: {
+        model: 'form_submissions',
+        key: 'id',
+      },
+      onDelete: 'SET NULL',
     },
     progress: {
       type: DataTypes.JSON,

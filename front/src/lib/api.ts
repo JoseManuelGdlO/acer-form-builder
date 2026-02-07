@@ -247,6 +247,21 @@ class ApiClient {
     });
   }
 
+  // Form session submissions (public - no auth required)
+  async createSubmissionFromSession(formId: string, sessionId: string, clientInfo: any) {
+    return this.request<any>(`/forms/${formId}/sessions/${sessionId}/submission`, {
+      method: 'POST',
+      body: JSON.stringify({ clientInfo }),
+    });
+  }
+
+  async updateSubmissionFromSession(formId: string, sessionId: string, answers: any, options?: { status?: string }) {
+    return this.request<any>(`/forms/${formId}/sessions/${sessionId}/submission`, {
+      method: 'PATCH',
+      body: JSON.stringify({ answers, status: options?.status }),
+    });
+  }
+
   /**
    * Pause conversation with the agent for the given phone (baja lógica).
    * Phone must be the same format as fkid_clients in Conversations (e.g. 10 digits).

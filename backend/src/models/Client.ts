@@ -5,7 +5,7 @@ import { User } from './User';
 interface ClientAttributes {
   id: string;
   name: string;
-  email: string;
+  email?: string;
   phone?: string;
   address?: string;
   notes?: string;
@@ -21,7 +21,7 @@ interface ClientCreationAttributes extends Optional<ClientAttributes, 'id' | 'fo
 export class Client extends Model<ClientAttributes, ClientCreationAttributes> implements ClientAttributes {
   public id!: string;
   public name!: string;
-  public email!: string;
+  public email?: string;
   public phone?: string;
   public address?: string;
   public notes?: string;
@@ -45,7 +45,7 @@ Client.init(
     },
     email: {
       type: DataTypes.STRING(255),
-      allowNull: false,
+      allowNull: true,
       validate: {
         isEmail: true,
       },

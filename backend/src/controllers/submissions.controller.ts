@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { body, validationResult } from 'express-validator';
-import { FormSubmission, Form, Client } from '../models';
+import { FormSubmission, Form, Client, FormSession } from '../models';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { Op } from 'sequelize';
 
@@ -103,10 +103,11 @@ export const createSubmission = [
       }
 
       let { formId, formName, respondentName, respondentEmail, respondentPhone, address, answers, clientId } = req.body;
-      // Email is optional; use placeholder for DB when not provided (column is NOT NULL)
-      const emailPlaceholder = 'sin-correo@formulario.local';
-      if (!respondentEmail || typeof respondentEmail !== 'string' || !respondentEmail.trim()) {
-        respondentEmail = emailPlaceholder;
+      // Email is optional - don't use placeholder
+      if (respondentEmail && typeof respondentEmail === 'string') {
+        respondentEmail = respondentEmail.trim() || null;
+      } else {
+        respondentEmail = null;
       }
 
       // Debug: Log received data
@@ -154,9 +155,9 @@ export const createSubmission = [
       console.log('Final answers to save:', normalizedAnswers);
       console.log('Final answers keys:', Object.keys(normalizedAnswers));
 
-      // Try to find or create client by email; save/update phone and address (skip when email is placeholder)
+      // Try to find or create client by email
       let finalClientId = clientId;
-      if (!finalClientId && respondentEmail && respondentEmail !== emailPlaceholder) {
+      if (!finalClientId && respondentEmail) {
         let client = await Client.findOne({ where: { email: respondentEmail } });
         if (!client) {
           client = await Client.create({
@@ -343,3 +344,225 @@ export const getSubmissionStats = async (req: AuthRequest, res: Response): Promi
     res.status(500).json({ error: 'Internal server error' });
   }
 };
+
+/**
+ * Create a new submission from a form session (public endpoint)
+ * Called after user completes the 'info' step
+ */
+export const createSubmissionFromSession = [
+  body('clientInfo.name').notEmpty().withMessage('Client name is required'),
+  body('clientInfo.phone').notEmpty().withMessage('Client phone is required'),
+  body('clientInfo.email').optional({ checkFalsy: true }).isEmail().normalizeEmail(),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        res.status(400).json({ errors: errors.array() });
+        return;
+      }
+
+      const formId = req.params.id;
+      const { sessionId } = req.params;
+      const { clientInfo } = req.body;
+
+      // Validate session exists and is in progress
+      const session = await FormSession.findOne({
+        where: { id: sessionId, formId },
+      });
+
+      if (!session) {
+        res.status(404).json({ error: 'Session not found or invalid' });
+        return;
+      }
+
+      if (session.status === 'completed') {
+        res.status(400).json({ error: 'This form has already been submitted' });
+        return;
+      }
+
+      // Check if submission already exists for this session
+      if (session.submissionId) {
+        const existingSubmission = await FormSubmission.findByPk(session.submissionId);
+        if (existingSubmission) {
+          res.json(existingSubmission);
+          return;
+        }
+      }
+
+      // Get form data
+      const form = await Form.findByPk(formId);
+      if (!form) {
+        res.status(404).json({ error: 'Form not found' });
+        return;
+      }
+
+      // Email is optional - don't use placeholder
+      let email = clientInfo.email;
+      if (email && typeof email === 'string') {
+        email = email.trim() || null;
+      } else {
+        email = null;
+      }
+
+      // Find or create client
+      let client;
+      let clientId;
+      
+      if (email) {
+        // Email provided - try to find existing client by email
+        client = await Client.findOne({ where: { email } });
+        if (!client) {
+          client = await Client.create({
+            name: clientInfo.name,
+            email: email,
+            phone: clientInfo.phone || undefined,
+            status: 'pending',
+          });
+        } else {
+          // Update existing client with new information
+          const updateData: any = {};
+          if (clientInfo.name) updateData.name = clientInfo.name;
+          if (clientInfo.phone) updateData.phone = clientInfo.phone;
+          if (Object.keys(updateData).length > 0) {
+            await client.update(updateData);
+          }
+        }
+        clientId = client.id;
+      } else {
+        // No email provided - create new client without email
+        client = await Client.create({
+          name: clientInfo.name,
+          email: null,
+          phone: clientInfo.phone || undefined,
+          status: 'pending',
+        });
+        clientId = client.id;
+      }
+
+      // Create submission with status 'in_progress'
+      const submission = await FormSubmission.create({
+        formId,
+        formName: form.name,
+        respondentName: clientInfo.name,
+        respondentEmail: email,
+        respondentPhone: clientInfo.phone || undefined,
+        answers: {},
+        clientId,
+        status: 'in_progress',
+      });
+
+      // Update session with clientId and submissionId
+      await session.update({
+        clientId,
+        submissionId: submission.id,
+      });
+
+      console.log(`Created submission ${submission.id} from session ${sessionId} for client ${clientId}`);
+
+      res.status(201).json(submission);
+    } catch (error) {
+      console.error('Create submission from session error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  },
+];
+
+/**
+ * Update a submission from a form session (public endpoint)
+ * Called when user advances sections or completes the form
+ */
+export const updateSubmissionFromSession = [
+  body('answers').optional().isObject().withMessage('Answers must be an object'),
+  body('status').optional().isIn(['pending', 'in_progress', 'completed', 'cancelled']),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        res.status(400).json({ errors: errors.array() });
+        return;
+      }
+
+      const formId = req.params.id;
+      const { sessionId } = req.params;
+      const { answers, status } = req.body;
+
+      // Validate session exists and belongs to this form
+      const session = await FormSession.findOne({
+        where: { id: sessionId, formId },
+      });
+
+      if (!session) {
+        res.status(404).json({ error: 'Session not found or invalid' });
+        return;
+      }
+
+      if (!session.submissionId) {
+        res.status(400).json({ error: 'No submission found for this session. Please start the form first.' });
+        return;
+      }
+
+      // Get the submission
+      const submission = await FormSubmission.findByPk(session.submissionId);
+      if (!submission) {
+        res.status(404).json({ error: 'Submission not found' });
+        return;
+      }
+
+      // Prepare update data
+      const updateData: any = {};
+
+      // Merge answers if provided
+      if (answers) {
+        const currentAnswers = submission.answers || {};
+        const finalAnswers = answers && typeof answers === 'object' && !Array.isArray(answers) ? answers : {};
+        
+        // Normalize answers format
+        const normalizedAnswers: Record<string, any> = {};
+        Object.entries(finalAnswers).forEach(([questionId, answerData]) => {
+          if (answerData && typeof answerData === 'object' && !Array.isArray(answerData) && 'question' in answerData) {
+            normalizedAnswers[questionId] = answerData;
+          } else {
+            normalizedAnswers[questionId] = {
+              questionId,
+              answer: answerData,
+            };
+          }
+        });
+
+        updateData.answers = { ...currentAnswers, ...normalizedAnswers };
+      }
+
+      // Update status if provided
+      if (status) {
+        updateData.status = status;
+      }
+
+      // Update the submission
+      await submission.update(updateData);
+
+      // Update client's formsCompleted count if status changed to pending/completed
+      if (status === 'pending' || status === 'completed') {
+        if (submission.clientId) {
+          const client = await Client.findByPk(submission.clientId);
+          if (client) {
+            const count = await FormSubmission.count({
+              where: {
+                clientId: submission.clientId,
+                status: { [Op.in]: ['pending', 'in_progress', 'completed'] },
+              },
+            });
+            await client.update({ formsCompleted: count });
+            console.log(`Updated client ${submission.clientId} formsCompleted to ${count}`);
+          }
+        }
+      }
+
+      console.log(`Updated submission ${submission.id} from session ${sessionId}`);
+
+      res.json(submission);
+    } catch (error) {
+      console.error('Update submission from session error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  },
+];

@@ -141,6 +141,9 @@ export default function PublicFormView() {
   // Client info
   const [clientInfo, setClientInfo] = useState(defaultClientInfo);
   
+  // Submission ID (created after info step)
+  const [submissionId, setSubmissionId] = useState<string | null>(null);
+  
   // Form answers (string | string[] | Date | FileAnswerValue for file_upload)
   const [answers, setAnswers] = useState<Record<string, string | string[] | Date | FileAnswerValue>>({});
   
@@ -152,6 +155,9 @@ export default function PublicFormView() {
     if (!progress) return;
     if (progress.clientInfo) {
       setClientInfo({ ...defaultClientInfo, ...progress.clientInfo });
+    }
+    if (progress.submissionId) {
+      setSubmissionId(progress.submissionId);
     }
     if (progress.answers) {
       const restored: Record<string, string | string[] | Date | FileAnswerValue> = {};
@@ -180,6 +186,7 @@ export default function PublicFormView() {
     try {
       const progress = {
         clientInfo,
+        submissionId,
         answers: Object.fromEntries(
           Object.entries(answers).map(([key, value]) => [
             key,
@@ -198,7 +205,7 @@ export default function PublicFormView() {
     } catch (error) {
       console.error('Failed to save progress:', error);
     }
-  }, [formId, sessionToken, clientInfo, answers, step, currentSectionIndex]);
+  }, [formId, sessionToken, clientInfo, submissionId, answers, step, currentSectionIndex]);
 
   useEffect(() => {
     const loadForm = async () => {
@@ -237,13 +244,13 @@ export default function PublicFormView() {
     loadForm();
   }, [formId, sessionToken, applyProgress]);
 
-  // Save progress only when changing step or section (navigation), not while typing
+  // Save progress only when changing step, section, or submissionId (navigation), not while typing
   useEffect(() => {
     if (step === 'success' || !formId || !sessionToken) return;
     saveProgress();
-    // Intentionally only run on step/section change; saveProgress is stable enough for this effect
+    // Intentionally only run on step/section/submissionId change; saveProgress is stable enough for this effect
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, currentSectionIndex]);
+  }, [step, currentSectionIndex, submissionId]);
 
   // Format phone number with mask (XXX)-XXXX-XXXX
   const formatPhoneNumber = (value: string): string => {
@@ -294,18 +301,47 @@ export default function PublicFormView() {
     return Object.keys(newErrors).length === 0;
   };
 
-  // Al avanzar desde la pantalla de datos (nombre, teléfono, correo), se pausa la conversación
-  // con el agente para ese teléfono (baja lógica). Si falla la llamada, el usuario puede seguir.
+  // Al avanzar desde la pantalla de datos (nombre, teléfono, correo), se crea el cliente
+  // y el submission, y se pausa la conversación con el agente para ese teléfono (baja lógica).
   const handleStartForm = async () => {
     if (!validateClientInfo()) return;
-    const cleanPhone = getCleanPhone(clientInfo.phone);
-    try {
-      await api.pauseConversationByPhone(cleanPhone, true);
-    } catch (err) {
-      console.error('No se pudo pausar la conversación con el asistente:', err);
-      toast.warning('No se pudo pausar la conversación con el asistente, pero puedes continuar con el formulario.');
+    
+    if (!formId || !sessionToken) {
+      toast.error('Error: No se pudo identificar el formulario');
+      return;
     }
-    setStep('sections');
+
+    const cleanPhone = getCleanPhone(clientInfo.phone);
+    
+    try {
+      // Pause conversation with the agent
+      try {
+        await api.pauseConversationByPhone(cleanPhone, true);
+      } catch (err) {
+        console.error('No se pudo pausar la conversación con el asistente:', err);
+        toast.warning('No se pudo pausar la conversación con el asistente, pero puedes continuar con el formulario.');
+      }
+
+      // Check if submission already exists (user may have started on another device)
+      if (!submissionId) {
+        // Create client and submission only if it doesn't exist yet
+        const submission = await api.createSubmissionFromSession(
+          formId,
+          sessionToken,
+          clientInfo
+        );
+        
+        setSubmissionId(submission.id);
+        console.log('Created submission:', submission.id);
+      } else {
+        console.log('Submission already exists:', submissionId);
+      }
+      
+      setStep('sections');
+    } catch (error: any) {
+      console.error('Failed to create submission:', error);
+      toast.error('Error al crear el registro. Por favor intenta de nuevo.');
+    }
   };
 
   const handleAnswer = (questionId: string, value: string | string[] | Date | FileAnswerValue) => {
@@ -332,10 +368,25 @@ export default function PublicFormView() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (!form) return;
     
     if (validateCurrentSection()) {
+      // Update submission with current answers before advancing
+      if (formId && sessionToken) {
+        try {
+          await api.updateSubmissionFromSession(
+            formId,
+            sessionToken,
+            answers
+          );
+          console.log('Updated submission with current answers');
+        } catch (error) {
+          console.warn('Failed to save section progress:', error);
+          toast.warning('No se pudo guardar el progreso, pero puedes continuar');
+        }
+      }
+
       if (currentSectionIndex < form.sections.length - 1) {
         setCurrentSectionIndex(prev => prev + 1);
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -357,19 +408,15 @@ export default function PublicFormView() {
   const handleSubmit = async () => {
     if (!form) return;
     
+    if (!formId || !sessionToken) {
+      toast.error('Error: No se pudo identificar el formulario');
+      return;
+    }
+    
     try {
       // Collect all answers from all sections
       const allAnswers: Record<string, string | string[] | Date | FileAnswerValue> = { ...answers };
       
-      // Ensure we have answers for all questions (even if empty)
-      form.sections.forEach(section => {
-        section.questions.forEach(question => {
-          if (!(question.id in allAnswers)) {
-            // Question not answered, skip it (don't add empty values)
-          }
-        });
-      });
-
       // Convert Date objects to ISO strings and include question information
       const formattedAnswers: Record<string, any> = {};
       form.sections.forEach(section => {
@@ -391,14 +438,14 @@ export default function PublicFormView() {
             }
 
             // Get question title, ensuring it's not "Nueva pregunta" or empty
-            let questionTitle = question.title || question.label || question.text || '';
-            // If title is "Nueva pregunta" or invalid, try to get a better value
+            let questionTitle = question.title || '';
+            // If title is "Nueva pregunta" or invalid, use question ID
             if (!questionTitle || 
                 questionTitle.trim() === '' || 
                 questionTitle.trim().toLowerCase() === 'nueva pregunta' ||
                 questionTitle.trim().toLowerCase() === 'nueva pregunta frecuente') {
-              // Try alternative fields
-              questionTitle = question.label || question.text || question.id || `Pregunta ${question.id.slice(0, 8)}`;
+              // Fallback to question ID
+              questionTitle = question.id || `Pregunta ${question.id.slice(0, 8)}`;
             }
 
             // Include both the answer and question information
@@ -427,29 +474,19 @@ export default function PublicFormView() {
         return;
       }
 
-      // Get clean phone number (only digits) for submission
-      const cleanPhoneNumber = getCleanPhone(clientInfo.phone);
-
-      const submissionData = {
-        formId: form.id,
-        formName: form.name,
-        respondentName: clientInfo.name,
-        respondentEmail: clientInfo.email.trim() || undefined,
-        respondentPhone: cleanPhoneNumber || undefined,
-        address: undefined,
-        answers: formattedAnswers,
-      };
-
-      console.log('Full submission data:', JSON.stringify(submissionData, null, 2));
-
-      const response = await api.createSubmission(submissionData);
+      // Update the existing submission with final answers and mark as pending (completed)
+      const response = await api.updateSubmissionFromSession(
+        formId,
+        sessionToken,
+        formattedAnswers,
+        { status: 'pending' }
+      );
       
-      console.log('Submission response:', response);
+      console.log('Submission updated:', response);
       console.log('Response answers:', response.answers);
       
-      if (sessionToken) {
-        await api.completeFormSession(form.id, sessionToken);
-      }
+      // Complete the session
+      await api.completeFormSession(form.id, sessionToken);
       
       toast.success('Formulario enviado correctamente');
       setStep('success');
