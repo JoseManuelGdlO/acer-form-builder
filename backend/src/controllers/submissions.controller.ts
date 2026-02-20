@@ -432,7 +432,7 @@ export const createSubmissionFromSession = [
         // No email provided - create new client without email
         client = await Client.create({
           name: clientInfo.name,
-          email: null,
+          email: undefined,
           phone: clientInfo.phone || undefined,
           status: 'pending',
         });
