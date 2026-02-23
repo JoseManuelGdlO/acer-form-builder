@@ -78,10 +78,10 @@ class ApiClient {
     });
   }
 
-  async register(email: string, password: string, name: string) {
+  async register(email: string, password: string, name: string, companySlug?: string) {
     return this.request<{ token: string; user: any }>('/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ email, password, name }),
+      body: JSON.stringify({ email, password, name, ...(companySlug && { companySlug }) }),
     });
   }
 
@@ -90,6 +90,30 @@ class ApiClient {
       method: 'GET',
       token: token ?? this.getToken(),
       requireAuth: true,
+    });
+  }
+
+  async getTenant(domain: string) {
+    return this.request<{ company: { id: string; name: string; slug: string; logoUrl: string | null }; theme: Record<string, string> | null }>(
+      `/public/tenant?domain=${encodeURIComponent(domain)}`,
+      { method: 'GET' }
+    );
+  }
+
+  async getMyCompany(token?: string | null) {
+    return this.request<{ id: string; name: string; slug: string; logoUrl: string | null; domain: string | null; theme: Record<string, string> | null }>('/companies/me', {
+      method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async updateMyCompany(data: { domain?: string | null; theme?: Record<string, string> | null }, token?: string | null) {
+    return this.request<{ id: string; name: string; slug: string; logoUrl: string | null; domain: string | null; theme: Record<string, string> | null }>('/companies/me', {
+      method: 'PATCH',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+      body: JSON.stringify(data),
     });
   }
 
@@ -154,6 +178,22 @@ class ApiClient {
     });
   }
 
+  async getClientAmountDueHistory(clientId: string, token?: string | null) {
+    return this.request<any[]>(`/clients/${clientId}/amount-due-history`, {
+      method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async getClientPaymentDeletedHistory(clientId: string, token?: string | null) {
+    return this.request<any[]>(`/clients/${clientId}/payment-deleted-history`, {
+      method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
   async createClient(clientData: any, token?: string | null) {
     return this.request<any>('/clients', {
       method: 'POST',
@@ -184,12 +224,14 @@ class ApiClient {
   async getForms() {
     return this.request<any[]>('/forms', {
       method: 'GET',
+      requireAuth: true,
     });
   }
 
-  async getForm(id: string) {
+  async getForm(id: string, token?: string | null) {
     return this.request<any>(`/forms/${id}`, {
       method: 'GET',
+      token: token ?? this.getToken(),
     });
   }
 
@@ -300,9 +342,11 @@ class ApiClient {
     });
   }
 
-  async createSubmission(submissionData: any) {
+  async createSubmission(submissionData: any, token?: string | null) {
     return this.request<any>('/submissions', {
       method: 'POST',
+      token: token ?? this.getToken(),
+      requireAuth: true,
       body: JSON.stringify(submissionData),
     });
   }
@@ -325,9 +369,11 @@ class ApiClient {
   }
 
   // Checklist
-  async getChecklistTemplates() {
+  async getChecklistTemplates(token?: string | null) {
     return this.request<any[]>('/checklist/templates', {
       method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
     });
   }
 
@@ -409,6 +455,44 @@ class ApiClient {
     });
   }
 
+  // Payments
+  async getCompanyPayments(token?: string | null) {
+    return this.request<any[]>(`/payments`, {
+      method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async getClientPayments(clientId: string, token?: string | null) {
+    return this.request<any[]>(`/payments/clients/${clientId}`, {
+      method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async createPayment(
+    clientId: string,
+    data: { amount: number; paymentDate: string; paymentType?: 'tarjeta' | 'transferencia' | 'efectivo'; note?: string },
+    token?: string | null
+  ) {
+    return this.request<any>(`/payments/clients/${clientId}`, {
+      method: 'POST',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deletePayment(id: string, token?: string | null) {
+    return this.request<{ message: string }>(`/payments/${id}`, {
+      method: 'DELETE',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
   // Messages
   async getClientMessages(clientId: string, token?: string | null) {
     return this.request<any[]>(`/messages/clients/${clientId}`, {
@@ -436,16 +520,20 @@ class ApiClient {
   }
 
   // FAQs
-  async getFAQs(params?: { isActive?: string }) {
+  async getFAQs(params?: { isActive?: string }, token?: string | null) {
     const queryParams = new URLSearchParams(params as any).toString();
     return this.request<any[]>(`/faqs${queryParams ? `?${queryParams}` : ''}`, {
       method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
     });
   }
 
-  async getFAQ(id: string) {
+  async getFAQ(id: string, token?: string | null) {
     return this.request<any>(`/faqs/${id}`, {
       method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
     });
   }
 
@@ -476,9 +564,11 @@ class ApiClient {
   }
 
   // Bot
-  async getBotBehavior() {
+  async getBotBehavior(token?: string | null) {
     return this.request<any>('/bot', {
       method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
     });
   }
 

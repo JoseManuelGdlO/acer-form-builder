@@ -122,6 +122,12 @@ export const SUBMISSION_STATUS_CONFIG: Record<SubmissionStatus, { label: string;
 
 export type ClientStatus = 'active' | 'inactive' | 'pending';
 
+export interface ClientAssignedUser {
+  id: string;
+  name: string;
+  email?: string;
+}
+
 export interface Client {
   id: string;
   name: string;
@@ -131,7 +137,10 @@ export interface Client {
   notes?: string;
   status: ClientStatus;
   formsCompleted: number;
-  assignedUserId?: string; // ID del usuario asignado
+  assignedUserId?: string;
+  assignedUser?: ClientAssignedUser | null;
+  totalAmountDue?: number;
+  totalPaid?: number;
   createdAt: Date;
   updatedAt: Date;
   checklistProgress?: number;
@@ -139,6 +148,42 @@ export interface Client {
   checklistCompleted?: number;
   checklistTotal?: number;
   checklistByTemplate?: Record<string, { completed: boolean; templateId: string }>;
+}
+
+export type PaymentType = 'tarjeta' | 'transferencia' | 'efectivo';
+
+export const PAYMENT_TYPE_LABELS: Record<PaymentType, string> = {
+  tarjeta: 'Tarjeta',
+  transferencia: 'Transferencia',
+  efectivo: 'Efectivo',
+};
+
+export interface ClientPayment {
+  id: string;
+  amount: number;
+  paymentDate: string;
+  paymentType: PaymentType;
+  note?: string;
+  createdAt: Date;
+}
+
+export interface AmountDueLogEntry {
+  id: string;
+  previousValue: number | null;
+  newValue: number | null;
+  createdAt: Date;
+  changedByUser?: { id: string; name: string; email?: string } | null;
+}
+
+export interface PaymentDeletedLogEntry {
+  id: string;
+  paymentId: string;
+  amount: number;
+  paymentDate: string;
+  paymentType: string;
+  note?: string | null;
+  createdAt: Date;
+  deletedByUser?: { id: string; name: string; email?: string } | null;
 }
 
 export const CLIENT_STATUS_CONFIG: Record<ClientStatus, { label: string; color: string }> = {

@@ -6,8 +6,13 @@ import { Op } from 'sequelize';
 
 export const getAllSubmissions = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
+    const companyId = req.user?.companyId;
+    if (!companyId) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
     const { formId, clientId, status } = req.query;
-    const where: any = {};
+    const where: any = { companyId };
 
     if (formId) where.formId = formId;
     if (clientId) where.clientId = clientId;
@@ -16,7 +21,7 @@ export const getAllSubmissions = async (req: AuthRequest, res: Response): Promis
     // If user is reviewer, only show submissions of assigned clients
     if (req.user && !req.user.roles.includes('super_admin')) {
       const assignedClients = await Client.findAll({
-        where: { assignedUserId: req.user.id },
+        where: { companyId, assignedUserId: req.user.id },
         attributes: ['id'],
       });
       const clientIds = assignedClients.map((c) => c.id);
@@ -51,17 +56,17 @@ export const getAllSubmissions = async (req: AuthRequest, res: Response): Promis
 export const getSubmissionById = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
+    const companyId = req.user?.companyId;
+    if (!companyId) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
 
-    const submission = await FormSubmission.findByPk(id, {
+    const submission = await FormSubmission.findOne({
+      where: { id, companyId },
       include: [
-        {
-          model: Form,
-          as: 'form',
-        },
-        {
-          model: Client,
-          as: 'client',
-        },
+        { model: Form, as: 'form' },
+        { model: Client, as: 'client' },
       ],
     });
 
@@ -94,8 +99,14 @@ export const createSubmission = [
   body('respondentName').notEmpty().withMessage('Respondent name is required'),
   body('respondentEmail').optional({ checkFalsy: true }).isEmail().normalizeEmail(),
   body('answers').isObject().withMessage('Answers must be an object'),
-  async (req: Request, res: Response): Promise<void> => {
+  async (req: AuthRequest, res: Response): Promise<void> => {
     try {
+      const companyId = req.user?.companyId;
+      if (!companyId) {
+        res.status(401).json({ error: 'Authentication required' });
+        return;
+      }
+
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         res.status(400).json({ errors: errors.array() });
@@ -103,6 +114,13 @@ export const createSubmission = [
       }
 
       let { formId, formName, respondentName, respondentEmail, respondentPhone, address, answers, clientId } = req.body;
+
+      const form = await Form.findOne({ where: { id: formId, companyId } });
+      if (!form) {
+        res.status(404).json({ error: 'Form not found' });
+        return;
+      }
+
       // Email is optional - don't use placeholder
       if (respondentEmail && typeof respondentEmail === 'string') {
         respondentEmail = respondentEmail.trim() || null;
@@ -158,9 +176,10 @@ export const createSubmission = [
       // Try to find or create client by email
       let finalClientId = clientId;
       if (!finalClientId && respondentEmail) {
-        let client = await Client.findOne({ where: { email: respondentEmail } });
+        let client = await Client.findOne({ where: { email: respondentEmail, companyId } });
         if (!client) {
           client = await Client.create({
+            companyId,
             name: respondentName,
             email: respondentEmail,
             phone: respondentPhone || undefined,
@@ -184,6 +203,7 @@ export const createSubmission = [
       }
 
       const submission = await FormSubmission.create({
+        companyId,
         formId,
         formName,
         respondentName,
@@ -237,7 +257,12 @@ export const updateSubmission = [
       }
 
       const { id } = req.params;
-      const submission = await FormSubmission.findByPk(id);
+      const companyId = req.user?.companyId;
+      if (!companyId) {
+        res.status(401).json({ error: 'Authentication required' });
+        return;
+      }
+      const submission = await FormSubmission.findOne({ where: { id, companyId } });
 
       if (!submission) {
         res.status(404).json({ error: 'Submission not found' });
@@ -286,7 +311,12 @@ export const updateSubmission = [
 export const deleteSubmission = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const submission = await FormSubmission.findByPk(id);
+    const companyId = req.user?.companyId;
+    if (!companyId) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+    const submission = await FormSubmission.findOne({ where: { id, companyId } });
 
     if (!submission) {
       res.status(404).json({ error: 'Submission not found' });
@@ -314,12 +344,17 @@ export const deleteSubmission = async (req: AuthRequest, res: Response): Promise
 
 export const getSubmissionStats = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const where: any = {};
+    const companyId = req.user?.companyId;
+    if (!companyId) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+    const where: any = { companyId };
 
     // If user is reviewer, only count submissions of assigned clients
     if (req.user && !req.user.roles.includes('super_admin')) {
       const assignedClients = await Client.findAll({
-        where: { assignedUserId: req.user.id },
+        where: { companyId, assignedUserId: req.user.id },
         attributes: ['id'],
       });
       const clientIds = assignedClients.map((c) => c.id);
@@ -408,21 +443,27 @@ export const createSubmissionFromSession = [
       let client;
       let clientId;
       
+      const companyId = (form as any).companyId;
+      const assignedUserId = (session as any).assignedUserId ?? undefined;
+
       if (email) {
-        // Email provided - try to find existing client by email
-        client = await Client.findOne({ where: { email } });
+        // Email provided - try to find existing client by email in this company
+        client = await Client.findOne({ where: { email, companyId } });
         if (!client) {
           client = await Client.create({
+            companyId,
             name: clientInfo.name,
             email: email,
             phone: clientInfo.phone || undefined,
             status: 'pending',
+            assignedUserId,
           });
         } else {
           // Update existing client with new information
           const updateData: any = {};
           if (clientInfo.name) updateData.name = clientInfo.name;
           if (clientInfo.phone) updateData.phone = clientInfo.phone;
+          if (assignedUserId && !client.assignedUserId) updateData.assignedUserId = assignedUserId;
           if (Object.keys(updateData).length > 0) {
             await client.update(updateData);
           }
@@ -431,16 +472,19 @@ export const createSubmissionFromSession = [
       } else {
         // No email provided - create new client without email
         client = await Client.create({
+          companyId,
           name: clientInfo.name,
-          email: null,
+          email: undefined,
           phone: clientInfo.phone || undefined,
           status: 'pending',
+          assignedUserId,
         });
         clientId = client.id;
       }
 
       // Create submission with status 'in_progress'
       const submission = await FormSubmission.create({
+        companyId,
         formId,
         formName: form.name,
         respondentName: clientInfo.name,

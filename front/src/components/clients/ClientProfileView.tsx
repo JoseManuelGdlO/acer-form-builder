@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Client } from '@/types/form';
+import { Client, ClientPayment, AmountDueLogEntry, PaymentDeletedLogEntry } from '@/types/form';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
@@ -8,12 +8,13 @@ import { ClientChecklist, ChecklistItem } from './ClientChecklist';
 import { ClientChat, ChatMessage } from './ClientChat';
 import { ClientFormData, ClientFormSubmission } from './ClientFormData';
 import { ClientNotes, ClientNote } from './ClientNotes';
+import { ClientPaymentHistory } from './ClientPaymentHistory';
 import { useSettingsStore } from '@/hooks/useSettingsStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
 import { 
   User, Mail, Phone, MapPin, Calendar, Clock, 
-  ArrowLeft, Edit2, FileText 
+  ArrowLeft, Edit2, FileText, UserCircle 
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -28,12 +29,21 @@ interface ClientProfileViewProps {
 
 export const ClientProfileView = ({ client, onBack, onEdit }: ClientProfileViewProps) => {
   const { getActiveChecklistItems, fetchChecklistTemplates } = useSettingsStore();
-  const { token } = useAuth();
+  const { token, hasRole } = useAuth();
+  const isAdmin = hasRole('super_admin');
   const [isLoading, setIsLoading] = useState(true);
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [clientNotes, setClientNotes] = useState<ClientNote[]>([]);
+  const [payments, setPayments] = useState<ClientPayment[]>([]);
+  const [amountDueHistory, setAmountDueHistory] = useState<AmountDueLogEntry[]>([]);
+  const [paymentDeletedHistory, setPaymentDeletedHistory] = useState<PaymentDeletedLogEntry[]>([]);
   const [submissions, setSubmissions] = useState<ClientFormSubmission[]>([]);
+  const [clientSnapshot, setClientSnapshot] = useState<Client>(client);
+
+  useEffect(() => {
+    setClientSnapshot(client);
+  }, [client]);
 
   // Load all data when component mounts
   useEffect(() => {
@@ -47,13 +57,33 @@ export const ClientProfileView = ({ client, onBack, onEdit }: ClientProfileViewP
     
     setIsLoading(true);
     try {
-      // Load data in parallel
-      const [notesData, messagesData, submissionsData, checklistData] = await Promise.all([
+      // Refetch client to get latest data (e.g. totalAmountDue) from DB. Historial solo para admin.
+      const [freshClientData, notesData, messagesData, submissionsData, checklistData, paymentsData, amountDueHistoryData, paymentDeletedHistoryData] = await Promise.all([
+        api.getClient(client.id, token).catch(() => null),
         api.getClientNotes(client.id, token).catch(() => []),
         api.getClientMessages(client.id, token).catch(() => []),
         api.getSubmissions({ clientId: client.id }, token).catch(() => []),
         api.getClientChecklist(client.id, token).catch(() => []),
+        api.getClientPayments(client.id, token).catch(() => []),
+        isAdmin ? api.getClientAmountDueHistory(client.id, token).catch(() => []) : Promise.resolve([]),
+        isAdmin ? api.getClientPaymentDeletedHistory(client.id, token).catch(() => []) : Promise.resolve([]),
       ]);
+
+      if (freshClientData) {
+        const totalDue = freshClientData.total_amount_due != null
+          ? Number(freshClientData.total_amount_due)
+          : (freshClientData.totalAmountDue != null ? Number(freshClientData.totalAmountDue) : undefined);
+        const assignedUser = freshClientData.assigned_user || freshClientData.assignedUser;
+        setClientSnapshot({
+          ...client,
+          ...freshClientData,
+          totalAmountDue: totalDue,
+          assignedUserId: freshClientData.assigned_user_id ?? freshClientData.assignedUserId,
+          assignedUser: assignedUser ? { id: assignedUser.id, name: assignedUser.name, email: assignedUser.email } : null,
+          createdAt: new Date(freshClientData.created_at || freshClientData.createdAt),
+          updatedAt: new Date(freshClientData.updated_at || freshClientData.updatedAt),
+        } as Client);
+      }
 
       // Transform notes
       const notes: ClientNote[] = notesData.map((n: any) => ({
@@ -62,6 +92,37 @@ export const ClientProfileView = ({ client, onBack, onEdit }: ClientProfileViewP
         createdAt: new Date(n.created_at || n.createdAt),
       }));
       setClientNotes(notes);
+
+      const paymentsList: ClientPayment[] = paymentsData.map((p: any) => ({
+        id: p.id,
+        amount: Number(p.amount),
+        paymentDate: p.payment_date || p.paymentDate,
+        paymentType: (p.payment_type || p.paymentType || 'efectivo') as ClientPayment['paymentType'],
+        note: p.note,
+        createdAt: new Date(p.created_at || p.createdAt),
+      }));
+      setPayments(paymentsList);
+
+      const historyEntries: AmountDueLogEntry[] = (amountDueHistoryData || []).map((h: any) => ({
+        id: h.id,
+        previousValue: h.previous_value != null ? Number(h.previous_value) : (h.previousValue != null ? Number(h.previousValue) : null),
+        newValue: h.new_value != null ? Number(h.new_value) : (h.newValue != null ? Number(h.newValue) : null),
+        createdAt: new Date(h.created_at || h.createdAt),
+        changedByUser: h.changedByUser || h.changed_by_user ? { id: (h.changedByUser || h.changed_by_user).id, name: (h.changedByUser || h.changed_by_user).name, email: (h.changedByUser || h.changed_by_user).email } : null,
+      }));
+      setAmountDueHistory(historyEntries);
+
+      const deletedEntries: PaymentDeletedLogEntry[] = (paymentDeletedHistoryData || []).map((h: any) => ({
+        id: h.id,
+        paymentId: h.payment_id || h.paymentId,
+        amount: Number(h.amount),
+        paymentDate: h.payment_date || h.paymentDate,
+        paymentType: h.payment_type || h.paymentType || 'efectivo',
+        note: h.note,
+        createdAt: new Date(h.created_at || h.createdAt),
+        deletedByUser: h.deletedByUser || h.deleted_by_user ? { id: (h.deletedByUser || h.deleted_by_user).id, name: (h.deletedByUser || h.deleted_by_user).name, email: (h.deletedByUser || h.deleted_by_user).email } : null,
+      }));
+      setPaymentDeletedHistory(deletedEntries);
 
       // Transform messages
       const chatMessages: ChatMessage[] = messagesData.map((m: any) => ({
@@ -231,6 +292,72 @@ export const ClientProfileView = ({ client, onBack, onEdit }: ClientProfileViewP
     }
   };
 
+  const handleAddPayment = async (data: { amount: number; paymentDate: string; paymentType: 'tarjeta' | 'transferencia' | 'efectivo'; note?: string }) => {
+    if (!token) return;
+    try {
+      const newPayment = await api.createPayment(client.id, data, token);
+      const payment: ClientPayment = {
+        id: newPayment.id,
+        amount: Number(newPayment.amount),
+        paymentDate: newPayment.payment_date || newPayment.paymentDate,
+        paymentType: (newPayment.payment_type || newPayment.paymentType || 'efectivo') as ClientPayment['paymentType'],
+        note: newPayment.note,
+        createdAt: new Date(newPayment.created_at || newPayment.createdAt),
+      };
+      setPayments(prev => [payment, ...prev]);
+      toast.success('Pago registrado');
+    } catch (error: any) {
+      toast.error(error.message || 'Error al registrar el pago');
+    }
+  };
+
+  const handleDeletePayment = async (paymentId: string) => {
+    if (!token) return;
+    try {
+      await api.deletePayment(paymentId, token);
+      setPayments(prev => prev.filter(p => p.id !== paymentId));
+      if (isAdmin) {
+        const deletedData = await api.getClientPaymentDeletedHistory(client.id, token).catch(() => []);
+        const entries: PaymentDeletedLogEntry[] = (deletedData || []).map((h: any) => ({
+          id: h.id,
+          paymentId: h.payment_id || h.paymentId,
+          amount: Number(h.amount),
+          paymentDate: h.payment_date || h.paymentDate,
+          paymentType: h.payment_type || h.paymentType || 'efectivo',
+          note: h.note,
+          createdAt: new Date(h.created_at || h.createdAt),
+          deletedByUser: h.deletedByUser || h.deleted_by_user ? { id: (h.deletedByUser || h.deleted_by_user).id, name: (h.deletedByUser || h.deleted_by_user).name, email: (h.deletedByUser || h.deleted_by_user).email } : null,
+        }));
+        setPaymentDeletedHistory(entries);
+      }
+      toast.success('Pago eliminado');
+    } catch (error: any) {
+      toast.error(error.message || 'Error al eliminar el pago');
+    }
+  };
+
+  const handleUpdateTotalAmountDue = async (value: number | null) => {
+    if (!token || !isAdmin) return;
+    try {
+      await api.updateClient(client.id, { totalAmountDue: value }, token);
+      setClientSnapshot(prev => ({ ...prev, totalAmountDue: value ?? undefined }));
+      if (isAdmin) {
+        const historyData = await api.getClientAmountDueHistory(client.id, token).catch(() => []);
+        const entries: AmountDueLogEntry[] = (historyData || []).map((h: any) => ({
+          id: h.id,
+          previousValue: h.previous_value != null ? Number(h.previous_value) : (h.previousValue != null ? Number(h.previousValue) : null),
+          newValue: h.new_value != null ? Number(h.new_value) : (h.newValue != null ? Number(h.newValue) : null),
+          createdAt: new Date(h.created_at || h.createdAt),
+          changedByUser: h.changedByUser || h.changed_by_user ? { id: (h.changedByUser || h.changed_by_user).id, name: (h.changedByUser || h.changed_by_user).name, email: (h.changedByUser || h.changed_by_user).email } : null,
+        }));
+        setAmountDueHistory(entries);
+      }
+      toast.success('Total a pagar actualizado');
+    } catch (error: any) {
+      toast.error(error.message || 'Error al actualizar el total');
+    }
+  };
+
   const handleToggleChecklist = async (itemId: string) => {
     if (!token) return;
     const item = checklist.find(i => i.id === itemId);
@@ -274,20 +401,22 @@ export const ClientProfileView = ({ client, onBack, onEdit }: ClientProfileViewP
     }
   };
 
+  const displayClient = clientSnapshot ?? client;
   const infoItems = [
-    { icon: Mail, label: 'Correo', value: client.email },
-    { icon: Phone, label: 'Teléfono', value: client.phone || 'No registrado' },
-    { icon: MapPin, label: 'Dirección', value: client.address || 'No registrada' },
-    { icon: FileText, label: 'Formularios', value: `${client.formsCompleted} completados` },
+    { icon: Mail, label: 'Correo', value: displayClient.email },
+    { icon: Phone, label: 'Teléfono', value: displayClient.phone || 'No registrado' },
+    { icon: MapPin, label: 'Dirección', value: displayClient.address || 'No registrada' },
+    { icon: UserCircle, label: 'Asesor', value: displayClient.assignedUser?.name ?? 'Sin asignar' },
+    { icon: FileText, label: 'Formularios', value: `${displayClient.formsCompleted} completados` },
     { 
       icon: Calendar, 
       label: 'Registro', 
-      value: format(client.createdAt, "d MMM yyyy 'a las' HH:mm", { locale: es }) 
+      value: format(displayClient.createdAt, "d MMM yyyy 'a las' HH:mm", { locale: es }) 
     },
     { 
       icon: Clock, 
       label: 'Actualización', 
-      value: format(client.updatedAt, "d MMM yyyy 'a las' HH:mm", { locale: es }) 
+      value: format(displayClient.updatedAt, "d MMM yyyy 'a las' HH:mm", { locale: es }) 
     },
   ];
 
@@ -381,6 +510,17 @@ export const ClientProfileView = ({ client, onBack, onEdit }: ClientProfileViewP
               notes={clientNotes}
               onAddNote={handleAddNote}
               onDeleteNote={handleDeleteNote}
+            />
+
+            <ClientPaymentHistory
+              clientId={client.id}
+              totalAmountDue={clientSnapshot.totalAmountDue}
+              onUpdateTotalAmountDue={handleUpdateTotalAmountDue}
+              payments={payments}
+              amountDueHistory={amountDueHistory}
+              paymentDeletedHistory={paymentDeletedHistory}
+              onAddPayment={handleAddPayment}
+              onDeletePayment={handleDeletePayment}
             />
 
             {/* Checklist */}

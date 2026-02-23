@@ -11,16 +11,23 @@ import { ClientList } from '@/components/clients/ClientList';
 import { UserList } from '@/components/users/UserList';
 import { ChatbotSettings } from '@/components/chatbot/ChatbotSettings';
 import { SettingsPage } from '@/components/settings/SettingsPage';
+import { PaymentLogsPage } from '@/components/payments/PaymentLogsPage';
 import { Dashboard } from '@/components/dashboard/Dashboard';
 import { ViewAsSelector } from '@/components/admin/ViewAsSelector';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { RoleGuard } from '@/components/auth/RoleGuard';
 import { Button } from '@/components/ui/button';
-import { LayoutDashboard, FileText, ClipboardList, Users, UserCog, Bot, Settings } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { LayoutDashboard, FileText, ClipboardList, Users, UserCog, Bot, Settings, Receipt, ChevronDown } from 'lucide-react';
 import { User } from '@/types/user';
 import { Client, ClientStatus } from '@/types/form';
 
-type View = 'dashboard' | 'forms' | 'submissions' | 'clients' | 'users' | 'chatbot' | 'settings';
+type View = 'dashboard' | 'forms' | 'submissions' | 'clients' | 'paymentLogs' | 'users' | 'chatbot' | 'settings';
 
 const Index = () => {
   const [activeView, setActiveView] = useState<View>('dashboard');
@@ -64,8 +71,8 @@ const Index = () => {
     updateClientStatus: updateClientStatusStore,
     getClientStats,
   } = useClientStore();
-  const { token } = useAuth();
-  const { users } = useUserStore();
+  const { token, hasRole } = useAuth();
+  const { users, fetchUsers } = useUserStore();
 
   // Load data when component mounts or when token changes
   useEffect(() => {
@@ -93,12 +100,17 @@ const Index = () => {
     }
   }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Load clients when switching to clients view
+  // Load clients (and users for admin assign dropdown) when switching to clients view
   useEffect(() => {
     if (token && activeView === 'clients') {
       fetchClients(token).catch((error) => {
         console.error('Failed to fetch clients:', error);
       });
+      if (hasRole('super_admin')) {
+        fetchUsers(token).catch((error) => {
+          console.error('Failed to fetch users:', error);
+        });
+      }
     }
   }, [activeView, token]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -163,27 +175,27 @@ const Index = () => {
         variant={current === 'dashboard' ? 'default' : 'ghost'}
         size="sm"
         onClick={() => setActiveView('dashboard')}
-        className="gap-2"
+        className="gap-1.5 shrink-0"
       >
-        <LayoutDashboard className="w-4 h-4" />
+        <LayoutDashboard className="w-4 h-4 shrink-0" />
         <span className="hidden sm:inline">Dashboard</span>
       </Button>
       <Button
         variant={current === 'forms' ? 'default' : 'ghost'}
         size="sm"
         onClick={() => setActiveView('forms')}
-        className="gap-2"
+        className="gap-1.5 shrink-0"
       >
-        <FileText className="w-4 h-4" />
+        <FileText className="w-4 h-4 shrink-0" />
         <span className="hidden sm:inline">Formularios</span>
       </Button>
       <Button
         variant={current === 'submissions' ? 'default' : 'ghost'}
         size="sm"
         onClick={() => setActiveView('submissions')}
-        className="gap-2"
+        className="gap-1.5 shrink-0"
       >
-        <ClipboardList className="w-4 h-4" />
+        <ClipboardList className="w-4 h-4 shrink-0" />
         <span className="hidden sm:inline">Respuestas</span>
         {submissions.length > 0 && (
           <span className="px-1.5 py-0.5 text-xs rounded-full bg-secondary/20 text-secondary">
@@ -195,9 +207,9 @@ const Index = () => {
         variant={current === 'clients' ? 'default' : 'ghost'}
         size="sm"
         onClick={() => setActiveView('clients')}
-        className="gap-2"
+        className="gap-1.5 shrink-0"
       >
-        <Users className="w-4 h-4" />
+        <Users className="w-4 h-4 shrink-0" />
         <span className="hidden sm:inline">Clientes</span>
         {filteredClients.length > 0 && (
           <span className="px-1.5 py-0.5 text-xs rounded-full bg-secondary/20 text-secondary">
@@ -206,37 +218,37 @@ const Index = () => {
         )}
       </Button>
       <RoleGuard allowedRoles={['super_admin']}>
-        <Button
-          variant={current === 'users' ? 'default' : 'ghost'}
-          size="sm"
-          onClick={() => setActiveView('users')}
-          className="gap-2"
-        >
-          <UserCog className="w-4 h-4" />
-          <span className="hidden sm:inline">Usuarios</span>
-        </Button>
-      </RoleGuard>
-      <RoleGuard allowedRoles={['super_admin']}>
-        <Button
-          variant={current === 'chatbot' ? 'default' : 'ghost'}
-          size="sm"
-          onClick={() => setActiveView('chatbot')}
-          className="gap-2"
-        >
-          <Bot className="w-4 h-4" />
-          <span className="hidden sm:inline">Chatbot</span>
-        </Button>
-      </RoleGuard>
-      <RoleGuard allowedRoles={['super_admin']}>
-        <Button
-          variant={current === 'settings' ? 'default' : 'ghost'}
-          size="sm"
-          onClick={() => setActiveView('settings')}
-          className="gap-2"
-        >
-          <Settings className="w-4 h-4" />
-          <span className="hidden sm:inline">Configuración</span>
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant={['paymentLogs', 'users', 'chatbot', 'settings'].includes(current) ? 'default' : 'ghost'}
+              size="sm"
+              className="gap-1.5 shrink-0"
+            >
+              <Settings className="w-4 h-4 shrink-0" />
+              <span className="hidden sm:inline">Administración</span>
+              <ChevronDown className="w-3.5 h-3.5 shrink-0 opacity-70" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-52">
+            <DropdownMenuItem onClick={() => setActiveView('paymentLogs')} className="gap-2 cursor-pointer">
+              <Receipt className="w-4 h-4" />
+              Logs de pagos
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setActiveView('users')} className="gap-2 cursor-pointer">
+              <UserCog className="w-4 h-4" />
+              Usuarios
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setActiveView('chatbot')} className="gap-2 cursor-pointer">
+              <Bot className="w-4 h-4" />
+              Chatbot
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setActiveView('settings')} className="gap-2 cursor-pointer">
+              <Settings className="w-4 h-4" />
+              Configuración
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </RoleGuard>
     </>
   );
@@ -337,9 +349,31 @@ const Index = () => {
             onCreate={createClient}
             onUpdate={updateClient}
             onBack={() => setActiveView('dashboard')}
+            users={users}
+            isAdmin={hasRole('super_admin')}
           />
         </div>
       </>
+    );
+  }
+
+  // Vista de logs de pagos (solo super_admin)
+  if (activeView === 'paymentLogs') {
+    return (
+      <RoleGuard allowedRoles={['super_admin']} fallback={<div className="min-h-screen flex items-center justify-center"><p className="text-muted-foreground">No tienes permisos para acceder a esta sección</p></div>}>
+        <>
+          <FloatingViewAs />
+          <div className={`min-h-screen bg-background ${viewingAs ? 'pt-10' : ''}`}>
+            <AppHeader>
+              <NavigationButtons current="paymentLogs" />
+            </AppHeader>
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+              <h1 className="text-3xl font-bold text-primary mb-6">Logs de pagos</h1>
+              <PaymentLogsPage />
+            </div>
+          </div>
+        </>
+      </RoleGuard>
     );
   }
 

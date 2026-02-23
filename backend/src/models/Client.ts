@@ -4,6 +4,7 @@ import { User } from './User';
 
 interface ClientAttributes {
   id: string;
+  companyId: string;
   name: string;
   email?: string;
   phone?: string;
@@ -12,6 +13,7 @@ interface ClientAttributes {
   status: 'active' | 'inactive' | 'pending';
   formsCompleted: number;
   assignedUserId?: string;
+  totalAmountDue?: number;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -20,6 +22,7 @@ interface ClientCreationAttributes extends Optional<ClientAttributes, 'id' | 'fo
 
 export class Client extends Model<ClientAttributes, ClientCreationAttributes> implements ClientAttributes {
   public id!: string;
+  public companyId!: string;
   public name!: string;
   public email?: string;
   public phone?: string;
@@ -28,6 +31,7 @@ export class Client extends Model<ClientAttributes, ClientCreationAttributes> im
   public status!: 'active' | 'inactive' | 'pending';
   public formsCompleted!: number;
   public assignedUserId?: string;
+  public totalAmountDue?: number;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
 }
@@ -38,6 +42,15 @@ Client.init(
       type: DataTypes.UUID,
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
+    },
+    companyId: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      references: {
+        model: 'companies',
+        key: 'id',
+      },
+      onDelete: 'CASCADE',
     },
     name: {
       type: DataTypes.STRING(255),
@@ -80,6 +93,14 @@ Client.init(
         key: 'id',
       },
       onDelete: 'SET NULL',
+    },
+    totalAmountDue: {
+      type: DataTypes.DECIMAL(12, 2),
+      allowNull: true,
+      get() {
+        const value = this.getDataValue('totalAmountDue');
+        return value != null ? parseFloat(String(value)) : value;
+      },
     },
   },
   {

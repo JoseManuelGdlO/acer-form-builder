@@ -6,14 +6,19 @@ import { AuthRequest } from '../middleware/auth.middleware';
 export const getClientMessages = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { clientId } = req.params;
-
-    // Check if reviewer can access this client
-    if (req.user && !req.user.roles.includes('super_admin')) {
-      const client = await Client.findByPk(clientId);
-      if (!client || client.assignedUserId !== req.user.id) {
-        res.status(403).json({ error: 'Access denied' });
-        return;
-      }
+    const companyId = req.user?.companyId;
+    if (!companyId) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+    const client = await Client.findOne({ where: { id: clientId, companyId } });
+    if (!client) {
+      res.status(404).json({ error: 'Client not found' });
+      return;
+    }
+    if (!req.user?.roles.includes('super_admin') && client.assignedUserId !== req.user?.id) {
+      res.status(403).json({ error: 'Access denied' });
+      return;
     }
 
     const messages = await ClientMessage.findAll({
@@ -41,17 +46,23 @@ export const createMessage = [
 
       const { clientId } = req.params;
       const { content, sender } = req.body;
-
-      // Check if reviewer can access this client
-      if (req.user && !req.user.roles.includes('super_admin')) {
-        const client = await Client.findByPk(clientId);
-        if (!client || client.assignedUserId !== req.user.id) {
-          res.status(403).json({ error: 'Access denied' });
-          return;
-        }
+      const companyId = req.user?.companyId;
+      if (!companyId) {
+        res.status(401).json({ error: 'Authentication required' });
+        return;
+      }
+      const client = await Client.findOne({ where: { id: clientId, companyId } });
+      if (!client) {
+        res.status(404).json({ error: 'Client not found' });
+        return;
+      }
+      if (!req.user?.roles.includes('super_admin') && client.assignedUserId !== req.user?.id) {
+        res.status(403).json({ error: 'Access denied' });
+        return;
       }
 
       const message = await ClientMessage.create({
+        companyId,
         clientId,
         content,
         sender,
@@ -69,20 +80,22 @@ export const createMessage = [
 export const deleteMessage = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const message = await ClientMessage.findByPk(id);
+    const companyId = req.user?.companyId;
+    if (!companyId) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+    const message = await ClientMessage.findOne({ where: { id, companyId } });
 
     if (!message) {
       res.status(404).json({ error: 'Message not found' });
       return;
     }
 
-    // Check if reviewer can access this client
-    if (req.user && !req.user.roles.includes('super_admin')) {
-      const client = await Client.findByPk(message.clientId);
-      if (!client || client.assignedUserId !== req.user.id) {
-        res.status(403).json({ error: 'Access denied' });
-        return;
-      }
+    const client = await Client.findOne({ where: { id: message.clientId, companyId } });
+    if (!req.user?.roles.includes('super_admin') && client && client.assignedUserId !== req.user?.id) {
+      res.status(403).json({ error: 'Access denied' });
+      return;
     }
 
     await message.destroy();

@@ -1,7 +1,15 @@
 import { Client, ClientStatus } from '@/types/form';
+import { User as UserType } from '@/types/user';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ClientStatusBadge } from './ClientStatusBadge';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,7 +17,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Eye, Trash2, User, Mail, Phone, FileText, Edit2 } from 'lucide-react';
+import { MoreHorizontal, Eye, Trash2, User, Mail, Phone, FileText, Edit2, DollarSign, UserCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -19,6 +27,9 @@ interface ClientCardProps {
   onDelete: () => void;
   onView: () => void;
   onEdit: () => void;
+  onUpdate?: (clientId: string, updates: Partial<Client>) => void;
+  users?: UserType[];
+  isAdmin?: boolean;
 }
 
 export const ClientCard = ({
@@ -27,7 +38,17 @@ export const ClientCard = ({
   onDelete,
   onView,
   onEdit,
+  onUpdate,
+  users = [],
+  isAdmin = false,
 }: ClientCardProps) => {
+  const handleAssignAdvisor = (userId: string) => {
+    if (!onUpdate) return;
+    onUpdate(client.id, {
+      assignedUserId: userId === '__none__' ? (null as unknown as string) : userId,
+    } as Partial<Client>);
+  };
+
   return (
     <Card className="group hover:shadow-card-hover transition-all duration-300 border-border/50 hover:border-primary/30">
       <CardContent className="p-5">
@@ -62,6 +83,43 @@ export const ClientCard = ({
                 <FileText className="w-4 h-4" />
                 <span>{client.formsCompleted} formularios completados</span>
               </div>
+            </div>
+
+            <div className="flex items-center gap-2 text-sm">
+              <UserCircle className="w-4 h-4 text-muted-foreground shrink-0" />
+              {isAdmin && users.length > 0 ? (
+                <Select
+                  value={client.assignedUserId ?? '__none__'}
+                  onValueChange={handleAssignAdvisor}
+                >
+                  <SelectTrigger className="h-8 w-[200px] border-muted/60 bg-muted/20">
+                    <SelectValue placeholder="Asignar asesor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Sin asignar</SelectItem>
+                    {users.map(u => (
+                      <SelectItem key={u.id} value={u.id}>
+                        {u.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <span className="text-muted-foreground">
+                  Asesor: {client.assignedUser?.name ?? 'Sin asignar'}
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-3 text-sm bg-muted/40 rounded-lg px-3 py-2">
+              <DollarSign className="w-4 h-4 text-primary shrink-0" />
+              <span className="text-muted-foreground">
+                Total a pagar: <span className="font-medium text-foreground">{client.totalAmountDue != null ? client.totalAmountDue.toFixed(2) : '—'}</span>
+              </span>
+              <span className="text-muted-foreground">·</span>
+              <span className="text-muted-foreground">
+                Pagado: <span className="font-medium text-foreground">{(client.totalPaid ?? 0).toFixed(2)}</span>
+              </span>
             </div>
 
             {client.notes && (

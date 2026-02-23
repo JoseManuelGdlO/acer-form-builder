@@ -15,6 +15,7 @@ export type MessageSender = 'user' | 'client';
 
 export interface JwtPayload {
   userId: string;
+  companyId: string;
   email: string;
   roles: UserRole[];
 }

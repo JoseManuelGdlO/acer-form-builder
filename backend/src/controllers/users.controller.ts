@@ -4,16 +4,22 @@ import { User, UserRole as UserRoleModel } from '../models';
 import { hashPassword } from '../utils/password';
 import { AuthRequest } from '../middleware/auth.middleware';
 
-export const getAllUsers = async (_req: AuthRequest, res: Response): Promise<void> => {
+export const getAllUsers = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
+    const companyId = req.user?.companyId;
+    if (!companyId) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
     const users = await User.findAll({
-        include: [
-          {
-            model: UserRoleModel,
-            as: 'roles',
-            attributes: ['role'],
-          },
-        ],
+      where: { companyId },
+      include: [
+        {
+          model: UserRoleModel,
+          as: 'roles',
+          attributes: ['role'],
+        },
+      ],
       order: [['created_at', 'DESC']],
     });
 
@@ -36,15 +42,21 @@ export const getAllUsers = async (_req: AuthRequest, res: Response): Promise<voi
 export const getUserById = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
+    const companyId = req.user?.companyId;
+    if (!companyId) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
 
-    const user = await User.findByPk(id, {
-        include: [
-          {
-            model: UserRoleModel,
-            as: 'roles',
-            attributes: ['role'],
-          },
-        ],
+    const user = await User.findOne({
+      where: { id, companyId },
+      include: [
+        {
+          model: UserRoleModel,
+          as: 'roles',
+          attributes: ['role'],
+        },
+      ],
     });
 
     if (!user) {
@@ -82,16 +94,22 @@ export const createUser = [
       }
 
       const { email, password, name, role } = req.body;
+      const companyId = req.user?.companyId;
+      if (!companyId) {
+        res.status(401).json({ error: 'Authentication required' });
+        return;
+      }
 
-      const existingUser = await User.findOne({ where: { email } });
+      const existingUser = await User.findOne({ where: { email, companyId } });
       if (existingUser) {
-        res.status(400).json({ error: 'User already exists' });
+        res.status(400).json({ error: 'User already exists in this company' });
         return;
       }
 
       const hashedPassword = await hashPassword(password);
 
       const user = await User.create({
+        companyId,
         email,
         password: hashedPassword,
         name,
@@ -133,18 +151,23 @@ export const updateUser = [
 
       const { id } = req.params;
       const { name, email, status, role, password } = req.body;
+      const companyId = req.user?.companyId;
+      if (!companyId) {
+        res.status(401).json({ error: 'Authentication required' });
+        return;
+      }
 
-      const user = await User.findByPk(id);
+      const user = await User.findOne({ where: { id, companyId } });
       if (!user) {
         res.status(404).json({ error: 'User not found' });
         return;
       }
 
-      // Check if email is being changed and if it's already taken
+      // Check if email is being changed and if it's already taken in this company
       if (email && email !== user.email) {
-        const existingUser = await User.findOne({ where: { email } });
+        const existingUser = await User.findOne({ where: { email, companyId } });
         if (existingUser) {
-          res.status(400).json({ error: 'Email already in use' });
+          res.status(400).json({ error: 'Email already in use in this company' });
           return;
         }
       }
@@ -194,6 +217,11 @@ export const updateUser = [
 export const deleteUser = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
+    const companyId = req.user?.companyId;
+    if (!companyId) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
 
     // Prevent deleting yourself
     if (req.user?.id === id) {
@@ -201,7 +229,7 @@ export const deleteUser = async (req: AuthRequest, res: Response): Promise<void>
       return;
     }
 
-    const user = await User.findByPk(id);
+    const user = await User.findOne({ where: { id, companyId } });
     if (!user) {
       res.status(404).json({ error: 'User not found' });
       return;

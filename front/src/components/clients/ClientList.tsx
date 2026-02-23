@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Client, ClientStatus } from '@/types/form';
+import { User } from '@/types/user';
 import { ClientCard } from './ClientCard';
 import { ClientFormModal } from './ClientFormModal';
 import { ClientProfileView } from './ClientProfileView';
@@ -24,6 +25,8 @@ interface ClientListProps {
   onCreate: (clientData: Omit<Client, 'id' | 'createdAt' | 'updatedAt' | 'formsCompleted'>) => Promise<void>;
   onUpdate: (clientId: string, updates: Partial<Client>) => Promise<void>;
   onBack: () => void;
+  users?: User[];
+  isAdmin?: boolean;
 }
 
 type StatusFilterType = 'all' | ClientStatus;
@@ -37,6 +40,8 @@ export const ClientList = ({
   onCreate,
   onUpdate,
   onBack,
+  users = [],
+  isAdmin = false,
 }: ClientListProps) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilterType>('all');
@@ -360,6 +365,9 @@ export const ClientList = ({
                 onDelete={() => handleDelete(client.id)}
                 onView={() => handleViewClient(client)}
                 onEdit={() => handleEditClient(client)}
+                onUpdate={onUpdate}
+                users={users}
+                isAdmin={isAdmin}
               />
             ))}
           </div>

@@ -1,4 +1,5 @@
 import { ChecklistCatalog } from './ChecklistCatalog';
+import { CompanyBrandingSettings } from './CompanyBrandingSettings';
 import { Settings } from 'lucide-react';
 
 export const SettingsPage = () => {
@@ -14,6 +15,7 @@ export const SettingsPage = () => {
         </div>
       </div>
 
+      <CompanyBrandingSettings />
       <ChecklistCatalog />
     </div>
   );

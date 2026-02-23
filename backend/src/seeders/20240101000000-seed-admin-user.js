@@ -4,16 +4,24 @@ const bcrypt = require('bcrypt');
 
 module.exports = {
   async up(queryInterface, Sequelize) {
-    // Default admin credentials
     const adminEmail = process.env.ADMIN_EMAIL || 'admin@saruvisas.com';
     const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
     const adminName = process.env.ADMIN_NAME || 'Administrador';
 
-    // Check if admin user already exists
+    const [companies] = await queryInterface.sequelize.query(
+      `SELECT id FROM companies WHERE slug = 'saru' LIMIT 1`,
+      { type: Sequelize.QueryTypes.SELECT }
+    );
+    const companyId = Array.isArray(companies) && companies[0] ? companies[0].id : null;
+    if (!companyId) {
+      console.log('Default company (saru) not found. Run migrations first.');
+      return;
+    }
+
     const existingUser = await queryInterface.sequelize.query(
-      `SELECT id FROM users WHERE email = :email`,
+      `SELECT id FROM users WHERE email = :email AND company_id = :companyId`,
       {
-        replacements: { email: adminEmail },
+        replacements: { email: adminEmail, companyId },
         type: Sequelize.QueryTypes.SELECT,
       }
     );
@@ -23,13 +31,12 @@ module.exports = {
       return;
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(adminPassword, 10);
 
-    // Create admin user
     await queryInterface.bulkInsert('users', [
       {
         id: Sequelize.literal('UUID()'),
+        company_id: companyId,
         email: adminEmail,
         password: hashedPassword,
         name: adminName,
@@ -39,11 +46,10 @@ module.exports = {
       },
     ]);
 
-    // Get the created user ID
     const createdUser = await queryInterface.sequelize.query(
-      `SELECT id FROM users WHERE email = :email LIMIT 1`,
+      `SELECT id FROM users WHERE email = :email AND company_id = :companyId LIMIT 1`,
       {
-        replacements: { email: adminEmail },
+        replacements: { email: adminEmail, companyId },
         type: Sequelize.QueryTypes.SELECT,
       }
     );
@@ -89,9 +95,14 @@ module.exports = {
         user_id: userId,
       });
 
-      // Delete user
+      const [companies] = await queryInterface.sequelize.query(
+        `SELECT id FROM companies WHERE slug = 'saru' LIMIT 1`,
+        { type: Sequelize.QueryTypes.SELECT }
+      );
+      const companyId = Array.isArray(companies) && companies[0] ? companies[0].id : null;
       await queryInterface.bulkDelete('users', {
         email: adminEmail,
+        ...(companyId && { company_id: companyId }),
       });
     }
   },

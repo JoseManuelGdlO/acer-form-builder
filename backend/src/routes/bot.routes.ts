@@ -5,8 +5,8 @@ import { requireAdmin } from '../middleware/role.middleware';
 
 const router = Router();
 
-// Public route (read-only)
-router.get('/', botController.getBotBehavior);
+// Protected (tenant-scoped bot config)
+router.get('/', authenticate, botController.getBotBehavior);
 
 // Protected route (write - admin only)
 router.put('/', authenticate, requireAdmin, botController.updateBotBehavior);

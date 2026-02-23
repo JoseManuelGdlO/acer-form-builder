@@ -5,9 +5,8 @@ import { requireAdmin } from '../middleware/role.middleware';
 
 const router = Router();
 
-// Public routes (read-only)
-router.get('/', faqsController.getAllFAQs);
-router.get('/:id', faqsController.getFAQById);
+router.get('/', authenticate, faqsController.getAllFAQs);
+router.get('/:id', authenticate, faqsController.getFAQById);
 
 // Protected routes (write - admin only)
 router.post('/', authenticate, requireAdmin, faqsController.createFAQ);

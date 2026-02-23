@@ -1,11 +1,17 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import { body, validationResult } from 'express-validator';
-import { Form } from '../models';
+import { Form, Company } from '../models';
 import { AuthRequest } from '../middleware/auth.middleware';
 
-export const getAllForms = async (_req: Request, res: Response): Promise<void> => {
+export const getAllForms = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
+    const companyId = req.user?.companyId;
+    if (!companyId) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
     const forms = await Form.findAll({
+      where: { companyId },
       order: [['created_at', 'DESC']],
     });
 
@@ -16,17 +22,35 @@ export const getAllForms = async (_req: Request, res: Response): Promise<void> =
   }
 };
 
-export const getFormById = async (req: Request, res: Response): Promise<void> => {
+export const getFormById = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
 
-    const form = await Form.findByPk(id);
+    if (req.user?.companyId) {
+      // Authenticated: scope by company
+      const form = await Form.findOne({ where: { id, companyId: req.user.companyId } });
+      if (!form) {
+        res.status(404).json({ error: 'Form not found' });
+        return;
+      }
+      res.json(form);
+      return;
+    }
+
+    // Public (no auth): return form with company for branding
+    const form = await Form.findByPk(id, {
+      include: [{ model: Company, as: 'company', attributes: ['id', 'name', 'slug', 'logoUrl'] }],
+    });
     if (!form) {
       res.status(404).json({ error: 'Form not found' });
       return;
     }
-
-    res.json(form);
+    const formJson = form.toJSON();
+    const company = (form as any).company;
+    res.json({
+      ...formJson,
+      company: company ? { id: company.id, name: company.name, slug: company.slug, logoUrl: company.logoUrl } : null,
+    });
   } catch (error) {
     console.error('Get form by id error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -45,8 +69,14 @@ export const createForm = [
       }
 
       const { name, description, sections = [] } = req.body;
+      const companyId = req.user?.companyId;
+      if (!companyId) {
+        res.status(401).json({ error: 'Authentication required' });
+        return;
+      }
 
       const form = await Form.create({
+        companyId,
         name,
         description,
         sections,
@@ -72,7 +102,12 @@ export const updateForm = [
       }
 
       const { id } = req.params;
-      const form = await Form.findByPk(id);
+      const companyId = req.user?.companyId;
+      if (!companyId) {
+        res.status(401).json({ error: 'Authentication required' });
+        return;
+      }
+      const form = await Form.findOne({ where: { id, companyId } });
 
       if (!form) {
         res.status(404).json({ error: 'Form not found' });
@@ -91,7 +126,12 @@ export const updateForm = [
 export const deleteForm = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const form = await Form.findByPk(id);
+    const companyId = req.user?.companyId;
+    if (!companyId) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+    const form = await Form.findOne({ where: { id, companyId } });
 
     if (!form) {
       res.status(404).json({ error: 'Form not found' });

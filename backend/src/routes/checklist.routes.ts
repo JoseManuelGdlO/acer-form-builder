@@ -5,8 +5,7 @@ import { requireAdmin } from '../middleware/role.middleware';
 
 const router = Router();
 
-// Templates (admin only)
-router.get('/templates', checklistController.getAllTemplates);
+router.get('/templates', authenticate, checklistController.getAllTemplates);
 router.post('/templates', authenticate, requireAdmin, checklistController.createTemplate);
 router.put('/templates/:id', authenticate, requireAdmin, checklistController.updateTemplate);
 router.delete('/templates/:id', authenticate, requireAdmin, checklistController.deleteTemplate);

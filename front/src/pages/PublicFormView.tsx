@@ -134,6 +134,7 @@ export default function PublicFormView() {
   const sessionToken = searchParams.get('token');
 
   const [form, setForm] = useState<Form | null>(null);
+  const [formCompany, setFormCompany] = useState<{ name: string; logoUrl: string | null } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [step, setStep] = useState<'info' | 'sections' | 'success'>('info');
   const [currentSectionIndex, setCurrentSectionIndex] = useState(0);
@@ -227,6 +228,11 @@ export default function PublicFormView() {
           updatedAt: formData.updated_at ? new Date(formData.updated_at) : new Date(formData.updatedAt || Date.now()),
         };
         setForm(mappedForm);
+        if (formData.company) {
+          setFormCompany({ name: formData.company.name, logoUrl: formData.company.logoUrl ?? null });
+        } else {
+          setFormCompany(null);
+        }
 
         const sessionData = await api.getFormSessionProgress(formId, sessionToken);
         if (sessionData.status === 'completed') {
@@ -750,7 +756,7 @@ export default function PublicFormView() {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
         <div className="flex items-center gap-3 mb-6">
-          <img src={saruLogo} alt="Saru Visas" className="h-10 w-auto" />
+          <img src={formCompany?.logoUrl || saruLogo} alt={formCompany?.name || 'Saru Visas'} className="h-10 w-auto" />
           <div>
             <h1 className="text-lg font-bold text-primary leading-none">SARU</h1>
             <p className="text-xs text-muted-foreground">Visa y Pasaporte</p>
@@ -768,7 +774,7 @@ export default function PublicFormView() {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
         <div className="flex items-center gap-3 mb-6">
-          <img src={saruLogo} alt="Saru Visas" className="h-10 w-auto" />
+          <img src={formCompany?.logoUrl || saruLogo} alt={formCompany?.name || 'Saru Visas'} className="h-10 w-auto" />
           <div>
             <h1 className="text-lg font-bold text-primary leading-none">SARU</h1>
             <p className="text-xs text-muted-foreground">Visa y Pasaporte</p>
@@ -788,7 +794,7 @@ export default function PublicFormView() {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
         <div className="flex items-center gap-3 mb-6">
-          <img src={saruLogo} alt="Saru Visas" className="h-10 w-auto" />
+          <img src={formCompany?.logoUrl || saruLogo} alt={formCompany?.name || 'Saru Visas'} className="h-10 w-auto" />
           <div>
             <h1 className="text-lg font-bold text-primary leading-none">SARU</h1>
             <p className="text-xs text-muted-foreground">Visa y Pasaporte</p>
@@ -806,7 +812,7 @@ export default function PublicFormView() {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
         <div className="flex items-center gap-3 mb-6">
-          <img src={saruLogo} alt="Saru Visas" className="h-10 w-auto" />
+          <img src={formCompany?.logoUrl || saruLogo} alt={formCompany?.name || 'Saru Visas'} className="h-10 w-auto" />
           <div>
             <h1 className="text-lg font-bold text-primary leading-none">SARU</h1>
             <p className="text-xs text-muted-foreground">Visa y Pasaporte</p>
@@ -847,7 +853,7 @@ export default function PublicFormView() {
         <div className="max-w-2xl mx-auto px-4 py-4">
           <div className="flex items-center gap-3 flex-wrap">
             <div className="flex items-center gap-3 shrink-0">
-              <img src={saruLogo} alt="Saru Visas" className="h-8 w-auto" />
+              <img src={formCompany?.logoUrl || saruLogo} alt={formCompany?.name || 'Saru Visas'} className="h-8 w-auto" />
               <div>
                 <h1 className="text-lg font-bold text-primary leading-none">SARU</h1>
                 <p className="text-xs text-muted-foreground">Visa y Pasaporte</p>

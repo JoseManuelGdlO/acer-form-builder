@@ -3,6 +3,7 @@ import sequelize from '../config/database';
 
 interface BotBehaviorAttributes {
   id: string;
+  companyId: string;
   name: string;
   greeting: string;
   personality: string;
@@ -18,6 +19,7 @@ interface BotBehaviorCreationAttributes extends Optional<BotBehaviorAttributes, 
 
 export class BotBehavior extends Model<BotBehaviorAttributes, BotBehaviorCreationAttributes> implements BotBehaviorAttributes {
   public id!: string;
+  public companyId!: string;
   public name!: string;
   public greeting!: string;
   public personality!: string;
@@ -35,6 +37,15 @@ BotBehavior.init(
       type: DataTypes.UUID,
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
+    },
+    companyId: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      references: {
+        model: 'companies',
+        key: 'id',
+      },
+      onDelete: 'CASCADE',
     },
     name: {
       type: DataTypes.STRING(255),

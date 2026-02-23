@@ -6,14 +6,19 @@ import { AuthRequest } from '../middleware/auth.middleware';
 export const getClientNotes = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { clientId } = req.params;
-
-    // Check if reviewer can access this client
-    if (req.user && !req.user.roles.includes('super_admin')) {
-      const client = await Client.findByPk(clientId);
-      if (!client || client.assignedUserId !== req.user.id) {
-        res.status(403).json({ error: 'Access denied' });
-        return;
-      }
+    const companyId = req.user?.companyId;
+    if (!companyId) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+    const client = await Client.findOne({ where: { id: clientId, companyId } });
+    if (!client) {
+      res.status(404).json({ error: 'Client not found' });
+      return;
+    }
+    if (!req.user?.roles.includes('super_admin') && client.assignedUserId !== req.user?.id) {
+      res.status(403).json({ error: 'Access denied' });
+      return;
     }
 
     const notes = await ClientNote.findAll({
@@ -40,17 +45,23 @@ export const createNote = [
 
       const { clientId } = req.params;
       const { content } = req.body;
-
-      // Check if reviewer can access this client
-      if (req.user && !req.user.roles.includes('super_admin')) {
-        const client = await Client.findByPk(clientId);
-        if (!client || client.assignedUserId !== req.user.id) {
-          res.status(403).json({ error: 'Access denied' });
-          return;
-        }
+      const companyId = req.user?.companyId;
+      if (!companyId) {
+        res.status(401).json({ error: 'Authentication required' });
+        return;
+      }
+      const client = await Client.findOne({ where: { id: clientId, companyId } });
+      if (!client) {
+        res.status(404).json({ error: 'Client not found' });
+        return;
+      }
+      if (!req.user?.roles.includes('super_admin') && client.assignedUserId !== req.user?.id) {
+        res.status(403).json({ error: 'Access denied' });
+        return;
       }
 
       const note = await ClientNote.create({
+        companyId,
         clientId,
         content,
         createdBy: req.user?.id,
@@ -75,20 +86,22 @@ export const updateNote = [
       }
 
       const { id } = req.params;
-      const note = await ClientNote.findByPk(id);
+      const companyId = req.user?.companyId;
+      if (!companyId) {
+        res.status(401).json({ error: 'Authentication required' });
+        return;
+      }
+      const note = await ClientNote.findOne({ where: { id, companyId } });
 
       if (!note) {
         res.status(404).json({ error: 'Note not found' });
         return;
       }
 
-      // Check if reviewer can access this client
-      if (req.user && !req.user.roles.includes('super_admin')) {
-        const client = await Client.findByPk(note.clientId);
-        if (!client || client.assignedUserId !== req.user.id) {
-          res.status(403).json({ error: 'Access denied' });
-          return;
-        }
+      const client = await Client.findOne({ where: { id: note.clientId, companyId } });
+      if (!req.user?.roles.includes('super_admin') && client && client.assignedUserId !== req.user?.id) {
+        res.status(403).json({ error: 'Access denied' });
+        return;
       }
 
       await note.update({ content: req.body.content });
@@ -103,20 +116,22 @@ export const updateNote = [
 export const deleteNote = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const note = await ClientNote.findByPk(id);
+    const companyId = req.user?.companyId;
+    if (!companyId) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+    const note = await ClientNote.findOne({ where: { id, companyId } });
 
     if (!note) {
       res.status(404).json({ error: 'Note not found' });
       return;
     }
 
-    // Check if reviewer can access this client
-    if (req.user && !req.user.roles.includes('super_admin')) {
-      const client = await Client.findByPk(note.clientId);
-      if (!client || client.assignedUserId !== req.user.id) {
-        res.status(403).json({ error: 'Access denied' });
-        return;
-      }
+    const client = await Client.findOne({ where: { id: note.clientId, companyId } });
+    if (!req.user?.roles.includes('super_admin') && client && client.assignedUserId !== req.user?.id) {
+      res.status(403).json({ error: 'Access denied' });
+      return;
     }
 
     await note.destroy();

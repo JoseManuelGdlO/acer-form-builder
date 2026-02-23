@@ -3,6 +3,7 @@ import sequelize from '../config/database';
 
 interface ChecklistTemplateAttributes {
   id: string;
+  companyId: string;
   label: string;
   order: number;
   isActive: boolean;
@@ -14,6 +15,7 @@ interface ChecklistTemplateCreationAttributes extends Optional<ChecklistTemplate
 
 export class ChecklistTemplate extends Model<ChecklistTemplateAttributes, ChecklistTemplateCreationAttributes> implements ChecklistTemplateAttributes {
   public id!: string;
+  public companyId!: string;
   public label!: string;
   public order!: number;
   public isActive!: boolean;
@@ -27,6 +29,15 @@ ChecklistTemplate.init(
       type: DataTypes.UUID,
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
+    },
+    companyId: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      references: {
+        model: 'companies',
+        key: 'id',
+      },
+      onDelete: 'CASCADE',
     },
     label: {
       type: DataTypes.STRING(255),

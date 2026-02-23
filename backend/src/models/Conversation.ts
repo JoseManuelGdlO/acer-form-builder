@@ -1,5 +1,5 @@
 import { DataTypes, Model, Optional } from 'sequelize';
-import sequelizePg from '../config/database-pg';
+import sequelize from '../config/database';
 
 interface ConversationsAttributes {
   id: number;
@@ -70,7 +70,7 @@ Conversations.init(
     },
   },
   {
-    sequelize: sequelizePg,
+    sequelize,
     tableName: 'conversations',
     timestamps: true,
     underscored: true,

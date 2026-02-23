@@ -3,6 +3,7 @@ import sequelize from '../config/database';
 
 interface FAQAttributes {
   id: string;
+  companyId: string;
   question: string;
   answer: string;
   category?: string;
@@ -16,6 +17,7 @@ interface FAQCreationAttributes extends Optional<FAQAttributes, 'id' | 'createdA
 
 export class FAQ extends Model<FAQAttributes, FAQCreationAttributes> implements FAQAttributes {
   public id!: string;
+  public companyId!: string;
   public question!: string;
   public answer!: string;
   public category?: string;
@@ -31,6 +33,15 @@ FAQ.init(
       type: DataTypes.UUID,
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
+    },
+    companyId: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      references: {
+        model: 'companies',
+        key: 'id',
+      },
+      onDelete: 'CASCADE',
     },
     question: {
       type: DataTypes.TEXT,

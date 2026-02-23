@@ -16,6 +16,8 @@ export const useClientStore = () => {
       const clientsData = Array.isArray(response) ? response : (response.clients || response);
       const templates = response.templates || [];
       
+      const mapAssignedUser = (u: any) =>
+        u ? { id: u.id, name: u.name, email: u.email } : null;
       const clients: Client[] = clientsData.map((c: any) => ({
         id: c.id,
         name: c.name,
@@ -26,6 +28,9 @@ export const useClientStore = () => {
         status: c.status,
         formsCompleted: c.forms_completed || c.formsCompleted || 0,
         assignedUserId: c.assigned_user_id || c.assignedUserId,
+        assignedUser: mapAssignedUser(c.assigned_user || c.assignedUser),
+        totalAmountDue: c.total_amount_due != null ? Number(c.total_amount_due) : (c.totalAmountDue != null ? Number(c.totalAmountDue) : undefined),
+        totalPaid: c.total_paid != null ? Number(c.total_paid) : (c.totalPaid != null ? Number(c.totalPaid) : 0),
         createdAt: new Date(c.created_at || c.createdAt),
         updatedAt: new Date(c.updated_at || c.updatedAt),
         checklistProgress: c.checklist_progress || c.checklistProgress || 0,
@@ -55,6 +60,9 @@ export const useClientStore = () => {
     }
   }, []);
 
+  const mapAssignedUser = (u: any) =>
+    u ? { id: u.id, name: u.name, email: u.email } : null;
+
   const createClient = useCallback(async (token: string, clientData: Omit<Client, 'id' | 'createdAt' | 'updatedAt' | 'formsCompleted'>) => {
     try {
       const newClient = await api.createClient(clientData, token);
@@ -68,6 +76,9 @@ export const useClientStore = () => {
         status: newClient.status,
         formsCompleted: newClient.forms_completed || newClient.formsCompleted || 0,
         assignedUserId: newClient.assigned_user_id || newClient.assignedUserId,
+        assignedUser: mapAssignedUser(newClient.assigned_user || newClient.assignedUser),
+        totalAmountDue: newClient.total_amount_due != null ? Number(newClient.total_amount_due) : newClient.totalAmountDue,
+        totalPaid: newClient.total_paid != null ? Number(newClient.total_paid) : (newClient.totalPaid ?? 0),
         createdAt: new Date(newClient.created_at || newClient.createdAt || Date.now()),
         updatedAt: new Date(newClient.updated_at || newClient.updatedAt || Date.now()),
         checklistProgress: newClient.checklist_progress || newClient.checklistProgress || 0,
@@ -97,6 +108,9 @@ export const useClientStore = () => {
         status: updatedClient.status,
         formsCompleted: updatedClient.forms_completed || updatedClient.formsCompleted || 0,
         assignedUserId: updatedClient.assigned_user_id || updatedClient.assignedUserId,
+        assignedUser: mapAssignedUser(updatedClient.assigned_user || updatedClient.assignedUser),
+        totalAmountDue: updatedClient.total_amount_due != null ? Number(updatedClient.total_amount_due) : updatedClient.totalAmountDue,
+        totalPaid: updatedClient.total_paid != null ? Number(updatedClient.total_paid) : (updatedClient.totalPaid ?? 0),
         createdAt: new Date(updatedClient.created_at || updatedClient.createdAt),
         updatedAt: new Date(updatedClient.updated_at || updatedClient.updatedAt),
         checklistProgress: updatedClient.checklist_progress || updatedClient.checklistProgress || 0,

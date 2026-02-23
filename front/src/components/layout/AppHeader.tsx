@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import saruLogo from '@/assets/saru-logo.png';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTenant } from '@/contexts/TenantContext';
 import { Button } from '@/components/ui/button';
 import { LogOut, User, Menu, X } from 'lucide-react';
 import {
@@ -24,11 +25,12 @@ interface AppHeaderProps {
 }
 
 export function AppHeader({ children }: AppHeaderProps) {
-  const { user, logout } = useAuth();
+  const { user, company, logout } = useAuth();
+  const { tenant } = useTenant();
+  const logoUrl = company?.logoUrl || tenant?.company?.logoUrl || saruLogo;
+  const logoAlt = company?.name || tenant?.company?.name || 'Saru Visas';
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const childrenArray = React.Children.toArray(children);
-  const firstRow = childrenArray.slice(0, 4);
-  const secondRow = childrenArray.slice(4);
 
   return (
     <div className="border-b border-border/50 bg-card shadow-sm sticky top-0 z-50">
@@ -48,8 +50,8 @@ export function AppHeader({ children }: AppHeaderProps) {
                 <SheetHeader>
                   <SheetTitle className="flex items-center gap-2">
                     <img 
-                      src={saruLogo} 
-                      alt="Saru Visas" 
+                      src={logoUrl} 
+                      alt={logoAlt} 
                       className="h-8 w-auto"
                     />
                     <div>
@@ -137,8 +139,8 @@ export function AppHeader({ children }: AppHeaderProps) {
             
             {/* Logo - Mobile */}
             <img 
-              src={saruLogo} 
-              alt="Saru Visas" 
+              src={logoUrl} 
+              alt={logoAlt} 
               className="h-8 w-auto flex-shrink-0"
             />
             <div className="hidden min-[360px]:block min-w-0">
@@ -176,29 +178,29 @@ export function AppHeader({ children }: AppHeaderProps) {
 
         {/* Desktop Layout (>768px) */}
         <div className="hidden md:block">
-          {/* Single Row Layout (>1300px) */}
-          <div className="hidden xl:flex items-center justify-between py-3 gap-4">
-            {/* Logo and Brand */}
-            <div className="flex items-center gap-3 flex-shrink-0 min-w-[180px]">
+          {/* Single Row Layout (>1280px) */}
+          <div className="hidden xl:flex items-center justify-between py-2.5 gap-3">
+            {/* Logo and Brand - espacio reservado para que no se solape */}
+            <div className="flex items-center gap-2.5 flex-shrink-0 min-w-0 max-w-[200px]">
               <img 
-                src={saruLogo} 
-                alt="Saru Visas" 
-                className="h-10 w-auto"
+                src={logoUrl} 
+                alt={logoAlt} 
+                className="h-9 w-auto flex-shrink-0"
               />
-              <div>
-                <h1 className="text-lg font-bold text-primary leading-none">SARU</h1>
-                <p className="text-xs text-muted-foreground">Visa y Pasaporte</p>
+              <div className="min-w-0">
+                <h1 className="text-base font-bold text-primary leading-none truncate">SARU</h1>
+                <p className="text-[11px] text-muted-foreground truncate">Visa y Pasaporte</p>
               </div>
             </div>
             
-            {/* Navigation - Single Row */}
-            <div className="flex items-center gap-2 flex-1 min-w-0 justify-center">
+            {/* Navigation - Single Row, compacto */}
+            <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-center overflow-hidden">
               {childrenArray}
             </div>
             
             {/* User Menu */}
             {user && (
-              <div className="flex-shrink-0 ml-4">
+              <div className="flex-shrink-0 ml-2">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="sm" className="gap-2">
@@ -224,20 +226,20 @@ export function AppHeader({ children }: AppHeaderProps) {
             )}
           </div>
 
-          {/* Two Row Layout (768px - 1300px) */}
-          <div className="xl:hidden flex flex-col py-3 gap-3">
+          {/* Two Row Layout (768px - 1280px) */}
+          <div className="xl:hidden flex flex-col py-2.5 gap-2">
             {/* Top Row: Logo and User Menu */}
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center justify-between gap-3">
               {/* Logo */}
-              <div className="flex items-center gap-3 flex-shrink-0 min-w-0">
+              <div className="flex items-center gap-2.5 flex-shrink-0 min-w-0">
                 <img 
-                  src={saruLogo} 
-                  alt="Saru Visas" 
-                  className="h-10 w-auto flex-shrink-0"
+                  src={logoUrl} 
+                  alt={logoAlt} 
+                  className="h-9 w-auto flex-shrink-0"
                 />
                 <div className="min-w-0">
-                  <h1 className="text-lg font-bold text-primary leading-none truncate">SARU</h1>
-                  <p className="text-xs text-muted-foreground truncate">Visa y Pasaporte</p>
+                  <h1 className="text-base font-bold text-primary leading-none truncate">SARU</h1>
+                  <p className="text-[11px] text-muted-foreground truncate">Visa y Pasaporte</p>
                 </div>
               </div>
               
@@ -269,18 +271,9 @@ export function AppHeader({ children }: AppHeaderProps) {
               )}
             </div>
 
-            {/* Bottom Row: Navigation Buttons - Two Rows */}
-            <div className="flex flex-col gap-2 w-full">
-              {/* First Row: First 4 elements */}
-              <div className="flex items-center gap-2 flex-wrap nav-row-1">
-                {firstRow}
-              </div>
-              {/* Second Row: Last 3 elements */}
-              {secondRow.length > 0 && (
-                <div className="flex items-center gap-2 flex-wrap nav-row-2">
-                  {secondRow}
-                </div>
-              )}
+            {/* Bottom Row: Navigation Buttons */}
+            <div className="flex items-center gap-1.5 flex-wrap w-full">
+              {childrenArray}
             </div>
           </div>
         </div>

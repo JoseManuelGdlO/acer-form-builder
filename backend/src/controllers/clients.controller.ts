@@ -1,12 +1,18 @@
 import { Response } from 'express';
 import { body, validationResult } from 'express-validator';
-import { Client, ClientChecklist, ChecklistTemplate } from '../models';
+import { fn, col } from 'sequelize';
+import { Client, ClientChecklist, ChecklistTemplate, ClientAmountDueLog, ClientPaymentDeletedLog, ClientPayment, User } from '../models';
 import { AuthRequest } from '../middleware/auth.middleware';
 
 export const getAllClients = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
+    const companyId = req.user?.companyId;
+    if (!companyId) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
     const { status, assignedUserId } = req.query;
-    const where: any = {};
+    const where: any = { companyId };
 
     // If user is reviewer, only show assigned clients
     if (req.user && !req.user.roles.includes('super_admin')) {
@@ -24,6 +30,12 @@ export const getAllClients = async (req: AuthRequest, res: Response): Promise<vo
       order: [['created_at', 'DESC']],
       include: [
         {
+          model: User,
+          as: 'assignedUser',
+          attributes: ['id', 'name', 'email'],
+          required: false,
+        },
+        {
           model: ClientChecklist,
           as: 'checklistItems',
           include: [
@@ -39,13 +51,27 @@ export const getAllClients = async (req: AuthRequest, res: Response): Promise<vo
       ],
     });
 
-    // Get all active checklist templates to include in response
+    // Get all active checklist templates for this company
     const activeTemplates = await ChecklistTemplate.findAll({
-      where: { isActive: true },
+      where: { companyId, isActive: true },
       order: [['order', 'ASC']],
     });
 
-    // Add checklist stats to each client
+    // Sum of payments per client (total pagado)
+    const clientIds = clients.map(c => c.id);
+    const paymentSums = await ClientPayment.findAll({
+      where: { companyId, clientId: clientIds },
+      attributes: ['clientId', [fn('SUM', col('amount')), 'totalPaid']],
+      group: ['clientId'],
+      raw: true,
+    });
+    const totalPaidByClientId: Record<string, number> = {};
+    paymentSums.forEach((row: any) => {
+      const id = row.clientId || row.client_id;
+      if (id) totalPaidByClientId[id] = parseFloat(row.totalPaid || '0') || 0;
+    });
+
+    // Add checklist stats and payment totals to each client
     const clientsWithStats = clients.map(client => {
       const checklistItems = (client as any).checklistItems || [];
       const totalItems = checklistItems.length;
@@ -74,13 +100,15 @@ export const getAllClients = async (req: AuthRequest, res: Response): Promise<vo
       });
 
       const clientData = client.toJSON();
+      const totalPaid = totalPaidByClientId[client.id] ?? 0;
       return {
         ...clientData,
         checklistProgress: progress,
         checklistStatus,
         checklistCompleted: completedItems,
         checklistTotal: totalItems,
-        checklistByTemplate, // Map of templateId -> { completed: boolean }
+        checklistByTemplate,
+        totalPaid,
       };
     });
 
@@ -105,8 +133,18 @@ export const getAllClients = async (req: AuthRequest, res: Response): Promise<vo
 export const getClientById = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
+    const companyId = req.user?.companyId;
+    if (!companyId) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
 
-    const client = await Client.findByPk(id);
+    const client = await Client.findOne({
+      where: { id, companyId },
+      include: [
+        { model: User, as: 'assignedUser', attributes: ['id', 'name', 'email'], required: false },
+      ],
+    });
     if (!client) {
       res.status(404).json({ error: 'Client not found' });
       return;
@@ -127,6 +165,64 @@ export const getClientById = async (req: AuthRequest, res: Response): Promise<vo
   }
 };
 
+export const getClientAmountDueHistory = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    if (!req.user?.roles.includes('super_admin')) {
+      res.status(403).json({ error: 'Solo administradores pueden ver el historial de cambios del total a pagar' });
+      return;
+    }
+    const { id: clientId } = req.params;
+    const companyId = req.user?.companyId;
+    if (!companyId) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+    const client = await Client.findOne({ where: { id: clientId, companyId } });
+    if (!client) {
+      res.status(404).json({ error: 'Client not found' });
+      return;
+    }
+    const logs = await ClientAmountDueLog.findAll({
+      where: { clientId, companyId },
+      include: [{ model: User, as: 'changedByUser', attributes: ['id', 'name', 'email'] }],
+      order: [['created_at', 'DESC']],
+    });
+    res.json(logs);
+  } catch (error) {
+    console.error('Get client amount due history error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+export const getClientPaymentDeletedHistory = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    if (!req.user?.roles.includes('super_admin')) {
+      res.status(403).json({ error: 'Solo administradores pueden ver el historial de pagos eliminados' });
+      return;
+    }
+    const { id: clientId } = req.params;
+    const companyId = req.user?.companyId;
+    if (!companyId) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+    const client = await Client.findOne({ where: { id: clientId, companyId } });
+    if (!client) {
+      res.status(404).json({ error: 'Client not found' });
+      return;
+    }
+    const logs = await ClientPaymentDeletedLog.findAll({
+      where: { clientId, companyId },
+      include: [{ model: User, as: 'deletedByUser', attributes: ['id', 'name', 'email'] }],
+      order: [['created_at', 'DESC']],
+    });
+    res.json(logs);
+  } catch (error) {
+    console.error('Get client payment deleted history error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 export const createClient = [
   body('name').notEmpty().withMessage('Name is required'),
   body('email').isEmail().normalizeEmail(),
@@ -139,7 +235,13 @@ export const createClient = [
         return;
       }
 
-      const client = await Client.create(req.body);
+      const companyId = req.user?.companyId;
+      if (!companyId) {
+        res.status(401).json({ error: 'Authentication required' });
+        return;
+      }
+
+      const client = await Client.create({ ...req.body, companyId });
       
       // Get checklist stats for the new client
       const checklistItems = await ClientChecklist.findAll({
@@ -199,6 +301,7 @@ export const updateClient = [
   body('name').optional().notEmpty(),
   body('email').optional().isEmail().normalizeEmail(),
   body('status').optional().isIn(['active', 'inactive', 'pending']),
+  body('totalAmountDue').optional({ values: 'null' }).custom((val) => val === null || val === undefined || (typeof val === 'number' && !Number.isNaN(val) && val >= 0)).withMessage('Total amount due must be a non-negative number or null'),
   async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       const errors = validationResult(req);
@@ -208,7 +311,12 @@ export const updateClient = [
       }
 
       const { id } = req.params;
-      const client = await Client.findByPk(id);
+      const companyId = req.user?.companyId;
+      if (!companyId) {
+        res.status(401).json({ error: 'Authentication required' });
+        return;
+      }
+      const client = await Client.findOne({ where: { id, companyId } });
 
       if (!client) {
         res.status(404).json({ error: 'Client not found' });
@@ -223,8 +331,38 @@ export const updateClient = [
         }
       }
 
-      await client.update(req.body);
-      
+      const updates: Record<string, unknown> = {};
+      if (req.body.name !== undefined) updates.name = req.body.name;
+      if (req.body.email !== undefined) updates.email = req.body.email;
+      if (req.body.phone !== undefined) updates.phone = req.body.phone;
+      if (req.body.address !== undefined) updates.address = req.body.address;
+      if (req.body.notes !== undefined) updates.notes = req.body.notes;
+      if (req.body.status !== undefined) updates.status = req.body.status;
+      if (req.body.assignedUserId !== undefined && req.user?.roles.includes('super_admin')) {
+        updates.assignedUserId = req.body.assignedUserId || null;
+      }
+      if (req.body.totalAmountDue !== undefined && req.user?.roles.includes('super_admin')) {
+        updates.totalAmountDue = req.body.totalAmountDue;
+      }
+
+      const previousTotalAmountDue = client.totalAmountDue != null ? Number(client.totalAmountDue) : null;
+      await client.update(updates);
+      await client.reload({
+        include: [{ model: User, as: 'assignedUser', attributes: ['id', 'name', 'email'], required: false }],
+      });
+      if (req.body.totalAmountDue !== undefined) {
+        const newVal = req.body.totalAmountDue === null || req.body.totalAmountDue === undefined
+          ? null
+          : Number(req.body.totalAmountDue);
+        await ClientAmountDueLog.create({
+          companyId,
+          clientId: client.id,
+          previousValue: previousTotalAmountDue,
+          newValue: newVal,
+          changedBy: req.user?.id,
+        });
+      }
+
       // Get checklist stats for the updated client
       const checklistItems = await ClientChecklist.findAll({
         where: { clientId: client.id },
@@ -282,7 +420,12 @@ export const updateClient = [
 export const deleteClient = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const client = await Client.findByPk(id);
+    const companyId = req.user?.companyId;
+    if (!companyId) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+    const client = await Client.findOne({ where: { id, companyId } });
 
     if (!client) {
       res.status(404).json({ error: 'Client not found' });
@@ -307,7 +450,12 @@ export const deleteClient = async (req: AuthRequest, res: Response): Promise<voi
 
 export const getClientStats = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const where: any = {};
+    const companyId = req.user?.companyId;
+    if (!companyId) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+    const where: any = { companyId };
 
     // If user is reviewer, only count assigned clients
     if (req.user && !req.user.roles.includes('super_admin')) {

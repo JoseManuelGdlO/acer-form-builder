@@ -5,6 +5,7 @@ import { Client } from './Client';
 
 interface FormSubmissionAttributes {
   id: string;
+  companyId: string;
   formId: string;
   formName: string;
   respondentName: string;
@@ -22,6 +23,7 @@ interface FormSubmissionCreationAttributes extends Optional<FormSubmissionAttrib
 
 export class FormSubmission extends Model<FormSubmissionAttributes, FormSubmissionCreationAttributes> implements FormSubmissionAttributes {
   public id!: string;
+  public companyId!: string;
   public formId!: string;
   public formName!: string;
   public respondentName!: string;
@@ -41,6 +43,15 @@ FormSubmission.init(
       type: DataTypes.UUID,
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
+    },
+    companyId: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      references: {
+        model: 'companies',
+        key: 'id',
+      },
+      onDelete: 'CASCADE',
     },
     formId: {
       type: DataTypes.UUID,

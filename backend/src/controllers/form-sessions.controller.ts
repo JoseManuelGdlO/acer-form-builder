@@ -21,11 +21,18 @@ export const createFormSession = async (req: AuthRequest, res: Response): Promis
       res.status(404).json({ error: 'Form not found' });
       return;
     }
+    const companyId = (form as any).companyId;
+    if (req.user?.companyId && companyId !== req.user.companyId) {
+      res.status(403).json({ error: 'Access denied to this form' });
+      return;
+    }
 
     console.log('[form-sessions] createFormSession: formulario encontrado', { formId, formName: form.name });
 
     const session = await FormSession.create({
+      companyId,
       formId,
+      assignedUserId: userId ?? undefined,
       progress: {},
       status: 'in_progress',
     });

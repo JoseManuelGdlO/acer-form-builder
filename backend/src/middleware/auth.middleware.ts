@@ -6,6 +6,7 @@ import { JwtPayload } from '../types';
 export interface AuthRequest extends Request {
   user?: {
     id: string;
+    companyId: string;
     email: string;
     name: string;
     roles: string[];
@@ -43,9 +44,20 @@ export const authenticate = async (
       return;
     }
 
-    // Attach user to request
+    const userCompanyId = (user as any).companyId;
+    if (!userCompanyId) {
+      res.status(403).json({ error: 'User company not set' });
+      return;
+    }
+    if (payload.companyId !== userCompanyId) {
+      res.status(403).json({ error: 'Token does not match user company' });
+      return;
+    }
+
+    // Attach user to request (companyId always from DB for tenant isolation)
     req.user = {
       id: user.id,
+      companyId: userCompanyId,
       email: user.email,
       name: user.name,
       roles: (user as any).roles?.map((r: UserRole) => r.role) || [],

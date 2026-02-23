@@ -3,6 +3,7 @@ import sequelize from '../config/database';
 
 interface UserAttributes {
   id: string;
+  companyId: string;
   email: string;
   password: string;
   name: string;
@@ -15,6 +16,7 @@ interface UserCreationAttributes extends Optional<UserAttributes, 'id' | 'create
 
 export class User extends Model<UserAttributes, UserCreationAttributes> implements UserAttributes {
   public id!: string;
+  public companyId!: string;
   public email!: string;
   public password!: string;
   public name!: string;
@@ -30,10 +32,18 @@ User.init(
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
     },
+    companyId: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      references: {
+        model: 'companies',
+        key: 'id',
+      },
+      onDelete: 'CASCADE',
+    },
     email: {
       type: DataTypes.STRING(255),
       allowNull: false,
-      unique: true,
       validate: {
         isEmail: true,
       },
@@ -57,5 +67,11 @@ User.init(
     tableName: 'users',
     timestamps: true,
     underscored: true,
+    indexes: [
+      {
+        unique: true,
+        fields: ['company_id', 'email'],
+      },
+    ],
   }
 );

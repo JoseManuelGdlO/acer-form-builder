@@ -1,12 +1,17 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import { body, validationResult } from 'express-validator';
 import { FAQ } from '../models';
 import { AuthRequest } from '../middleware/auth.middleware';
 
-export const getAllFAQs = async (req: Request, res: Response): Promise<void> => {
+export const getAllFAQs = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
+    const companyId = req.user?.companyId;
+    if (!companyId) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
     const { isActive } = req.query;
-    const where: any = {};
+    const where: any = { companyId };
 
     if (isActive !== undefined) {
       where.isActive = isActive === 'true';
@@ -25,10 +30,15 @@ export const getAllFAQs = async (req: Request, res: Response): Promise<void> => 
   }
 };
 
-export const getFAQById = async (req: Request, res: Response): Promise<void> => {
+export const getFAQById = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const faq = await FAQ.findByPk(id);
+    const companyId = req.user?.companyId;
+    if (!companyId) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+    const faq = await FAQ.findOne({ where: { id, companyId } });
 
     if (!faq) {
       res.status(404).json({ error: 'FAQ not found' });
@@ -55,7 +65,13 @@ export const createFAQ = [
       }
 
       const { question, answer, category, order } = req.body;
+      const companyId = req.user?.companyId;
+      if (!companyId) {
+        res.status(401).json({ error: 'Authentication required' });
+        return;
+      }
       const faq = await FAQ.create({
+        companyId,
         question,
         answer,
         isActive: true,
@@ -84,7 +100,12 @@ export const updateFAQ = [
       }
 
       const { id } = req.params;
-      const faq = await FAQ.findByPk(id);
+      const companyId = req.user?.companyId;
+      if (!companyId) {
+        res.status(401).json({ error: 'Authentication required' });
+        return;
+      }
+      const faq = await FAQ.findOne({ where: { id, companyId } });
 
       if (!faq) {
         res.status(404).json({ error: 'FAQ not found' });
@@ -103,7 +124,12 @@ export const updateFAQ = [
 export const deleteFAQ = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const faq = await FAQ.findByPk(id);
+    const companyId = req.user?.companyId;
+    if (!companyId) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+    const faq = await FAQ.findOne({ where: { id, companyId } });
 
     if (!faq) {
       res.status(404).json({ error: 'FAQ not found' });

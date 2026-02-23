@@ -1,16 +1,20 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import { body, validationResult } from 'express-validator';
 import { BotBehavior } from '../models';
 import { AuthRequest } from '../middleware/auth.middleware';
 
-export const getBotBehavior = async (_req: Request, res: Response): Promise<void> => {
+export const getBotBehavior = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    // Bot behavior is a singleton - get the first (and only) record
-    let bot = await BotBehavior.findOne();
+    const companyId = req.user?.companyId;
+    if (!companyId) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+    let bot = await BotBehavior.findOne({ where: { companyId } });
 
-    // If it doesn't exist, create default
     if (!bot) {
       bot = await BotBehavior.create({
+        companyId,
         name: 'Asistente Saru',
         greeting: '¡Hola! Soy el asistente virtual de Saru Visas. ¿En qué puedo ayudarte hoy?',
         personality: 'Soy un asistente amable y profesional especializado en trámites de visa y pasaporte. Mi objetivo es ayudar a resolver dudas de manera clara y eficiente.',
@@ -44,11 +48,16 @@ export const updateBotBehavior = [
         return;
       }
 
-      let bot = await BotBehavior.findOne();
+      const companyId = req.user?.companyId;
+      if (!companyId) {
+        res.status(401).json({ error: 'Authentication required' });
+        return;
+      }
+      let bot = await BotBehavior.findOne({ where: { companyId } });
 
       if (!bot) {
-        // Create if doesn't exist
         bot = await BotBehavior.create({
+          companyId,
           name: 'Asistente Saru',
           greeting: '¡Hola! Soy el asistente virtual de Saru Visas. ¿En qué puedo ayudarte hoy?',
           personality: 'Soy un asistente amable y profesional especializado en trámites de visa y pasaporte.',

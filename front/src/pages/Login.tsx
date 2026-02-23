@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTenant } from '@/contexts/TenantContext';
+import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,19 +14,30 @@ const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { login } = useAuth();
+  const { setAuthFromLoginResponse } = useAuth();
+  const { tenant } = useTenant();
   const navigate = useNavigate();
+
+  const logoUrl = tenant?.company?.logoUrl || saruLogo;
+  const logoAlt = tenant?.company?.name || 'Saru Visas';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
     try {
-      await login(email, password);
+      const response = await api.login(email, password);
+      if (tenant?.company && response.user?.company?.id && response.user.company.id !== tenant.company.id) {
+        toast.error('No puedes iniciar sesión en este dominio con una cuenta de otra empresa.');
+        setIsLoading(false);
+        return;
+      }
+      setAuthFromLoginResponse(response);
       toast.success('Inicio de sesión exitoso');
       navigate('/');
-    } catch (error: any) {
-      toast.error(error.message || 'Error al iniciar sesión');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Error al iniciar sesión';
+      toast.error(message);
     } finally {
       setIsLoading(false);
     }
@@ -36,8 +49,8 @@ const Login = () => {
         <CardHeader className="space-y-1">
           <div className="flex items-center justify-center mb-4">
             <img 
-              src={saruLogo} 
-              alt="Saru Visas Logo" 
+              src={logoUrl} 
+              alt={logoAlt} 
               className="h-20 w-auto object-contain"
             />
           </div>

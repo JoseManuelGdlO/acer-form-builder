@@ -1,12 +1,18 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import { body, validationResult } from 'express-validator';
 import { ChecklistTemplate, ClientChecklist, Client } from '../models';
 import { AuthRequest } from '../middleware/auth.middleware';
 
 // Templates
-export const getAllTemplates = async (_req: Request, res: Response): Promise<void> => {
+export const getAllTemplates = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
+    const companyId = req.user?.companyId;
+    if (!companyId) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
     const templates = await ChecklistTemplate.findAll({
+      where: { companyId },
       order: [['order', 'ASC']],
     });
     res.json(templates);
@@ -27,7 +33,13 @@ export const createTemplate = [
         return;
       }
 
-      const template = await ChecklistTemplate.create(req.body);
+      const companyId = req.user?.companyId;
+      if (!companyId) {
+        res.status(401).json({ error: 'Authentication required' });
+        return;
+      }
+
+      const template = await ChecklistTemplate.create({ ...req.body, companyId });
       res.status(201).json(template);
     } catch (error) {
       console.error('Create template error:', error);
@@ -49,7 +61,12 @@ export const updateTemplate = [
       }
 
       const { id } = req.params;
-      const template = await ChecklistTemplate.findByPk(id);
+      const companyId = req.user?.companyId;
+      if (!companyId) {
+        res.status(401).json({ error: 'Authentication required' });
+        return;
+      }
+      const template = await ChecklistTemplate.findOne({ where: { id, companyId } });
 
       if (!template) {
         res.status(404).json({ error: 'Template not found' });
@@ -68,7 +85,12 @@ export const updateTemplate = [
 export const deleteTemplate = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const template = await ChecklistTemplate.findByPk(id);
+    const companyId = req.user?.companyId;
+    if (!companyId) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+    const template = await ChecklistTemplate.findOne({ where: { id, companyId } });
 
     if (!template) {
       res.status(404).json({ error: 'Template not found' });
@@ -88,18 +110,26 @@ export const getClientChecklist = async (req: AuthRequest, res: Response): Promi
   try {
     const { clientId } = req.params;
 
-    // Check if reviewer can access this client
-    if (req.user && !req.user.roles.includes('super_admin')) {
-      const client = await Client.findByPk(clientId);
-      if (!client || client.assignedUserId !== req.user.id) {
-        res.status(403).json({ error: 'Access denied' });
-        return;
-      }
+    const companyId = req.user?.companyId;
+    if (!companyId) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
     }
 
-    // Get all active checklist templates
+    // Check if reviewer can access this client and client belongs to company
+    const client = await Client.findOne({ where: { id: clientId, companyId } });
+    if (!client) {
+      res.status(404).json({ error: 'Client not found' });
+      return;
+    }
+    if (!req.user?.roles.includes('super_admin') && client.assignedUserId !== req.user?.id) {
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
+
+    // Get all active checklist templates for this company
     const activeTemplates = await ChecklistTemplate.findAll({
-      where: { isActive: true },
+      where: { companyId, isActive: true },
       order: [['order', 'ASC']],
     });
 
@@ -121,6 +151,7 @@ export const getClientChecklist = async (req: AuthRequest, res: Response): Promi
     if (missingTemplates.length > 0) {
       await ClientChecklist.bulkCreate(
         missingTemplates.map(template => ({
+          companyId,
           clientId,
           templateId: template.id,
           isCompleted: false,
@@ -160,17 +191,23 @@ export const updateChecklistItem = [
       const { clientId, itemId } = req.params;
       const { isCompleted } = req.body;
 
-      // Check if reviewer can access this client
-      if (req.user && !req.user.roles.includes('super_admin')) {
-        const client = await Client.findByPk(clientId);
-        if (!client || client.assignedUserId !== req.user.id) {
-          res.status(403).json({ error: 'Access denied' });
-          return;
-        }
+      const companyId = req.user?.companyId;
+      if (!companyId) {
+        res.status(401).json({ error: 'Authentication required' });
+        return;
+      }
+      const client = await Client.findOne({ where: { id: clientId, companyId } });
+      if (!client) {
+        res.status(404).json({ error: 'Client not found' });
+        return;
+      }
+      if (!req.user?.roles.includes('super_admin') && client.assignedUserId !== req.user?.id) {
+        res.status(403).json({ error: 'Access denied' });
+        return;
       }
 
       const item = await ClientChecklist.findOne({
-        where: { id: itemId, clientId },
+        where: { id: itemId, clientId, companyId },
       });
 
       if (!item) {

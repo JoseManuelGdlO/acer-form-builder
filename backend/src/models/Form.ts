@@ -17,6 +17,7 @@ interface FormSection {
 
 interface FormAttributes {
   id: string;
+  companyId: string;
   name: string;
   description?: string;
   sections: FormSection[];
@@ -28,6 +29,7 @@ interface FormCreationAttributes extends Optional<FormAttributes, 'id' | 'sectio
 
 export class Form extends Model<FormAttributes, FormCreationAttributes> implements FormAttributes {
   public id!: string;
+  public companyId!: string;
   public name!: string;
   public description?: string;
   public sections!: FormSection[];
@@ -41,6 +43,15 @@ Form.init(
       type: DataTypes.UUID,
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
+    },
+    companyId: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      references: {
+        model: 'companies',
+        key: 'id',
+      },
+      onDelete: 'CASCADE',
     },
     name: {
       type: DataTypes.STRING(255),

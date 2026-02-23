@@ -21,7 +21,9 @@ export interface FormSessionProgress {
 
 interface FormSessionAttributes {
   id: string;
+  companyId: string;
   formId: string;
+  assignedUserId?: string;
   clientId?: string;
   submissionId?: string;
   progress: FormSessionProgress;
@@ -34,7 +36,9 @@ interface FormSessionCreationAttributes extends Optional<FormSessionAttributes, 
 
 export class FormSession extends Model<FormSessionAttributes, FormSessionCreationAttributes> implements FormSessionAttributes {
   public id!: string;
+  public companyId!: string;
   public formId!: string;
+  public assignedUserId?: string;
   public clientId?: string;
   public submissionId?: string;
   public progress!: FormSessionProgress;
@@ -50,6 +54,15 @@ FormSession.init(
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
     },
+    companyId: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      references: {
+        model: 'companies',
+        key: 'id',
+      },
+      onDelete: 'CASCADE',
+    },
     formId: {
       type: DataTypes.UUID,
       allowNull: false,
@@ -58,6 +71,15 @@ FormSession.init(
         key: 'id',
       },
       onDelete: 'CASCADE',
+    },
+    assignedUserId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      references: {
+        model: 'users',
+        key: 'id',
+      },
+      onDelete: 'SET NULL',
     },
     clientId: {
       type: DataTypes.UUID,

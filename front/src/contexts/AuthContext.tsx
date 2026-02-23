@@ -2,11 +2,18 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 import { api } from '@/lib/api';
 import { User, UserRole } from '@/types/user';
 
+interface LoginResponse {
+  token: string;
+  user: { id: string; email: string; name: string; status: string; roles: string[]; company?: { id: string; name: string; slug: string; logoUrl: string | null } | null };
+}
+
 interface AuthContextType {
   user: User | null;
+  company: User['company'];
   token: string | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  setAuthFromLoginResponse: (response: LoginResponse) => void;
   logout: () => void;
   isAuthenticated: boolean;
   hasRole: (role: UserRole) => boolean;
@@ -34,7 +41,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const fetchUser = async (authToken: string) => {
     try {
-      // Token is passed explicitly here since we're validating it
       const response = await api.getMe(authToken);
       setUser({
         id: response.user.id,
@@ -43,6 +49,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         roles: response.user.roles || ['reviewer'],
         status: response.user.status,
         createdAt: new Date(response.user.createdAt || Date.now()),
+        company: response.user.company ?? null,
       });
     } catch (error) {
       console.error('Failed to fetch user:', error);
@@ -56,9 +63,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const login = async (email: string, password: string) => {
     const response = await api.login(email, password);
-    const authToken = response.token;
-    localStorage.setItem(TOKEN_KEY, authToken);
-    setToken(authToken);
+    setAuthFromLoginResponse(response);
+  };
+
+  const setAuthFromLoginResponse = (response: LoginResponse) => {
+    localStorage.setItem(TOKEN_KEY, response.token);
+    setToken(response.token);
     setUser({
       id: response.user.id,
       email: response.user.email,
@@ -66,6 +76,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       roles: response.user.roles || ['reviewer'],
       status: response.user.status,
       createdAt: new Date(),
+      company: response.user.company ?? null,
     });
   };
 
@@ -90,9 +101,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     <AuthContext.Provider
       value={{
         user,
+        company: user?.company ?? null,
         token,
         isLoading,
         login,
+        setAuthFromLoginResponse,
         logout,
         isAuthenticated: !!user && !!token,
         hasRole,

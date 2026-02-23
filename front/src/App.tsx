@@ -3,17 +3,33 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { TenantProvider, useTenant } from "@/contexts/TenantContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import PublicFormView from "./pages/PublicFormView";
 import NotFound from "./pages/NotFound";
+import DomainNotConfigured from "./pages/DomainNotConfigured";
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
+function AppContent() {
+  const { tenantError, isLoading } = useTenant();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="animate-pulse text-muted-foreground">Cargando...</div>
+      </div>
+    );
+  }
+
+  if (tenantError === 'not_found') {
+    return <DomainNotConfigured />;
+  }
+
+  return (
     <AuthProvider>
       <TooltipProvider>
         <Toaster />
@@ -30,12 +46,19 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
       </TooltipProvider>
     </AuthProvider>
+  );
+}
+
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <TenantProvider>
+      <AppContent />
+    </TenantProvider>
   </QueryClientProvider>
 );
 

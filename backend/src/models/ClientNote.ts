@@ -5,6 +5,7 @@ import { User } from './User';
 
 interface ClientNoteAttributes {
   id: string;
+  companyId: string;
   clientId: string;
   content: string;
   createdBy?: string;
@@ -16,6 +17,7 @@ interface ClientNoteCreationAttributes extends Optional<ClientNoteAttributes, 'i
 
 export class ClientNote extends Model<ClientNoteAttributes, ClientNoteCreationAttributes> implements ClientNoteAttributes {
   public id!: string;
+  public companyId!: string;
   public clientId!: string;
   public content!: string;
   public createdBy?: string;
@@ -29,6 +31,15 @@ ClientNote.init(
       type: DataTypes.UUID,
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
+    },
+    companyId: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      references: {
+        model: 'companies',
+        key: 'id',
+      },
+      onDelete: 'CASCADE',
     },
     clientId: {
       type: DataTypes.UUID,

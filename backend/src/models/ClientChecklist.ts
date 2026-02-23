@@ -5,6 +5,7 @@ import { ChecklistTemplate } from './ChecklistTemplate';
 
 interface ClientChecklistAttributes {
   id: string;
+  companyId: string;
   clientId: string;
   templateId: string;
   isCompleted: boolean;
@@ -17,6 +18,7 @@ interface ClientChecklistCreationAttributes extends Optional<ClientChecklistAttr
 
 export class ClientChecklist extends Model<ClientChecklistAttributes, ClientChecklistCreationAttributes> implements ClientChecklistAttributes {
   public id!: string;
+  public companyId!: string;
   public clientId!: string;
   public templateId!: string;
   public isCompleted!: boolean;
@@ -31,6 +33,15 @@ ClientChecklist.init(
       type: DataTypes.UUID,
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
+    },
+    companyId: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      references: {
+        model: 'companies',
+        key: 'id',
+      },
+      onDelete: 'CASCADE',
     },
     clientId: {
       type: DataTypes.UUID,
