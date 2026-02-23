@@ -220,6 +220,49 @@ class ApiClient {
     });
   }
 
+  // Groups
+  async getGroups(token?: string | null) {
+    return this.request<any[]>('/groups', {
+      method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async getGroup(id: string, token?: string | null) {
+    return this.request<any>(`/groups/${id}`, {
+      method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async createGroup(data: { title: string; clientIds?: string[] }, token?: string | null) {
+    return this.request<any>('/groups', {
+      method: 'POST',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateGroup(id: string, data: { title?: string; clientIds?: string[] }, token?: string | null) {
+    return this.request<any>(`/groups/${id}`, {
+      method: 'PUT',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteGroup(id: string, token?: string | null) {
+    return this.request<{ message: string }>(`/groups/${id}`, {
+      method: 'DELETE',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
   // Forms
   async getForms() {
     return this.request<any[]>('/forms', {

@@ -13,6 +13,8 @@ import { ClientPayment } from './ClientPayment';
 import { ClientAmountDueLog } from './ClientAmountDueLog';
 import { ClientPaymentDeletedLog } from './ClientPaymentDeletedLog';
 import { ClientMessage } from './ClientMessage';
+import { ClientGroup } from './ClientGroup';
+import { ClientGroupMember } from './ClientGroupMember';
 import { FAQ } from './FAQ';
 import { BotBehavior } from './BotBehavior';
 import { Conversations } from './Conversation';
@@ -88,6 +90,14 @@ ClientPaymentDeletedLog.belongsTo(User, { foreignKey: 'deletedBy', as: 'deletedB
 Client.hasMany(ClientMessage, { foreignKey: 'clientId', as: 'messages' });
 ClientMessage.belongsTo(Client, { foreignKey: 'clientId', as: 'client' });
 
+// ClientGroup relationships
+User.hasMany(ClientGroup, { foreignKey: 'assignedUserId', as: 'assignedGroups' });
+ClientGroup.belongsTo(User, { foreignKey: 'assignedUserId', as: 'assignedUser' });
+ClientGroup.belongsToMany(Client, { through: ClientGroupMember, foreignKey: 'groupId', otherKey: 'clientId', as: 'clients' });
+Client.belongsToMany(ClientGroup, { through: ClientGroupMember, foreignKey: 'clientId', otherKey: 'groupId', as: 'groups' });
+ClientGroupMember.belongsTo(ClientGroup, { foreignKey: 'groupId', as: 'group' });
+ClientGroupMember.belongsTo(Client, { foreignKey: 'clientId', as: 'client' });
+
 // Form relationships
 Form.hasMany(FormSession, { foreignKey: 'formId', as: 'sessions' });
 FormSession.belongsTo(Form, { foreignKey: 'formId', as: 'form' });
@@ -107,6 +117,8 @@ export {
   User,
   UserRole,
   Client,
+  ClientGroup,
+  ClientGroupMember,
   Form,
   FormSession,
   FormSubmission,

@@ -191,3 +191,19 @@ export const CLIENT_STATUS_CONFIG: Record<ClientStatus, { label: string; color: 
   inactive: { label: 'Inactivo', color: 'destructive' },
   pending: { label: 'Pendiente', color: 'warning' },
 };
+
+// ============= Groups =============
+
+export interface ClientLastSubmission {
+  formName: string;
+  submittedAt: string;
+}
+
+export interface Group {
+  id: string;
+  title: string;
+  assignedUserId?: string;
+  createdAt: Date;
+  updatedAt: Date;
+  clients?: (Client & { lastSubmission?: ClientLastSubmission | null })[];
+}

@@ -2,12 +2,13 @@ import { useState, useMemo, useEffect } from 'react';
 import { useFormStore } from '@/hooks/useFormStore';
 import { useSubmissionStore } from '@/hooks/useSubmissionStore';
 import { useClientStore } from '@/hooks/useClientStore';
+import { useGroupStore } from '@/hooks/useGroupStore';
 import { useUserStore } from '@/hooks/useUserStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { FormList } from '@/components/forms/FormList';
 import { FormEditor } from '@/components/forms/FormEditor';
-import { SubmissionList } from '@/components/submissions/SubmissionList';
 import { ClientList } from '@/components/clients/ClientList';
+import { GroupList } from '@/components/groups/GroupList';
 import { UserList } from '@/components/users/UserList';
 import { ChatbotSettings } from '@/components/chatbot/ChatbotSettings';
 import { SettingsPage } from '@/components/settings/SettingsPage';
@@ -23,11 +24,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { LayoutDashboard, FileText, ClipboardList, Users, UserCog, Bot, Settings, Receipt, ChevronDown } from 'lucide-react';
+
+import { LayoutDashboard, FileText, Users, UsersRound, UserCog, Bot, Settings, Receipt, ChevronDown } from 'lucide-react';
 import { User } from '@/types/user';
 import { Client, ClientStatus } from '@/types/form';
 
-type View = 'dashboard' | 'forms' | 'submissions' | 'clients' | 'paymentLogs' | 'users' | 'chatbot' | 'settings';
+type View = 'dashboard' | 'forms' | 'clients' | 'paymentLogs' | 'groups' | 'users' | 'chatbot' | 'settings';
 
 const Index = () => {
   const [activeView, setActiveView] = useState<View>('dashboard');
@@ -52,14 +54,7 @@ const Index = () => {
     selectForm,
   } = useFormStore();
 
-  const {
-    submissions,
-    isLoading: submissionsLoading,
-    fetchSubmissions,
-    updateSubmissionStatus,
-    deleteSubmission,
-    getSubmissionStats,
-  } = useSubmissionStore();
+  const { submissions, fetchSubmissions, getSubmissionStats } = useSubmissionStore();
 
   const {
     clients,
@@ -71,6 +66,13 @@ const Index = () => {
     updateClientStatus: updateClientStatusStore,
     getClientStats,
   } = useClientStore();
+  const {
+    groups,
+    fetchGroups,
+    createGroup: createGroupStore,
+    updateGroup: updateGroupStore,
+    deleteGroup: deleteGroupStore,
+  } = useGroupStore();
   const { token, hasRole } = useAuth();
   const { users, fetchUsers } = useUserStore();
 
@@ -114,11 +116,11 @@ const Index = () => {
     }
   }, [activeView, token]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Load submissions when switching to submissions view
+  // Load groups when switching to groups view
   useEffect(() => {
-    if (token && activeView === 'submissions') {
-      fetchSubmissions().catch((error) => {
-        console.error('Failed to fetch submissions:', error);
+    if (token && activeView === 'groups') {
+      fetchGroups(token).catch((error) => {
+        console.error('Failed to fetch groups:', error);
       });
     }
   }, [activeView, token]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -150,6 +152,19 @@ const Index = () => {
       throw new Error('No token available');
     }
     return updateClientStatusStore(token, clientId, status);
+  };
+
+  const createGroup = async (data: { title: string; clientIds?: string[] }) => {
+    if (!token) throw new Error('No token available');
+    return createGroupStore(token, data);
+  };
+  const updateGroup = async (groupId: string, data: { title?: string; clientIds?: string[] }) => {
+    if (!token) throw new Error('No token available');
+    return updateGroupStore(token, groupId, data);
+  };
+  const deleteGroup = async (groupId: string) => {
+    if (!token) throw new Error('No token available');
+    return deleteGroupStore(token, groupId);
   };
 
   // Filter clients based on "View As" selection
@@ -190,20 +205,6 @@ const Index = () => {
         <span className="hidden sm:inline">Formularios</span>
       </Button>
       <Button
-        variant={current === 'submissions' ? 'default' : 'ghost'}
-        size="sm"
-        onClick={() => setActiveView('submissions')}
-        className="gap-1.5 shrink-0"
-      >
-        <ClipboardList className="w-4 h-4 shrink-0" />
-        <span className="hidden sm:inline">Respuestas</span>
-        {submissions.length > 0 && (
-          <span className="px-1.5 py-0.5 text-xs rounded-full bg-secondary/20 text-secondary">
-            {submissions.length}
-          </span>
-        )}
-      </Button>
-      <Button
         variant={current === 'clients' ? 'default' : 'ghost'}
         size="sm"
         onClick={() => setActiveView('clients')}
@@ -214,6 +215,20 @@ const Index = () => {
         {filteredClients.length > 0 && (
           <span className="px-1.5 py-0.5 text-xs rounded-full bg-secondary/20 text-secondary">
             {filteredClients.length}
+          </span>
+        )}
+      </Button>
+      <Button
+        variant={current === 'groups' ? 'default' : 'ghost'}
+        size="sm"
+        onClick={() => setActiveView('groups')}
+        className="gap-2"
+      >
+        <UsersRound className="w-4 h-4" />
+        <span className="hidden sm:inline">Grupos</span>
+        {groups.length > 0 && (
+          <span className="px-1.5 py-0.5 text-xs rounded-full bg-secondary/20 text-secondary">
+            {groups.length}
           </span>
         )}
       </Button>
@@ -305,36 +320,6 @@ const Index = () => {
     );
   }
 
-  // Vista de respuestas
-  if (activeView === 'submissions') {
-    return (
-      <>
-        <FloatingViewAs />
-        <div className={viewingAs ? 'pt-10' : ''}>
-          <SubmissionList
-            submissions={submissions}
-            stats={getSubmissionStats()}
-            onUpdateStatus={async (submissionId, status) => {
-              await updateSubmissionStatus(submissionId, status);
-              // Reload submissions after update
-              if (token) {
-                await fetchSubmissions();
-              }
-            }}
-            onDelete={async (submissionId) => {
-              await deleteSubmission(submissionId);
-              // Reload submissions after deletion
-              if (token) {
-                await fetchSubmissions();
-              }
-            }}
-            onBack={() => setActiveView('dashboard')}
-          />
-        </div>
-      </>
-    );
-  }
-
   // Vista de clientes
   if (activeView === 'clients') {
     return (
@@ -346,8 +331,8 @@ const Index = () => {
             stats={filteredClientStats}
             onUpdateStatus={updateClientStatus}
             onDelete={deleteClient}
-            onCreate={createClient}
-            onUpdate={updateClient}
+            onCreate={async (data) => { await createClient(data); }}
+            onUpdate={async (id, data) => { await updateClient(id, data); }}
             onBack={() => setActiveView('dashboard')}
             users={users}
             isAdmin={hasRole('super_admin')}
@@ -374,6 +359,25 @@ const Index = () => {
           </div>
         </>
       </RoleGuard>
+    );
+  }
+
+  // Vista de grupos
+  if (activeView === 'groups') {
+    return (
+      <>
+        <FloatingViewAs />
+        <div className={viewingAs ? 'pt-10' : ''}>
+          <GroupList
+            groups={groups}
+            availableClients={filteredClients}
+            onCreate={async (data) => { await createGroup(data); }}
+            onUpdate={async (id, data) => { await updateGroup(id, data); }}
+            onDelete={deleteGroup}
+            onBack={() => setActiveView('dashboard')}
+          />
+        </div>
+      </>
     );
   }
 
