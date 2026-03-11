@@ -10,10 +10,12 @@ module.exports = {
             step: {
                 type: Sequelize.STRING(255),
                 allowNull: false,
+                defaultValue: "empty",
             },
             state:{
                 type: Sequelize.STRING(255),
                 allowNull: true,
+                defaultValue: "empty",
             }
         });
     },
