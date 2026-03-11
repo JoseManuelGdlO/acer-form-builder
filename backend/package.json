@@ -9,6 +9,8 @@
     "start": "node dist/server.js",
     "migrate": "sequelize-cli db:migrate",
     "migrate:undo": "sequelize-cli db:migrate:undo",
+    "migrate:pg": "sequelize-cli db:migrate --config src/config/database-pg.js --migrations-path src/migrations-pg",
+    "migrate:pg:undo": "sequelize-cli db:migrate:undo --config src/config/database-pg.js --migrations-path src/migrations-pg",
     "seed": "sequelize-cli db:seed:all",
     "seed:undo": "sequelize-cli db:seed:undo:all"
   },
