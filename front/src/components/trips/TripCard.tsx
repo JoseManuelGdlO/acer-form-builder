@@ -1,0 +1,87 @@
+import { Trip } from '@/types/form';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { MapPin, MoreHorizontal, Eye, Pencil, Trash2, Calendar } from 'lucide-react';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+
+interface TripCardProps {
+  trip: Trip;
+  onView: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}
+
+export const TripCard = ({ trip, onView, onEdit, onDelete }: TripCardProps) => {
+  const count = trip.participantCount ?? trip.participants?.length ?? 0;
+  const departure = trip.departureDate ? format(new Date(trip.departureDate), 'd MMM yyyy', { locale: es }) : '';
+  const returnDate = trip.returnDate ? format(new Date(trip.returnDate), 'd MMM yyyy', { locale: es }) : '';
+
+  return (
+    <Card
+      className="group hover:shadow-card-hover transition-all duration-300 border-border/50 hover:border-primary/30 cursor-pointer"
+      onClick={onView}
+    >
+      <CardContent className="p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
+                <MapPin className="w-6 h-6 text-primary" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-foreground text-lg">{trip.title}</h3>
+                {trip.destination && (
+                  <p className="text-sm text-muted-foreground flex items-center gap-1">
+                    <MapPin className="w-3.5 h-3.5" />
+                    {trip.destination}
+                  </p>
+                )}
+                <p className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5">
+                  <Calendar className="w-3.5 h-3.5" />
+                  {departure} – {returnDate}
+                </p>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  {count}/{trip.totalSeats} plazas
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={e => e.stopPropagation()}
+              >
+                <MoreHorizontal className="w-4 h-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={onView} className="gap-2">
+                <Eye className="w-4 h-4" />
+                Ver detalle
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onEdit} className="gap-2">
+                <Pencil className="w-4 h-4" />
+                Editar
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onDelete} className="gap-2 text-destructive focus:text-destructive">
+                <Trash2 className="w-4 h-4" />
+                Eliminar
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};

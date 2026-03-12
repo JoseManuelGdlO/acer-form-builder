@@ -1,0 +1,53 @@
+import { DataTypes, Model, Optional } from 'sequelize';
+import sequelize from '../config/database';
+
+interface TripParticipantAttributes {
+  id: string;
+  tripId: string;
+  clientId: string;
+  createdAt?: Date;
+}
+
+interface TripParticipantCreationAttributes extends Optional<TripParticipantAttributes, 'id' | 'createdAt'> {}
+
+export class TripParticipant extends Model<TripParticipantAttributes, TripParticipantCreationAttributes> implements TripParticipantAttributes {
+  public id!: string;
+  public tripId!: string;
+  public clientId!: string;
+  public readonly createdAt!: Date;
+}
+
+TripParticipant.init(
+  {
+    id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true,
+    },
+    tripId: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      references: { model: 'trips', key: 'id' },
+      onDelete: 'CASCADE',
+    },
+    clientId: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      references: { model: 'clients', key: 'id' },
+      onDelete: 'CASCADE',
+    },
+  },
+  {
+    sequelize,
+    tableName: 'trip_participants',
+    timestamps: true,
+    updatedAt: false,
+    underscored: true,
+    indexes: [
+      {
+        unique: true,
+        fields: ['trip_id', 'client_id'],
+      },
+    ],
+  }
+);
