@@ -932,12 +932,8 @@ class ApiClient {
     formData.append('title', data.title);
     formData.append('includes', data.includes);
     formData.append('price', String(data.price));
-    if (data.description !== undefined) {
-      formData.append('description', data.description);
-    }
-    if (data.requirements !== undefined) {
-      formData.append('requirements', data.requirements);
-    }
+    formData.append('description', data.description ?? '');
+    formData.append('requirements', data.requirements ?? '');
     if (data.imageFile) {
       formData.append('image', data.imageFile);
     }
@@ -967,8 +963,8 @@ class ApiClient {
     if (data.title !== undefined) formData.append('title', data.title);
     if (data.includes !== undefined) formData.append('includes', data.includes);
     if (data.price !== undefined) formData.append('price', String(data.price));
-    if (data.description !== undefined) formData.append('description', data.description);
-    if (data.requirements !== undefined) formData.append('requirements', data.requirements);
+    if (data.description !== undefined) formData.append('description', String(data.description));
+    if (data.requirements !== undefined) formData.append('requirements', String(data.requirements));
     if (data.imageFile) {
       formData.append('image', data.imageFile);
     }

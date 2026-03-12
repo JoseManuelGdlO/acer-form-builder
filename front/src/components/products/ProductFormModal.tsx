@@ -100,7 +100,7 @@ export const ProductFormModal = ({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && !isSubmitting && onClose()}>
-      <DialogContent className="max-h-[95vh] overflow-y-auto">
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{product ? 'Editar producto' : 'Crear producto'}</DialogTitle>
         </DialogHeader>

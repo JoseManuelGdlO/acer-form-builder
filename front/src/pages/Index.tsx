@@ -35,6 +35,7 @@ import { User } from '@/types/user';
 import { Client, ClientStatus } from '@/types/form';
 import { Product } from '@/types/product';
 import { api } from '@/lib/api';
+import { toast } from 'sonner';
 
 type View =
   | 'dashboard'
@@ -479,17 +480,24 @@ const Index = () => {
 
     const handleSubmit = async (data: {
       title: string;
-      description: string;
-      requirements: string;
+      includes: string;
+      price: number;
+      description?: string;
+      requirements?: string;
       imageFile?: File | null;
     }) => {
       if (!token) {
         throw new Error('No token available');
       }
-      if (editingProduct) {
-        await updateProduct(token, editingProduct.id, data);
-      } else {
-        await createProduct(token, data);
+      try {
+        if (editingProduct) {
+          await updateProduct(token, editingProduct.id, data);
+        } else {
+          await createProduct(token, data);
+        }
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Error al guardar el producto');
+        throw err;
       }
     };
 
