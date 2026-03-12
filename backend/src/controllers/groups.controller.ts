@@ -1,7 +1,7 @@
 import { Response } from 'express';
 import { body, validationResult } from 'express-validator';
 import { Op } from 'sequelize';
-import { ClientGroup, Client, ClientGroupMember, FormSubmission } from '../models';
+import { ClientGroup, Client, ClientGroupMember, FormSubmission, TripGroup, Trip } from '../models';
 import { AuthRequest } from '../middleware/auth.middleware';
 
 async function attachLastSubmissionToClients(clients: any[]): Promise<any[]> {
@@ -53,9 +53,24 @@ export const getAllGroups = async (req: AuthRequest, res: Response): Promise<voi
         },
       ],
     });
+    const groupIds = groups.map(g => g.id);
+    const tripGroups = await TripGroup.findAll({
+      where: { groupId: groupIds },
+      include: [{ model: Trip, as: 'trip', attributes: ['id', 'title'] }],
+    });
+    const assignedTripsByGroupId: Record<string, { id: string; title: string }[]> = {};
+    for (const tg of tripGroups) {
+      const gid = tg.groupId;
+      const trip = (tg as any).trip;
+      if (!trip) continue;
+      if (!assignedTripsByGroupId[gid]) assignedTripsByGroupId[gid] = [];
+      assignedTripsByGroupId[gid].push({ id: trip.id, title: trip.title });
+    }
+
     const groupsJson = groups.map(g => g.toJSON()) as any[];
     for (const g of groupsJson) {
       g.clients = await attachLastSubmissionToClients(g.clients || []);
+      g.assignedTrips = assignedTripsByGroupId[g.id] || [];
     }
     res.json(groupsJson);
   } catch (error) {
@@ -82,8 +97,18 @@ export const getGroupById = async (req: AuthRequest, res: Response): Promise<voi
       res.status(404).json({ error: 'Group not found' });
       return;
     }
+    const tripGroups = await TripGroup.findAll({
+      where: { groupId: id },
+      include: [{ model: Trip, as: 'trip', attributes: ['id', 'title'] }],
+    });
+    const assignedTrips = tripGroups
+      .map(tg => (tg as any).trip)
+      .filter(Boolean)
+      .map((t: any) => ({ id: t.id, title: t.title }));
+
     const groupJson = group.toJSON() as any;
     groupJson.clients = await attachLastSubmissionToClients(groupJson.clients || []);
+    groupJson.assignedTrips = assignedTrips;
     res.json(groupJson);
   } catch (error) {
     console.error('Get group by id error:', error);

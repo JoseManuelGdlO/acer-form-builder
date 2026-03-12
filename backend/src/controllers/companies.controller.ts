@@ -1,7 +1,41 @@
 import { Response } from 'express';
 import { body, validationResult } from 'express-validator';
+import { Op } from 'sequelize';
 import { Company } from '../models';
 import { AuthRequest } from '../middleware/auth.middleware';
+
+/** Normalize domain or URL to hostname only (e.g. http://192.168.100.73:8080/ -> 192.168.100.73). */
+function normalizeToHostname(domainOrUrl: string): string {
+  let s = (domainOrUrl || '').trim().toLowerCase();
+  s = s.replace(/^https?:\/\//i, '');
+  s = s.split('/')[0];
+  s = s.split(':')[0];
+  return s;
+}
+
+/** List companies for trip invite dropdown (super_admin only). Returns all companies except current user's. */
+export const getCompaniesForTripShare = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    if (!req.user?.roles?.includes('super_admin')) {
+      res.status(403).json({ error: 'Forbidden' });
+      return;
+    }
+    const companyId = req.user.companyId;
+    if (!companyId) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+    const companies = await Company.findAll({
+      attributes: ['id', 'name'],
+      where: { id: { [Op.ne]: companyId } },
+      order: [['name', 'ASC']],
+    });
+    res.json(companies.map(c => ({ id: c.id, name: c.name })));
+  } catch (error) {
+    console.error('Get companies for trip share error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
 
 export const getMyCompany = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -65,14 +99,19 @@ export const updateMyCompany = [
         if (trimmed === '') {
           updates.domain = null;
         } else {
-          const existing = await Company.findOne({
-            where: { domain: trimmed },
+          const hostname = normalizeToHostname(trimmed);
+          const withDomain = await Company.findAll({
+            where: { domain: { [Op.ne]: null } },
+            attributes: ['id', 'domain'],
           });
-          if (existing && existing.id !== companyId) {
+          const existing = withDomain.find(
+            c => normalizeToHostname((c as any).domain || '') === hostname && c.id !== companyId
+          );
+          if (existing) {
             res.status(400).json({ error: 'Este dominio ya está en uso por otra empresa' });
             return;
           }
-          updates.domain = trimmed;
+          updates.domain = hostname;
         }
       }
 

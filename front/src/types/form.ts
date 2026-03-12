@@ -148,6 +148,7 @@ export interface Client {
   checklistCompleted?: number;
   checklistTotal?: number;
   checklistByTemplate?: Record<string, { completed: boolean; templateId: string }>;
+  assignedTrips?: { id: string; title: string }[];
 }
 
 export type PaymentType = 'tarjeta' | 'transferencia' | 'efectivo';
@@ -206,4 +207,101 @@ export interface Group {
   createdAt: Date;
   updatedAt: Date;
   clients?: (Client & { lastSubmission?: ClientLastSubmission | null })[];
+  assignedTrips?: { id: string; title: string }[];
+}
+
+// ============= Trips =============
+
+export interface TripParticipantClient extends Client {
+  company?: { id: string; name: string };
+  totalAmountDue?: number | null;
+}
+
+export interface TripSeatAssignmentEntry {
+  id?: string;
+  clientId: string;
+  seatNumber?: number | null;
+  seatId?: string | null;
+  client?: Client & { company?: { id: string; name: string } };
+}
+
+export type BusBathroomPosition = 'front' | 'middle' | 'back';
+
+export type BusLayoutElementType = 'seat' | 'bathroom' | 'stairs' | 'door' | 'driver';
+
+export interface BusLayoutElement {
+  id: string;
+  type: BusLayoutElementType;
+  x: number;
+  y: number;
+  label?: string;
+  width?: number;
+  height?: number;
+}
+
+export interface BusLayoutFloor {
+  elements: BusLayoutElement[];
+}
+
+export interface BusLayout {
+  floors: BusLayoutFloor[];
+}
+
+export interface BusTemplate {
+  id: string;
+  companyId: string;
+  name: string;
+  totalSeats: number;
+  rows: number;
+  bathroomPosition: BusBathroomPosition;
+  floors: number;
+  stairsPosition?: string | null;
+  seatLabels?: string[] | null;
+  layout?: BusLayout | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface Trip {
+  id: string;
+  title: string;
+  destination?: string | null;
+  departureDate: string;
+  returnDate: string;
+  notes?: string | null;
+  totalSeats: number;
+  companyId?: string;
+  busTemplateId?: string | null;
+  busTemplate?: BusTemplate | null;
+  assignedUserId?: string | null;
+  sharedCompanies?: { id: string; name: string }[];
+  participants?: { id: string; clientId: string; client?: TripParticipantClient }[];
+  seatAssignments?: TripSeatAssignmentEntry[];
+  participantCount?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface TripInvitation {
+  id: string;
+  tripId: string;
+  trip?: { id: string; title: string; destination?: string; departureDate: string; returnDate: string; totalSeats: number };
+  invitedCompanyId: string;
+  invitedBy?: { id: string; name: string; email?: string };
+  status: 'pending' | 'accepted' | 'rejected';
+  createdAt: string;
+}
+
+export interface TripChangeLogEntry {
+  id: string;
+  tripId: string;
+  userId: string;
+  user?: { id: string; name: string };
+  action: string;
+  entityType?: string | null;
+  entityId?: string | null;
+  fieldName?: string | null;
+  oldValue?: string | null;
+  newValue?: string | null;
+  createdAt: string;
 }

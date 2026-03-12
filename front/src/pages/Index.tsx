@@ -1,15 +1,18 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useFormStore } from '@/hooks/useFormStore';
 import { useSubmissionStore } from '@/hooks/useSubmissionStore';
 import { useClientStore } from '@/hooks/useClientStore';
 import { useGroupStore } from '@/hooks/useGroupStore';
 import { useProductStore } from '@/hooks/useProductStore';
+import { useTripStore } from '@/hooks/useTripStore';
+import { useBusTemplateStore } from '@/hooks/useBusTemplateStore';
 import { useUserStore } from '@/hooks/useUserStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { FormList } from '@/components/forms/FormList';
 import { FormEditor } from '@/components/forms/FormEditor';
 import { ClientList } from '@/components/clients/ClientList';
 import { GroupList } from '@/components/groups/GroupList';
+import { TripList } from '@/components/trips/TripList';
 import { UserList } from '@/components/users/UserList';
 import { ChatbotSettings } from '@/components/chatbot/ChatbotSettings';
 import { SettingsPage } from '@/components/settings/SettingsPage';
@@ -27,11 +30,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-
-import { LayoutDashboard, FileText, Users, UsersRound, UserCog, Bot, Settings, Receipt, ChevronDown, ShoppingBag } from 'lucide-react';
+import { LayoutDashboard, FileText, Users, UsersRound, UserCog, Bot, Settings, Receipt, ChevronDown, ShoppingBag, MapPin } from 'lucide-react';
 import { User } from '@/types/user';
 import { Client, ClientStatus } from '@/types/form';
 import { Product } from '@/types/product';
+import { api } from '@/lib/api';
 
 type View =
   | 'dashboard'
@@ -40,6 +43,7 @@ type View =
   | 'products'
   | 'paymentLogs'
   | 'groups'
+  | 'trips'
   | 'users'
   | 'chatbot'
   | 'settings';
@@ -88,10 +92,44 @@ const Index = () => {
   } = useGroupStore();
   const { products, isLoading: productsLoading, fetchProducts, createProduct, updateProduct, deleteProduct } =
     useProductStore();
+  const {
+    trips,
+    invitations,
+    changeLog,
+    fetchTrips,
+    fetchTrip,
+    fetchInvitations,
+    fetchChangeLog,
+    acceptInvitation,
+    rejectInvitation,
+    createTrip,
+    updateTrip,
+    deleteTrip,
+    addParticipants,
+    removeParticipant,
+    setSeatAssignment,
+    clearSeatAssignment,
+    resetSeatAssignments,
+  } = useTripStore();
+  const {
+    templates: busTemplates,
+    fetchTemplates: fetchBusTemplates,
+    createTemplate: createBusTemplateStore,
+    updateTemplate: updateBusTemplateStore,
+    deleteTemplate: deleteBusTemplateStore,
+  } = useBusTemplateStore();
+  const [companiesForTripShare, setCompaniesForTripShare] = useState<{ id: string; name: string }[]>([]);
   const { token, hasRole } = useAuth();
   const { users, fetchUsers } = useUserStore();
   const [productModalOpen, setProductModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+
+  const handleLoadTripChangeLog = useCallback(
+    (tripId: string) => {
+      if (token) fetchChangeLog(tripId, token);
+    },
+    [fetchChangeLog, token]
+  );
 
   // Load data when component mounts or when token changes
   useEffect(() => {
@@ -157,6 +195,27 @@ const Index = () => {
       });
     }
   }, [activeView, token]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Load trips, invitations, companies, groups and bus templates when switching to trips view (super_admin only)
+  useEffect(() => {
+    if (token && activeView === 'trips' && hasRole('super_admin')) {
+      fetchTrips(token).catch((error) => {
+        console.error('Failed to fetch trips:', error);
+      });
+      fetchInvitations(token).catch((error) => {
+        console.error('Failed to fetch invitations:', error);
+      });
+      fetchGroups(token).catch((error) => {
+        console.error('Failed to fetch groups:', error);
+      });
+      fetchBusTemplates(token).catch((error) => {
+        console.error('Failed to fetch bus templates:', error);
+      });
+      api.getCompaniesForTripShare(token).then((list) => {
+        setCompaniesForTripShare(Array.isArray(list) ? list : []);
+      }).catch(() => setCompaniesForTripShare([]));
+    }
+  }, [activeView, token, hasRole]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Wrapper functions to pass token automatically
   const createClient = async (clientData: Omit<Client, 'id' | 'createdAt' | 'updatedAt' | 'formsCompleted'>) => {
@@ -274,6 +333,17 @@ const Index = () => {
           </span>
         )}
       </Button>
+      {hasRole('super_admin') && (
+        <Button
+          variant={current === 'trips' ? 'default' : 'ghost'}
+          size="sm"
+          onClick={() => setActiveView('trips')}
+          className="gap-2"
+        >
+          <MapPin className="w-4 h-4" />
+          <span className="hidden sm:inline">Viajes</span>
+        </Button>
+      )}
       <RoleGuard allowedRoles={['super_admin']}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -479,6 +549,78 @@ const Index = () => {
             onCreate={async (data) => { await createGroup(data); }}
             onUpdate={async (id, data) => { await updateGroup(id, data); }}
             onDelete={deleteGroup}
+            onBack={() => setActiveView('dashboard')}
+          />
+        </div>
+      </>
+    );
+  }
+
+  // Vista de viajes (solo super_admin)
+  if (activeView === 'trips') {
+    if (!hasRole('super_admin')) {
+      return (
+        <div className="min-h-screen flex items-center justify-center">
+          <p className="text-muted-foreground">No tienes permisos para acceder a esta sección.</p>
+        </div>
+      );
+    }
+    return (
+      <>
+        <FloatingViewAs />
+        <div className={viewingAs ? 'pt-10' : ''}>
+          <TripList
+            trips={trips}
+            invitations={invitations}
+            availableClients={filteredClients}
+            availableGroups={groups}
+            companiesForInvite={companiesForTripShare}
+            onCreate={async (data) => {
+              await createTrip(token!, data);
+            }}
+            onUpdate={async (tripId, data) => {
+              await updateTrip(token!, tripId, {
+                title: data.title,
+                destination: data.destination,
+                departureDate: data.departureDate,
+                returnDate: data.returnDate,
+                notes: data.notes,
+                totalSeats: data.totalSeats,
+                busTemplateId: (data as { busTemplateId?: string | null }).busTemplateId,
+                invitedCompanyIds: (data as { invitedCompanyIds?: string[] }).invitedCompanyIds,
+              });
+              await fetchTrip(tripId, token!);
+            }}
+            onDelete={async (tripId) => { await deleteTrip(token!, tripId); }}
+            onAddParticipants={async (tripId, payload) => { await addParticipants(token!, tripId, payload); await fetchTrip(tripId, token!); }}
+            onRemoveParticipant={async (tripId, clientId) => { await removeParticipant(token!, tripId, clientId); await fetchTrip(tripId, token!); }}
+            onAcceptInvitation={async (invitationId) => { await acceptInvitation(token!, invitationId); await fetchTrips(token!); await fetchInvitations(token!); }}
+            onRejectInvitation={async (invitationId) => { await rejectInvitation(token!, invitationId); await fetchInvitations(token!); }}
+            onResetSeatAssignments={async (tripId) => { await resetSeatAssignments(token!, tripId); await fetchTrip(tripId, token!); }}
+            onSetSeatAssignment={async (tripId, clientId, seat) => { await setSeatAssignment(token!, tripId, clientId, seat); await fetchTrip(tripId, token!); }}
+            onClearSeatAssignment={async (tripId, opts) => { await clearSeatAssignment(token!, tripId, opts); await fetchTrip(tripId, token!); }}
+            onUpdateTemplateSeatLabel={async (tripId, templateId, seatId, label) => {
+              const t = busTemplates.find((x) => x.id === templateId);
+              if (!t?.layout?.floors) return;
+              const newLayout = JSON.parse(JSON.stringify(t.layout)) as typeof t.layout;
+              for (const floor of newLayout.floors ?? []) {
+                for (const el of floor.elements ?? []) {
+                  if (el.id === seatId) {
+                    el.label = label;
+                    break;
+                  }
+                }
+              }
+              await updateBusTemplateStore(token!, templateId, { layout: newLayout });
+              await fetchTrip(tripId, token!);
+            }}
+            onLoadChangeLog={handleLoadTripChangeLog}
+            onFetchTrip={(tripId) => { fetchTrip(tripId, token!); }}
+            busTemplates={busTemplates}
+            onCreateBusTemplate={async (data) => { await createBusTemplateStore(token!, data); }}
+            onUpdateBusTemplate={async (id, data) => { await updateBusTemplateStore(token!, id, data); }}
+            onDeleteBusTemplate={async (id) => { await deleteBusTemplateStore(token!, id); }}
+            changeLog={changeLog}
             onBack={() => setActiveView('dashboard')}
           />
         </div>

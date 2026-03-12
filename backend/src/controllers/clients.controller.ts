@@ -1,7 +1,7 @@
 import { Response } from 'express';
 import { body, validationResult } from 'express-validator';
 import { fn, col } from 'sequelize';
-import { Client, ClientChecklist, ChecklistTemplate, ClientAmountDueLog, ClientPaymentDeletedLog, ClientPayment, User } from '../models';
+import { Client, ClientChecklist, ChecklistTemplate, ClientAmountDueLog, ClientPaymentDeletedLog, ClientPayment, User, TripParticipant, Trip } from '../models';
 import { AuthRequest } from '../middleware/auth.middleware';
 
 export const getAllClients = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -57,8 +57,23 @@ export const getAllClients = async (req: AuthRequest, res: Response): Promise<vo
       order: [['order', 'ASC']],
     });
 
-    // Sum of payments per client (total pagado)
     const clientIds = clients.map(c => c.id);
+
+    // Trips each client is assigned to (for "En viaje(s)" badge)
+    const tripParticipations = await TripParticipant.findAll({
+      where: { clientId: clientIds },
+      include: [{ model: Trip, as: 'trip', attributes: ['id', 'title'] }],
+    });
+    const assignedTripsByClientId: Record<string, { id: string; title: string }[]> = {};
+    for (const tp of tripParticipations) {
+      const cid = tp.clientId;
+      const trip = (tp as any).trip;
+      if (!trip) continue;
+      if (!assignedTripsByClientId[cid]) assignedTripsByClientId[cid] = [];
+      assignedTripsByClientId[cid].push({ id: trip.id, title: trip.title });
+    }
+
+    // Sum of payments per client (total pagado)
     const paymentSums = await ClientPayment.findAll({
       where: { companyId, clientId: clientIds },
       attributes: ['clientId', [fn('SUM', col('amount')), 'totalPaid']],
@@ -109,6 +124,7 @@ export const getAllClients = async (req: AuthRequest, res: Response): Promise<vo
         checklistTotal: totalItems,
         checklistByTemplate,
         totalPaid,
+        assignedTrips: assignedTripsByClientId[client.id] || [],
       };
     });
 
@@ -158,7 +174,18 @@ export const getClientById = async (req: AuthRequest, res: Response): Promise<vo
       }
     }
 
-    res.json(client);
+    const participations = await TripParticipant.findAll({
+      where: { clientId: id },
+      include: [{ model: Trip, as: 'trip', attributes: ['id', 'title'] }],
+    });
+    const assignedTrips = participations
+      .map(p => (p as any).trip)
+      .filter(Boolean)
+      .map((t: any) => ({ id: t.id, title: t.title }));
+
+    const clientJson = client.toJSON();
+    (clientJson as any).assignedTrips = assignedTrips;
+    res.json(clientJson);
   } catch (error) {
     console.error('Get client by id error:', error);
     res.status(500).json({ error: 'Internal server error' });

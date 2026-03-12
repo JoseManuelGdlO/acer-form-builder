@@ -15,6 +15,7 @@ import {
   Mail,
   Phone,
   FileText,
+  MapPin,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -126,6 +127,12 @@ export const GroupDetailView = ({
             <p className="text-muted-foreground mt-1">
               {clients.length} cliente{clients.length === 1 ? '' : 's'} en el grupo
             </p>
+            {group.assignedTrips && group.assignedTrips.length > 0 && (
+              <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 shrink-0" />
+                En viaje(s): {group.assignedTrips.map(t => t.title).join(', ')}
+              </p>
+            )}
           </div>
           <Button onClick={() => setAddModalOpen(true)} className="gap-2">
             <UserPlus className="w-4 h-4" />

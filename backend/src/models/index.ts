@@ -15,6 +15,14 @@ import { ClientPaymentDeletedLog } from './ClientPaymentDeletedLog';
 import { ClientMessage } from './ClientMessage';
 import { ClientGroup } from './ClientGroup';
 import { ClientGroupMember } from './ClientGroupMember';
+import { BusTemplate } from './BusTemplate';
+import { Trip } from './Trip';
+import { TripCompany } from './TripCompany';
+import { TripInvitation } from './TripInvitation';
+import { TripParticipant } from './TripParticipant';
+import { TripGroup } from './TripGroup';
+import { TripSeatAssignment } from './TripSeatAssignment';
+import { TripChangeLog } from './TripChangeLog';
 import { FAQ } from './FAQ';
 import { BotBehavior } from './BotBehavior';
 import { Conversations } from './Conversation';
@@ -45,6 +53,8 @@ Company.hasMany(ClientPaymentDeletedLog, { foreignKey: 'companyId', as: 'clientP
 ClientPaymentDeletedLog.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
 Company.hasMany(ClientMessage, { foreignKey: 'companyId', as: 'clientMessages' });
 ClientMessage.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+Company.hasMany(BusTemplate, { foreignKey: 'companyId', as: 'busTemplates' });
+BusTemplate.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
 Company.hasMany(FAQ, { foreignKey: 'companyId', as: 'faqs' });
 FAQ.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
 Company.hasMany(BotBehavior, { foreignKey: 'companyId', as: 'botBehaviors' });
@@ -101,6 +111,46 @@ Client.belongsToMany(ClientGroup, { through: ClientGroupMember, foreignKey: 'cli
 ClientGroupMember.belongsTo(ClientGroup, { foreignKey: 'groupId', as: 'group' });
 ClientGroupMember.belongsTo(Client, { foreignKey: 'clientId', as: 'client' });
 
+// Trip relationships
+Company.hasMany(Trip, { foreignKey: 'companyId', as: 'trips' });
+Trip.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+User.hasMany(Trip, { foreignKey: 'assignedUserId', as: 'assignedTrips' });
+Trip.belongsTo(User, { foreignKey: 'assignedUserId', as: 'assignedUser' });
+
+Trip.belongsTo(BusTemplate, { foreignKey: 'busTemplateId', as: 'busTemplate' });
+BusTemplate.hasMany(Trip, { foreignKey: 'busTemplateId', as: 'trips' });
+Trip.hasMany(TripCompany, { foreignKey: 'tripId', as: 'tripCompanies' });
+TripCompany.belongsTo(Trip, { foreignKey: 'tripId', as: 'trip' });
+TripCompany.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+Company.hasMany(TripCompany, { foreignKey: 'companyId', as: 'tripCompanies' });
+
+Trip.hasMany(TripInvitation, { foreignKey: 'tripId', as: 'invitations' });
+TripInvitation.belongsTo(Trip, { foreignKey: 'tripId', as: 'trip' });
+TripInvitation.belongsTo(Company, { foreignKey: 'invitedCompanyId', as: 'invitedCompany' });
+TripInvitation.belongsTo(User, { foreignKey: 'invitedBy', as: 'invitedByUser' });
+TripInvitation.belongsTo(User, { foreignKey: 'respondedBy', as: 'respondedByUser' });
+User.hasMany(TripInvitation, { foreignKey: 'invitedBy', as: 'sentTripInvitations' });
+
+Trip.hasMany(TripParticipant, { foreignKey: 'tripId', as: 'participants' });
+TripParticipant.belongsTo(Trip, { foreignKey: 'tripId', as: 'trip' });
+TripParticipant.belongsTo(Client, { foreignKey: 'clientId', as: 'client' });
+Client.hasMany(TripParticipant, { foreignKey: 'clientId', as: 'tripParticipants' });
+
+Trip.hasMany(TripGroup, { foreignKey: 'tripId', as: 'tripGroups' });
+TripGroup.belongsTo(Trip, { foreignKey: 'tripId', as: 'trip' });
+TripGroup.belongsTo(ClientGroup, { foreignKey: 'groupId', as: 'group' });
+ClientGroup.hasMany(TripGroup, { foreignKey: 'groupId', as: 'tripGroups' });
+
+Trip.hasMany(TripSeatAssignment, { foreignKey: 'tripId', as: 'seatAssignments' });
+TripSeatAssignment.belongsTo(Trip, { foreignKey: 'tripId', as: 'trip' });
+TripSeatAssignment.belongsTo(Client, { foreignKey: 'clientId', as: 'client' });
+Client.hasMany(TripSeatAssignment, { foreignKey: 'clientId', as: 'tripSeatAssignments' });
+
+Trip.hasMany(TripChangeLog, { foreignKey: 'tripId', as: 'changeLog' });
+TripChangeLog.belongsTo(Trip, { foreignKey: 'tripId', as: 'trip' });
+TripChangeLog.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+User.hasMany(TripChangeLog, { foreignKey: 'userId', as: 'tripChangeLogs' });
+
 // Form relationships
 Form.hasMany(FormSession, { foreignKey: 'formId', as: 'sessions' });
 FormSession.belongsTo(Form, { foreignKey: 'formId', as: 'form' });
@@ -122,6 +172,14 @@ export {
   Client,
   ClientGroup,
   ClientGroupMember,
+  BusTemplate,
+  Trip,
+  TripCompany,
+  TripInvitation,
+  TripParticipant,
+  TripGroup,
+  TripSeatAssignment,
+  TripChangeLog,
   Form,
   FormSession,
   FormSubmission,

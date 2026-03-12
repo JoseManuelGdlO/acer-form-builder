@@ -7,7 +7,7 @@ import {
 } from '@/components/ui/dialog';
 import { ClientStatusBadge } from './ClientStatusBadge';
 import { Separator } from '@/components/ui/separator';
-import { User, Mail, Phone, MapPin, FileText, Calendar, Clock } from 'lucide-react';
+import { User, Mail, Phone, MapPin, FileText, Calendar, Clock, Bus } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -74,6 +74,17 @@ export const ClientDetailModal = ({
               </div>
             </div>
           ))}
+          {client.assignedTrips && client.assignedTrips.length > 0 && (
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-lg bg-muted/50 flex items-center justify-center flex-shrink-0">
+                <Bus className="w-5 h-5 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">En viaje(s)</p>
+                <p className="font-medium text-foreground">{client.assignedTrips.map(t => t.title).join(', ')}</p>
+              </div>
+            </div>
+          )}
         </div>
 
         {client.notes && (

@@ -7,7 +7,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Users, MoreHorizontal, Eye, Pencil, Trash2 } from 'lucide-react';
+import { Users, MoreHorizontal, Eye, Pencil, Trash2, MapPin } from 'lucide-react';
 
 interface GroupCardProps {
   group: Group;
@@ -36,6 +36,12 @@ export const GroupCard = ({ group, onView, onEdit, onDelete }: GroupCardProps) =
                 <p className="text-sm text-muted-foreground">
                   {clientCount} cliente{clientCount === 1 ? '' : 's'}
                 </p>
+                {group.assignedTrips && group.assignedTrips.length > 0 && (
+                  <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                    <MapPin className="w-3 h-3 shrink-0" />
+                    En viaje(s): {group.assignedTrips.map(t => t.title).join(', ')}
+                  </p>
+                )}
               </div>
             </div>
           </div>

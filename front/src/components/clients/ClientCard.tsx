@@ -17,7 +17,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Eye, Trash2, User, Mail, Phone, FileText, Edit2, DollarSign, UserCircle } from 'lucide-react';
+import { MoreHorizontal, Eye, Trash2, User, Mail, Phone, FileText, Edit2, DollarSign, UserCircle, MapPin } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -121,6 +121,13 @@ export const ClientCard = ({
                 Pagado: <span className="font-medium text-foreground">{(client.totalPaid ?? 0).toFixed(2)}</span>
               </span>
             </div>
+
+            {client.assignedTrips && client.assignedTrips.length > 0 && (
+              <div className="flex items-center gap-1.5 text-sm text-muted-foreground flex-wrap">
+                <MapPin className="w-3.5 h-3.5 shrink-0" />
+                <span>En viaje(s): {client.assignedTrips.map(t => t.title).join(', ')}</span>
+              </div>
+            )}
 
             {client.notes && (
               <p className="text-sm text-muted-foreground italic bg-muted/30 px-3 py-2 rounded-lg">

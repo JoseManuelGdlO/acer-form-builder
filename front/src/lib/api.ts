@@ -1,5 +1,38 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+function getApiBaseURL(): string {
+  const configured = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+  if (typeof window === 'undefined') return configured;
+  try {
+    const apiUrl = new URL(configured);
+    const apiIsLocalhost = apiUrl.hostname === 'localhost' || apiUrl.hostname === '127.0.0.1';
+    const pageIsLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    if (apiIsLocalhost && !pageIsLocalhost) {
+      return `${window.location.protocol}//${window.location.hostname}:${apiUrl.port}${apiUrl.pathname}`;
+    }
+  } catch {
+    // ignore
+  }
+  return configured;
+}
+
+const API_URL = getApiBaseURL();
 const TOKEN_KEY = 'auth_token';
+
+/** Map trip response so seat_assignments have seatId (camelCase) from backend seat_id */
+function mapTripSeatAssignmentsToCamel(obj: any): any {
+  if (!obj) return obj;
+  const list = obj.seatAssignments ?? obj.seat_assignments;
+  if (Array.isArray(list)) {
+    const out = { ...obj };
+    out.seatAssignments = list.map((a: any) => ({
+      ...a,
+      seatId: a.seatId ?? a.seat_id ?? null,
+      seatNumber: a.seatNumber ?? a.seat_number ?? null,
+    }));
+    delete (out as any).seat_assignments;
+    return out;
+  }
+  return obj;
+}
 
 interface RequestOptions extends RequestInit {
   token?: string | null;
@@ -259,6 +292,247 @@ class ApiClient {
 
   async deleteGroup(id: string, token?: string | null) {
     return this.request<{ message: string }>(`/groups/${id}`, {
+      method: 'DELETE',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  // Companies (for trip invite dropdown)
+  async getCompaniesForTripShare(token?: string | null) {
+    return this.request<{ id: string; name: string }[]>('/companies/for-trip-share', {
+      method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  // Trips
+  async getTrips(token?: string | null) {
+    return this.request<any[]>('/trips', {
+      method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async getTrip(id: string, token?: string | null) {
+    const res = await this.request<any>(`/trips/${id}`, {
+      method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+    return mapTripSeatAssignmentsToCamel(res);
+  }
+
+  async getTripInvitations(token?: string | null) {
+    return this.request<any[]>('/trips/invitations', {
+      method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async acceptTripInvitation(invitationId: string, token?: string | null) {
+    return this.request<{ message: string }>(`/trips/invitations/${invitationId}/accept`, {
+      method: 'POST',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async rejectTripInvitation(invitationId: string, token?: string | null) {
+    return this.request<{ message: string }>(`/trips/invitations/${invitationId}/reject`, {
+      method: 'POST',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async getTripChangeLog(tripId: string, token?: string | null) {
+    return this.request<any[]>(`/trips/${tripId}/change-log`, {
+      method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async getBusTemplates(token?: string | null) {
+    return this.request<any[]>('/bus-templates', {
+      method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async getBusTemplate(id: string, token?: string | null) {
+    return this.request<any>(`/bus-templates/${id}`, {
+      method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async createBusTemplate(
+    data: {
+      name: string;
+      totalSeats?: number;
+      rows?: number;
+      bathroomPosition?: 'front' | 'middle' | 'back';
+      floors?: number;
+      stairsPosition?: string | null;
+      seatLabels?: string[] | null;
+      layout?: import('@/types/form').BusLayout | null;
+    },
+    token?: string | null
+  ) {
+    return this.request<any>('/bus-templates', {
+      method: 'POST',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateBusTemplate(
+    id: string,
+    data: {
+      name?: string;
+      totalSeats?: number;
+      rows?: number;
+      bathroomPosition?: 'front' | 'middle' | 'back';
+      floors?: number;
+      stairsPosition?: string | null;
+      seatLabels?: string[] | null;
+      layout?: import('@/types/form').BusLayout | null;
+    },
+    token?: string | null
+  ) {
+    return this.request<any>(`/bus-templates/${id}`, {
+      method: 'PUT',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteBusTemplate(id: string, token?: string | null) {
+    return this.request<void>(`/bus-templates/${id}`, {
+      method: 'DELETE',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async createTrip(data: {
+    title: string;
+    departureDate: string;
+    returnDate: string;
+    totalSeats: number;
+    destination?: string;
+    notes?: string;
+    busTemplateId?: string | null;
+    invitedCompanyIds?: string[];
+  }, token?: string | null) {
+    return this.request<any>('/trips', {
+      method: 'POST',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateTrip(
+    id: string,
+    data: {
+      title?: string;
+      departureDate?: string;
+      returnDate?: string;
+      totalSeats?: number;
+      destination?: string;
+      notes?: string;
+      busTemplateId?: string | null;
+      invitedCompanyIds?: string[];
+    },
+    token?: string | null
+  ) {
+    return this.request<any>(`/trips/${id}`, {
+      method: 'PUT',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteTrip(id: string, token?: string | null) {
+    return this.request<{ message: string }>(`/trips/${id}`, {
+      method: 'DELETE',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async addTripParticipants(
+    tripId: string,
+    data: { clientIds?: string[]; groupIds?: string[] },
+    token?: string | null
+  ) {
+    return this.request<any>(`/trips/${tripId}/participants`, {
+      method: 'POST',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+      body: JSON.stringify(data),
+    });
+  }
+
+  async removeTripParticipant(tripId: string, clientId: string, token?: string | null) {
+    return this.request<{ message: string }>(`/trips/${tripId}/participants/${clientId}`, {
+      method: 'DELETE',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async setTripSeatAssignment(
+    tripId: string,
+    data: { clientId: string; seatNumber?: number; seatId?: string },
+    token?: string | null
+  ) {
+    const res = await this.request<any>(`/trips/${tripId}/seat-assignments`, {
+      method: 'POST',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+      body: JSON.stringify(data),
+    });
+    return mapTripSeatAssignmentsToCamel(res);
+  }
+
+  async resetTripSeatAssignments(tripId: string, token?: string | null) {
+    return this.request<{ message: string }>(`/trips/${tripId}/seat-assignments`, {
+      method: 'DELETE',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async clearTripSeatAssignment(
+    tripId: string,
+    optsOrClientId: { clientId?: string; seatId?: string } | string,
+    token?: string | null
+  ) {
+    const opts = typeof optsOrClientId === 'string' ? { clientId: optsOrClientId } : optsOrClientId;
+    if (opts.seatId) {
+      return this.request<{ message: string }>(
+        `/trips/${tripId}/seat-assignments/by-seat?seatId=${encodeURIComponent(opts.seatId)}`,
+        {
+          method: 'DELETE',
+          token: token ?? this.getToken(),
+          requireAuth: true,
+        }
+      );
+    }
+    if (!opts.clientId) throw new Error('clientId or seatId required');
+    return this.request<{ message: string }>(`/trips/${tripId}/seat-assignments/${opts.clientId}`, {
       method: 'DELETE',
       token: token ?? this.getToken(),
       requireAuth: true,
