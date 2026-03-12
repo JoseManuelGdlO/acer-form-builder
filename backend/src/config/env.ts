@@ -28,4 +28,6 @@ export const config = {
       ? process.env.CORS_ORIGIN.split(',').map(origin => origin.trim())
       : ['http://localhost:5173'],
   },
+  /** Ruta base para subida de archivos (logos, productos, etc.). Por defecto usa ./uploads desde el directorio de trabajo del proceso. */
+  uploadsDir: process.env.UPLOADS_DIR || 'uploads',
 };

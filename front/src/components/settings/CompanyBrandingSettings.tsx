@@ -12,8 +12,9 @@ import { Slider } from '@/components/ui/slider';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { applyTheme, hslStringToHex, hexToHslString } from '@/lib/theme';
+import { applyFavicon } from '@/lib/favicon';
 import { useTenant } from '@/contexts/TenantContext';
-import { Globe, Palette, Eye, ChevronDown, ChevronRight, RotateCcw } from 'lucide-react';
+import { Globe, Palette, Eye, ChevronDown, ChevronRight, RotateCcw, Image, Bookmark } from 'lucide-react';
 
 const DEFAULT_THEME: Record<string, string> = {
   primary: '234 66% 30%',
@@ -102,6 +103,8 @@ function numberToRadius(num: number): string {
 export function CompanyBrandingSettings() {
   const { loadTenant } = useTenant();
   const [domain, setDomain] = useState('');
+  const [logoUrl, setLogoUrl] = useState('');
+  const [faviconUrl, setFaviconUrl] = useState('');
   const [theme, setTheme] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -116,6 +119,8 @@ export function CompanyBrandingSettings() {
       .then((company) => {
         if (!cancelled) {
           setDomain(company.domain ?? '');
+          setLogoUrl(company.logoUrl ?? '');
+          setFaviconUrl(company.faviconUrl ?? '');
           setTheme((company.theme && typeof company.theme === 'object') ? { ...company.theme } : {});
         }
       })
@@ -133,9 +138,12 @@ export function CompanyBrandingSettings() {
     try {
       const res = await api.updateMyCompany({
         domain: domain.trim() || null,
+        logoUrl: logoUrl.trim() || null,
+        faviconUrl: faviconUrl.trim() || null,
         theme: Object.keys(theme).length ? theme : null,
       });
       applyTheme(res.theme ?? null);
+      applyFavicon(res.faviconUrl ?? res.logoUrl ?? null);
       const hostname = window.location.hostname;
       const domainToUse = hostname === 'localhost' || hostname === '127.0.0.1' ? 'saru' : hostname;
       await loadTenant(domainToUse);
@@ -190,6 +198,44 @@ export function CompanyBrandingSettings() {
             value={domain}
             onChange={(e) => setDomain(e.target.value)}
           />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Image className="w-5 h-5 text-primary" />
+            <CardTitle>Logotipo y favicon</CardTitle>
+          </div>
+          <CardDescription>
+            URLs del logotipo (cabecera, login) y del favicon (pestaña del navegador). Pueden ser absolutas (https://...) o relativas (/uploads/...).
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="company-logo-url" className="flex items-center gap-2 text-sm font-medium">
+              <Image className="w-4 h-4" />
+              Logotipo (URL)
+            </Label>
+            <Input
+              id="company-logo-url"
+              placeholder="https://... o /uploads/logo.png"
+              value={logoUrl}
+              onChange={(e) => setLogoUrl(e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="company-favicon-url" className="flex items-center gap-2 text-sm font-medium">
+              <Bookmark className="w-4 h-4" />
+              Favicon (URL)
+            </Label>
+            <Input
+              id="company-favicon-url"
+              placeholder="https://... o /uploads/favicon.ico"
+              value={faviconUrl}
+              onChange={(e) => setFaviconUrl(e.target.value)}
+            />
+          </div>
         </CardContent>
       </Card>
 

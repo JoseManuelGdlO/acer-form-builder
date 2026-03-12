@@ -8,19 +8,21 @@ interface CompanyAttributes {
   name: string;
   slug: string;
   logoUrl?: string | null;
+  faviconUrl?: string | null;
   domain?: string | null;
   theme?: CompanyTheme | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
 
-interface CompanyCreationAttributes extends Optional<CompanyAttributes, 'id' | 'logoUrl' | 'domain' | 'theme' | 'createdAt' | 'updatedAt'> {}
+interface CompanyCreationAttributes extends Optional<CompanyAttributes, 'id' | 'logoUrl' | 'faviconUrl' | 'domain' | 'theme' | 'createdAt' | 'updatedAt'> {}
 
 export class Company extends Model<CompanyAttributes, CompanyCreationAttributes> implements CompanyAttributes {
   public id!: string;
   public name!: string;
   public slug!: string;
   public logoUrl!: string | null;
+  public faviconUrl!: string | null;
   public domain!: string | null;
   public theme!: CompanyTheme | null;
   public readonly createdAt!: Date;
@@ -44,6 +46,10 @@ Company.init(
       unique: true,
     },
     logoUrl: {
+      type: DataTypes.STRING(500),
+      allowNull: true,
+    },
+    faviconUrl: {
       type: DataTypes.STRING(500),
       allowNull: true,
     },

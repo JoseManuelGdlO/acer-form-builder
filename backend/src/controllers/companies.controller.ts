@@ -57,7 +57,7 @@ export const getMyCompany = async (req: AuthRequest, res: Response): Promise<voi
     }
 
     const company = await Company.findByPk(companyId, {
-      attributes: ['id', 'name', 'slug', 'logoUrl', 'domain', 'theme'],
+      attributes: ['id', 'name', 'slug', 'logoUrl', 'faviconUrl', 'domain', 'theme'],
     });
 
     if (!company) {
@@ -70,6 +70,7 @@ export const getMyCompany = async (req: AuthRequest, res: Response): Promise<voi
       name: company.name,
       slug: company.slug,
       logoUrl: company.logoUrl,
+      faviconUrl: (company as any).faviconUrl ?? null,
       domain: (company as any).domain ?? null,
       theme: (company as any).theme ?? null,
     });
@@ -81,6 +82,8 @@ export const getMyCompany = async (req: AuthRequest, res: Response): Promise<voi
 
 export const updateMyCompany = [
   body('domain').optional().isString().trim(),
+  body('logoUrl').optional().isString().trim(),
+  body('faviconUrl').optional().isString().trim(),
   body('theme').optional().isObject(),
   async (req: AuthRequest, res: Response): Promise<void> => {
     try {
@@ -102,8 +105,13 @@ export const updateMyCompany = [
         return;
       }
 
-      const { domain, theme } = req.body;
-      const updates: { domain?: string | null; theme?: Record<string, string> | null } = {};
+      const { domain, logoUrl, faviconUrl, theme } = req.body;
+      const updates: {
+        domain?: string | null;
+        logoUrl?: string | null;
+        faviconUrl?: string | null;
+        theme?: Record<string, string> | null;
+      } = {};
 
       if (domain !== undefined) {
         const parts = parseDomainList(domain);
@@ -132,6 +140,14 @@ export const updateMyCompany = [
         }
       }
 
+      if (logoUrl !== undefined) {
+        updates.logoUrl = typeof logoUrl === 'string' && logoUrl.trim() !== '' ? logoUrl.trim() : null;
+      }
+
+      if (faviconUrl !== undefined) {
+        updates.faviconUrl = typeof faviconUrl === 'string' && faviconUrl.trim() !== '' ? faviconUrl.trim() : null;
+      }
+
       if (theme !== undefined) {
         updates.theme = theme && typeof theme === 'object' ? theme : null;
       }
@@ -141,7 +157,7 @@ export const updateMyCompany = [
       }
 
       const updated = await Company.findByPk(companyId, {
-        attributes: ['id', 'name', 'slug', 'logoUrl', 'domain', 'theme'],
+        attributes: ['id', 'name', 'slug', 'logoUrl', 'faviconUrl', 'domain', 'theme'],
       });
 
       res.json({
@@ -149,6 +165,7 @@ export const updateMyCompany = [
         name: updated!.name,
         slug: updated!.slug,
         logoUrl: (updated as any).logoUrl,
+        faviconUrl: (updated as any).faviconUrl ?? null,
         domain: (updated as any).domain ?? null,
         theme: (updated as any).theme ?? null,
       });

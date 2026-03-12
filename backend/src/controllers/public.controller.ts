@@ -35,14 +35,14 @@ export const getTenantByDomain = async (req: Request, res: Response): Promise<vo
     // Primero intentamos por slug directo
     let company = await Company.findOne({
       where: { slug: hostname },
-      attributes: ['id', 'name', 'slug', 'logoUrl', 'domain', 'theme'],
+      attributes: ['id', 'name', 'slug', 'logoUrl', 'faviconUrl', 'domain', 'theme'],
     });
 
     if (!company) {
       // Luego buscamos por dominio (puede ser uno o varios separados por coma)
       const withDomain = await Company.findAll({
         where: { domain: { [Op.ne]: null } },
-        attributes: ['id', 'name', 'slug', 'logoUrl', 'domain', 'theme'],
+        attributes: ['id', 'name', 'slug', 'logoUrl', 'faviconUrl', 'domain', 'theme'],
       });
 
       company =
@@ -62,9 +62,21 @@ export const getTenantByDomain = async (req: Request, res: Response): Promise<vo
       return;
     }
 
-    const theme = (company as any).theme && typeof (company as any).theme === 'object'
-      ? (company as any).theme
-      : null;
+    // Normalizar theme: MySQL/Sequelize a veces devuelve JSON como string
+    const rawTheme = (company as any).theme ?? (company as any).dataValues?.theme;
+    let theme: Record<string, string> | null = null;
+    if (rawTheme != null) {
+      if (typeof rawTheme === 'object' && !Array.isArray(rawTheme)) {
+        theme = rawTheme as Record<string, string>;
+      } else if (typeof rawTheme === 'string') {
+        try {
+          const parsed = JSON.parse(rawTheme) as unknown;
+          theme = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? (parsed as Record<string, string>) : null;
+        } catch {
+          theme = null;
+        }
+      }
+    }
 
     res.json({
       company: {
@@ -72,6 +84,7 @@ export const getTenantByDomain = async (req: Request, res: Response): Promise<vo
         name: company.name,
         slug: company.slug,
         logoUrl: company.logoUrl,
+        faviconUrl: (company as any).faviconUrl ?? null,
       },
       theme,
     });

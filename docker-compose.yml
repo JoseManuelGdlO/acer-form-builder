@@ -8,6 +8,9 @@ services:
     container_name: form-builder-backend
     ports:
       - "${BACKEND_PORT:-3001}:3000"
+    volumes:
+      # Imágenes de productos (y futuras subidas) en el servidor, no en la imagen Docker
+      - ./uploads:/app/uploads
     environment:
       - NODE_ENV=${NODE_ENV:-production}
       - PORT=${PORT:-3000}

@@ -1,12 +1,14 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { api } from '@/lib/api';
 import { applyTheme } from '@/lib/theme';
+import { applyFavicon } from '@/lib/favicon';
 
 export interface TenantCompany {
   id: string;
   name: string;
   slug: string;
   logoUrl: string | null;
+  faviconUrl: string | null;
 }
 
 export interface TenantData {
@@ -34,6 +36,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     if (!domain) {
       setTenantError('not_found');
       setTenant(null);
+      applyFavicon(null);
       setIsLoading(false);
       return;
     }
@@ -46,18 +49,16 @@ export function TenantProvider({ children }: { children: ReactNode }) {
         theme: data.theme ?? null,
       });
       applyTheme(data.theme ?? null);
+      const faviconUrl = data.company.faviconUrl ?? data.company.logoUrl ?? null;
+      applyFavicon(faviconUrl);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '';
       const is404 = (err as { status?: number; response?: { status?: number } })?.response?.status === 404
         || (err as { status?: number })?.status === 404
         || message.includes('404');
-      if (is404) {
-        setTenantError('not_found');
-        setTenant(null);
-      } else {
-        setTenantError('not_found');
-        setTenant(null);
-      }
+      setTenantError('not_found');
+      setTenant(null);
+      applyFavicon(null);
     } finally {
       setIsLoading(false);
     }

@@ -2,12 +2,16 @@ import { Router } from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import { config } from '../config/env';
 import * as productsController from '../controllers/products.controller';
 import { authenticate } from '../middleware/auth.middleware';
 
 const router = Router();
 
-const uploadsRoot = path.join(__dirname, '..', '..', 'uploads', 'products');
+const uploadsBase = path.isAbsolute(config.uploadsDir)
+  ? config.uploadsDir
+  : path.join(process.cwd(), config.uploadsDir);
+const uploadsRoot = path.join(uploadsBase, 'products');
 if (!fs.existsSync(uploadsRoot)) {
   fs.mkdirSync(uploadsRoot, { recursive: true });
 }

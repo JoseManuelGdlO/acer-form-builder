@@ -16,7 +16,10 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-const uploadsPath = path.join(__dirname, '..', 'uploads');
+// Servir archivos subidos (productos, etc.) desde la carpeta configurada
+const uploadsPath = path.isAbsolute(config.uploadsDir)
+  ? config.uploadsDir
+  : path.join(process.cwd(), config.uploadsDir);
 app.use('/uploads', express.static(uploadsPath));
 
 // Health check
