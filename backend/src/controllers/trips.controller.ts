@@ -11,7 +11,6 @@ import {
   TripChangeLog,
   BusTemplate,
   Client,
-  ClientGroup,
   ClientGroupMember,
   Company,
   User,
@@ -37,7 +36,7 @@ async function logTripChange(
   tripId: string,
   userId: string,
   action: string,
-  opts?: { entityType?: string; entityId?: string; fieldName?: string; oldValue?: string; newValue?: string }
+  opts?: { entityType?: string; entityId?: string; fieldName?: string; oldValue?: string | null; newValue?: string | null }
 ): Promise<void> {
   await TripChangeLog.create({
     tripId,
@@ -275,15 +274,7 @@ export const updateTrip = [
         res.status(404).json({ error: 'Trip not found' });
         return;
       }
-      const updates: Partial<{
-        title: string;
-        departureDate: string;
-        returnDate: string;
-        totalSeats: number;
-        destination: string | null;
-        notes: string | null;
-        busTemplateId: string | null;
-      }> = {};
+      const updates: Record<string, any> = {};
       const fields = ['title', 'departureDate', 'returnDate', 'totalSeats', 'destination', 'notes'] as const;
       for (const f of fields) {
         if (req.body[f] !== undefined) {
@@ -300,8 +291,8 @@ export const updateTrip = [
         }
       }
       if (req.body.totalSeats !== undefined) {
-        const maxSeat = await TripSeatAssignment.max('seat_number', { where: { tripId: id } });
-        if (maxSeat != null && Number(req.body.totalSeats) < maxSeat) {
+        const maxSeat = (await TripSeatAssignment.max('seatNumber', { where: { tripId: id } })) as number | null;
+        if (typeof maxSeat === 'number' && Number(req.body.totalSeats) < maxSeat) {
           res.status(400).json({ error: 'totalSeats no puede ser menor que el asiento máximo ya asignado. Reinicia las asignaciones primero.' });
           return;
         }
