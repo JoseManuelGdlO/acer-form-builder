@@ -13,6 +13,17 @@ function normalizeToHostname(domainOrUrl: string): string {
   return s;
 }
 
+/** Parse one or many domains (comma-separated string) into normalized hostnames. */
+function parseDomainList(value: unknown): string[] {
+  if (typeof value !== 'string') {
+    return [];
+  }
+  return value
+    .split(',')
+    .map(part => normalizeToHostname(part))
+    .filter(Boolean);
+}
+
 /** List companies for trip invite dropdown (super_admin only). Returns all companies except current user's. */
 export const getCompaniesForTripShare = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -95,23 +106,29 @@ export const updateMyCompany = [
       const updates: { domain?: string | null; theme?: Record<string, string> | null } = {};
 
       if (domain !== undefined) {
-        const trimmed = typeof domain === 'string' ? domain.trim() : '';
-        if (trimmed === '') {
+        const parts = parseDomainList(domain);
+        if (parts.length === 0) {
           updates.domain = null;
         } else {
-          const hostname = normalizeToHostname(trimmed);
           const withDomain = await Company.findAll({
             where: { domain: { [Op.ne]: null } },
             attributes: ['id', 'domain'],
           });
-          const existing = withDomain.find(
-            c => normalizeToHostname((c as any).domain || '') === hostname && c.id !== companyId
-          );
-          if (existing) {
-            res.status(400).json({ error: 'Este dominio ya está en uso por otra empresa' });
+
+          // Evitar que cualquier hostname se repita en otra empresa
+          const conflict = withDomain.find(c => {
+            if (c.id === companyId) return false;
+            const existingParts = parseDomainList((c as any).domain || '');
+            return existingParts.some(h => parts.includes(h));
+          });
+
+          if (conflict) {
+            res.status(400).json({ error: 'Alguno de estos dominios ya está en uso por otra empresa' });
             return;
           }
-          updates.domain = hostname;
+
+          // Guardamos como string separado por comas (backward compatible)
+          updates.domain = Array.from(new Set(parts)).join(',');
         }
       }
 

@@ -18,7 +18,8 @@ function normalizeToHostname(domainOrUrl: string): string {
  * Resolve tenant (company + theme) by domain.
  * GET /api/public/tenant?domain=empresa-a.com
  * Or domain can be read from Host header.
- * Stored domain can be hostname (e.g. 192.168.100.73) or full URL (e.g. http://192.168.100.73:8080/).
+ * Stored domain can be hostname (e.g. 192.168.100.73) or full URL (e.g. http://192.168.100.73:8080/),
+ * or a comma-separated list of hostnames/URLs.
  */
 export const getTenantByDomain = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -31,22 +32,28 @@ export const getTenantByDomain = async (req: Request, res: Response): Promise<vo
       return;
     }
 
+    // Primero intentamos por slug directo
     let company = await Company.findOne({
-      where: {
-        [Op.or]: [
-          { domain: hostname },
-          { slug: hostname },
-        ],
-      },
+      where: { slug: hostname },
       attributes: ['id', 'name', 'slug', 'logoUrl', 'domain', 'theme'],
     });
 
     if (!company) {
+      // Luego buscamos por dominio (puede ser uno o varios separados por coma)
       const withDomain = await Company.findAll({
         where: { domain: { [Op.ne]: null } },
         attributes: ['id', 'name', 'slug', 'logoUrl', 'domain', 'theme'],
       });
-      company = withDomain.find(c => normalizeToHostname((c as any).domain || '') === hostname) || null;
+
+      company =
+        withDomain.find(c => {
+          const raw = (c as any).domain || '';
+          const parts = String(raw)
+            .split(',')
+            .map(part => normalizeToHostname(part))
+            .filter(Boolean);
+          return parts.includes(hostname);
+        }) || null;
     }
 
     if (!company) {
