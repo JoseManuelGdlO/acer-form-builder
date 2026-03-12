@@ -49,8 +49,10 @@ export const getProductById = async (req: AuthRequest, res: Response): Promise<v
 
 export const createProduct = [
   body('title').notEmpty().withMessage('Title is required'),
-  body('description').notEmpty().withMessage('Description is required'),
-  body('requirements').notEmpty().withMessage('Requirements are required'),
+  body('includes').notEmpty().withMessage('Includes is required'),
+  body('price').notEmpty().withMessage('Price is required').bail().isInt({ gt: 0 }).withMessage('Price must be a positive integer'),
+  body('description').optional(),
+  body('requirements').optional(),
   async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       const errors = validationResult(req);
@@ -65,7 +67,7 @@ export const createProduct = [
         return;
       }
 
-      const { title, description, requirements } = req.body;
+      const { title, includes, price, description, requirements } = req.body;
 
       let imagePath: string | undefined;
       const file = (req as any).file as Express.Multer.File | undefined;
@@ -79,8 +81,10 @@ export const createProduct = [
       const product = await Product.create({
         companyId,
         title,
-        description,
-        requirements,
+        includes,
+        price: parseInt(price, 10),
+        description: description ?? null,
+        requirements: requirements ?? null,
         imagePath: imagePath ?? null,
       });
 
@@ -94,8 +98,10 @@ export const createProduct = [
 
 export const updateProduct = [
   body('title').optional().notEmpty(),
-  body('description').optional().notEmpty(),
-  body('requirements').optional().notEmpty(),
+  body('includes').optional().notEmpty(),
+  body('price').optional().isInt({ gt: 0 }).withMessage('Price must be a positive integer'),
+  body('description').optional(),
+  body('requirements').optional(),
   async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       const errors = validationResult(req);
@@ -120,8 +126,10 @@ export const updateProduct = [
 
       const updates: Record<string, unknown> = {};
       if (req.body.title !== undefined) updates.title = req.body.title;
-      if (req.body.description !== undefined) updates.description = req.body.description;
-      if (req.body.requirements !== undefined) updates.requirements = req.body.requirements;
+      if (req.body.includes !== undefined) updates.includes = req.body.includes;
+      if (req.body.price !== undefined) updates.price = parseInt(req.body.price, 10);
+      if (req.body.description !== undefined) updates.description = req.body.description ?? null;
+      if (req.body.requirements !== undefined) updates.requirements = req.body.requirements ?? null;
 
       const file = (req as any).file as Express.Multer.File | undefined;
       if (file) {

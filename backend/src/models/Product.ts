@@ -5,8 +5,10 @@ interface ProductAttributes {
   id: string;
   companyId: string;
   title: string;
-  description: string;
-  requirements: string;
+  description: string | null;
+  requirements: string | null;
+  includes: string;
+  price: number;
   imagePath?: string | null;
   createdAt?: Date;
   updatedAt?: Date;
@@ -22,8 +24,10 @@ export class Product
   public id!: string;
   public companyId!: string;
   public title!: string;
-  public description!: string;
-  public requirements!: string;
+  public description!: string | null;
+  public requirements!: string | null;
+  public includes!: string;
+  public price!: number;
   public imagePath?: string | null;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
@@ -51,10 +55,18 @@ Product.init(
     },
     description: {
       type: DataTypes.TEXT,
-      allowNull: false,
+      allowNull: true,
     },
     requirements: {
       type: DataTypes.TEXT,
+      allowNull: true,
+    },
+    includes: {
+      type: DataTypes.TEXT,
+      allowNull: false,
+    },
+    price: {
+      type: DataTypes.INTEGER,
       allowNull: false,
     },
     imagePath: {

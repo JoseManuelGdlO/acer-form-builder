@@ -9,8 +9,10 @@ export const useProductStore = () => {
   const mapProduct = (p: any): Product => ({
     id: p.id,
     title: p.title,
-    description: p.description,
-    requirements: p.requirements,
+    description: p.description ?? null,
+    requirements: p.requirements ?? null,
+    includes: p.includes,
+    price: Number(p.price),
     imagePath: p.image_path || p.imagePath || null,
     createdAt: new Date(p.created_at || p.createdAt || Date.now()),
     updatedAt: new Date(p.updated_at || p.updatedAt || Date.now()),
@@ -33,7 +35,14 @@ export const useProductStore = () => {
   const createProduct = useCallback(
     async (
       token: string,
-      data: { title: string; description: string; requirements: string; imageFile?: File | null }
+      data: {
+        title: string;
+        includes: string;
+        price: number;
+        description?: string;
+        requirements?: string;
+        imageFile?: File | null;
+      }
     ) => {
       const created = await api.createProduct(data, token);
       const product = mapProduct(created);
@@ -47,7 +56,14 @@ export const useProductStore = () => {
     async (
       token: string,
       id: string,
-      data: { title?: string; description?: string; requirements?: string; imageFile?: File | null }
+      data: {
+        title?: string;
+        includes?: string;
+        price?: number;
+        description?: string;
+        requirements?: string;
+        imageFile?: File | null;
+      }
     ) => {
       const updated = await api.updateProduct(id, data, token);
       const product = mapProduct(updated);

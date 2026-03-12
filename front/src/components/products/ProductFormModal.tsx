@@ -17,8 +17,10 @@ interface ProductFormModalProps {
   onClose: () => void;
   onSubmit: (data: {
     title: string;
-    description: string;
-    requirements: string;
+    includes: string;
+    price: number;
+    description?: string;
+    requirements?: string;
     imageFile?: File | null;
   }) => Promise<void>;
 }
@@ -32,6 +34,8 @@ export const ProductFormModal = ({
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [requirements, setRequirements] = useState('');
+  const [includes, setIncludes] = useState('');
+  const [price, setPrice] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -39,14 +43,18 @@ export const ProductFormModal = ({
   useEffect(() => {
     if (product) {
       setTitle(product.title);
-      setDescription(product.description);
-      setRequirements(product.requirements);
+      setDescription(product.description ?? '');
+      setRequirements(product.requirements ?? '');
+      setIncludes(product.includes);
+      setPrice(product.price != null ? String(product.price) : '');
       setImageFile(null);
       setPreviewUrl(null);
     } else {
       setTitle('');
       setDescription('');
       setRequirements('');
+      setIncludes('');
+      setPrice('');
       setImageFile(null);
       setPreviewUrl(null);
     }
@@ -65,15 +73,23 @@ export const ProductFormModal = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || !description.trim() || !requirements.trim()) {
+    const trimmedTitle = title.trim();
+    const trimmedIncludes = includes.trim();
+    const trimmedDescription = description.trim();
+    const trimmedRequirements = requirements.trim();
+    const priceValue = parseInt(price, 10);
+
+    if (!trimmedTitle || !trimmedIncludes || Number.isNaN(priceValue) || priceValue <= 0) {
       return;
     }
     setIsSubmitting(true);
     try {
       await onSubmit({
-        title: title.trim(),
-        description: description.trim(),
-        requirements: requirements.trim(),
+        title: trimmedTitle,
+        includes: trimmedIncludes,
+        price: priceValue,
+        description: trimmedDescription || undefined,
+        requirements: trimmedRequirements || undefined,
         imageFile,
       });
       onClose();
@@ -84,7 +100,7 @@ export const ProductFormModal = ({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && !isSubmitting && onClose()}>
-      <DialogContent>
+      <DialogContent className="max-h-[95vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{product ? 'Editar producto' : 'Crear producto'}</DialogTitle>
         </DialogHeader>
@@ -104,32 +120,57 @@ export const ProductFormModal = ({
           <div className="space-y-2">
             <label className="text-sm font-medium">
               Descripción
-              <span className="text-destructive ml-0.5">*</span>
             </label>
             <Textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Descripción general del servicio de visa..."
               rows={3}
-              required
             />
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium">
               Requerimientos
-              <span className="text-destructive ml-0.5">*</span>
             </label>
             <Textarea
               value={requirements}
               onChange={(e) => setRequirements(e.target.value)}
               placeholder="Lista de requisitos (puedes usar saltos de línea)..."
               rows={4}
-              required
             />
             <p className="text-xs text-muted-foreground">
               Puedes escribir los requisitos separados por saltos de línea para que tu cliente
               los vea claros.
             </p>
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">
+              Qué incluye
+              <span className="text-destructive ml-0.5">*</span>
+            </label>
+            <Textarea
+              value={includes}
+              onChange={(e) => setIncludes(e.target.value)}
+              placeholder="Detalle de lo que incluye este producto o servicio..."
+              rows={4}
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">
+              Precio
+              <span className="text-destructive ml-0.5">*</span>
+            </label>
+            <Input
+              type="number"
+              inputMode="numeric"
+              min={1}
+              step={1}
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+              placeholder="Ej. 1500"
+              required
+            />
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium">Imagen promocional</label>
