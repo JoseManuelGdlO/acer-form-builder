@@ -31,8 +31,10 @@ class ApiClient {
   ): Promise<T> {
     const { token, requireAuth = false, ...fetchOptions } = options;
 
+    const isFormData = fetchOptions.body instanceof FormData;
+
     const headers: HeadersInit = {
-      'Content-Type': 'application/json',
+      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
       ...fetchOptions.headers,
     };
 
@@ -621,6 +623,74 @@ class ApiClient {
       token: token ?? this.getToken(),
       requireAuth: true,
       body: JSON.stringify(botData),
+    });
+  }
+
+  // Products (visas)
+  async getProducts(token?: string | null) {
+    return this.request<any[]>('/products', {
+      method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async getProduct(id: string, token?: string | null) {
+    return this.request<any>(`/products/${id}`, {
+      method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async createProduct(
+    data: { title: string; description: string; requirements: string; imageFile?: File | null },
+    token?: string | null
+  ) {
+    const formData = new FormData();
+    formData.append('title', data.title);
+    formData.append('description', data.description);
+    formData.append('requirements', data.requirements);
+    if (data.imageFile) {
+      formData.append('image', data.imageFile);
+    }
+
+    return this.request<any>('/products', {
+      method: 'POST',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+      body: formData as unknown as BodyInit,
+      headers: {},
+    });
+  }
+
+  async updateProduct(
+    id: string,
+    data: { title?: string; description?: string; requirements?: string; imageFile?: File | null },
+    token?: string | null
+  ) {
+    const formData = new FormData();
+    if (data.title !== undefined) formData.append('title', data.title);
+    if (data.description !== undefined) formData.append('description', data.description);
+    if (data.requirements !== undefined) formData.append('requirements', data.requirements);
+    if (data.imageFile) {
+      formData.append('image', data.imageFile);
+    }
+
+    return this.request<any>(`/products/${id}`, {
+      method: 'PUT',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+      body: formData as unknown as BodyInit,
+      headers: {},
+    });
+  }
+
+  async deleteProduct(id: string, token?: string | null) {
+    return this.request<{ message: string }>(`/products/${id}`, {
+      method: 'DELETE',
+      token: token ?? this.getToken(),
+      requireAuth: true,
     });
   }
 }

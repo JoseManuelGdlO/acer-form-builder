@@ -14,6 +14,7 @@ import messagesRoutes from './messages.routes';
 import faqsRoutes from './faqs.routes';
 import botRoutes from './bot.routes';
 import conversacionesChatRoutes from './conversations.routes';
+import productsRoutes from './products.routes';
 
 const router = Router();
 
@@ -32,5 +33,6 @@ router.use('/messages', messagesRoutes);
 router.use('/faqs', faqsRoutes);
 router.use('/bot', botRoutes);
 router.use('/addChat', conversacionesChatRoutes);
+router.use('/products', productsRoutes);
 
 export default router;

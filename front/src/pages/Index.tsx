@@ -3,6 +3,7 @@ import { useFormStore } from '@/hooks/useFormStore';
 import { useSubmissionStore } from '@/hooks/useSubmissionStore';
 import { useClientStore } from '@/hooks/useClientStore';
 import { useGroupStore } from '@/hooks/useGroupStore';
+import { useProductStore } from '@/hooks/useProductStore';
 import { useUserStore } from '@/hooks/useUserStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { FormList } from '@/components/forms/FormList';
@@ -13,6 +14,8 @@ import { UserList } from '@/components/users/UserList';
 import { ChatbotSettings } from '@/components/chatbot/ChatbotSettings';
 import { SettingsPage } from '@/components/settings/SettingsPage';
 import { PaymentLogsPage } from '@/components/payments/PaymentLogsPage';
+import { ProductsList } from '@/components/products/ProductsList';
+import { ProductFormModal } from '@/components/products/ProductFormModal';
 import { Dashboard } from '@/components/dashboard/Dashboard';
 import { ViewAsSelector } from '@/components/admin/ViewAsSelector';
 import { AppHeader } from '@/components/layout/AppHeader';
@@ -25,11 +28,21 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
-import { LayoutDashboard, FileText, Users, UsersRound, UserCog, Bot, Settings, Receipt, ChevronDown } from 'lucide-react';
+import { LayoutDashboard, FileText, Users, UsersRound, UserCog, Bot, Settings, Receipt, ChevronDown, ShoppingBag } from 'lucide-react';
 import { User } from '@/types/user';
 import { Client, ClientStatus } from '@/types/form';
+import { Product } from '@/types/product';
 
-type View = 'dashboard' | 'forms' | 'clients' | 'paymentLogs' | 'groups' | 'users' | 'chatbot' | 'settings';
+type View =
+  | 'dashboard'
+  | 'forms'
+  | 'clients'
+  | 'products'
+  | 'paymentLogs'
+  | 'groups'
+  | 'users'
+  | 'chatbot'
+  | 'settings';
 
 const Index = () => {
   const [activeView, setActiveView] = useState<View>('dashboard');
@@ -73,8 +86,12 @@ const Index = () => {
     updateGroup: updateGroupStore,
     deleteGroup: deleteGroupStore,
   } = useGroupStore();
+  const { products, isLoading: productsLoading, fetchProducts, createProduct, updateProduct, deleteProduct } =
+    useProductStore();
   const { token, hasRole } = useAuth();
   const { users, fetchUsers } = useUserStore();
+  const [productModalOpen, setProductModalOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
   // Load data when component mounts or when token changes
   useEffect(() => {
@@ -99,6 +116,13 @@ const Index = () => {
           console.error('Failed to fetch clients:', error);
         });
       }
+
+      // Load products (visas)
+      if (products.length === 0) {
+        fetchProducts(token).catch((error) => {
+          console.error('Failed to fetch products:', error);
+        });
+      }
     }
   }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -113,6 +137,15 @@ const Index = () => {
           console.error('Failed to fetch users:', error);
         });
       }
+    }
+  }, [activeView, token]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Load products when switching to products view
+  useEffect(() => {
+    if (token && activeView === 'products') {
+      fetchProducts(token).catch((error) => {
+        console.error('Failed to fetch products:', error);
+      });
     }
   }, [activeView, token]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -217,6 +250,15 @@ const Index = () => {
             {filteredClients.length}
           </span>
         )}
+      </Button>
+      <Button
+        variant={current === 'products' ? 'default' : 'ghost'}
+        size="sm"
+        onClick={() => setActiveView('products')}
+        className="gap-1.5 shrink-0"
+      >
+        <ShoppingBag className="w-4 h-4 shrink-0" />
+        <span className="hidden sm:inline">Productos</span>
       </Button>
       <Button
         variant={current === 'groups' ? 'default' : 'ghost'}
@@ -336,6 +378,69 @@ const Index = () => {
             onBack={() => setActiveView('dashboard')}
             users={users}
             isAdmin={hasRole('super_admin')}
+          />
+        </div>
+      </>
+    );
+  }
+
+  // Vista de productos (visas)
+  if (activeView === 'products') {
+    const handleCreate = () => {
+      setEditingProduct(null);
+      setProductModalOpen(true);
+    };
+
+    const handleEdit = (product: Product) => {
+      setEditingProduct(product);
+      setProductModalOpen(true);
+    };
+
+    const handleDelete = async (product: Product) => {
+      if (!token) {
+        throw new Error('No token available');
+      }
+      const confirmed = window.confirm(
+        `¿Seguro que quieres eliminar el producto "${product.title}"?`
+      );
+      if (!confirmed) return;
+      await deleteProduct(token, product.id);
+    };
+
+    const handleSubmit = async (data: {
+      title: string;
+      description: string;
+      requirements: string;
+      imageFile?: File | null;
+    }) => {
+      if (!token) {
+        throw new Error('No token available');
+      }
+      if (editingProduct) {
+        await updateProduct(token, editingProduct.id, data);
+      } else {
+        await createProduct(token, data);
+      }
+    };
+
+    return (
+      <>
+        <FloatingViewAs />
+        <div className={viewingAs ? 'pt-10' : ''}>
+          <AppHeader>
+            <NavigationButtons current="products" />
+          </AppHeader>
+          <ProductsList
+            products={products}
+            onCreate={handleCreate}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+          />
+          <ProductFormModal
+            open={productModalOpen}
+            product={editingProduct}
+            onClose={() => setProductModalOpen(false)}
+            onSubmit={handleSubmit}
           />
         </div>
       </>
