@@ -9,6 +9,10 @@ export const generateToken = (payload: JwtPayload): string => {
   });
 };
 
+export const generatePermanentToken = (payload: JwtPayload): string => {
+  return jwt.sign(payload, config.jwt.secret);
+};
+
 export const verifyToken = (token: string): JwtPayload => {
   try {
     const decoded = jwt.verify(token, config.jwt.secret) as JwtPayload;

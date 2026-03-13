@@ -8,5 +8,6 @@ router.post('/login', authController.login);
 router.post('/register', authController.register);
 router.get('/me', authenticate, authController.me);
 router.post('/logout', authenticate, authController.logout);
+router.post('/permanent-token', authenticate, authController.getPermanentToken);
 
 export default router;
