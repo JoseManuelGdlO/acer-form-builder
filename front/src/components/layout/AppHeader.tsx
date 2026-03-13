@@ -54,7 +54,7 @@ export function AppHeader({ children }: AppHeaderProps) {
                       <span className="text-lg font-bold text-primary">{companyName}</span>
                     )}
                     <div>
-                      <h2 className="text-lg font-bold text-primary leading-none truncate">Administrador</h2>
+                      <h2 className="text-lg font-bold text-primary leading-none truncate">{companyName}</h2>
                     </div>
                   </SheetTitle>
                 </SheetHeader>
