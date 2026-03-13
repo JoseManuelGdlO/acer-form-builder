@@ -22,7 +22,6 @@ import { format, getYear, getMonth } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
-import saruLogo from '@/assets/saru-logo.png';
 import DatePicker, { registerLocale, ReactDatePickerCustomHeaderProps } from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import '@/styles/datepicker.css';
@@ -752,15 +751,17 @@ export default function PublicFormView() {
     }
   };
 
+  const companyDisplayName = formCompany?.name || 'Compañía';
+  const companyLogoUrl = formCompany?.logoUrl ?? null;
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
-        <div className="flex items-center gap-3 mb-6">
-          <img src={formCompany?.logoUrl || saruLogo} alt={formCompany?.name || 'Saru Visas'} className="h-10 w-auto" />
-          <div>
-            <h1 className="text-lg font-bold text-primary leading-none">SARU</h1>
-            <p className="text-xs text-muted-foreground">Visa y Pasaporte</p>
-          </div>
+        <div className="flex items-center justify-center gap-3 mb-6">
+          {companyLogoUrl ? (
+            <img src={companyLogoUrl} alt={companyDisplayName} className="h-10 w-auto" />
+          ) : null}
+          <h1 className="text-lg font-bold text-primary leading-none">{companyDisplayName}</h1>
         </div>
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-primary" />
@@ -773,12 +774,11 @@ export default function PublicFormView() {
   if (!sessionToken) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
-        <div className="flex items-center gap-3 mb-6">
-          <img src={formCompany?.logoUrl || saruLogo} alt={formCompany?.name || 'Saru Visas'} className="h-10 w-auto" />
-          <div>
-            <h1 className="text-lg font-bold text-primary leading-none">SARU</h1>
-            <p className="text-xs text-muted-foreground">Visa y Pasaporte</p>
-          </div>
+        <div className="flex items-center justify-center gap-3 mb-6">
+          {companyLogoUrl ? (
+            <img src={companyLogoUrl} alt={companyDisplayName} className="h-10 w-auto" />
+          ) : null}
+          <h1 className="text-lg font-bold text-primary leading-none">{companyDisplayName}</h1>
         </div>
         <div className="text-center max-w-md">
           <h1 className="text-2xl font-bold text-foreground mb-2">Enlace no válido</h1>
@@ -793,12 +793,11 @@ export default function PublicFormView() {
   if (!form) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
-        <div className="flex items-center gap-3 mb-6">
-          <img src={formCompany?.logoUrl || saruLogo} alt={formCompany?.name || 'Saru Visas'} className="h-10 w-auto" />
-          <div>
-            <h1 className="text-lg font-bold text-primary leading-none">SARU</h1>
-            <p className="text-xs text-muted-foreground">Visa y Pasaporte</p>
-          </div>
+        <div className="flex items-center justify-center gap-3 mb-6">
+          {companyLogoUrl ? (
+            <img src={companyLogoUrl} alt={companyDisplayName} className="h-10 w-auto" />
+          ) : null}
+          <h1 className="text-lg font-bold text-primary leading-none">{companyDisplayName}</h1>
         </div>
         <div className="text-center">
           <h1 className="text-2xl font-bold text-foreground mb-2">Formulario no encontrado</h1>
@@ -811,12 +810,11 @@ export default function PublicFormView() {
   if (step === 'success') {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
-        <div className="flex items-center gap-3 mb-6">
-          <img src={formCompany?.logoUrl || saruLogo} alt={formCompany?.name || 'Saru Visas'} className="h-10 w-auto" />
-          <div>
-            <h1 className="text-lg font-bold text-primary leading-none">SARU</h1>
-            <p className="text-xs text-muted-foreground">Visa y Pasaporte</p>
-          </div>
+        <div className="flex items-center justify-center gap-3 mb-6">
+          {companyLogoUrl ? (
+            <img src={companyLogoUrl} alt={companyDisplayName} className="h-10 w-auto" />
+          ) : null}
+          <h1 className="text-lg font-bold text-primary leading-none">{companyDisplayName}</h1>
         </div>
         <Card className="max-w-md w-full">
           <CardContent className="p-8 text-center">
@@ -853,11 +851,10 @@ export default function PublicFormView() {
         <div className="max-w-2xl mx-auto px-4 py-4">
           <div className="flex items-center gap-3 flex-wrap">
             <div className="flex items-center gap-3 shrink-0">
-              <img src={formCompany?.logoUrl || saruLogo} alt={formCompany?.name || 'Saru Visas'} className="h-8 w-auto" />
-              <div>
-                <h1 className="text-lg font-bold text-primary leading-none">SARU</h1>
-                <p className="text-xs text-muted-foreground">Visa y Pasaporte</p>
-              </div>
+              {companyLogoUrl ? (
+                <img src={companyLogoUrl} alt={companyDisplayName} className="h-8 w-auto" />
+              ) : null}
+              <h1 className="text-lg font-bold text-primary leading-none truncate">{companyDisplayName}</h1>
             </div>
             <h2 className="text-lg font-semibold text-foreground">{form.name}</h2>
           </div>

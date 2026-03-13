@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import saruLogo from '@/assets/saru-logo.png';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTenant } from '@/contexts/TenantContext';
 import { Button } from '@/components/ui/button';
@@ -27,8 +26,8 @@ interface AppHeaderProps {
 export function AppHeader({ children }: AppHeaderProps) {
   const { user, company, logout } = useAuth();
   const { tenant } = useTenant();
-  const logoUrl = company?.logoUrl || tenant?.company?.logoUrl || saruLogo;
-  const logoAlt = company?.name || tenant?.company?.name || 'Saru Visas';
+  const companyName = company?.name || tenant?.company?.name || 'Compañía';
+  const logoUrl = company?.logoUrl ?? tenant?.company?.logoUrl ?? null;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const childrenArray = React.Children.toArray(children);
 
@@ -49,14 +48,13 @@ export function AppHeader({ children }: AppHeaderProps) {
               <SheetContent side="left" className="w-[280px] sm:w-[320px]">
                 <SheetHeader>
                   <SheetTitle className="flex items-center gap-2">
-                    <img 
-                      src={logoUrl} 
-                      alt={logoAlt} 
-                      className="h-8 w-auto"
-                    />
+                    {logoUrl ? (
+                      <img src={logoUrl} alt={companyName} className="h-8 w-auto" />
+                    ) : (
+                      <span className="text-lg font-bold text-primary">{companyName}</span>
+                    )}
                     <div>
-                      <h2 className="text-lg font-bold text-primary leading-none">SARU</h2>
-                      <p className="text-xs text-muted-foreground">Visa y Pasaporte</p>
+                      <h2 className="text-lg font-bold text-primary leading-none truncate">{companyName}</h2>
                     </div>
                   </SheetTitle>
                 </SheetHeader>
@@ -138,14 +136,13 @@ export function AppHeader({ children }: AppHeaderProps) {
             </Sheet>
             
             {/* Logo - Mobile */}
-            <img 
-              src={logoUrl} 
-              alt={logoAlt} 
-              className="h-8 w-auto flex-shrink-0"
-            />
+            {logoUrl ? (
+              <img src={logoUrl} alt={companyName} className="h-8 w-auto flex-shrink-0" />
+            ) : (
+              <span className="text-sm font-bold text-primary truncate">{companyName}</span>
+            )}
             <div className="hidden min-[360px]:block min-w-0">
-              <h1 className="text-sm font-bold text-primary leading-none truncate">SARU</h1>
-              <p className="text-[10px] text-muted-foreground truncate">Visa y Pasaporte</p>
+              <h1 className="text-sm font-bold text-primary leading-none truncate">{companyName}</h1>
             </div>
           </div>
           
@@ -182,14 +179,13 @@ export function AppHeader({ children }: AppHeaderProps) {
           <div className="hidden xl:flex items-center justify-between py-2.5 gap-3">
             {/* Logo and Brand - espacio reservado para que no se solape */}
             <div className="flex items-center gap-2.5 flex-shrink-0 min-w-0 max-w-[200px]">
-              <img 
-                src={logoUrl} 
-                alt={logoAlt} 
-                className="h-9 w-auto flex-shrink-0"
-              />
+              {logoUrl ? (
+                <img src={logoUrl} alt={companyName} className="h-9 w-auto flex-shrink-0" />
+              ) : (
+                <span className="text-base font-bold text-primary truncate">{companyName}</span>
+              )}
               <div className="min-w-0">
-                <h1 className="text-base font-bold text-primary leading-none truncate">SARU</h1>
-                <p className="text-[11px] text-muted-foreground truncate">Visa y Pasaporte</p>
+                <h1 className="text-base font-bold text-primary leading-none truncate">{companyName}</h1>
               </div>
             </div>
             
@@ -232,14 +228,13 @@ export function AppHeader({ children }: AppHeaderProps) {
             <div className="flex items-center justify-between gap-3">
               {/* Logo */}
               <div className="flex items-center gap-2.5 flex-shrink-0 min-w-0">
-                <img 
-                  src={logoUrl} 
-                  alt={logoAlt} 
-                  className="h-9 w-auto flex-shrink-0"
-                />
+                {logoUrl ? (
+                  <img src={logoUrl} alt={companyName} className="h-9 w-auto flex-shrink-0" />
+                ) : (
+                  <span className="text-base font-bold text-primary truncate">{companyName}</span>
+                )}
                 <div className="min-w-0">
-                  <h1 className="text-base font-bold text-primary leading-none truncate">SARU</h1>
-                  <p className="text-[11px] text-muted-foreground truncate">Visa y Pasaporte</p>
+                  <h1 className="text-base font-bold text-primary leading-none truncate">{companyName}</h1>
                 </div>
               </div>
               

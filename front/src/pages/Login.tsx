@@ -8,7 +8,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
-import saruLogo from '@/assets/saru-logo.png';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -18,8 +17,8 @@ const Login = () => {
   const { tenant } = useTenant();
   const navigate = useNavigate();
 
-  const logoUrl = tenant?.company?.logoUrl || saruLogo;
-  const logoAlt = tenant?.company?.name || 'Saru Visas';
+  const companyName = tenant?.company?.name || 'Sistema';
+  const logoUrl = tenant?.company?.logoUrl ?? null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,11 +47,11 @@ const Login = () => {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <div className="flex items-center justify-center mb-4">
-            <img 
-              src={logoUrl} 
-              alt={logoAlt} 
-              className="h-20 w-auto object-contain"
-            />
+            {logoUrl ? (
+              <img src={logoUrl} alt={companyName} className="h-20 w-auto object-contain" />
+            ) : (
+              <span className="text-2xl font-bold text-primary">{companyName}</span>
+            )}
           </div>
           <CardTitle className="text-2xl text-center">Iniciar Sesión</CardTitle>
           <CardDescription className="text-center">

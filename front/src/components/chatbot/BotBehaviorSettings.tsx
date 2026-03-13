@@ -55,7 +55,7 @@ export const BotBehaviorSettings = ({ behavior, onUpdate }: BotBehaviorSettingsP
               id="bot-name"
               value={behavior.name}
               onChange={(e) => onUpdate({ name: e.target.value })}
-              placeholder="Ej: Asistente Saru"
+              placeholder="Ej: Asistente virtual"
             />
           </div>
 
