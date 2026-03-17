@@ -29,7 +29,7 @@ const addConv = [
       ].join(':');
 
       const record = await Conversations.create({
-        fkid_clients: phone,
+        phone,
         mensaje,
         from,
         fecha,
@@ -55,18 +55,13 @@ const addConv = [
 ];
 
 
-const ALLOWED_UPDATE_FIELDS = [
-  'fkid_clients',
-  'mensaje',
-  'from',
-  'baja_logica'
-] as const;
+const ALLOWED_UPDATE_FIELDS = ['phone', 'mensaje', 'from', 'baja_logica'] as const;
 
 const updateConv = [
-  body('fkid_clients')
+  body('phone')
     .optional()
     .isString()
-    .withMessage('fkid_clients must be a string')
+    .withMessage('phone must be a string')
     .trim(),
   body('mensaje')
     .optional()
@@ -119,7 +114,7 @@ const updateConv = [
         res.json(record);
       } else {
         const [count] = await Conversations.update(updateData, {
-          where: { fkid_clients: identifier },
+          where: { phone: identifier },
         });
         res.json({ updated: count, phone: identifier, ...updateData });
       }
@@ -144,7 +139,7 @@ const bajaLogicaConv = [
 
       const { baja_logica } = req.body;
       const record = await Conversations.findOne({
-        where: { fkid_clients: req.params.phone },
+        where: { phone: req.params.phone },
         order: [['id', 'DESC']],
       });
       if (!record) {

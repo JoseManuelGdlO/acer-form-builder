@@ -3,7 +3,7 @@ import sequelize from '../config/database';
 
 interface ConversationsAttributes {
   id: number;
-  fkid_clients: string;
+  phone: string;
   fecha: Date;
   hora: Date;
   from: 'usuario' | 'bot';
@@ -24,7 +24,7 @@ export class Conversations
   implements ConversationsAttributes
 {
   public id!: number;
-  public fkid_clients!: string;
+  public phone!: string;
   public fecha!: Date;
   public hora!: Date;
   public from!: 'usuario' | 'bot';
@@ -41,8 +41,8 @@ Conversations.init(
       autoIncrement: true,
       primaryKey: true,
     },
-    fkid_clients: {
-      type: DataTypes.STRING(20),
+    phone: {
+      type: DataTypes.STRING(50),
       allowNull: false,
     },
     fecha: {
