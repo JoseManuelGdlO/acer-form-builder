@@ -1,6 +1,9 @@
 # Build stage
 FROM node:20-alpine AS builder
 
+# Zona horaria
+ENV TZ=America/Mexico_City
+
 WORKDIR /app
 
 # Copy package files
