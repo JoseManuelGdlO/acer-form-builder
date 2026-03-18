@@ -56,22 +56,28 @@ export const FormEditor = ({
   onReorderQuestions,
 }: FormEditorProps) => {
   // Local state for unsaved changes
-  const [localForm, setLocalForm] = useState<Form>(form);
+  const [localForm, setLocalForm] = useState<Form>({
+    ...form,
+    sections: Array.isArray(form.sections) ? form.sections : [],
+  });
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   // Update local form when prop changes (only when form ID changes or when saved)
   useEffect(() => {
-    setLocalForm(form);
+    setLocalForm({
+      ...form,
+      sections: Array.isArray(form.sections) ? form.sections : [],
+    });
     setHasUnsavedChanges(false);
   }, [form.id, form.updatedAt]); // Reset when form ID changes or when form is updated from backend
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeSectionId, setActiveSectionId] = useState<string | null>(
-    localForm.sections.length > 0 ? localForm.sections[0].id : null
+    Array.isArray(localForm.sections) && localForm.sections.length > 0 ? localForm.sections[0].id : null
   );
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
-    new Set(localForm.sections.map(s => s.id))
+    new Set((Array.isArray(localForm.sections) ? localForm.sections : []).map(s => s.id))
   );
   const [dragOverSectionId, setDragOverSectionId] = useState<string | null>(null);
 
@@ -95,7 +101,7 @@ export const FormEditor = ({
   const handleLocalUpdateSection = (sectionId: string, updates: Partial<FormSection>) => {
     setLocalForm(prev => ({
       ...prev,
-      sections: prev.sections.map(s =>
+      sections: (Array.isArray(prev.sections) ? prev.sections : []).map(s =>
         s.id === sectionId ? { ...s, ...updates } : s
       ),
     }));
@@ -105,7 +111,7 @@ export const FormEditor = ({
   const handleLocalUpdateQuestion = (sectionId: string, questionId: string, updates: Partial<Question>) => {
     setLocalForm(prev => ({
       ...prev,
-      sections: prev.sections.map(s =>
+      sections: (Array.isArray(prev.sections) ? prev.sections : []).map(s =>
         s.id === sectionId
           ? {
               ...s,
@@ -125,10 +131,13 @@ export const FormEditor = ({
       title: 'Nueva sección',
       questions: [],
     };
-    setLocalForm(prev => ({
-      ...prev,
-      sections: [...prev.sections, newSection],
-    }));
+    setLocalForm(prev => {
+      const prevSections = Array.isArray(prev.sections) ? prev.sections : [];
+      return {
+        ...prev,
+        sections: [...prevSections, newSection],
+      };
+    });
     setExpandedSections(prev => new Set([...prev, newSection.id]));
     setHasUnsavedChanges(true);
   };
@@ -136,7 +145,7 @@ export const FormEditor = ({
   const handleLocalDeleteSection = (sectionId: string) => {
     setLocalForm(prev => ({
       ...prev,
-      sections: prev.sections.filter(s => s.id !== sectionId),
+      sections: (Array.isArray(prev.sections) ? prev.sections : []).filter(s => s.id !== sectionId),
     }));
     setHasUnsavedChanges(true);
   };
@@ -151,14 +160,17 @@ export const FormEditor = ({
         ? [{ id: Math.random().toString(36).substr(2, 9), label: 'Opción 1' }]
         : undefined,
     };
-    setLocalForm(prev => ({
-      ...prev,
-      sections: prev.sections.map(s =>
-        s.id === sectionId
-          ? { ...s, questions: [...s.questions, newQuestion] }
-          : s
-      ),
-    }));
+    setLocalForm(prev => {
+      const prevSections = Array.isArray(prev.sections) ? prev.sections : [];
+      return {
+        ...prev,
+        sections: prevSections.map(s =>
+          s.id === sectionId
+            ? { ...s, questions: [...(s.questions ?? []), newQuestion] }
+            : s
+        ),
+      };
+    });
     setExpandedSections(prev => new Set([...prev, sectionId]));
     setHasUnsavedChanges(true);
   };
@@ -166,7 +178,7 @@ export const FormEditor = ({
   const handleLocalDeleteQuestion = (sectionId: string, questionId: string) => {
     setLocalForm(prev => ({
       ...prev,
-      sections: prev.sections.map(s =>
+      sections: (Array.isArray(prev.sections) ? prev.sections : []).map(s =>
         s.id === sectionId
           ? { ...s, questions: s.questions.filter(q => q.id !== questionId) }
           : s
@@ -183,7 +195,7 @@ export const FormEditor = ({
       await onUpdateForm({
         name: localForm.name,
         description: localForm.description,
-        sections: localForm.sections,
+        sections: Array.isArray(localForm.sections) ? localForm.sections : [],
       });
       
       setHasUnsavedChanges(false);
@@ -250,11 +262,12 @@ export const FormEditor = ({
 
     // Reorder sections
     if (active.data.current?.isSection && over.data.current?.isSection) {
-      const oldIndex = localForm.sections.findIndex(s => s.id === active.id);
-      const newIndex = localForm.sections.findIndex(s => s.id === over.id);
+      const sections = Array.isArray(localForm.sections) ? localForm.sections : [];
+      const oldIndex = sections.findIndex(s => s.id === active.id);
+      const newIndex = sections.findIndex(s => s.id === over.id);
 
       if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
-        const newSections = arrayMove(localForm.sections, oldIndex, newIndex);
+        const newSections = arrayMove(sections, oldIndex, newIndex);
         setLocalForm(prev => ({ ...prev, sections: newSections }));
         setHasUnsavedChanges(true);
       }
@@ -264,16 +277,17 @@ export const FormEditor = ({
     // Reorder questions within the same section
     const sectionId = active.data.current?.sectionId;
     if (sectionId && active.id !== over.id) {
-      const section = localForm.sections.find(s => s.id === sectionId);
+    const sections = Array.isArray(localForm.sections) ? localForm.sections : [];
+    const section = sections.find(s => s.id === sectionId);
       if (section) {
         const oldIndex = section.questions.findIndex(q => q.id === active.id);
         const newIndex = section.questions.findIndex(q => q.id === over.id);
 
         if (oldIndex !== -1 && newIndex !== -1) {
-          const newQuestions = arrayMove(section.questions, oldIndex, newIndex);
+          const newQuestions = arrayMove(section.questions ?? [], oldIndex, newIndex);
           setLocalForm(prev => ({
             ...prev,
-            sections: prev.sections.map(s =>
+            sections: (Array.isArray(prev.sections) ? prev.sections : []).map(s =>
               s.id === sectionId ? { ...s, questions: newQuestions } : s
             ),
           }));
@@ -284,14 +298,20 @@ export const FormEditor = ({
   };
 
   const activeQuestion = activeId
-    ? localForm.sections.flatMap(s => s.questions).find(q => q.id === activeId)
+    ? (Array.isArray(localForm.sections) ? localForm.sections : [])
+        .flatMap(s => s.questions ?? [])
+        .find(q => q.id === activeId)
     : null;
 
   const activeDragType = activeId?.startsWith('new-') 
     ? activeId.replace('new-', '') as QuestionType 
     : null;
 
-  const getTotalQuestions = () => localForm.sections.reduce((acc, s) => acc + s.questions.length, 0);
+  const getTotalQuestions = () =>
+    (Array.isArray(localForm.sections) ? localForm.sections : []).reduce(
+      (acc, s) => acc + (s.questions?.length ?? 0),
+      0
+    );
 
   return (
     <DndContext

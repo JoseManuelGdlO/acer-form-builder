@@ -924,6 +924,7 @@ class ApiClient {
       price: number;
       description?: string;
       requirements?: string;
+      categories?: string[];
       imageFile?: File | null;
     },
     token?: string | null
@@ -934,6 +935,16 @@ class ApiClient {
     formData.append('price', String(data.price));
     formData.append('description', data.description ?? '');
     formData.append('requirements', data.requirements ?? '');
+    if (data.categories !== undefined) {
+      if (data.categories.length === 0) {
+        // Permite vaciar categorías (backend interpretará esto como [] por validación/normalización)
+        formData.append('categories', '');
+      } else {
+        for (const cat of data.categories) {
+          formData.append('categories', cat);
+        }
+      }
+    }
     if (data.imageFile) {
       formData.append('image', data.imageFile);
     }
@@ -955,6 +966,7 @@ class ApiClient {
       price?: number;
       description?: string;
       requirements?: string;
+      categories?: string[];
       imageFile?: File | null;
     },
     token?: string | null
@@ -965,6 +977,15 @@ class ApiClient {
     if (data.price !== undefined) formData.append('price', String(data.price));
     if (data.description !== undefined) formData.append('description', String(data.description));
     if (data.requirements !== undefined) formData.append('requirements', String(data.requirements));
+    if (data.categories !== undefined) {
+      if (data.categories.length === 0) {
+        formData.append('categories', '');
+      } else {
+        for (const cat of data.categories) {
+          formData.append('categories', cat);
+        }
+      }
+    }
     if (data.imageFile) {
       formData.append('image', data.imageFile);
     }
@@ -975,6 +996,15 @@ class ApiClient {
       requireAuth: true,
       body: formData as unknown as BodyInit,
       headers: {},
+    });
+  }
+
+  async getProductsByCategories(categories: string[], token?: string | null) {
+    const query = new URLSearchParams({ categories: categories.join(',') }).toString();
+    return this.request<any[]>(`/products/by-category?${query}`, {
+      method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
     });
   }
 

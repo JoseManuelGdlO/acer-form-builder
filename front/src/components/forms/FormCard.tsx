@@ -153,8 +153,18 @@ export const FormCard = ({ form, onEdit, onDelete, onDuplicate }: FormCardProps)
       )}
 
       <div className="flex items-center justify-between text-xs text-muted-foreground">
-        <span>{form.sections.reduce((acc, s) => acc + s.questions.length, 0)} preguntas</span>
-        <span>Editado {formatDate(form.updatedAt)}</span>
+        <span>
+          {Array.isArray(form.sections)
+            ? form.sections.reduce((acc, s) => acc + (s.questions?.length ?? 0), 0)
+            : 0}{' '}
+          preguntas
+        </span>
+        <span>
+          Editado{' '}
+          {form.updatedAt instanceof Date
+            ? formatDate(form.updatedAt)
+            : formatDate(new Date(form.updatedAt))}
+        </span>
       </div>
     </div>
   );

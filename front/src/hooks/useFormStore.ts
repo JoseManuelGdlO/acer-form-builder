@@ -14,11 +14,28 @@ export const useFormStore = () => {
 
   // Helper function to map backend form data to frontend Form type
   const mapFormData = (formData: any): Form => {
+    let sections: FormSection[] = [];
+
+    if (Array.isArray(formData.sections)) {
+      sections = formData.sections as FormSection[];
+    } else if (typeof formData.sections === 'string') {
+      try {
+        const parsed = JSON.parse(formData.sections);
+        sections = Array.isArray(parsed) ? (parsed as FormSection[]) : [];
+      } catch (error) {
+        console.error('Failed to parse form sections JSON:', error, formData.sections);
+        sections = [];
+      }
+    } else if (formData.sections && typeof formData.sections === 'object') {
+      // In case it comes as a JSON object that is not an array, try to coerce or fall back
+      sections = [];
+    }
+
     return {
       id: formData.id,
       name: formData.name,
       description: formData.description || '',
-      sections: formData.sections || [],
+      sections,
       createdAt: formData.created_at ? new Date(formData.created_at) : new Date(formData.createdAt || Date.now()),
       updatedAt: formData.updated_at ? new Date(formData.updated_at) : new Date(formData.updatedAt || Date.now()),
     };
