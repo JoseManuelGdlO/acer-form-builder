@@ -1,17 +1,20 @@
 import { useMemo } from 'react';
 import { Product } from '@/types/product';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Category } from '@/types/category';
 
 interface ProductsListProps {
   products: Product[];
   onCreate: () => void;
   onEdit: (product: Product) => void;
   onDelete: (product: Product) => void;
+  categoriesMap?: Record<string, Category>;
 }
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
-export const ProductsList = ({ products, onCreate, onEdit, onDelete }: ProductsListProps) => {
+export const ProductsList = ({ products, onCreate, onEdit, onDelete, categoriesMap }: ProductsListProps) => {
   const sortedProducts = useMemo(
     () => [...products].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()),
     [products]
@@ -56,6 +59,24 @@ export const ProductsList = ({ products, onCreate, onEdit, onDelete }: ProductsL
                   )}
                   <div className="p-4 flex flex-col gap-2 flex-1">
                     <h2 className="font-semibold text-lg line-clamp-1">{product.title}</h2>
+                    {product.categories && product.categories.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {product.categories.map((catKey) => {
+                          const cat = categoriesMap?.[catKey];
+                          const label = cat?.name || catKey;
+                          const variant = (cat?.color as any) || 'secondary';
+                          return (
+                            <Badge
+                              key={catKey}
+                              variant={variant}
+                              className="text-[10px] font-normal px-2 py-0.5"
+                            >
+                              {label}
+                            </Badge>
+                          );
+                        })}
+                      </div>
+                    )}
                     <p className="text-sm text-muted-foreground line-clamp-3">
                       {product.description}
                     </p>

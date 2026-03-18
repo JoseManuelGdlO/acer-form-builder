@@ -19,6 +19,9 @@ import { SettingsPage } from '@/components/settings/SettingsPage';
 import { PaymentLogsPage } from '@/components/payments/PaymentLogsPage';
 import { ProductsList } from '@/components/products/ProductsList';
 import { ProductFormModal } from '@/components/products/ProductFormModal';
+import { CategoryManagerModal } from '@/components/products/CategoryManagerModal';
+import { useCategoryStore } from '@/hooks/useCategoryStore';
+import type { Category } from '@/types/category';
 import { Dashboard } from '@/components/dashboard/Dashboard';
 import { ViewAsSelector } from '@/components/admin/ViewAsSelector';
 import { AppHeader } from '@/components/layout/AppHeader';
@@ -124,6 +127,22 @@ const Index = () => {
   const { users, fetchUsers } = useUserStore();
   const [productModalOpen, setProductModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
+  const [selectedFilterCategories, setSelectedFilterCategories] = useState<string[]>([]);
+  const { categories, fetchCategories, createCategory, updateCategory, deleteCategory } = useCategoryStore();
+
+  const normalizeCategoryKey = (input: string): string | null => {
+    const v = String(input || '')
+      .trim()
+      .toUpperCase()
+      .replace(/\s+/g, '_')
+      .replace(/-+/g, '_');
+
+    if (v === 'VIAJE_SOLO' || v === 'VIAJA_POR_TU_CUENTA' || v === 'VIAJA_POR_SU_CUENTA') return 'SOLO';
+    if (v === 'VIAJE_SARUVISAS' || v === 'VIAJA_CON_SARUVISAS') return 'CON_SARUVISAS';
+
+    return v;
+  };
 
   const handleLoadTripChangeLog = useCallback(
     (tripId: string) => {
@@ -179,11 +198,14 @@ const Index = () => {
     }
   }, [activeView, token]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Load products when switching to products view
+  // Load products & categories when switching to products view
   useEffect(() => {
     if (token && activeView === 'products') {
       fetchProducts(token).catch((error) => {
         console.error('Failed to fetch products:', error);
+      });
+      fetchCategories(token).catch((error) => {
+        console.error('Failed to fetch categories:', error);
       });
     }
   }, [activeView, token]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -484,6 +506,7 @@ const Index = () => {
       price: number;
       description?: string;
       requirements?: string;
+      categories?: string[];
       imageFile?: File | null;
     }) => {
       if (!token) {
@@ -501,6 +524,42 @@ const Index = () => {
       }
     };
 
+    const toggleFilterCategory = (key: string) => {
+      setSelectedFilterCategories(prev =>
+        prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
+      );
+    };
+
+    const applyFilters = async () => {
+      if (!token) return;
+      if (selectedFilterCategories.length === 0) {
+        await fetchProducts(token);
+      } else {
+        const filtered = await api.getProductsByCategories(selectedFilterCategories, token);
+        const list = Array.isArray(filtered) ? filtered : [];
+        setProducts(
+          list.map((p: any) => ({
+            id: p.id,
+            title: p.title,
+            description: p.description ?? null,
+            requirements: p.requirements ?? null,
+            includes: p.includes,
+            categories: Array.isArray(p.categories) ? p.categories : [],
+            price: Number(p.price),
+            imagePath: p.image_path || p.imagePath || null,
+            createdAt: new Date(p.created_at || p.createdAt || Date.now()),
+            updatedAt: new Date(p.updated_at || p.updatedAt || Date.now()),
+          }))
+        );
+      }
+    };
+
+    const clearFilters = async () => {
+      if (!token) return;
+      setSelectedFilterCategories([]);
+      await fetchProducts(token);
+    };
+
     return (
       <>
         <FloatingViewAs />
@@ -508,17 +567,96 @@ const Index = () => {
           <AppHeader>
             <NavigationButtons current="products" />
           </AppHeader>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4 mb-4 flex justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setCategoryManagerOpen(true)}
+            >
+              Gestionar categorías
+            </Button>
+          </div>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4 mb-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap gap-2 items-center">
+                <span className="text-sm font-medium text-muted-foreground">Filtrar por categoría:</span>
+                {categories.map((cat: Category) => {
+                  const active = selectedFilterCategories.includes(cat.key);
+                  return (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => toggleFilterCategory(cat.key)}
+                      className={`text-xs px-2 py-1 rounded-full border ${
+                        active
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'bg-background text-foreground hover:bg-accent'
+                      }`}
+                    >
+                      {cat.name}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={applyFilters}
+                  disabled={!token}
+                >
+                  Aplicar filtros
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={clearFilters}
+                  disabled={!token && selectedFilterCategories.length === 0}
+                >
+                  Quitar filtros
+                </Button>
+              </div>
+            </div>
+          </div>
           <ProductsList
             products={products}
             onCreate={handleCreate}
             onEdit={handleEdit}
             onDelete={handleDelete}
+            categoriesMap={categories.reduce<Record<string, Category>>((acc, cat) => {
+              const normalizedKey = normalizeCategoryKey(cat.key);
+              acc[cat.key] = cat;
+              if (normalizedKey) {
+                acc[normalizedKey] = cat;
+              }
+              return acc;
+            }, {})}
           />
           <ProductFormModal
             open={productModalOpen}
             product={editingProduct}
             onClose={() => setProductModalOpen(false)}
+            availableCategories={categories}
             onSubmit={handleSubmit}
+          />
+          <CategoryManagerModal
+            open={categoryManagerOpen}
+            categories={categories}
+            onClose={() => setCategoryManagerOpen(false)}
+            onCreate={async (data) => {
+              if (!token) throw new Error('No token available');
+              await createCategory(token, data);
+            }}
+            onUpdate={async (id, data) => {
+              if (!token) throw new Error('No token available');
+              await updateCategory(token, id, data);
+            }}
+            onDelete={async (id) => {
+              if (!token) throw new Error('No token available');
+              await deleteCategory(token, id);
+            }}
           />
         </div>
       </>

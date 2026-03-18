@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Product } from '@/types/product';
+import { Category } from '@/types/category';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -10,17 +11,20 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge';
 
 interface ProductFormModalProps {
   open: boolean;
   product?: Product | null;
   onClose: () => void;
+  availableCategories?: Category[];
   onSubmit: (data: {
     title: string;
     includes: string;
     price: number;
     description?: string;
     requirements?: string;
+    categories?: string[];
     imageFile?: File | null;
   }) => Promise<void>;
 }
@@ -29,6 +33,7 @@ export const ProductFormModal = ({
   open,
   product,
   onClose,
+  availableCategories,
   onSubmit,
 }: ProductFormModalProps) => {
   const [title, setTitle] = useState('');
@@ -39,6 +44,7 @@ export const ProductFormModal = ({
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
 
   useEffect(() => {
     if (product) {
@@ -49,6 +55,7 @@ export const ProductFormModal = ({
       setPrice(product.price != null ? String(product.price) : '');
       setImageFile(null);
       setPreviewUrl(null);
+      setSelectedCategories(Array.isArray(product.categories) ? product.categories : []);
     } else {
       setTitle('');
       setDescription('');
@@ -57,6 +64,7 @@ export const ProductFormModal = ({
       setPrice('');
       setImageFile(null);
       setPreviewUrl(null);
+      setSelectedCategories([]);
     }
   }, [product, open]);
 
@@ -69,6 +77,12 @@ export const ProductFormModal = ({
     } else {
       setPreviewUrl(null);
     }
+  };
+
+  const toggleCategory = (key: string) => {
+    setSelectedCategories((prev) =>
+      prev.includes(key) ? prev.filter((c) => c !== key) : [...prev, key]
+    );
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -90,6 +104,7 @@ export const ProductFormModal = ({
         price: priceValue,
         description: trimmedDescription || undefined,
         requirements: trimmedRequirements || undefined,
+        categories: selectedCategories,
         imageFile,
       });
       onClose();
@@ -171,6 +186,47 @@ export const ProductFormModal = ({
               placeholder="Ej. 1500"
               required
             />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Categorías</label>
+            {availableCategories && availableCategories.length > 0 ? (
+              <>
+                <div className="grid grid-cols-2 gap-2">
+                  {availableCategories.map((cat) => {
+                    const checked = selectedCategories.includes(cat.key);
+                    return (
+                      <div
+                        key={cat.id}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => toggleCategory(cat.key)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            toggleCategory(cat.key);
+                          }
+                        }}
+                        className="flex items-center gap-2 rounded-md border px-2 py-1 text-left hover:bg-accent cursor-pointer"
+                      >
+                        <Badge
+                          variant={(checked ? (cat.color as any) : 'outline') || (checked ? 'secondary' : 'outline')}
+                          className="text-xs font-normal"
+                        >
+                          {cat.name}
+                        </Badge>
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Puedes asignar una o varias categorías para agrupar mejor tus productos.
+                </p>
+              </>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Aún no hay categorías configuradas. Usa \"Gestionar categorías\" para crear algunas.
+              </p>
+            )}
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium">Imagen promocional</label>

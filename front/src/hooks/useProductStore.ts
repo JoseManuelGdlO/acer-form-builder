@@ -12,6 +12,7 @@ export const useProductStore = () => {
     description: p.description ?? null,
     requirements: p.requirements ?? null,
     includes: p.includes,
+    categories: Array.isArray(p.categories) ? p.categories : [],
     price: Number(p.price),
     imagePath: p.image_path || p.imagePath || null,
     createdAt: new Date(p.created_at || p.createdAt || Date.now()),
@@ -41,6 +42,7 @@ export const useProductStore = () => {
         price: number;
         description?: string;
         requirements?: string;
+          categories?: string[];
         imageFile?: File | null;
       }
     ) => {
@@ -62,6 +64,7 @@ export const useProductStore = () => {
         price?: number;
         description?: string;
         requirements?: string;
+          categories?: string[];
         imageFile?: File | null;
       }
     ) => {

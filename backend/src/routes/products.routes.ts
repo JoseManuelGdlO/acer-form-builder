@@ -45,6 +45,7 @@ const upload = multer({
 router.use(authenticate);
 
 router.get('/', productsController.getAllProducts);
+router.get('/by-category', productsController.getProductsByCategories);
 router.get('/:id', productsController.getProductById);
 router.post('/', upload.single('image'), productsController.createProduct);
 router.put('/:id', upload.single('image'), productsController.updateProduct);

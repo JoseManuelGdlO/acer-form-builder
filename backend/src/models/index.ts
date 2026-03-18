@@ -27,6 +27,8 @@ import { FAQ } from './FAQ';
 import { BotBehavior } from './BotBehavior';
 import { Conversations } from './Conversation';
 import { Product } from './Product';
+import { ProductCategory } from './ProductCategory';
+import { Category } from './Category';
 
 // Company relationships (multi-tenant)
 Company.hasMany(User, { foreignKey: 'companyId', as: 'users' });
@@ -61,6 +63,14 @@ Company.hasMany(BotBehavior, { foreignKey: 'companyId', as: 'botBehaviors' });
 BotBehavior.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
 Company.hasMany(Product, { foreignKey: 'companyId', as: 'products' });
 Product.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+
+// Category relationships
+Company.hasMany(Category, { foreignKey: 'companyId', as: 'categories' });
+Category.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+
+// Product relationships
+Product.hasMany(ProductCategory, { foreignKey: 'productId', as: 'categories' });
+ProductCategory.belongsTo(Product, { foreignKey: 'productId', as: 'product' });
 
 // User relationships
 User.hasMany(UserRole, { foreignKey: 'userId', as: 'roles' });
@@ -194,4 +204,6 @@ export {
   BotBehavior,
   Conversations,
   Product,
+  ProductCategory,
+  Category,
 };

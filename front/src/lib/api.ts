@@ -1008,6 +1008,55 @@ class ApiClient {
     });
   }
 
+  // Categories (product tags)
+  async getCategories(token?: string | null) {
+    return this.request<any[]>('/categories', {
+      method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async createCategory(
+    data: {
+      name: string;
+      color?: string;
+      key?: string;
+    },
+    token?: string | null
+  ) {
+    return this.request<any>('/categories', {
+      method: 'POST',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateCategory(
+    id: string,
+    data: {
+      name?: string;
+      color?: string | null;
+    },
+    token?: string | null
+  ) {
+    return this.request<any>(`/categories/${id}`, {
+      method: 'PUT',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteCategory(id: string, token?: string | null) {
+    return this.request<{ message: string }>(`/categories/${id}`, {
+      method: 'DELETE',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
   async deleteProduct(id: string, token?: string | null) {
     return this.request<{ message: string }>(`/products/${id}`, {
       method: 'DELETE',
