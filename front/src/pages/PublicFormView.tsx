@@ -127,6 +127,73 @@ const defaultClientInfo = {
   email: '',
 };
 
+const normalizeFormSections = (rawSections: unknown): FormSection[] => {
+  let candidate: unknown = rawSections;
+
+  // Some legacy records store JSON as string.
+  if (typeof candidate === 'string') {
+    try {
+      candidate = JSON.parse(candidate);
+    } catch {
+      return [];
+    }
+  }
+
+  // Some records may persist sections as object keyed by index/id.
+  if (!Array.isArray(candidate) && candidate && typeof candidate === 'object') {
+    candidate = Object.values(candidate as Record<string, unknown>);
+  }
+
+  if (!Array.isArray(candidate)) {
+    return [];
+  }
+
+  return candidate
+    .map((section): FormSection | null => {
+      if (!section || typeof section !== 'object') return null;
+      const raw = section as Record<string, unknown>;
+      const questionsRaw = Array.isArray(raw.questions) ? raw.questions : [];
+      const questions = questionsRaw
+        .map((question): Question | null => {
+          if (!question || typeof question !== 'object') return null;
+          const q = question as Record<string, unknown>;
+          const options = Array.isArray(q.options)
+            ? q.options
+                .filter((opt): opt is { id: string; label: string } => {
+                  return !!opt && typeof opt === 'object' && typeof (opt as { id?: unknown }).id === 'string' && typeof (opt as { label?: unknown }).label === 'string';
+                })
+                .map(opt => ({ id: opt.id, label: opt.label }))
+            : undefined;
+
+          if (typeof q.id !== 'string' || typeof q.type !== 'string' || typeof q.title !== 'string') {
+            return null;
+          }
+
+          return {
+            id: q.id,
+            type: q.type,
+            title: q.title,
+            description: typeof q.description === 'string' ? q.description : '',
+            required: Boolean(q.required),
+            options,
+          };
+        })
+        .filter((question): question is Question => question !== null);
+
+      if (typeof raw.id !== 'string' || typeof raw.title !== 'string') {
+        return null;
+      }
+
+      return {
+        id: raw.id,
+        title: raw.title,
+        description: typeof raw.description === 'string' ? raw.description : '',
+        questions,
+      };
+    })
+    .filter((section): section is FormSection => section !== null);
+};
+
 export default function PublicFormView() {
   const { formId } = useParams<{ formId: string }>();
   const [searchParams] = useSearchParams();
@@ -222,7 +289,7 @@ export default function PublicFormView() {
           id: formData.id,
           name: formData.name,
           description: formData.description || '',
-          sections: formData.sections || [],
+          sections: normalizeFormSections(formData.sections),
           createdAt: formData.created_at ? new Date(formData.created_at) : new Date(formData.createdAt || Date.now()),
           updatedAt: formData.updated_at ? new Date(formData.updated_at) : new Date(formData.updatedAt || Date.now()),
         };
@@ -840,7 +907,28 @@ export default function PublicFormView() {
   const answeredQuestions = Object.keys(answers).length;
   const progress = step === 'info' 
     ? 0 
-    : ((currentSectionIndex + 1) / form.sections.length) * 100;
+    : form.sections.length > 0
+      ? ((currentSectionIndex + 1) / form.sections.length) * 100
+      : 0;
+
+  if (step === 'sections' && form.sections.length === 0) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
+        <div className="flex items-center justify-center gap-3 mb-6">
+          {companyLogoUrl ? (
+            <img src={companyLogoUrl} alt={companyDisplayName} className="h-10 w-auto" />
+          ) : null}
+          <h1 className="text-lg font-bold text-primary leading-none">{companyDisplayName}</h1>
+        </div>
+        <div className="text-center max-w-md">
+          <h1 className="text-2xl font-bold text-foreground mb-2">Formulario no disponible</h1>
+          <p className="text-muted-foreground">
+            Este formulario no tiene secciones configuradas. Solicita a tu asesor que vuelva a generar el enlace.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   const currentSection = form.sections[currentSectionIndex];
 
