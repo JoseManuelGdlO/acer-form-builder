@@ -36,6 +36,11 @@ COPY --from=builder /app/dist ./dist
 # Copy runtime scripts (OpenAPI generator, etc.)
 COPY --from=builder /app/scripts ./scripts
 
+# Copy route/controller sources for OpenAPI generation at runtime.
+# The generator parses the TypeScript route/controller files as text.
+COPY --from=builder /app/src/routes ./src/routes
+COPY --from=builder /app/src/controllers ./src/controllers
+
 # Copy necessary files for migrations and seeders
 COPY --from=builder /app/src/migrations ./src/migrations
 COPY --from=builder /app/src/seeders ./src/seeders
