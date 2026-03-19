@@ -66,6 +66,7 @@ Client.init(
     phone: {
       type: DataTypes.STRING(50),
       allowNull: true,
+      unique: true,
     },
     address: {
       type: DataTypes.TEXT,

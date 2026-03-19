@@ -252,7 +252,7 @@ export const getClientPaymentDeletedHistory = async (req: AuthRequest, res: Resp
 
 export const createClient = [
   body('name').notEmpty().withMessage('Name is required'),
-  body('email').isEmail().normalizeEmail(),
+  body('email').optional().isEmail().normalizeEmail(),
   body('status').optional().isIn(['active', 'inactive', 'pending']),
   async (req: AuthRequest, res: Response): Promise<void> => {
     try {
@@ -266,6 +266,22 @@ export const createClient = [
       if (!companyId) {
         res.status(401).json({ error: 'Authentication required' });
         return;
+      }
+
+      const normalizedPhone = typeof req.body.phone === 'string' ? req.body.phone.trim() : req.body.phone;
+      if (normalizedPhone !== undefined) {
+        req.body.phone = normalizedPhone;
+      }
+
+      if (normalizedPhone) {
+        const existingClient = await Client.findOne({ where: { companyId, phone: normalizedPhone } });
+        if (existingClient) {
+          res.status(200).json({
+            message: 'Cliente ya existe',
+            client: existingClient,
+          });
+          return;
+        }
       }
 
       const client = await Client.create({ ...req.body, companyId });
@@ -319,6 +335,21 @@ export const createClient = [
       });
     } catch (error) {
       console.error('Create client error:', error);
+      const err = error as { name?: string; fields?: Record<string, unknown> };
+      if (err?.name === 'SequelizeUniqueConstraintError' && err?.fields?.phone) {
+        const companyId = req.user?.companyId;
+        const normalizedPhone = typeof req.body.phone === 'string' ? req.body.phone.trim() : req.body.phone;
+        if (companyId && normalizedPhone) {
+          const existingClient = await Client.findOne({ where: { companyId, phone: normalizedPhone } });
+          if (existingClient) {
+            res.status(200).json({
+              message: 'Cliente ya existe',
+              client: existingClient,
+            });
+            return;
+          }
+        }
+      }
       res.status(500).json({ error: 'Internal server error' });
     }
   },

@@ -445,16 +445,22 @@ export const createSubmissionFromSession = [
       
       const companyId = (form as any).companyId;
       const assignedUserId = (session as any).assignedUserId ?? undefined;
+      const normalizedPhone =
+        typeof clientInfo.phone === 'string' ? clientInfo.phone.trim() : clientInfo.phone;
 
       if (email) {
         // Email provided - try to find existing client by email in this company
         client = await Client.findOne({ where: { email, companyId } });
+        if (!client && normalizedPhone) {
+          // Fallback by phone to avoid duplicates when client was pre-created without email
+          client = await Client.findOne({ where: { phone: normalizedPhone, companyId } });
+        }
         if (!client) {
           client = await Client.create({
             companyId,
             name: clientInfo.name,
             email: email,
-            phone: clientInfo.phone || undefined,
+            phone: normalizedPhone || undefined,
             status: 'pending',
             assignedUserId,
           });
@@ -462,7 +468,8 @@ export const createSubmissionFromSession = [
           // Update existing client with new information
           const updateData: any = {};
           if (clientInfo.name) updateData.name = clientInfo.name;
-          if (clientInfo.phone) updateData.phone = clientInfo.phone;
+          if (normalizedPhone) updateData.phone = normalizedPhone;
+          if (email && !client.email) updateData.email = email;
           if (assignedUserId && !client.assignedUserId) updateData.assignedUserId = assignedUserId;
           if (Object.keys(updateData).length > 0) {
             await client.update(updateData);
@@ -470,15 +477,29 @@ export const createSubmissionFromSession = [
         }
         clientId = client.id;
       } else {
-        // No email provided - create new client without email
-        client = await Client.create({
-          companyId,
-          name: clientInfo.name,
-          email: undefined,
-          phone: clientInfo.phone || undefined,
-          status: 'pending',
-          assignedUserId,
-        });
+        // No email provided - first try to find existing client by phone
+        if (normalizedPhone) {
+          client = await Client.findOne({ where: { phone: normalizedPhone, companyId } });
+        }
+        if (!client) {
+          client = await Client.create({
+            companyId,
+            name: clientInfo.name,
+            email: undefined,
+            phone: normalizedPhone || undefined,
+            status: 'pending',
+            assignedUserId,
+          });
+        } else {
+          // Update existing client with latest info from form
+          const updateData: any = {};
+          if (clientInfo.name) updateData.name = clientInfo.name;
+          if (normalizedPhone) updateData.phone = normalizedPhone;
+          if (assignedUserId && !client.assignedUserId) updateData.assignedUserId = assignedUserId;
+          if (Object.keys(updateData).length > 0) {
+            await client.update(updateData);
+          }
+        }
         clientId = client.id;
       }
 
