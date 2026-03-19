@@ -81,6 +81,10 @@ export const useProductStore = () => {
     setProducts((prev) => prev.filter((p) => p.id !== id));
   }, []);
 
+  const replaceProducts = useCallback((next: Product[]) => {
+    setProducts(next);
+  }, []);
+
   return {
     products,
     isLoading,
@@ -88,6 +92,7 @@ export const useProductStore = () => {
     createProduct,
     updateProduct,
     deleteProduct,
+    replaceProducts,
   };
 };
 

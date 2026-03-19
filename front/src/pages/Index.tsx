@@ -94,8 +94,15 @@ const Index = () => {
     updateGroup: updateGroupStore,
     deleteGroup: deleteGroupStore,
   } = useGroupStore();
-  const { products, isLoading: productsLoading, fetchProducts, createProduct, updateProduct, deleteProduct } =
-    useProductStore();
+  const {
+    products,
+    isLoading: productsLoading,
+    fetchProducts,
+    createProduct,
+    updateProduct,
+    deleteProduct,
+    replaceProducts,
+  } = useProductStore();
   const {
     trips,
     invitations,
@@ -479,6 +486,21 @@ const Index = () => {
 
   // Vista de productos (visas)
   if (activeView === 'products') {
+    const mapApiProductsToUi = (list: any[]): Product[] => {
+      return (Array.isArray(list) ? list : []).map((p: any) => ({
+        id: p.id,
+        title: p.title,
+        description: p.description ?? null,
+        requirements: p.requirements ?? null,
+        includes: p.includes,
+        categories: Array.isArray(p.categories) ? p.categories : [],
+        price: Number(p.price),
+        imagePath: p.image_path || p.imagePath || null,
+        createdAt: new Date(p.created_at || p.createdAt || Date.now()),
+        updatedAt: new Date(p.updated_at || p.updatedAt || Date.now()),
+      }));
+    };
+
     const handleCreate = () => {
       setEditingProduct(null);
       setProductModalOpen(true);
@@ -536,21 +558,7 @@ const Index = () => {
         await fetchProducts(token);
       } else {
         const filtered = await api.getProductsByCategories(selectedFilterCategories, token);
-        const list = Array.isArray(filtered) ? filtered : [];
-        setProducts(
-          list.map((p: any) => ({
-            id: p.id,
-            title: p.title,
-            description: p.description ?? null,
-            requirements: p.requirements ?? null,
-            includes: p.includes,
-            categories: Array.isArray(p.categories) ? p.categories : [],
-            price: Number(p.price),
-            imagePath: p.image_path || p.imagePath || null,
-            createdAt: new Date(p.created_at || p.createdAt || Date.now()),
-            updatedAt: new Date(p.updated_at || p.updatedAt || Date.now()),
-          }))
-        );
+        replaceProducts(mapApiProductsToUi(filtered));
       }
     };
 
@@ -655,7 +663,32 @@ const Index = () => {
             }}
             onDelete={async (id) => {
               if (!token) throw new Error('No token available');
-              await deleteCategory(token, id);
+              const deleting = categories.find((c) => c.id === id);
+              const deletedKey = deleting?.key;
+
+              const affectsActiveFilter = deletedKey
+                ? selectedFilterCategories.includes(deletedKey)
+                : false;
+              const nextSelectedFilterCategories = affectsActiveFilter && deletedKey
+                ? selectedFilterCategories.filter((k) => k !== deletedKey)
+                : selectedFilterCategories;
+
+              try {
+                await deleteCategory(token, id);
+              } catch (err) {
+                toast.error(err instanceof Error ? err.message : 'Error al eliminar categoría');
+                return;
+              }
+
+              if (affectsActiveFilter) {
+                setSelectedFilterCategories(nextSelectedFilterCategories);
+                if (nextSelectedFilterCategories.length === 0) {
+                  await fetchProducts(token);
+                } else {
+                  const filtered = await api.getProductsByCategories(nextSelectedFilterCategories, token);
+                  replaceProducts(mapApiProductsToUi(filtered));
+                }
+              }
             }}
           />
         </div>
