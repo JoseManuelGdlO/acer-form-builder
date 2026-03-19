@@ -4,7 +4,12 @@ import { BusTemplate } from '../models';
 import type { BusLayout } from '../models/BusTemplate';
 import { AuthRequest } from '../middleware/auth.middleware';
 
-const LAYOUT_TYPES = ['seat', 'bathroom', 'stairs', 'door', 'driver'] as const;
+const LAYOUT_TYPES = ['seat', 'bathroom', 'stairs', 'door', 'driver', 'aisle', 'blocked'] as const;
+
+function normalizeNumberForKey(n: number): number {
+  // Avoid false negatives due to floating point rounding.
+  return Math.round(n * 100) / 100;
+}
 
 function countSeatsFromLayout(layout: BusLayout): number {
   let n = 0;
@@ -20,20 +25,47 @@ function validateLayout(layout: unknown): { valid: boolean; error?: string } {
   if (!layout || typeof layout !== 'object') return { valid: false, error: 'Layout must be an object' };
   const l = layout as Record<string, unknown>;
   if (!Array.isArray(l.floors)) return { valid: false, error: 'Layout must have floors array' };
+  const seenIds = new Set<string>();
+  let seatCount = 0;
   for (let i = 0; i < l.floors.length; i++) {
     const floor = l.floors[i];
     if (!floor || typeof floor !== 'object') return { valid: false, error: `Floor ${i} must be an object` };
     const elements = (floor as Record<string, unknown>).elements;
     if (!Array.isArray(elements)) return { valid: false, error: `Floor ${i} must have elements array` };
+    const occupiedSlots = new Set<string>();
     for (let j = 0; j < elements.length; j++) {
       const el = elements[j] as Record<string, unknown>;
       if (!el || typeof el !== 'object') return { valid: false, error: `Element ${j} on floor ${i} must be an object` };
       if (typeof el.id !== 'string' || !el.id.trim()) return { valid: false, error: `Element ${j} on floor ${i} must have id` };
+      const idTrimmed = el.id.trim();
+      if (seenIds.has(idTrimmed)) return { valid: false, error: `Duplicate element.id "${idTrimmed}"` };
+      seenIds.add(idTrimmed);
       if (!LAYOUT_TYPES.includes(el.type as any)) return { valid: false, error: `Element ${j} on floor ${i} has invalid type` };
+      if (typeof el.label !== 'undefined' && typeof el.label !== 'string') return { valid: false, error: `Element ${j} on floor ${i} label must be a string` };
       if (typeof el.x !== 'number') return { valid: false, error: `Element ${j} on floor ${i} must have number x` };
       if (typeof el.y !== 'number') return { valid: false, error: `Element ${j} on floor ${i} must have number y` };
+
+      if (typeof el.width !== 'undefined' && typeof el.width !== 'number') return { valid: false, error: `Element ${j} on floor ${i} width must be a number` };
+      if (typeof el.height !== 'undefined' && typeof el.height !== 'number') return { valid: false, error: `Element ${j} on floor ${i} height must be a number` };
+      if (typeof el.width === 'number' && el.width <= 0) return { valid: false, error: `Element ${j} on floor ${i} width must be > 0` };
+      if (typeof el.height === 'number' && el.height <= 0) return { valid: false, error: `Element ${j} on floor ${i} height must be > 0` };
+      if (typeof el.rotation !== 'undefined' && typeof el.rotation !== 'number') return { valid: false, error: `Element ${j} on floor ${i} rotation must be a number` };
+      if (typeof el.metadata !== 'undefined' && (!el.metadata || typeof el.metadata !== 'object' || Array.isArray(el.metadata))) {
+        return { valid: false, error: `Element ${j} on floor ${i} metadata must be an object` };
+      }
+
+      if (el.type === 'seat') seatCount++;
+
+      // Basic collision rule: no two elements can occupy the same exact (x,y,width,height) slot on the same floor.
+      // This aligns with the editor snap-to-grid behavior.
+      const w = typeof el.width === 'number' ? el.width : 44;
+      const h = typeof el.height === 'number' ? el.height : 44;
+      const slotKey = `${i}|${normalizeNumberForKey(el.x)}|${normalizeNumberForKey(el.y)}|${normalizeNumberForKey(w)}|${normalizeNumberForKey(h)}`;
+      if (occupiedSlots.has(slotKey)) return { valid: false, error: `Elements overlap at floor ${i} position (${el.x}, ${el.y})` };
+      occupiedSlots.add(slotKey);
     }
   }
+  if (seatCount < 1) return { valid: false, error: 'Layout must contain at least one seat' };
   return { valid: true };
 }
 

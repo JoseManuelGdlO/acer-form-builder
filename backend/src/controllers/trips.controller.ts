@@ -493,9 +493,34 @@ export const removeParticipant = async (req: AuthRequest, res: Response): Promis
   }
 };
 
+function normalizeLayoutForSeatLookup(layout: any): { floors: Array<{ elements: any[] }> } | null {
+  if (layout == null) return null;
+  let parsed = layout;
+  if (typeof parsed === 'string') {
+    try {
+      parsed = JSON.parse(parsed);
+    } catch {
+      return null;
+    }
+  }
+  if (!parsed || typeof parsed !== 'object') return null;
+  const floors = Array.isArray((parsed as any).floors) ? (parsed as any).floors : null;
+  if (!floors) return null;
+  return {
+    floors: floors.map((f: any) => ({
+      elements: Array.isArray(f?.elements)
+        ? f.elements
+        : Array.isArray(f?.items)
+          ? f.items
+          : [],
+    })),
+  };
+}
+
 function seatIdExistsInLayout(layout: any, seatId: string): boolean {
-  if (!layout || !layout.floors || !Array.isArray(layout.floors)) return false;
-  for (const floor of layout.floors) {
+  const normalized = normalizeLayoutForSeatLookup(layout);
+  if (!normalized) return false;
+  for (const floor of normalized.floors) {
     const elements = floor.elements || [];
     for (const el of elements) {
       if (el && el.type === 'seat' && el.id === seatId) return true;

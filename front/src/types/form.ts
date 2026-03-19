@@ -227,7 +227,13 @@ export interface TripSeatAssignmentEntry {
 
 export type BusBathroomPosition = 'front' | 'middle' | 'back';
 
-export type BusLayoutElementType = 'seat' | 'bathroom' | 'stairs' | 'door' | 'driver';
+export type BusLayoutElementType = 'seat' | 'bathroom' | 'stairs' | 'door' | 'driver' | 'aisle' | 'blocked';
+
+export interface BusLayoutCanvas {
+  width: number;
+  height: number;
+  gridSize: number;
+}
 
 export interface BusLayoutElement {
   id: string;
@@ -237,6 +243,8 @@ export interface BusLayoutElement {
   label?: string;
   width?: number;
   height?: number;
+  rotation?: number;
+  metadata?: Record<string, unknown>;
 }
 
 export interface BusLayoutFloor {
@@ -245,6 +253,10 @@ export interface BusLayoutFloor {
 
 export interface BusLayout {
   floors: BusLayoutFloor[];
+  /**
+   * Optional rendering hints. When missing, consumers must fall back to defaults.
+   */
+  canvas?: BusLayoutCanvas;
 }
 
 export interface BusTemplate {

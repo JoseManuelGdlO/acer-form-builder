@@ -2,7 +2,22 @@ import { useState, useCallback } from 'react';
 import { BusTemplate } from '@/types/form';
 import { api } from '@/lib/api';
 
+function parseJsonIfString<T>(value: unknown): T | null {
+  if (value == null) return null;
+  if (typeof value === 'string') {
+    try {
+      return JSON.parse(value) as T;
+    } catch {
+      return null;
+    }
+  }
+  if (typeof value === 'object') return value as T;
+  return null;
+}
+
 function mapBusTemplate(raw: any): BusTemplate {
+  const parsedLayout = parseJsonIfString<BusTemplate['layout']>(raw.layout);
+  const parsedSeatLabels = parseJsonIfString<string[] | null>(raw.seat_labels ?? raw.seatLabels);
   return {
     id: raw.id,
     companyId: raw.company_id ?? raw.companyId,
@@ -12,8 +27,8 @@ function mapBusTemplate(raw: any): BusTemplate {
     bathroomPosition: raw.bathroom_position ?? raw.bathroomPosition,
     floors: raw.floors,
     stairsPosition: raw.stairs_position ?? raw.stairsPosition ?? null,
-    seatLabels: raw.seat_labels ?? raw.seatLabels ?? null,
-    layout: raw.layout ?? null,
+    seatLabels: parsedSeatLabels ?? null,
+    layout: parsedLayout ?? null,
     createdAt: raw.created_at ?? raw.createdAt,
     updatedAt: raw.updated_at ?? raw.updatedAt,
   };

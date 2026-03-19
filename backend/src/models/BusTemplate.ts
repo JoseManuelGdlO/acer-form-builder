@@ -3,7 +3,13 @@ import sequelize from '../config/database';
 
 export type BathroomPosition = 'front' | 'middle' | 'back';
 
-export type BusLayoutElementType = 'seat' | 'bathroom' | 'stairs' | 'door' | 'driver';
+export type BusLayoutElementType = 'seat' | 'bathroom' | 'stairs' | 'door' | 'driver' | 'aisle' | 'blocked';
+
+export interface BusLayoutCanvas {
+  width: number;
+  height: number;
+  gridSize: number;
+}
 
 export interface BusLayoutElement {
   id: string;
@@ -13,6 +19,8 @@ export interface BusLayoutElement {
   label?: string;
   width?: number;
   height?: number;
+  rotation?: number;
+  metadata?: Record<string, unknown>;
 }
 
 export interface BusLayoutFloor {
@@ -21,6 +29,10 @@ export interface BusLayoutFloor {
 
 export interface BusLayout {
   floors: BusLayoutFloor[];
+  /**
+   * Optional rendering hints. If missing, the frontend/backends must fallback to defaults.
+   */
+  canvas?: BusLayoutCanvas;
 }
 
 interface BusTemplateAttributes {

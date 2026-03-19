@@ -14,6 +14,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Armchair, UserMinus, RotateCcw, Droplets, ArrowUpDown, DoorOpen, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { BusLayoutRenderer } from './bus-layout/BusLayoutRenderer';
 
 const CANVAS_WIDTH = 400;
 const CANVAS_HEIGHT = 600;
@@ -161,13 +162,9 @@ export function SeatPickerModal({
   }
 
   if (hasLayout) {
-    const seatElementsByFloor = (layout!.floors ?? []).map((floor) =>
-      (floor.elements ?? []).filter((e) => e.type === 'seat')
-    );
-
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Armchair className="w-5 h-5" />
@@ -178,7 +175,7 @@ export function SeatPickerModal({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 flex-1 min-h-0">
+          <div className="grid grid-cols-1 md:grid-cols-[1.7fr_1fr_1fr] gap-4 flex-1 min-h-0">
             <div className="flex flex-col min-h-0">
               <p className="text-xs text-muted-foreground mb-2">
                 Haz clic en un asiento para asignar o quitar.
@@ -191,49 +188,13 @@ export function SeatPickerModal({
                 </TabsList>
                 {layout!.floors.map((floor, fi) => (
                   <TabsContent key={fi} value={String(fi)} className="flex-1 m-0 mt-2 overflow-auto">
-                    <div
-                      className="relative rounded-xl border-2 border-dashed bg-muted/20 mx-auto"
-                      style={{ width: CANVAS_WIDTH, height: CANVAS_HEIGHT }}
-                    >
-                      {(floor.elements ?? []).map((el) => {
-                        const isSeat = el.type === 'seat';
-                        const assigned = isSeat ? assignmentBySeatId[el.id] : null;
-                        const isPending = pendingSeatId === el.id;
-                        const Icon = ELEMENT_ICONS[el.type] ?? Armchair;
-                        return (
-                          <div
-                            key={el.id}
-                            className={cn(
-                              'absolute flex flex-col items-center justify-center rounded-lg border-2 box-border cursor-pointer transition-colors',
-                              isSeat
-                                ? assigned
-                                  ? 'bg-muted border-muted-foreground/40 cursor-default'
-                                  : isPending
-                                    ? 'bg-primary text-primary-foreground border-primary ring-2 ring-primary/50'
-                                    : 'bg-background border-border hover:border-primary hover:bg-primary/10'
-                                : 'bg-muted/50 border-muted-foreground/30 cursor-default'
-                            )}
-                            style={{
-                              left: el.x,
-                              top: el.y,
-                              width: SEAT_SIZE,
-                              height: SEAT_SIZE,
-                            }}
-                            onClick={() => isSeat && !assigned && handleSeatClickLayout(el.id)}
-                          >
-                            <Icon className="w-4 h-4 shrink-0" />
-                            <span className="text-[10px] font-medium truncate max-w-full">
-                              {isSeat ? (el.label ?? '?') : (el.type === 'bathroom' ? 'Baño' : el.type === 'stairs' ? 'Esc.' : el.type === 'door' ? 'Puerta' : 'Cond.')}
-                            </span>
-                            {assigned && (
-                              <span className="text-[9px] truncate max-w-full text-muted-foreground">
-                                {(assigned as any).client?.name?.split(' ')[0] ?? '—'}
-                              </span>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
+                    <BusLayoutRenderer
+                      layout={layout!}
+                      floorIndex={fi}
+                      pendingSeatId={pendingSeatId}
+                      assignmentBySeatId={assignmentBySeatId as any}
+                      onSeatClick={handleSeatClickLayout}
+                    />
                   </TabsContent>
                 ))}
               </Tabs>
@@ -352,7 +313,7 @@ export function SeatPickerModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Armchair className="w-5 h-5" />
@@ -363,7 +324,7 @@ export function SeatPickerModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 flex-1 min-h-0">
+        <div className="grid grid-cols-1 md:grid-cols-[1.7fr_1fr_1fr] gap-4 flex-1 min-h-0">
           <div className="flex flex-col min-h-0">
             <div className="rounded-lg border bg-muted/20 p-3 overflow-auto flex-1 min-h-[200px]">
               <p className="text-xs text-muted-foreground mb-2">Haz clic en un asiento libre para asignar.</p>

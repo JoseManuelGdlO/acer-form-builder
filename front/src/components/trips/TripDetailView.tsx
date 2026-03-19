@@ -19,10 +19,12 @@ import {
   History,
   Building2,
   DollarSign,
+  Download,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { jsPDF } from 'jspdf';
 import { AddParticipantsToTripModal } from './AddParticipantsToTripModal';
 import {
   AlertDialog,
@@ -193,9 +195,240 @@ export const TripDetailView = ({
   const departureStr = trip.departureDate ? format(new Date(trip.departureDate), "d 'de' MMMM yyyy", { locale: es }) : '';
   const returnStr = trip.returnDate ? format(new Date(trip.returnDate), "d 'de' MMMM yyyy", { locale: es }) : '';
 
+  const handleDownloadTripDetails = () => {
+    try {
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      let y = 18;
+
+      const ensureSpace = (min = 12) => {
+        if (y + min <= pageHeight - 12) return;
+        doc.addPage();
+        y = 18;
+      };
+
+      const writeLine = (text: string, opts?: { bold?: boolean; size?: number; indent?: number; gap?: number }) => {
+        ensureSpace(10);
+        doc.setFont('helvetica', opts?.bold ? 'bold' : 'normal');
+        doc.setFontSize(opts?.size ?? 10);
+        const indent = opts?.indent ?? 14;
+        const lines = doc.splitTextToSize(text, pageWidth - indent - 14);
+        doc.text(lines, indent, y);
+        y += (lines.length * ((opts?.size ?? 10) * 0.45)) + (opts?.gap ?? 3);
+      };
+
+      const getSeatLabelById = (seatId: string) => {
+        const floors = trip.busTemplate?.layout?.floors ?? [];
+        for (const floor of floors) {
+          const el = (floor.elements ?? []).find((e) => e.type === 'seat' && e.id === seatId);
+          if (el) return el.label ?? seatId;
+        }
+        return seatId;
+      };
+
+      // Render a snapshot image of each floor layout, including assigned seats.
+      const drawLayoutFloorCanvas = (floorIndex: number): string | null => {
+        const layout = trip.busTemplate?.layout;
+        const floor = layout?.floors?.[floorIndex];
+        if (!layout || !floor) return null;
+
+        const logicalWidth = layout.canvas?.width ?? 400;
+        const logicalHeight = layout.canvas?.height ?? 600;
+        const padding = 16;
+        const scale = 1.6;
+
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(logicalWidth * scale + padding * 2));
+        canvas.height = Math.max(1, Math.round(logicalHeight * scale + padding * 2));
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return null;
+
+        const assignmentBySeatId = new Map(
+          (trip.seatAssignments ?? [])
+            .filter((a) => a.seatId)
+            .map((a) => [a.seatId!, a] as const)
+        );
+
+        // Background and border.
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.strokeStyle = '#d8dde8';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(0.5, 0.5, canvas.width - 1, canvas.height - 1);
+
+        // Light grid for readability.
+        const grid = layout.canvas?.gridSize ?? 10;
+        ctx.strokeStyle = '#f0f2f7';
+        for (let x = padding; x <= canvas.width - padding; x += Math.max(6, grid * scale)) {
+          ctx.beginPath();
+          ctx.moveTo(x, padding);
+          ctx.lineTo(x, canvas.height - padding);
+          ctx.stroke();
+        }
+        for (let yGrid = padding; yGrid <= canvas.height - padding; yGrid += Math.max(6, grid * scale)) {
+          ctx.beginPath();
+          ctx.moveTo(padding, yGrid);
+          ctx.lineTo(canvas.width - padding, yGrid);
+          ctx.stroke();
+        }
+
+        const labelForType = (type: string) => {
+          if (type === 'bathroom') return 'Baño';
+          if (type === 'stairs') return 'Esc.';
+          if (type === 'door') return 'Puerta';
+          if (type === 'driver') return 'Conductor';
+          if (type === 'aisle') return 'Pasillo';
+          if (type === 'blocked') return 'Bloq.';
+          return '';
+        };
+
+        for (const el of floor.elements ?? []) {
+          const x = padding + (Number((el as any).x) || 0) * scale;
+          const yEl = padding + (Number((el as any).y) || 0) * scale;
+          const w = (Number((el as any).width) || 44) * scale;
+          const h = (Number((el as any).height) || 44) * scale;
+          const rotation = Number((el as any).rotation) || 0;
+          const isSeat = (el as any).type === 'seat';
+          const assignment = isSeat ? assignmentBySeatId.get((el as any).id) : null;
+
+          ctx.save();
+          if (rotation) {
+            ctx.translate(x + w / 2, yEl + h / 2);
+            ctx.rotate((rotation * Math.PI) / 180);
+            ctx.translate(-(x + w / 2), -(yEl + h / 2));
+          }
+
+          ctx.fillStyle = isSeat ? (assignment ? '#dbe7ff' : '#f7f8fb') : '#eef1f6';
+          ctx.strokeStyle = isSeat ? (assignment ? '#2a49c8' : '#b8bfd0') : '#c6ccda';
+          ctx.lineWidth = 1.4;
+          ctx.beginPath();
+          ctx.roundRect(x, yEl, w, h, 6);
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillStyle = '#1f2430';
+          ctx.font = '12px Helvetica';
+          const label = isSeat
+            ? ((el as any).label ?? (el as any).id ?? '?')
+            : labelForType((el as any).type);
+          ctx.fillText(String(label), x + w / 2, yEl + h / 2 - (assignment ? 6 : 0), Math.max(30, w - 4));
+
+          if (assignment) {
+            const name = assignment.client?.name ?? assignment.clientId;
+            const firstName = String(name || '').split(' ')[0];
+            ctx.fillStyle = '#2a49c8';
+            ctx.font = '10px Helvetica';
+            ctx.fillText(firstName, x + w / 2, yEl + h / 2 + 10, Math.max(30, w - 4));
+          }
+          ctx.restore();
+        }
+
+        return canvas.toDataURL('image/png');
+      };
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(16);
+      doc.text('Detalle de viaje y asignación de asientos', pageWidth / 2, y, { align: 'center' });
+      y += 10;
+
+      writeLine(`Viaje: ${trip.title}`, { bold: true, size: 12, indent: 14 });
+      writeLine(`Destino: ${trip.destination ?? '—'}`);
+      writeLine(`Fechas: ${departureStr} - ${returnStr}`);
+      writeLine(`Plazas: ${trip.participants?.length ?? 0}/${trip.totalSeats}`);
+      writeLine(`Plantilla de camión: ${trip.busTemplate?.name ?? 'No asignada'}`);
+      if (trip.notes) writeLine(`Notas: ${trip.notes}`);
+
+      y += 2;
+      doc.setDrawColor(200);
+      doc.line(14, y, pageWidth - 14, y);
+      y += 6;
+
+      writeLine('Participantes', { bold: true, size: 12 });
+      const participants = trip.participants ?? [];
+      if (!participants.length) {
+        writeLine('Sin participantes registrados.');
+      } else {
+        participants.forEach((p, index) => {
+          const name = p.client?.name ?? p.clientId;
+          const company = p.client?.company?.name ? ` (${p.client?.company?.name})` : '';
+          writeLine(`${index + 1}. ${name}${company}`, { indent: 18 });
+        });
+      }
+
+      y += 2;
+      doc.setDrawColor(200);
+      doc.line(14, y, pageWidth - 14, y);
+      y += 6;
+
+      writeLine('Selección de asientos / asignaciones actuales', { bold: true, size: 12 });
+      const assignments = [...(trip.seatAssignments ?? [])];
+      if (!assignments.length) {
+        writeLine('Sin asignaciones de asientos.');
+      } else {
+        assignments.sort((a, b) => {
+          const aKey = a.seatNumber ?? Number.MAX_SAFE_INTEGER;
+          const bKey = b.seatNumber ?? Number.MAX_SAFE_INTEGER;
+          if (aKey !== bKey) return aKey - bKey;
+          return (a.seatId ?? '').localeCompare(b.seatId ?? '');
+        });
+        assignments.forEach((a, index) => {
+          const label = a.seatId ? getSeatLabelById(a.seatId) : String(a.seatNumber ?? '—');
+          const clientName = a.client?.name ?? a.clientId;
+          writeLine(`${index + 1}. Asiento ${label} -> ${clientName}`, { indent: 18 });
+        });
+      }
+
+      // Add one layout snapshot page per floor, with assigned seats highlighted.
+      const layout = trip.busTemplate?.layout;
+      if (layout?.floors?.length) {
+        for (let fi = 0; fi < layout.floors.length; fi++) {
+          const imageData = drawLayoutFloorCanvas(fi);
+          if (!imageData) continue;
+          doc.addPage();
+          y = 18;
+          writeLine(`Plano de asientos - Piso ${fi + 1}`, { bold: true, size: 12, indent: 14, gap: 6 });
+
+          const imgMaxWidth = pageWidth - 28;
+          const imgMaxHeight = pageHeight - y - 20;
+          const logicalWidth = layout.canvas?.width ?? 400;
+          const logicalHeight = layout.canvas?.height ?? 600;
+          const ratio = logicalWidth / logicalHeight;
+
+          let drawWidth = imgMaxWidth;
+          let drawHeight = drawWidth / ratio;
+          if (drawHeight > imgMaxHeight) {
+            drawHeight = imgMaxHeight;
+            drawWidth = drawHeight * ratio;
+          }
+          const xImg = (pageWidth - drawWidth) / 2;
+          doc.addImage(imageData, 'PNG', xImg, y, drawWidth, drawHeight, undefined, 'FAST');
+        }
+      }
+
+      doc.setFontSize(8);
+      doc.setTextColor(120);
+      doc.text(
+        `Generado: ${format(new Date(), "dd/MM/yyyy HH:mm", { locale: es })}`,
+        pageWidth / 2,
+        pageHeight - 8,
+        { align: 'center' }
+      );
+
+      const safeName = trip.title.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '');
+      doc.save(`viaje-${safeName || trip.id}-detalles.pdf`);
+      toast.success('Detalle del viaje descargado');
+    } catch (err) {
+      console.error(err);
+      toast.error('No se pudo descargar el detalle del viaje');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-4xl mx-auto p-6 space-y-6">
+      <div className="max-w-6xl mx-auto p-6 space-y-6">
         <div className="flex items-start justify-between flex-wrap gap-4">
           <div>
             <Button variant="ghost" onClick={onBack} className="mb-2 -ml-2 gap-2">
@@ -249,6 +482,16 @@ export const TripDetailView = ({
               >
                 <Armchair className="w-4 h-4" />
                 Seleccionar asientos
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={handleDownloadTripDetails}
+              >
+                <Download className="w-4 h-4" />
+                Descargar detalles
               </Button>
               <Button
                 type="button"
