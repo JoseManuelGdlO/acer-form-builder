@@ -33,6 +33,9 @@ RUN npm ci --only=production && \
 # Copy built files from builder
 COPY --from=builder /app/dist ./dist
 
+# Copy runtime scripts (OpenAPI generator, etc.)
+COPY --from=builder /app/scripts ./scripts
+
 # Copy necessary files for migrations and seeders
 COPY --from=builder /app/src/migrations ./src/migrations
 COPY --from=builder /app/src/seeders ./src/seeders
