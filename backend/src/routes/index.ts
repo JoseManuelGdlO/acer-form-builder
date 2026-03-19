@@ -18,6 +18,7 @@ import botRoutes from './bot.routes';
 import conversacionesChatRoutes from './conversations.routes';
 import productsRoutes from './products.routes';
 import categoriesRoutes from './categories.routes';
+import notificationsRoutes from './notifications.routes';
 
 const router = Router();
 
@@ -40,5 +41,6 @@ router.use('/bot', botRoutes);
 router.use('/addChat', conversacionesChatRoutes);
 router.use('/products', productsRoutes);
 router.use('/categories', categoriesRoutes);
+router.use('/notifications', notificationsRoutes);
 
 export default router;

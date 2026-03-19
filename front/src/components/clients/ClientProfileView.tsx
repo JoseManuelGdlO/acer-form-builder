@@ -58,10 +58,11 @@ export const ClientProfileView = ({ client, onBack, onEdit }: ClientProfileViewP
     setIsLoading(true);
     try {
       // Refetch client to get latest data (e.g. totalAmountDue) from DB. Historial solo para admin.
-      const [freshClientData, notesData, messagesData, submissionsData, checklistData, paymentsData, amountDueHistoryData, paymentDeletedHistoryData] = await Promise.all([
+      const [freshClientData, notesData, messagesData, conversationsData, submissionsData, checklistData, paymentsData, amountDueHistoryData, paymentDeletedHistoryData] = await Promise.all([
         api.getClient(client.id, token).catch(() => null),
         api.getClientNotes(client.id, token).catch(() => []),
         api.getClientMessages(client.id, token).catch(() => []),
+        api.getClientConversations(client.id, token).catch(() => []),
         api.getSubmissions({ clientId: client.id }, token).catch(() => []),
         api.getClientChecklist(client.id, token).catch(() => []),
         api.getClientPayments(client.id, token).catch(() => []),
@@ -131,7 +132,18 @@ export const ClientProfileView = ({ client, onBack, onEdit }: ClientProfileViewP
         sender: m.sender === 'user' ? 'agent' : 'client',
         timestamp: new Date(m.created_at || m.createdAt),
       }));
-      setMessages(chatMessages);
+
+      const botChatMessages: ChatMessage[] = (conversationsData || []).map((m: any) => ({
+        id: `conv-${m.id}`,
+        content: m.mensaje ?? m.content,
+        sender: m.from === 'bot' ? 'agent' : 'client',
+        timestamp: new Date(m.created_at || m.createdAt),
+      }));
+
+      const mergedMessages = [...chatMessages, ...botChatMessages].sort(
+        (a, b) => a.timestamp.getTime() - b.timestamp.getTime()
+      );
+      setMessages(mergedMessages);
 
       // Transform submissions - need to get form structure to map answers
       const formSubmissions: ClientFormSubmission[] = await Promise.all(

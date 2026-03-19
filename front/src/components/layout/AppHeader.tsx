@@ -18,6 +18,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
 
 interface AppHeaderProps {
   children?: React.ReactNode;
@@ -148,7 +149,8 @@ export function AppHeader({ children }: AppHeaderProps) {
           
           {/* User Menu - Mobile (Icon only, menu in hamburger) */}
           {user && (
-            <div className="flex-shrink-0">
+            <div className="flex-shrink-0 flex items-center gap-2">
+              <NotificationBell />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
@@ -196,7 +198,8 @@ export function AppHeader({ children }: AppHeaderProps) {
             
             {/* User Menu */}
             {user && (
-              <div className="flex-shrink-0 ml-2">
+              <div className="flex-shrink-0 ml-2 flex items-center gap-2">
+                <NotificationBell />
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="sm" className="gap-2">
@@ -240,7 +243,8 @@ export function AppHeader({ children }: AppHeaderProps) {
               
               {/* User Menu */}
               {user && (
-                <div className="flex-shrink-0">
+                <div className="flex-shrink-0 flex items-center gap-2">
+                  <NotificationBell />
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="sm" className="gap-2">

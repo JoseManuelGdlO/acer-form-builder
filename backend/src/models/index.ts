@@ -26,9 +26,12 @@ import { TripChangeLog } from './TripChangeLog';
 import { FAQ } from './FAQ';
 import { BotBehavior } from './BotBehavior';
 import { Conversations } from './Conversation';
+import { Notification } from './Notification';
+import { NotificationRecipient } from './NotificationRecipient';
 import { Product } from './Product';
 import { ProductCategory } from './ProductCategory';
 import { Category } from './Category';
+import { PushSubscription } from './PushSubscription';
 
 // Company relationships (multi-tenant)
 Company.hasMany(User, { foreignKey: 'companyId', as: 'users' });
@@ -63,6 +66,39 @@ Company.hasMany(BotBehavior, { foreignKey: 'companyId', as: 'botBehaviors' });
 BotBehavior.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
 Company.hasMany(Product, { foreignKey: 'companyId', as: 'products' });
 Product.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+
+// Notifications relationships (multi-tenant)
+Company.hasMany(Notification, { foreignKey: 'companyId', as: 'notifications' });
+Notification.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+
+Notification.hasMany(NotificationRecipient, {
+  foreignKey: 'notificationId',
+  as: 'recipients',
+});
+NotificationRecipient.belongsTo(Notification, {
+  foreignKey: 'notificationId',
+  as: 'notification',
+});
+
+User.hasMany(NotificationRecipient, {
+  foreignKey: 'recipientUserId',
+  as: 'notificationRecipients',
+});
+NotificationRecipient.belongsTo(User, {
+  foreignKey: 'recipientUserId',
+  as: 'recipient',
+});
+
+Company.hasMany(PushSubscription, {
+  foreignKey: 'companyId',
+  as: 'pushSubscriptions',
+});
+PushSubscription.belongsTo(Company, {
+  foreignKey: 'companyId',
+  as: 'company',
+});
+User.hasMany(PushSubscription, { foreignKey: 'userId', as: 'pushSubscriptionsByUser' });
+PushSubscription.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 
 // Category relationships
 Company.hasMany(Category, { foreignKey: 'companyId', as: 'categories' });
@@ -179,6 +215,8 @@ export {
   Company,
   User,
   UserRole,
+  Notification,
+  NotificationRecipient,
   Client,
   ClientGroup,
   ClientGroupMember,
@@ -206,4 +244,5 @@ export {
   Product,
   ProductCategory,
   Category,
+  PushSubscription,
 };

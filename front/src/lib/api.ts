@@ -623,6 +623,15 @@ class ApiClient {
     });
   }
 
+  // Conversations (bot)
+  async getClientConversations(clientId: string, token?: string | null) {
+    return this.request<any[]>(`/addChat/clients/${encodeURIComponent(clientId)}`, {
+      method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
   /**
    * Pause conversation with the agent for the given phone (baja lógica).
    * Phone must be the same format as fkid_clients in Conversations (e.g. 10 digits).
@@ -1060,6 +1069,38 @@ class ApiClient {
   async deleteProduct(id: string, token?: string | null) {
     return this.request<{ message: string }>(`/products/${id}`, {
       method: 'DELETE',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  // Notifications
+  async getVapidPublicKey() {
+    return this.request<{ publicKey: string }>(`/notifications/vapid-public-key`, {
+      method: 'GET',
+    });
+  }
+
+  async registerPushSubscription(subscription: any, token?: string | null) {
+    return this.request<{ id: string; updated: boolean }>(`/notifications/push-subscriptions`, {
+      method: 'POST',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+      body: JSON.stringify({ subscription }),
+    });
+  }
+
+  async getNotifications(token?: string | null) {
+    return this.request<any[]>(`/notifications`, {
+      method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async markNotificationRead(notificationId: string, token?: string | null) {
+    return this.request<any>(`/notifications/${notificationId}/read`, {
+      method: 'PATCH',
       token: token ?? this.getToken(),
       requireAuth: true,
     });

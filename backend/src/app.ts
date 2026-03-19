@@ -4,6 +4,8 @@ import cors from 'cors';
 import { config } from './config/env';
 import routes from './routes';
 import { errorHandler } from './middleware/error.middleware';
+import swaggerUi from 'swagger-ui-express';
+import openApiSpec from './swagger/openapi.json';
 
 const app: Express = express();
 
@@ -26,6 +28,9 @@ app.use('/uploads', express.static(uploadsPath));
 app.get('/health', (_req: Request, res: Response) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+
+// Swagger UI
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(openApiSpec));
 
 // API Routes
 app.use('/api', routes);
