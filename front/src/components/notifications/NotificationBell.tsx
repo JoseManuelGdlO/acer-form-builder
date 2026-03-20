@@ -120,6 +120,15 @@ export function NotificationBell() {
         >
           Actualizar
         </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={async () => {
+            await markAllAsRead();
+            await fetchNotifications();
+          }}
+          className="cursor-pointer"
+        >
+          Marcar todas como leídas
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

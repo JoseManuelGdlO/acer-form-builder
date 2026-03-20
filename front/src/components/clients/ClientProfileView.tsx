@@ -154,8 +154,23 @@ export const ClientProfileView = ({ client, onBack, onEdit }: ClientProfileViewP
             // Support both old format (questionId: answer) and new format (questionId: { question, answer, ... })
             // Iterate over saved answers directly (not form questions) to show all answered questions
             const answers: any[] = [];
-            if (sub.answers) {
-              Object.entries(sub.answers).forEach(([questionId, answerData]: [string, any]) => {
+            // `sub.answers` puede venir como JSON string (backend) o como objeto (compatibilidad con datos antiguos).
+            // Si se itera un string directamente, `Object.entries` termina recorriendo índices/carácteres y genera miles de preguntas.
+            const answersObj: Record<string, any> =
+              typeof sub.answers === 'string'
+                ? (() => {
+                    try {
+                      const parsed = JSON.parse(sub.answers);
+                      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+                    } catch {
+                      return {};
+                    }
+                  })()
+                : sub.answers && typeof sub.answers === 'object' && !Array.isArray(sub.answers)
+                  ? sub.answers
+                  : {};
+
+            Object.entries(answersObj).forEach(([questionId, answerData]: [string, any]) => {
                 // Check if it's the new format (object with question info)
                 const isNewFormat = answerData && typeof answerData === 'object' && !Array.isArray(answerData) && 'question' in answerData;
                 
@@ -225,13 +240,24 @@ export const ClientProfileView = ({ client, onBack, onEdit }: ClientProfileViewP
                   answerValue = answerData;
                 }
                 
+                const formatAnswer = (value: any): string => {
+                  // Para respuestas tipo `date`, el backend suele mandar ISO con TZ
+                  // Ej: `2026-01-30T06:00:00.000Z` -> queremos `2026-01-30`
+                  if (typeof value === 'string') {
+                    if (/^\d{4}-\d{2}-\d{2}T/.test(value)) return value.slice(0, 10);
+                    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+                  }
+                  return String(value);
+                };
+
                 answers.push({
                   section: sectionName,
                   question: questionText,
-                  answer: Array.isArray(answerValue) ? answerValue.join(', ') : String(answerValue),
+                  answer: Array.isArray(answerValue)
+                    ? answerValue.map((v) => formatAnswer(v)).join(', ')
+                    : formatAnswer(answerValue),
                 });
-              });
-            }
+            });
             return {
               id: sub.id,
               formName: sub.form_name || sub.formName,
