@@ -33,6 +33,15 @@ self.addEventListener('push', (event) => {
   event.waitUntil(Promise.all([notifyPromise, syncPromise]));
 });
 
+const getNavigationUrlFromAction = (actionUrl) => {
+  if (typeof actionUrl !== 'string') return '/';
+  const legacyMatch = actionUrl.match(/^\/clients\/([^/?#]+)/);
+  if (legacyMatch && legacyMatch[1]) {
+    return `/?view=clients&clientId=${encodeURIComponent(legacyMatch[1])}`;
+  }
+  return actionUrl;
+};
+
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 
@@ -41,7 +50,7 @@ self.addEventListener('notificationclick', (event) => {
   event.waitUntil(
     (async () => {
       if (actionUrl) {
-        return self.clients.openWindow(actionUrl);
+        return self.clients.openWindow(getNavigationUrlFromAction(actionUrl));
       }
       return self.clients.openWindow('/');
     })()

@@ -15,6 +15,14 @@ import { useNotifications } from '@/hooks/useNotifications';
 import type { NotificationItem } from '@/types/notifications';
 import { cn } from '@/lib/utils';
 
+const getNavigationUrlFromAction = (actionUrl: string): string => {
+  const legacyMatch = actionUrl.match(/^\/clients\/([^/?#]+)/);
+  if (legacyMatch?.[1]) {
+    return `/?view=clients&clientId=${encodeURIComponent(legacyMatch[1])}`;
+  }
+  return actionUrl;
+};
+
 const NotificationBellItem = ({
   n,
   onDismiss,
@@ -130,7 +138,7 @@ export function NotificationBell() {
                 onClick={async () => {
                   await markNotificationRead(n.notificationId);
                   if (n.actionUrl) {
-                    window.location.href = n.actionUrl;
+                    window.location.href = getNavigationUrlFromAction(n.actionUrl);
                   }
                 }}
                 className="cursor-pointer"

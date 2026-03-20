@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { Client, ClientStatus } from '@/types/form';
 import { User } from '@/types/user';
 import { ClientCard } from './ClientCard';
@@ -24,6 +24,7 @@ interface ClientListProps {
   onDelete: (clientId: string) => Promise<void>;
   onCreate: (clientData: Omit<Client, 'id' | 'createdAt' | 'updatedAt' | 'formsCompleted'>) => Promise<void>;
   onUpdate: (clientId: string, updates: Partial<Client>) => Promise<void>;
+  initialClientId?: string | null;
   users?: User[];
   isAdmin?: boolean;
 }
@@ -38,6 +39,7 @@ export const ClientList = ({
   onDelete,
   onCreate,
   onUpdate,
+  initialClientId = null,
   users = [],
   isAdmin = false,
 }: ClientListProps) => {
@@ -47,6 +49,7 @@ export const ClientList = ({
   const [viewingClient, setViewingClient] = useState<Client | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const hasAutoOpenedInitialClient = useRef(false);
   
   const { checklistTemplates: clientStoreTemplates } = useClientStore();
   const { checklistTemplates: settingsTemplates, fetchChecklistTemplates } = useSettingsStore();
@@ -75,6 +78,27 @@ export const ClientList = ({
       });
     }
   }, [token, checklistTemplates.length, settingsTemplates.length, fetchChecklistTemplates]);
+
+  useEffect(() => {
+    if (hasAutoOpenedInitialClient.current) return;
+    if (!initialClientId) return;
+    if (clients.length === 0) return;
+
+    const targetClient = clients.find((client) => client.id === initialClientId);
+    if (!targetClient) return;
+
+    setViewingClient(targetClient);
+    hasAutoOpenedInitialClient.current = true;
+
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      params.delete('view');
+      params.delete('clientId');
+      const nextSearch = params.toString();
+      const nextUrl = `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ''}`;
+      window.history.replaceState({}, '', nextUrl);
+    }
+  }, [clients, initialClientId]);
 
   // Calculate checklist stats for each template
   // Count clients by their LAST completed checklist item

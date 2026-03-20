@@ -52,8 +52,25 @@ type View =
   | 'chatbot'
   | 'settings';
 
+const parseInitialClientNavigation = (): { initialView: View; initialClientId: string | null } => {
+  if (typeof window === 'undefined') {
+    return { initialView: 'dashboard', initialClientId: null };
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  const viewParam = params.get('view');
+  const clientIdParam = params.get('clientId');
+
+  if (viewParam === 'clients') {
+    return { initialView: 'clients', initialClientId: clientIdParam };
+  }
+
+  return { initialView: 'dashboard', initialClientId: null };
+};
+
 const Index = () => {
-  const [activeView, setActiveView] = useState<View>('dashboard');
+  const initialNavigation = useMemo(parseInitialClientNavigation, []);
+  const [activeView, setActiveView] = useState<View>(initialNavigation.initialView);
   const [viewingAs, setViewingAs] = useState<User | null>(null);
   
   const {
@@ -482,6 +499,7 @@ const Index = () => {
           <ClientList
             clients={filteredClients}
             stats={filteredClientStats}
+            initialClientId={initialNavigation.initialClientId}
             onUpdateStatus={updateClientStatus}
             onDelete={deleteClient}
             onCreate={async (data) => { await createClient(data); }}

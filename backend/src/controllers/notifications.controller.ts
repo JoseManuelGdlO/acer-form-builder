@@ -7,6 +7,31 @@ import { AuthRequest } from '../middleware/auth.middleware';
 
 const VAPID_ADMIN_EMAIL = process.env.VAPID_ADMIN_EMAIL || 'admin@example.com';
 
+const normalizeNotificationActionUrl = (
+  type: string,
+  actionUrl: string | null | undefined,
+  data: Record<string, unknown> | null | undefined
+): string | null => {
+  const conversationId =
+    data && typeof data.conversationId !== 'undefined' && data.conversationId !== null
+      ? String(data.conversationId)
+      : null;
+
+  if (type === 'conversation_help' && conversationId) {
+    return `/?view=clients&clientId=${encodeURIComponent(conversationId)}`;
+  }
+
+  if (typeof actionUrl === 'string') {
+    const legacyMatch = actionUrl.match(/^\/clients\/([^/?#]+)/);
+    if (legacyMatch?.[1]) {
+      return `/?view=clients&clientId=${encodeURIComponent(legacyMatch[1])}`;
+    }
+    return actionUrl;
+  }
+
+  return null;
+};
+
 const configureWebPush = (): boolean => {
   const publicKey = process.env.VAPID_PUBLIC_KEY;
   const privateKey = process.env.VAPID_PRIVATE_KEY;
@@ -252,6 +277,7 @@ export const createNotification = [
         data?: Record<string, unknown> | null;
         audienceRoles?: Array<'super_admin' | 'reviewer'>;
       };
+      const normalizedActionUrl = normalizeNotificationActionUrl(type, actionUrl, data);
 
       // Resolve recipients from roles within the same company.
       const users = await User.findAll({
@@ -279,7 +305,7 @@ export const createNotification = [
         title,
         message,
         data,
-        actionUrl,
+        actionUrl: normalizedActionUrl,
       });
 
       const recipientUserIds = recipients.map((u) => u.id);
@@ -313,7 +339,7 @@ export const createNotification = [
           notificationId: notification.id,
           title: notification.title || 'Notificación',
           body: notification.message,
-          actionUrl: notification.actionUrl,
+          actionUrl: normalizedActionUrl,
         });
 
         let pushedCount = 0;
