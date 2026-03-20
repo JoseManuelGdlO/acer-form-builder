@@ -51,7 +51,6 @@ interface TripListProps {
   onUpdateBusTemplate?: (id: string, data: { name?: string; layout?: import('@/types/form').BusLayout }) => Promise<void>;
   onDeleteBusTemplate?: (id: string) => Promise<void>;
   changeLog: { id: string; tripId: string; userId: string; user?: { id: string; name: string }; action: string; fieldName?: string | null; oldValue?: string | null; newValue?: string | null; createdAt: string }[];
-  onBack: () => void;
 }
 
 export const TripList = ({
@@ -78,7 +77,6 @@ export const TripList = ({
   onUpdateBusTemplate,
   onDeleteBusTemplate,
   changeLog,
-  onBack,
 }: TripListProps) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -244,9 +242,6 @@ export const TripList = ({
       <div className="max-w-5xl mx-auto p-6 space-y-6">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
-            <Button variant="ghost" onClick={onBack} className="mb-2 -ml-2">
-              ← Volver
-            </Button>
             <h1 className="text-3xl font-bold text-foreground">Viajes</h1>
             <p className="text-muted-foreground mt-1">
               Gestiona viajes, invitaciones y asientos

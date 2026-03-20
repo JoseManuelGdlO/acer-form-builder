@@ -4022,6 +4022,27 @@
           }
         }
       },
+      "delete": {
+        "tags": [
+          "notifications"
+        ],
+        "operationId": "delete__api_notifications",
+        "summary": "DELETE /api/notifications",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      },
       "post": {
         "tags": [
           "notifications"
@@ -4087,6 +4108,40 @@
         ],
         "operationId": "patch__api_notifications__id__read",
         "summary": "PATCH /api/notifications/{id}/read",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID: id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/notifications/{id}": {
+      "delete": {
+        "tags": [
+          "notifications"
+        ],
+        "operationId": "delete__api_notifications__id_",
+        "summary": "DELETE /api/notifications/{id}",
         "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
         "parameters": [
           {

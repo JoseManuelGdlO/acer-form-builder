@@ -24,7 +24,6 @@ interface ClientListProps {
   onDelete: (clientId: string) => Promise<void>;
   onCreate: (clientData: Omit<Client, 'id' | 'createdAt' | 'updatedAt' | 'formsCompleted'>) => Promise<void>;
   onUpdate: (clientId: string, updates: Partial<Client>) => Promise<void>;
-  onBack: () => void;
   users?: User[];
   isAdmin?: boolean;
 }
@@ -39,7 +38,6 @@ export const ClientList = ({
   onDelete,
   onCreate,
   onUpdate,
-  onBack,
   users = [],
   isAdmin = false,
 }: ClientListProps) => {
@@ -263,9 +261,6 @@ export const ClientList = ({
         {/* Header */}
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
-            <Button variant="ghost" onClick={onBack} className="mb-2 -ml-2">
-              ← Volver a formularios
-            </Button>
             <h1 className="text-3xl font-bold text-foreground">
               Clientes
             </h1>

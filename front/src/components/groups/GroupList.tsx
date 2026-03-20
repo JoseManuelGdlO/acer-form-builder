@@ -14,7 +14,6 @@ interface GroupListProps {
   onCreate: (data: { title: string; clientIds?: string[] }) => Promise<void>;
   onUpdate: (groupId: string, data: { title?: string; clientIds?: string[] }) => Promise<void>;
   onDelete: (groupId: string) => Promise<void>;
-  onBack: () => void;
 }
 
 export const GroupList = ({
@@ -23,7 +22,6 @@ export const GroupList = ({
   onCreate,
   onUpdate,
   onDelete,
-  onBack,
 }: GroupListProps) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -111,9 +109,6 @@ export const GroupList = ({
       <div className="max-w-5xl mx-auto p-6 space-y-6">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
-            <Button variant="ghost" onClick={onBack} className="mb-2 -ml-2">
-              ← Volver
-            </Button>
             <h1 className="text-3xl font-bold text-foreground">Grupos</h1>
             <p className="text-muted-foreground mt-1">
               Agrupa clientes (por ejemplo, familias para trámites de visa)

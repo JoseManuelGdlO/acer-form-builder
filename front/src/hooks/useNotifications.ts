@@ -28,6 +28,8 @@ interface NotificationsState {
   ensurePushEnabled: () => Promise<boolean>;
   markNotificationRead: (notificationId: string) => Promise<void>;
   markAllAsRead: () => Promise<void>;
+  dismissNotification: (notificationId: string) => Promise<void>;
+  dismissAllNotifications: () => Promise<void>;
 }
 
 export const useNotifications = create<NotificationsState>((set, get) => ({
@@ -126,6 +128,24 @@ export const useNotifications = create<NotificationsState>((set, get) => ({
       notifications: s.notifications.map((n) => (!n.readAt ? { ...n, readAt: now } : n)),
       unreadCount: 0,
     }));
+  },
+
+  dismissNotification: async (notificationId: string) => {
+    await api.dismissNotification(notificationId);
+    set((state) => {
+      const target = state.notifications.find((n) => n.notificationId === notificationId);
+      const removedUnread = target && !target.readAt ? 1 : 0;
+
+      return {
+        notifications: state.notifications.filter((n) => n.notificationId !== notificationId),
+        unreadCount: Math.max(0, state.unreadCount - removedUnread),
+      };
+    });
+  },
+
+  dismissAllNotifications: async () => {
+    await api.dismissAllNotifications();
+    set({ notifications: [], unreadCount: 0 });
   },
 }));
 

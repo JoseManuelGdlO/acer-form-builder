@@ -422,43 +422,51 @@ const Index = () => {
   // Si estamos editando un formulario, mostramos el editor
   if (currentForm) {
     return (
-      <FormEditor
-        form={currentForm}
-        onBack={async () => {
-          await selectForm(null);
-          // Reload forms after editing
-          if (token) {
-            await fetchForms();
-          }
-        }}
-        onUpdateForm={async (updates) => {
-          await updateForm(currentForm.id, updates);
-        }}
-        onAddSection={async () => {
-          await addSection(currentForm.id);
-        }}
-        onUpdateSection={async (sectionId, updates) => {
-          await updateSection(currentForm.id, sectionId, updates);
-        }}
-        onDeleteSection={async (sectionId) => {
-          await deleteSection(currentForm.id, sectionId);
-        }}
-        onReorderSections={async (sections) => {
-          await reorderSections(currentForm.id, sections);
-        }}
-        onAddQuestion={async (sectionId, type) => {
-          await addQuestion(currentForm.id, sectionId, type);
-        }}
-        onUpdateQuestion={async (sectionId, questionId, updates) => {
-          await updateQuestion(currentForm.id, sectionId, questionId, updates);
-        }}
-        onDeleteQuestion={async (sectionId, questionId) => {
-          await deleteQuestion(currentForm.id, sectionId, questionId);
-        }}
-        onReorderQuestions={async (sectionId, questions) => {
-          await reorderQuestions(currentForm.id, sectionId, questions);
-        }}
-      />
+      <>
+        <FloatingViewAs />
+        <div className={`min-h-screen bg-background ${viewingAs ? 'pt-10' : ''}`}>
+          <AppHeader>
+            <NavigationButtons current="forms" />
+          </AppHeader>
+          <FormEditor
+            form={currentForm}
+            onBack={async () => {
+              await selectForm(null);
+              // Reload forms after editing
+              if (token) {
+                await fetchForms();
+              }
+            }}
+            onUpdateForm={async (updates) => {
+              await updateForm(currentForm.id, updates);
+            }}
+            onAddSection={async () => {
+              await addSection(currentForm.id);
+            }}
+            onUpdateSection={async (sectionId, updates) => {
+              await updateSection(currentForm.id, sectionId, updates);
+            }}
+            onDeleteSection={async (sectionId) => {
+              await deleteSection(currentForm.id, sectionId);
+            }}
+            onReorderSections={async (sections) => {
+              await reorderSections(currentForm.id, sections);
+            }}
+            onAddQuestion={async (sectionId, type) => {
+              await addQuestion(currentForm.id, sectionId, type);
+            }}
+            onUpdateQuestion={async (sectionId, questionId, updates) => {
+              await updateQuestion(currentForm.id, sectionId, questionId, updates);
+            }}
+            onDeleteQuestion={async (sectionId, questionId) => {
+              await deleteQuestion(currentForm.id, sectionId, questionId);
+            }}
+            onReorderQuestions={async (sectionId, questions) => {
+              await reorderQuestions(currentForm.id, sectionId, questions);
+            }}
+          />
+        </div>
+      </>
     );
   }
 
@@ -467,7 +475,10 @@ const Index = () => {
     return (
       <>
         <FloatingViewAs />
-        <div className={viewingAs ? 'pt-10' : ''}>
+        <div className={`min-h-screen bg-background ${viewingAs ? 'pt-10' : ''}`}>
+          <AppHeader>
+            <NavigationButtons current="clients" />
+          </AppHeader>
           <ClientList
             clients={filteredClients}
             stats={filteredClientStats}
@@ -475,7 +486,6 @@ const Index = () => {
             onDelete={deleteClient}
             onCreate={async (data) => { await createClient(data); }}
             onUpdate={async (id, data) => { await updateClient(id, data); }}
-            onBack={() => setActiveView('dashboard')}
             users={users}
             isAdmin={hasRole('super_admin')}
           />
@@ -575,18 +585,8 @@ const Index = () => {
           <AppHeader>
             <NavigationButtons current="products" />
           </AppHeader>
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4 mb-4 flex justify-end">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setCategoryManagerOpen(true)}
-            >
-              Gestionar categorías
-            </Button>
-          </div>
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4 mb-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="space-y-3">
               <div className="flex flex-wrap gap-2 items-center">
                 <span className="text-sm font-medium text-muted-foreground">Filtrar por categoría:</span>
                 {categories.map((cat: Category) => {
@@ -607,23 +607,33 @@ const Index = () => {
                   );
                 })}
               </div>
-              <div className="flex gap-2">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={applyFilters}
+                    disabled={!token}
+                  >
+                    Aplicar filtros
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={clearFilters}
+                    disabled={!token && selectedFilterCategories.length === 0}
+                  >
+                    Quitar filtros
+                  </Button>
+                </div>
                 <Button
                   type="button"
-                  size="sm"
-                  onClick={applyFilters}
-                  disabled={!token}
-                >
-                  Aplicar filtros
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
                   variant="outline"
-                  onClick={clearFilters}
-                  disabled={!token && selectedFilterCategories.length === 0}
+                  size="sm"
+                  onClick={() => setCategoryManagerOpen(true)}
                 >
-                  Quitar filtros
+                  Gestionar categorías
                 </Button>
               </div>
             </div>
@@ -721,14 +731,16 @@ const Index = () => {
     return (
       <>
         <FloatingViewAs />
-        <div className={viewingAs ? 'pt-10' : ''}>
+        <div className={`min-h-screen bg-background ${viewingAs ? 'pt-10' : ''}`}>
+          <AppHeader>
+            <NavigationButtons current="groups" />
+          </AppHeader>
           <GroupList
             groups={groups}
             availableClients={filteredClients}
             onCreate={async (data) => { await createGroup(data); }}
             onUpdate={async (id, data) => { await updateGroup(id, data); }}
             onDelete={deleteGroup}
-            onBack={() => setActiveView('dashboard')}
           />
         </div>
       </>
@@ -747,7 +759,10 @@ const Index = () => {
     return (
       <>
         <FloatingViewAs />
-        <div className={viewingAs ? 'pt-10' : ''}>
+        <div className={`min-h-screen bg-background ${viewingAs ? 'pt-10' : ''}`}>
+          <AppHeader>
+            <NavigationButtons current="trips" />
+          </AppHeader>
           <TripList
             trips={trips}
             invitations={invitations}
@@ -800,7 +815,6 @@ const Index = () => {
             onUpdateBusTemplate={async (id, data) => { await updateBusTemplateStore(token!, id, data); }}
             onDeleteBusTemplate={async (id) => { await deleteBusTemplateStore(token!, id); }}
             changeLog={changeLog}
-            onBack={() => setActiveView('dashboard')}
           />
         </div>
       </>

@@ -1111,6 +1111,22 @@ class ApiClient {
       requireAuth: true,
     });
   }
+
+  async dismissNotification(notificationId: string, token?: string | null) {
+    return this.request<any>(`/notifications/${notificationId}`, {
+      method: 'DELETE',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async dismissAllNotifications(token?: string | null) {
+    return this.request<{ dismissed: number }>(`/notifications`, {
+      method: 'DELETE',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
 }
 
 export const api = new ApiClient(API_URL);

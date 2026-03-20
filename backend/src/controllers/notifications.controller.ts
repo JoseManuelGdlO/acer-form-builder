@@ -158,6 +158,56 @@ export const markNotificationRead = async (req: AuthRequest, res: Response): Pro
   }
 };
 
+export const dismissNotification = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+
+    const { id } = req.params; // notificationId
+    const recipient = await NotificationRecipient.findOne({
+      where: {
+        companyId: req.user.companyId,
+        recipientUserId: req.user.id,
+        notificationId: id,
+      },
+    });
+
+    if (!recipient) {
+      res.status(404).json({ error: 'Notification not found' });
+      return;
+    }
+
+    await recipient.destroy();
+    res.json({ notificationId: id, dismissed: true });
+  } catch (error) {
+    console.error('dismissNotification error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+export const dismissAllNotifications = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+
+    const deleted = await NotificationRecipient.destroy({
+      where: {
+        companyId: req.user.companyId,
+        recipientUserId: req.user.id,
+      },
+    });
+
+    res.json({ dismissed: deleted });
+  } catch (error) {
+    console.error('dismissAllNotifications error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 export const createNotification = [
   body('type').notEmpty().withMessage('type is required').isString(),
   body('message').notEmpty().withMessage('message is required').isString(),
