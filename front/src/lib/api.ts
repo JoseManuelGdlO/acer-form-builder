@@ -609,6 +609,12 @@ class ApiClient {
   }
 
   // Form session submissions (public - no auth required)
+  async getSubmissionBySession(formId: string, sessionId: string) {
+    return this.request<any>(`/forms/${formId}/sessions/${sessionId}/submission`, {
+      method: 'GET',
+    });
+  }
+
   async createSubmissionFromSession(formId: string, sessionId: string, clientInfo: any) {
     return this.request<any>(`/forms/${formId}/sessions/${sessionId}/submission`, {
       method: 'POST',

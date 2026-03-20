@@ -247,27 +247,19 @@ export default function PublicFormView() {
     }
   }, []);
 
-  // Save progress to API (DB)
+  // Save progress to API (DB). En secciones no incluimos answers (están en la submission)
+  // para evitar enviar ~12MB de base64 en cada guardado.
   const saveProgress = useCallback(async () => {
     if (!formId || !sessionToken || step === 'success') return;
     try {
-      const progress = {
+      const progress: Record<string, any> = {
         clientInfo,
         submissionId,
-        answers: Object.fromEntries(
-          Object.entries(answers).map(([key, value]) => [
-            key,
-            value instanceof Date
-              ? value.toISOString()
-              : typeof value === 'object' && value !== null && !Array.isArray(value) && 'data' in value
-                ? value
-                : value,
-          ])
-        ),
         step,
         currentSectionIndex,
         savedAt: new Date().toISOString(),
       };
+      // En sections no incluimos answers (evita ~12MB por guardado); se restauran desde la submission al recargar
       await api.updateFormSessionProgress(formId, sessionToken, progress);
     } catch (error) {
       console.error('Failed to save progress:', error);
@@ -304,7 +296,31 @@ export default function PublicFormView() {
         if (sessionData.status === 'completed') {
           setStep('success');
         } else if (sessionData.progress && Object.keys(sessionData.progress).length > 0) {
-          applyProgress(sessionData.progress);
+          const prog = sessionData.progress;
+          applyProgress(prog);
+          // Si estamos en sections con submissionId, cargar answers desde la submission (no del progress)
+          if (prog.submissionId && prog.step === 'sections') {
+            try {
+              const sub = await api.getSubmissionBySession(formId, sessionToken);
+              if (sub?.answers && Object.keys(sub.answers).length > 0) {
+                const restored: Record<string, string | string[] | Date | FileAnswerValue> = {};
+                Object.entries(sub.answers).forEach(([key, val]: [string, any]) => {
+                  const v = val?.answer ?? val;
+                  if (v && typeof v === 'object' && !Array.isArray(v) && 'data' in v && 'fileName' in v) {
+                    restored[key] = v as FileAnswerValue;
+                  } else if (typeof v === 'string' && v.match(/^\d{4}-\d{2}-\d{2}T/)) {
+                    restored[key] = new Date(v);
+                  } else {
+                    restored[key] = v as string | string[] | Date;
+                  }
+                });
+                setAnswers(restored);
+              }
+            } catch {
+              // Fallback: usar progress.answers si existe (compatibilidad con datos antiguos)
+              if (prog.answers) applyProgress({ answers: prog.answers });
+            }
+          }
         }
       } catch (error) {
         console.error('Failed to load form or session:', error);
@@ -440,30 +456,66 @@ export default function PublicFormView() {
     return Object.keys(newErrors).length === 0;
   };
 
+  // Format answers for API - shared by handleNext and handleSubmit
+  const formatAnswersForApi = useCallback((questions: Question[]) => {
+    const result: Record<string, any> = {};
+    questions.forEach(question => {
+      const answerValue = answers[question.id];
+      if (answerValue !== undefined && answerValue !== null) {
+        let formattedValue: string | string[] | FileAnswerValue;
+        if (answerValue instanceof Date) {
+          formattedValue = answerValue.toISOString();
+        } else if (Array.isArray(answerValue)) {
+          formattedValue = answerValue;
+        } else if (typeof answerValue === 'string') {
+          formattedValue = answerValue;
+        } else if (typeof answerValue === 'object' && answerValue !== null && 'data' in answerValue && 'fileName' in answerValue) {
+          formattedValue = answerValue as FileAnswerValue;
+        } else {
+          formattedValue = String(answerValue);
+        }
+        const questionTitle = question.title && question.title.trim() && !/nueva pregunta/i.test(question.title.trim())
+          ? question.title
+          : (question.id?.slice(0, 8) ?? question.id);
+        result[question.id] = {
+          questionId: question.id,
+          question: questionTitle,
+          questionType: question.type,
+          questionDescription: question.description,
+          answer: formattedValue,
+          options: question.options,
+        };
+      }
+    });
+    return result;
+  }, [answers]);
+
   const handleNext = async () => {
     if (!form) return;
     
     if (validateCurrentSection()) {
-      // Update submission with current answers before advancing
-      if (formId && sessionToken) {
-        try {
-          await api.updateSubmissionFromSession(
-            formId,
-            sessionToken,
-            answers
-          );
-          console.log('Updated submission with current answers');
-        } catch (error) {
-          console.warn('Failed to save section progress:', error);
-          toast.warning('No se pudo guardar el progreso, pero puedes continuar');
+      const isLastSection = currentSectionIndex >= form.sections.length - 1;
+
+      if (formId && sessionToken && !isLastSection) {
+        // Solo enviar respuestas de la sección actual (reduce payload ~10x con archivos)
+        const section = form.sections[currentSectionIndex];
+        const sectionAnswers = formatAnswersForApi(section.questions);
+        if (Object.keys(sectionAnswers).length > 0) {
+          api.updateSubmissionFromSession(formId, sessionToken, sectionAnswers)
+            .then(() => console.log('Progreso guardado'))
+            .catch((err) => {
+              console.warn('Error al guardar progreso:', err);
+              toast.warning('No se pudo guardar el progreso, pero puedes continuar');
+            });
+          // No await: avanza inmediato, guarda en segundo plano
         }
       }
 
-      if (currentSectionIndex < form.sections.length - 1) {
+      if (isLastSection) {
+        handleSubmit();
+      } else {
         setCurrentSectionIndex(prev => prev + 1);
         window.scrollTo({ top: 0, behavior: 'smooth' });
-      } else {
-        handleSubmit();
       }
     }
   };
@@ -486,58 +538,8 @@ export default function PublicFormView() {
     }
     
     try {
-      // Collect all answers from all sections
-      const allAnswers: Record<string, string | string[] | Date | FileAnswerValue> = { ...answers };
-      
-      // Convert Date objects to ISO strings and include question information
-      const formattedAnswers: Record<string, any> = {};
-      form.sections.forEach(section => {
-        section.questions.forEach(question => {
-          const answerValue = allAnswers[question.id];
-          if (answerValue !== undefined && answerValue !== null) {
-            // Format the answer value (file_upload stays as object with fileName, mimeType, data)
-            let formattedValue: string | string[] | FileAnswerValue;
-            if (answerValue instanceof Date) {
-              formattedValue = answerValue.toISOString();
-            } else if (Array.isArray(answerValue)) {
-              formattedValue = answerValue;
-            } else if (typeof answerValue === 'string') {
-              formattedValue = answerValue;
-            } else if (typeof answerValue === 'object' && answerValue !== null && 'data' in answerValue && 'fileName' in answerValue) {
-              formattedValue = answerValue as FileAnswerValue;
-            } else {
-              formattedValue = String(answerValue);
-            }
-
-            // Get question title, ensuring it's not "Nueva pregunta" or empty
-            let questionTitle = question.title || '';
-            // If title is "Nueva pregunta" or invalid, use question ID
-            if (!questionTitle || 
-                questionTitle.trim() === '' || 
-                questionTitle.trim().toLowerCase() === 'nueva pregunta' ||
-                questionTitle.trim().toLowerCase() === 'nueva pregunta frecuente') {
-              // Fallback to question ID
-              questionTitle = question.id || `Pregunta ${question.id.slice(0, 8)}`;
-            }
-
-            // Include both the answer and question information
-            formattedAnswers[question.id] = {
-              questionId: question.id,
-              question: questionTitle,
-              questionType: question.type,
-              questionDescription: question.description,
-              answer: formattedValue,
-              options: question.options, // Preserve options for display
-            };
-          }
-        });
-      });
-
-      // Debug: Log answers before sending
-      console.log('Raw answers state:', answers);
-      console.log('All answers collected:', allAnswers);
-      console.log('Formatted answers to send:', formattedAnswers);
-      console.log('Number of answers:', Object.keys(formattedAnswers).length);
+      const allQuestions = form.sections.flatMap(s => s.questions);
+      const formattedAnswers = formatAnswersForApi(allQuestions);
 
       // Validate we have at least some answers
       if (Object.keys(formattedAnswers).length === 0) {

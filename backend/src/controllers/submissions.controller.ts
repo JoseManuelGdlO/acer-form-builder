@@ -533,6 +533,37 @@ export const createSubmissionFromSession = [
 ];
 
 /**
+ * Get submission by session (public). Used to restore answers on page reload
+ * without storing large base64 payloads in session progress.
+ */
+export const getSubmissionBySession = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const formId = req.params.id;
+    const { sessionId } = req.params;
+
+    const session = await FormSession.findOne({
+      where: { id: sessionId, formId },
+    });
+
+    if (!session || !session.submissionId) {
+      res.status(404).json({ error: 'Submission not found' });
+      return;
+    }
+
+    const submission = await FormSubmission.findByPk(session.submissionId);
+    if (!submission) {
+      res.status(404).json({ error: 'Submission not found' });
+      return;
+    }
+
+    res.json(submission);
+  } catch (error) {
+    console.error('Get submission by session error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+/**
  * Update a submission from a form session (public endpoint)
  * Called when user advances sections or completes the form
  */
@@ -578,9 +609,27 @@ export const updateSubmissionFromSession = [
 
       // Merge answers if provided
       if (answers) {
-        const currentAnswers = submission.answers || {};
+        // MySQL/Sequelize sometimes returns JSON columns as string - must parse to avoid
+        // spreading a string (which would create {0:"{", 1:"\"", ...} and explode payload size)
+        let currentAnswers: Record<string, any> = {};
+        const rawAnswers = submission.answers;
+        if (rawAnswers) {
+          if (typeof rawAnswers === 'string') {
+            try {
+              currentAnswers = (JSON.parse(rawAnswers) as Record<string, any>) || {};
+            } catch {
+              currentAnswers = {};
+            }
+          } else if (typeof rawAnswers === 'object' && !Array.isArray(rawAnswers)) {
+            // Detect corrupted data: object with numeric string keys from accidental string spread
+            const keys = Object.keys(rawAnswers);
+            const isCorrupted = keys.length > 100 && keys.every((k) => /^\d+$/.test(k));
+            currentAnswers = isCorrupted ? {} : (rawAnswers as Record<string, any>);
+          }
+        }
+
         const finalAnswers = answers && typeof answers === 'object' && !Array.isArray(answers) ? answers : {};
-        
+
         // Normalize answers format
         const normalizedAnswers: Record<string, any> = {};
         Object.entries(finalAnswers).forEach(([questionId, answerData]) => {
@@ -594,7 +643,21 @@ export const updateSubmissionFromSession = [
           }
         });
 
-        updateData.answers = { ...currentAnswers, ...normalizedAnswers };
+        const mergedAnswers = { ...currentAnswers, ...normalizedAnswers };
+
+        // Prevent max_allowed_packet error: cap at 64MB to allow forms with file uploads (base64).
+        // MySQL default is 16MB - increase with: SET GLOBAL max_allowed_packet=67108864;
+        const MAX_ANSWERS_SIZE = 64 * 1024 * 1024;
+        const answersJson = JSON.stringify(mergedAnswers);
+        if (answersJson.length > MAX_ANSWERS_SIZE) {
+          console.error(`Answers payload too large: ${answersJson.length} bytes (max ${MAX_ANSWERS_SIZE})`);
+          res.status(413).json({
+            error: 'Las respuestas del formulario exceden el tamaño máximo permitido. Por favor, reduce el tamaño de archivos adjuntos o textos muy largos.',
+          });
+          return;
+        }
+
+        updateData.answers = mergedAnswers;
       }
 
       // Update status if provided

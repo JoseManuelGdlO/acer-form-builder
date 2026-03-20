@@ -1980,6 +1980,39 @@
       }
     },
     "/api/forms/{id}/sessions/{sessionId}/submission": {
+      "get": {
+        "tags": [
+          "forms"
+        ],
+        "operationId": "get__api_forms__id__sessions__sessionId__submission",
+        "summary": "GET /api/forms/{id}/sessions/{sessionId}/submission",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Acceso publico.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID: id",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "description": "ID: sessionId",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
       "post": {
         "tags": [
           "forms"

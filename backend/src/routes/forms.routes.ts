@@ -14,6 +14,7 @@ router.get('/:id/sessions/:sessionId', formSessionsController.getFormSessionProg
 router.patch('/:id/sessions/:sessionId', ...formSessionsController.updateFormSessionProgress);
 router.post('/:id/sessions/:sessionId/complete', formSessionsController.completeFormSession);
 // Public routes for form session submissions
+router.get('/:id/sessions/:sessionId/submission', submissionsController.getSubmissionBySession);
 router.post('/:id/sessions/:sessionId/submission', ...submissionsController.createSubmissionFromSession);
 router.patch('/:id/sessions/:sessionId/submission', ...submissionsController.updateSubmissionFromSession);
 router.get('/:id', formsController.getFormById);
