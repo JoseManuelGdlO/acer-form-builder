@@ -304,6 +304,31 @@ export const getProductsByCategories = async (req: AuthRequest, res: Response): 
   }
 };
 
+export const getProductByTitle = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { title } = req.params;
+    const companyId = req.user?.companyId;
+    if (!companyId) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+
+    const product = await Product.findOne({ 
+      where: { title, companyId },
+      include: [{ model: ProductCategory, as: 'categories', attributes: ['category'] }],
+    });
+    if (!product) {
+      res.status(404).json({ error: 'Product not found' });
+      return;
+    }
+
+    res.json(serializeProduct(product));
+  } catch (error) {
+    console.error('No hubo coincidencia con el titulo:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 export const deleteProduct = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;

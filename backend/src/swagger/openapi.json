@@ -3699,6 +3699,40 @@
         }
       }
     },
+    "/api/products/title/{title}": {
+      "get": {
+        "tags": [
+          "products"
+        ],
+        "operationId": "get__api_products_title__title_",
+        "summary": "GET /api/products/title/{title}",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "parameters": [
+          {
+            "name": "title",
+            "in": "path",
+            "required": true,
+            "description": "Path parameter: title",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
     "/api/products/{id}": {
       "get": {
         "tags": [

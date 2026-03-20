@@ -46,6 +46,7 @@ router.use(authenticate);
 
 router.get('/', productsController.getAllProducts);
 router.get('/by-category', productsController.getProductsByCategories);
+router.get('/title/:title', productsController.getProductByTitle);
 router.get('/:id', productsController.getProductById);
 router.post('/', upload.single('image'), productsController.createProduct);
 router.put('/:id', upload.single('image'), productsController.updateProduct);
