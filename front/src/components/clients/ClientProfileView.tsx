@@ -21,6 +21,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { formatPhoneOptional } from '@/lib/phone';
 
 interface ClientProfileViewProps {
   client: Client;
@@ -497,7 +498,7 @@ export const ClientProfileView = ({ client, onBack, onEdit }: ClientProfileViewP
   };
   const infoItems = [
     { icon: Mail, label: 'Correo', value: displayClient.email },
-    { icon: Phone, label: 'Teléfono', value: displayClient.phone || 'No registrado' },
+    { icon: Phone, label: 'Teléfono', value: formatPhoneOptional(displayClient.phone) },
     { icon: MapPin, label: 'Dirección', value: displayClient.address || 'No registrada' },
     { icon: UserCircle, label: 'Asesor', value: displayClient.assignedUser?.name ?? 'Sin asignar' },
     { icon: FileText, label: 'Formularios', value: `${displayClient.formsCompleted} completados` },

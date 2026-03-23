@@ -20,6 +20,7 @@ import {
 import { MoreHorizontal, Eye, Trash2, User, Mail, Phone, FileText, Edit2, DollarSign, UserCircle, MapPin } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { formatPhoneNumberDisplay } from '@/lib/phone';
 
 interface ClientCardProps {
   client: Client;
@@ -74,7 +75,7 @@ export const ClientCard = ({
               {client.phone && (
                 <div className="flex items-center gap-1.5">
                   <Phone className="w-4 h-4" />
-                  <span>{client.phone}</span>
+                  <span>{formatPhoneNumberDisplay(client.phone)}</span>
                 </div>
               )}
               <div className="flex items-center gap-1.5">

@@ -22,6 +22,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { User, Mail, Phone, MapPin, FileText, ShoppingBag } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { formatPhoneNumberDisplay, normalizePhoneDigits } from '@/lib/phone';
 
 interface ClientFormModalProps {
   client?: Client | null;
@@ -55,13 +57,14 @@ export const ClientFormModal = ({
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [phoneError, setPhoneError] = useState('');
 
   useEffect(() => {
     if (client) {
       setFormData({
         name: client.name,
         email: client.email,
-        phone: client.phone || '',
+        phone: normalizePhoneDigits(client.phone || ''),
         address: client.address || '',
         notes: client.notes || '',
         visaCasAppointmentDate: client.visaCasAppointmentDate || '',
@@ -87,17 +90,38 @@ export const ClientFormModal = ({
       });
     }
     setError('');
+    setPhoneError('');
     setIsLoading(false);
   }, [client, open, visaStatusTemplates]);
+
+  const validatePhone = (digits: string): boolean => {
+    if (!digits) {
+      setPhoneError('');
+      return true;
+    }
+    if (digits.length !== 10) {
+      setPhoneError('El teléfono debe tener exactamente 10 dígitos (máximo 10).');
+      return false;
+    }
+    setPhoneError('');
+    return true;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
+    setPhoneError('');
+
+    if (!validatePhone(formData.phone)) {
+      setIsLoading(false);
+      return;
+    }
 
     try {
       await onSave({
         ...formData,
+        phone: formData.phone || '',
         visaCasAppointmentDate: formData.visaCasAppointmentDate || null,
         visaCasAppointmentLocation: formData.visaCasAppointmentLocation.trim() || null,
         visaConsularAppointmentDate: formData.visaConsularAppointmentDate || null,
@@ -162,10 +186,29 @@ export const ClientFormModal = ({
             <Input
               id="phone"
               type="tel"
-              value={formData.phone}
-              onChange={e => setFormData(prev => ({ ...prev, phone: e.target.value }))}
-              placeholder="+52 55 1234 5678"
+              value={formatPhoneNumberDisplay(formData.phone)}
+              onChange={e => {
+                const digits = normalizePhoneDigits(e.target.value);
+                setFormData(prev => ({ ...prev, phone: digits }));
+                if (!digits) {
+                  setPhoneError('');
+                } else if (digits.length !== 10) {
+                  setPhoneError('El teléfono debe tener exactamente 10 dígitos (máximo 10).');
+                } else {
+                  setPhoneError('');
+                }
+              }}
+              onBlur={() => validatePhone(formData.phone)}
+              placeholder="(618)-290-1223"
+              maxLength={14}
+              className={cn(phoneError && 'border-destructive')}
+              aria-invalid={!!phoneError}
             />
+            {phoneError ? (
+              <p className="text-sm text-destructive">{phoneError}</p>
+            ) : (
+              <p className="text-xs text-muted-foreground">10 dígitos; se guarda sin formato en el sistema.</p>
+            )}
           </div>
 
           <div className="space-y-2">

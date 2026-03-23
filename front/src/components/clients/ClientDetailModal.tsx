@@ -10,6 +10,7 @@ import { Separator } from '@/components/ui/separator';
 import { User, Mail, Phone, MapPin, FileText, Calendar, Clock, Bus } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { formatPhoneOptional } from '@/lib/phone';
 
 interface ClientDetailModalProps {
   client: Client | null;
@@ -26,7 +27,7 @@ export const ClientDetailModal = ({
 
   const infoItems = [
     { icon: Mail, label: 'Correo electrónico', value: client.email },
-    { icon: Phone, label: 'Teléfono', value: client.phone || 'No registrado' },
+    { icon: Phone, label: 'Teléfono', value: formatPhoneOptional(client.phone) },
     { icon: MapPin, label: 'Dirección', value: client.address || 'No registrada' },
     { icon: FileText, label: 'Formularios completados', value: `${client.formsCompleted}` },
     { 

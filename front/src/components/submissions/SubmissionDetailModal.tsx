@@ -15,6 +15,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { api } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
+import { formatPhoneNumberDisplay } from '@/lib/phone';
 
 interface SubmissionDetailModalProps {
   submission: FormSubmission | null;
@@ -197,7 +198,7 @@ export const SubmissionDetailModal = ({
                     {displaySubmission.respondentPhone && (
                       <div className="flex items-center gap-1.5">
                         <Phone className="w-3.5 h-3.5" />
-                        <span>{displaySubmission.respondentPhone}</span>
+                        <span>{formatPhoneNumberDisplay(displaySubmission.respondentPhone)}</span>
                       </div>
                     )}
                   </div>

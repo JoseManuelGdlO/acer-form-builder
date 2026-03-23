@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { jsPDF } from 'jspdf';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { formatPhoneNumberDisplay } from '@/lib/phone';
 
 interface SubmissionListProps {
   submissions: FormSubmission[];
@@ -86,7 +87,7 @@ export const SubmissionList = ({
     doc.text(`Email: ${submission.respondentEmail}`, 20, yPos);
     yPos += 6;
     if (submission.respondentPhone) {
-      doc.text(`Teléfono: ${submission.respondentPhone}`, 20, yPos);
+      doc.text(`Teléfono: ${formatPhoneNumberDisplay(submission.respondentPhone)}`, 20, yPos);
       yPos += 6;
     }
     doc.text(`Estado: ${SUBMISSION_STATUS_CONFIG[submission.status].label}`, 20, yPos);

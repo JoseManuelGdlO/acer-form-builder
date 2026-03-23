@@ -28,6 +28,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { formatPhoneNumberDisplay } from '@/lib/phone';
 
 interface GroupDetailViewProps {
   group: Group;
@@ -172,7 +173,7 @@ export const GroupDetailView = ({
                             {client.phone && (
                               <span className="flex items-center gap-1">
                                 <Phone className="w-3.5 h-3.5 shrink-0" />
-                                {client.phone}
+                                {formatPhoneNumberDisplay(client.phone)}
                               </span>
                             )}
                             {'lastSubmission' in client && client.lastSubmission ? (
