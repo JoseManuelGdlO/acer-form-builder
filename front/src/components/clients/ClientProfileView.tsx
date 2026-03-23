@@ -40,6 +40,9 @@ export const ClientProfileView = ({ client, onBack, onEdit }: ClientProfileViewP
   const [paymentDeletedHistory, setPaymentDeletedHistory] = useState<PaymentDeletedLogEntry[]>([]);
   const [submissions, setSubmissions] = useState<ClientFormSubmission[]>([]);
   const [clientSnapshot, setClientSnapshot] = useState<Client>(client);
+  const [isConversationPaused, setIsConversationPaused] = useState(false);
+  const [hasConversationHistory, setHasConversationHistory] = useState(false);
+  const [isTogglingConversationPause, setIsTogglingConversationPause] = useState(false);
 
   useEffect(() => {
     setClientSnapshot(client);
@@ -133,7 +136,14 @@ export const ClientProfileView = ({ client, onBack, onEdit }: ClientProfileViewP
         timestamp: new Date(m.created_at || m.createdAt),
       }));
 
-      const botChatMessages: ChatMessage[] = (conversationsData || []).map((m: any) => ({
+      const conversationsList = Array.isArray(conversationsData) ? conversationsData : [];
+      const lastConversation = conversationsList.length > 0
+        ? conversationsList[conversationsList.length - 1]
+        : null;
+      setHasConversationHistory(conversationsList.length > 0);
+      setIsConversationPaused(Boolean(lastConversation?.baja_logica));
+
+      const botChatMessages: ChatMessage[] = conversationsList.map((m: any) => ({
         id: `conv-${m.id}`,
         content: m.mensaje ?? m.content,
         sender: m.from === 'bot' ? 'agent' : 'client',
@@ -439,6 +449,30 @@ export const ClientProfileView = ({ client, onBack, onEdit }: ClientProfileViewP
     }
   };
 
+  const handleToggleConversationPause = async () => {
+    const clientPhone = (clientSnapshot?.phone ?? client.phone ?? '').trim();
+    if (!clientPhone) {
+      toast.error('Este cliente no tiene teléfono registrado');
+      return;
+    }
+    if (!hasConversationHistory) {
+      toast.error('No hay conversación para pausar o reanudar');
+      return;
+    }
+
+    const nextStatus = !isConversationPaused;
+    setIsTogglingConversationPause(true);
+    try {
+      await api.pauseConversationByPhone(clientPhone, nextStatus);
+      setIsConversationPaused(nextStatus);
+      toast.success(nextStatus ? 'Conversación pausada' : 'Conversación reanudada');
+    } catch (error: any) {
+      toast.error(error.message || 'Error al actualizar el estado de conversación');
+    } finally {
+      setIsTogglingConversationPause(false);
+    }
+  };
+
   const displayClient = clientSnapshot ?? client;
   const infoItems = [
     { icon: Mail, label: 'Correo', value: displayClient.email },
@@ -585,6 +619,10 @@ export const ClientProfileView = ({ client, onBack, onEdit }: ClientProfileViewP
               clientName={client.name.split(' ')[0]}
               messages={messages}
               onSendMessage={handleSendMessage}
+              isConversationPaused={isConversationPaused}
+              isTogglingConversationPause={isTogglingConversationPause}
+              canToggleConversationPause={Boolean(displayClient.phone) && hasConversationHistory}
+              onToggleConversationPause={handleToggleConversationPause}
             />
           </div>
         </div>

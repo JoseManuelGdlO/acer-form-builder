@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { MessageCircle, Send, User } from 'lucide-react';
+import { MessageCircle, PauseCircle, PlayCircle, Send, User } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -19,15 +19,31 @@ interface ClientChatProps {
   clientName: string;
   messages: ChatMessage[];
   onSendMessage: (content: string) => void;
+  isConversationPaused: boolean;
+  onToggleConversationPause: () => void | Promise<void>;
+  isTogglingConversationPause: boolean;
+  canToggleConversationPause: boolean;
 }
 
-export const ClientChat = ({ clientId, clientName, messages, onSendMessage }: ClientChatProps) => {
+export const ClientChat = ({
+  clientId,
+  clientName,
+  messages,
+  onSendMessage,
+  isConversationPaused,
+  onToggleConversationPause,
+  isTogglingConversationPause,
+  canToggleConversationPause,
+}: ClientChatProps) => {
   const [newMessage, setNewMessage] = useState('');
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    if (scrollAreaRef.current) {
+      const viewport = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]') as HTMLDivElement | null;
+      if (viewport) {
+        viewport.scrollTop = viewport.scrollHeight;
+      }
     }
   }, [messages]);
 
@@ -47,14 +63,33 @@ export const ClientChat = ({ clientId, clientName, messages, onSendMessage }: Cl
 
   return (
     <Card className="border-border/50 flex flex-col h-full">
-      <CardHeader className="pb-3 border-b border-border/50">
+      <CardHeader className="px-6 py-4 border-b border-border/50 flex-row items-center justify-between gap-3 space-y-0">
         <CardTitle className="text-base flex items-center gap-2">
           <MessageCircle className="w-5 h-5 text-primary" />
           Chat con {clientName}
         </CardTitle>
+        <Button
+          type="button"
+          size="sm"
+          variant={isConversationPaused ? 'secondary' : 'outline'}
+          onClick={onToggleConversationPause}
+          disabled={isTogglingConversationPause || !canToggleConversationPause}
+          className="shrink-0 self-center"
+        >
+          {isConversationPaused ? (
+            <PlayCircle className="w-4 h-4 mr-1.5" />
+          ) : (
+            <PauseCircle className="w-4 h-4 mr-1.5" />
+          )}
+          {isTogglingConversationPause
+            ? 'Actualizando...'
+            : isConversationPaused
+              ? 'Reanudar'
+              : 'Pausar'}
+        </Button>
       </CardHeader>
       <CardContent className="flex-1 flex flex-col p-0 min-h-0">
-        <ScrollArea className="flex-1 p-4" ref={scrollRef}>
+        <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full py-12 text-center">
               <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center mb-3">
