@@ -165,7 +165,7 @@ export interface Client {
   visaConsularAppointmentDate?: string | null;
   visaConsularAppointmentLocation?: string | null;
   visaStatusTemplateId: string;
-  visaStatusTemplate?: { id: string; label: string; order?: number; isActive?: boolean } | null;
+  visaStatusTemplate?: { id: string; label: string; order?: number; isActive?: boolean; color?: string | null } | null;
   formsCompleted: number;
   assignedUserId?: string;
   assignedUser?: ClientAssignedUser | null;

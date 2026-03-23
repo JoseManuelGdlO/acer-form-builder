@@ -54,7 +54,7 @@ export const ClientDetailModal = ({
                 <DialogTitle className="text-xl font-bold">
                   {client.name}
                 </DialogTitle>
-                <ClientStatusBadge label={client.visaStatusTemplate?.label} />
+                <ClientStatusBadge label={client.visaStatusTemplate?.label} color={client.visaStatusTemplate?.color} />
               </div>
             </div>
           </div>

@@ -541,7 +541,7 @@ export const ClientProfileView = ({ client, onBack, onEdit }: ClientProfileViewP
                 <h1 className="text-2xl font-bold text-foreground">
                   {client.name}
                 </h1>
-                <ClientStatusBadge label={displayClient.visaStatusTemplate?.label} />
+                <ClientStatusBadge label={displayClient.visaStatusTemplate?.label} color={displayClient.visaStatusTemplate?.color} />
                 <div className="flex flex-wrap gap-2 mt-2">
                   <Badge variant="secondary" className="gap-1">
                     <Calendar className="w-3.5 h-3.5" />

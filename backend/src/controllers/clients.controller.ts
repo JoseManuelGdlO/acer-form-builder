@@ -47,7 +47,7 @@ export const getAllClients = async (req: AuthRequest, res: Response): Promise<vo
         {
           model: VisaStatusTemplate,
           as: 'visaStatusTemplate',
-          attributes: ['id', 'label', 'order', 'isActive'],
+          attributes: ['id', 'label', 'order', 'isActive', 'color'],
           required: false,
         },
         {
@@ -161,6 +161,7 @@ export const getAllClients = async (req: AuthRequest, res: Response): Promise<vo
         label: t.label,
         order: t.order,
         isActive: t.isActive,
+        color: t.color,
       })),
     };
 
@@ -185,7 +186,7 @@ export const getClientById = async (req: AuthRequest, res: Response): Promise<vo
       include: [
         { model: User, as: 'assignedUser', attributes: ['id', 'name', 'email'], required: false },
         { model: Product, as: 'product', attributes: ['id', 'title'], required: false },
-        { model: VisaStatusTemplate, as: 'visaStatusTemplate', attributes: ['id', 'label', 'order', 'isActive'], required: false },
+        { model: VisaStatusTemplate, as: 'visaStatusTemplate', attributes: ['id', 'label', 'order', 'isActive', 'color'], required: false },
       ],
     });
     if (!client) {
@@ -335,7 +336,7 @@ export const createClient = [
       await client.reload({
         include: [
           { model: Product, as: 'product', attributes: ['id', 'title'], required: false },
-          { model: VisaStatusTemplate, as: 'visaStatusTemplate', attributes: ['id', 'label', 'order', 'isActive'], required: false },
+          { model: VisaStatusTemplate, as: 'visaStatusTemplate', attributes: ['id', 'label', 'order', 'isActive', 'color'], required: false },
         ],
       });
       
@@ -491,7 +492,7 @@ export const updateClient = [
         include: [
           { model: User, as: 'assignedUser', attributes: ['id', 'name', 'email'], required: false },
           { model: Product, as: 'product', attributes: ['id', 'title'], required: false },
-          { model: VisaStatusTemplate, as: 'visaStatusTemplate', attributes: ['id', 'label', 'order', 'isActive'], required: false },
+          { model: VisaStatusTemplate, as: 'visaStatusTemplate', attributes: ['id', 'label', 'order', 'isActive', 'color'], required: false },
         ],
       });
       if (req.body.totalAmountDue !== undefined) {
@@ -610,14 +611,14 @@ export const getClientStats = async (req: AuthRequest, res: Response): Promise<v
     const clients = await Client.findAll({
       where,
       attributes: ['visaStatusTemplateId'],
-      include: [{ model: VisaStatusTemplate, as: 'visaStatusTemplate', attributes: ['id', 'label'], required: false }],
+      include: [{ model: VisaStatusTemplate, as: 'visaStatusTemplate', attributes: ['id', 'label', 'color'], required: false }],
     });
-    const visaStatusCounts: Record<string, { id: string; label: string; count: number }> = {};
+    const visaStatusCounts: Record<string, { id: string; label: string; color: string | null; count: number }> = {};
     clients.forEach((client) => {
       const tpl = (client as any).visaStatusTemplate;
       if (!tpl?.id) return;
       if (!visaStatusCounts[tpl.id]) {
-        visaStatusCounts[tpl.id] = { id: tpl.id, label: tpl.label, count: 0 };
+        visaStatusCounts[tpl.id] = { id: tpl.id, label: tpl.label, color: tpl.color ?? null, count: 0 };
       }
       visaStatusCounts[tpl.id].count += 1;
     });

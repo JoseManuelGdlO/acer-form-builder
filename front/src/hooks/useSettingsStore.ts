@@ -14,7 +14,7 @@ interface SettingsState {
   reorderChecklistItems: (items: ChecklistTemplate[]) => void;
   getActiveChecklistItems: () => ChecklistTemplate[];
   fetchVisaStatusTemplates: (token?: string | null) => Promise<void>;
-  addVisaStatusItem: (label: string, token?: string | null) => Promise<void>;
+  addVisaStatusItem: (label: string, token?: string | null, color?: string | null) => Promise<void>;
   updateVisaStatusItem: (id: string, updates: Partial<VisaStatusTemplate>, token?: string | null) => Promise<void>;
   deleteVisaStatusItem: (id: string, token?: string | null) => Promise<void>;
   toggleVisaStatusItem: (id: string, token?: string | null) => Promise<void>;
@@ -163,6 +163,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         label: t.label,
         order: t.order || 0,
         isActive: t.is_active !== undefined ? t.is_active : t.isActive !== undefined ? t.isActive : true,
+        color: t.color ?? null,
         createdAt: new Date(t.created_at || t.createdAt || Date.now()),
       }));
 
@@ -178,15 +179,18 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     }
   },
 
-  addVisaStatusItem: async (label: string, token?: string | null) => {
+  addVisaStatusItem: async (label: string, token?: string | null, color?: string | null) => {
     try {
       const order = get().visaStatusTemplates.length;
-      const newTemplate = await api.createVisaStatusTemplate({ label, order, isActive: true }, token);
+      const payload: Record<string, unknown> = { label, order, isActive: true };
+      if (color) payload.color = color;
+      const newTemplate = await api.createVisaStatusTemplate(payload, token);
       const newItem: VisaStatusTemplate = {
         id: newTemplate.id,
         label: newTemplate.label,
         order: newTemplate.order || order,
         isActive: newTemplate.is_active !== undefined ? newTemplate.is_active : newTemplate.isActive !== undefined ? newTemplate.isActive : true,
+        color: newTemplate.color ?? null,
         createdAt: new Date(newTemplate.created_at || newTemplate.createdAt || Date.now()),
       };
       set((state) => {
@@ -209,6 +213,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       if (updates.label !== undefined) updateData.label = updates.label;
       if (updates.order !== undefined) updateData.order = updates.order;
       if (updates.isActive !== undefined) updateData.isActive = updates.isActive;
+      if (updates.color !== undefined) updateData.color = updates.color;
 
       const updatedTemplate = await api.updateVisaStatusTemplate(id, updateData, token);
       const updatedItem: VisaStatusTemplate = {
@@ -216,6 +221,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         label: updatedTemplate.label,
         order: updatedTemplate.order || existingItem.order,
         isActive: updatedTemplate.is_active !== undefined ? updatedTemplate.is_active : updatedTemplate.isActive !== undefined ? updatedTemplate.isActive : existingItem.isActive,
+        color: updatedTemplate.color !== undefined ? updatedTemplate.color : existingItem.color ?? null,
         createdAt: existingItem.createdAt,
       };
 

@@ -11,6 +11,8 @@ export interface VisaStatusTemplate {
   label: string;
   order: number;
   isActive: boolean;
+  /** Hex (#rrggbb); null/undefined = sin color personalizado */
+  color?: string | null;
   createdAt: Date;
 }
 

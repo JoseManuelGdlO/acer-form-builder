@@ -193,7 +193,13 @@ export const ClientFormModal = ({
               <SelectContent>
                 {visaStatusTemplates.map((template) => (
                   <SelectItem key={template.id} value={template.id}>
-                    {template.label}
+                    <span className="flex items-center gap-2">
+                      <span
+                        className="h-2.5 w-2.5 shrink-0 rounded-full border border-border/60"
+                        style={{ backgroundColor: template.color || '#94a3b8' }}
+                      />
+                      {template.label}
+                    </span>
                   </SelectItem>
                 ))}
               </SelectContent>

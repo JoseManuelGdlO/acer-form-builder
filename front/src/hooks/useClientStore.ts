@@ -69,6 +69,7 @@ export const useClientStore = () => {
           label: t.label,
           order: t.order || 0,
           isActive: t.is_active !== undefined ? t.is_active : t.isActive !== undefined ? t.isActive : true,
+          color: t.color ?? null,
           createdAt: new Date(t.created_at || t.createdAt || Date.now()),
         }));
         setVisaStatusTemplates(mappedVisaTemplates);

@@ -3,6 +3,11 @@ import { body, validationResult } from 'express-validator';
 import { VisaStatusTemplate } from '../models';
 import { AuthRequest } from '../middleware/auth.middleware';
 
+const isValidHexColor = (value: unknown): boolean => {
+  if (value === null || value === undefined || value === '') return true;
+  return typeof value === 'string' && /^#([0-9A-Fa-f]{6}|[0-9A-Fa-f]{3})$/.test(value);
+};
+
 export const getAllVisaStatusTemplates = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const companyId = req.user?.companyId;
@@ -26,6 +31,7 @@ export const getAllVisaStatusTemplates = async (req: AuthRequest, res: Response)
 export const createVisaStatusTemplate = [
   body('label').notEmpty().withMessage('Label is required'),
   body('order').optional().isInt(),
+  body('color').optional({ values: 'null' }).custom(isValidHexColor).withMessage('Color must be a valid hex value'),
   async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       const errors = validationResult(req);
@@ -40,7 +46,14 @@ export const createVisaStatusTemplate = [
         return;
       }
 
-      const template = await VisaStatusTemplate.create({ ...req.body, companyId });
+      const { label, order, isActive, color } = req.body;
+      const template = await VisaStatusTemplate.create({
+        label,
+        order,
+        isActive,
+        color: color === '' || color === undefined ? null : color,
+        companyId,
+      });
       res.status(201).json(template);
     } catch (error) {
       console.error('Create visa status template error:', error);
@@ -53,6 +66,7 @@ export const updateVisaStatusTemplate = [
   body('label').optional().notEmpty(),
   body('order').optional().isInt(),
   body('isActive').optional().isBoolean(),
+  body('color').optional({ values: 'null' }).custom(isValidHexColor).withMessage('Color must be a valid hex value'),
   async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       const errors = validationResult(req);
@@ -74,7 +88,14 @@ export const updateVisaStatusTemplate = [
         return;
       }
 
-      await template.update(req.body);
+      const { label, order, isActive, color } = req.body;
+      const patch: Record<string, unknown> = {};
+      if (label !== undefined) patch.label = label;
+      if (order !== undefined) patch.order = order;
+      if (isActive !== undefined) patch.isActive = isActive;
+      if (color !== undefined) patch.color = color === '' ? null : color;
+
+      await template.update(patch);
       res.json(template);
     } catch (error) {
       console.error('Update visa status template error:', error);

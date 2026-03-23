@@ -7,11 +7,13 @@ interface VisaStatusTemplateAttributes {
   label: string;
   order: number;
   isActive: boolean;
+  color: string | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
 
-interface VisaStatusTemplateCreationAttributes extends Optional<VisaStatusTemplateAttributes, 'id' | 'createdAt' | 'updatedAt'> {}
+interface VisaStatusTemplateCreationAttributes
+  extends Optional<VisaStatusTemplateAttributes, 'id' | 'createdAt' | 'updatedAt' | 'color'> {}
 
 export class VisaStatusTemplate extends Model<VisaStatusTemplateAttributes, VisaStatusTemplateCreationAttributes> implements VisaStatusTemplateAttributes {
   public id!: string;
@@ -19,6 +21,7 @@ export class VisaStatusTemplate extends Model<VisaStatusTemplateAttributes, Visa
   public label!: string;
   public order!: number;
   public isActive!: boolean;
+  public color!: string | null;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
 }
@@ -52,6 +55,10 @@ VisaStatusTemplate.init(
       type: DataTypes.BOOLEAN,
       defaultValue: true,
       allowNull: false,
+    },
+    color: {
+      type: DataTypes.STRING(32),
+      allowNull: true,
     },
   },
   {

@@ -243,7 +243,12 @@ export const ClientList = ({
       buttons.push({
         key: template.id,
         label: template.label,
-        icon: <CheckCircle2 className="w-4 h-4" />,
+        icon: (
+          <CheckCircle2
+            className="w-4 h-4"
+            style={template.color ? { color: template.color } : undefined}
+          />
+        ),
         count,
       });
     });

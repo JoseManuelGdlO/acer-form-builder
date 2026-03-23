@@ -67,7 +67,7 @@ export const ClientCard = ({
                   </div>
                 </div>
               </div>
-              <ClientStatusBadge label={client.visaStatusTemplate?.label} />
+              <ClientStatusBadge label={client.visaStatusTemplate?.label} color={client.visaStatusTemplate?.color} />
             </div>
 
             <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">

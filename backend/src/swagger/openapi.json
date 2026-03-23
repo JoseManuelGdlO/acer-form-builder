@@ -4607,6 +4607,9 @@
                   },
                   "order": {
                     "type": "integer"
+                  },
+                  "color": {
+                    "type": "string"
                   }
                 }
               }
@@ -4668,6 +4671,9 @@
                   },
                   "isActive": {
                     "type": "boolean"
+                  },
+                  "color": {
+                    "type": "string"
                   }
                 }
               }
