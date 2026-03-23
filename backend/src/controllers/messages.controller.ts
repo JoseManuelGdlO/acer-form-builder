@@ -79,6 +79,52 @@ const sendTextMessage = async (to: string, bodyText: string): Promise<void> => {
   }
 };
 
+const sendTemplateMessage = async (to: string): Promise<void> => {
+  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
+  const version = process.env.WHATSAPP_VERSION || 'v22.0';
+
+  if (!phoneNumberId || !accessToken) {
+    throw new MessageBusinessError(
+      500,
+      'WHATSAPP_CONFIG_MISSING',
+      'No se pudo enviar la plantilla de WhatsApp por configuración faltante.'
+    );
+  }
+
+  const response = await fetch(`https://graph.facebook.com/${version}/${phoneNumberId}/messages`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to,
+      type: 'template',
+      template: {
+        name: 'mensaje_inicial',
+        language: {
+          code: 'es_MX',
+        },
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    const errorPayload = (await response.json().catch(() => null)) as
+      | { error?: { message?: string } }
+      | null;
+    const metaMessage = errorPayload?.error?.message;
+    throw new MessageBusinessError(
+      502,
+      'WHATSAPP_TEMPLATE_SEND_FAILED',
+      metaMessage || 'No se pudo enviar la plantilla de WhatsApp.'
+    );
+  }
+};
+
 const createInternalMessage = async ({
   companyId,
   clientId,
@@ -193,51 +239,28 @@ export const createMessage = [
         order: [['created_at', 'DESC']],
       });
 
-      if (!lastUserConversation) {
-        const message = await createInternalMessage({
-          companyId,
-          clientId,
-          content,
-          sender,
-          senderId: req.user?.id,
-        });
-        res.status(409).json({
-          error:
-            'No se puede enviar por WhatsApp porque el cliente no ha enviado mensajes previos en esta conversación.',
-          code: 'NO_PREVIOUS_USER_MESSAGE',
-          message,
-        });
-        return;
-      }
-
-      const lastUserMessageAt = new Date(lastUserConversation.createdAt);
-      const windowExpiredAt = new Date(lastUserMessageAt.getTime() + TWENTY_FOUR_HOURS_MS);
-      const isWindowExpired = Date.now() - lastUserMessageAt.getTime() >= TWENTY_FOUR_HOURS_MS;
-
-      if (isWindowExpired) {
-        const message = await createInternalMessage({
-          companyId,
-          clientId,
-          content,
-          sender,
-          senderId: req.user?.id,
-        });
-        res.status(422).json({
-          error:
-            'La ventana de 24 horas expiró. Pide al cliente que responda para volver a enviar mensajes.',
-          code: 'WHATSAPP_24H_WINDOW_EXPIRED',
-          details: {
-            lastUserMessageAt: lastUserMessageAt.toISOString(),
-            windowExpiredAt: windowExpiredAt.toISOString(),
-          },
-          message,
-        });
-        return;
-      }
-
-      await sendTextMessage(normalizePhoneForWhatsapp(clientPhone), content);
-
+      const lastUserMessageAt = lastUserConversation ? new Date(lastUserConversation.createdAt) : null;
+      const isWindowExpired = lastUserMessageAt
+        ? Date.now() - lastUserMessageAt.getTime() >= TWENTY_FOUR_HOURS_MS
+        : false;
       const { fecha, hora } = getConversationDateParts();
+      const normalizedPhone = normalizePhoneForWhatsapp(clientPhone);
+      const shouldUseTemplateFallback = !lastUserConversation || isWindowExpired;
+
+      if (shouldUseTemplateFallback) {
+        await sendTemplateMessage(normalizedPhone);
+        await Conversations.create({
+          phone: clientPhone,
+          mensaje: '[Plantilla mensaje_inicial enviada]',
+          from: 'bot',
+          fecha,
+          hora: hora as unknown as Date,
+          baja_logica: false,
+        });
+      }
+
+      await sendTextMessage(normalizedPhone, content);
+
       await Conversations.create({
         phone: clientPhone,
         mensaje: content,
