@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { Form, FormSection, Question, QUESTION_TYPE_CONFIG } from '@/types/form';
+import { Form, FormSection, Question, QUESTION_TYPE_CONFIG, QuestionVisibility } from '@/types/form';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -148,6 +148,34 @@ const normalizeFormSections = (rawSections: unknown): FormSection[] => {
     return [];
   }
 
+  const normalizeVisibility = (rawVisibility: unknown): Question['visibility'] => {
+    if (!rawVisibility || typeof rawVisibility !== 'object' || Array.isArray(rawVisibility)) return undefined;
+    const rv = rawVisibility as Record<string, unknown>;
+
+    const mode = rv.mode;
+    if (mode !== 'any' && mode !== 'all') return undefined;
+
+    const rulesRaw = Array.isArray(rv.rules) ? rv.rules : [];
+    const rules = rulesRaw
+      .map(rule => {
+        if (!rule || typeof rule !== 'object' || Array.isArray(rule)) return null;
+        const rr = rule as Record<string, unknown>;
+        const dependsOnQuestionId = rr.dependsOnQuestionId;
+        const optionIdsRaw = rr.optionIds;
+        const optionIds = Array.isArray(optionIdsRaw)
+          ? optionIdsRaw.filter((id): id is string => typeof id === 'string')
+          : [];
+        if (typeof dependsOnQuestionId !== 'string') return null;
+        return { dependsOnQuestionId, optionIds };
+      })
+      .filter((r): r is NonNullable<QuestionVisibility['rules'][number]> => r !== null);
+
+    return {
+      mode,
+      rules,
+    };
+  };
+
   return candidate
     .map((section): FormSection | null => {
       if (!section || typeof section !== 'object') return null;
@@ -165,17 +193,24 @@ const normalizeFormSections = (rawSections: unknown): FormSection[] => {
                 .map(opt => ({ id: opt.id, label: opt.label }))
             : undefined;
 
-          if (typeof q.id !== 'string' || typeof q.type !== 'string' || typeof q.title !== 'string') {
+          const typeCandidate = q.type;
+          if (typeof q.id !== 'string' || typeof typeCandidate !== 'string' || typeof q.title !== 'string') {
+            return null;
+          }
+
+          // Valida contra los tipos soportados por el sistema (evita pasar un `string` genérico)
+          if (!(typeCandidate in QUESTION_TYPE_CONFIG)) {
             return null;
           }
 
           return {
             id: q.id,
-            type: q.type,
+            type: typeCandidate as keyof typeof QUESTION_TYPE_CONFIG,
             title: q.title,
             description: typeof q.description === 'string' ? q.description : '',
             required: Boolean(q.required),
             options,
+            visibility: normalizeVisibility(q.visibility),
           };
         })
         .filter((question): question is Question => question !== null);
@@ -441,13 +476,136 @@ export default function PublicFormView() {
     setErrors(prev => ({ ...prev, [questionId]: '' }));
   };
 
+  const isAnswered = (value: unknown): boolean => {
+    if (value === undefined || value === null) return false;
+    if (typeof value === 'string') return value.trim() !== '';
+    if (Array.isArray(value)) return value.length > 0;
+    if (value instanceof Date) return true;
+    if (typeof value === 'object') return true; // includes file_upload answers
+    return true;
+  };
+
+  const allQuestions = useMemo(() => {
+    return (form?.sections ?? []).flatMap(s => s.questions ?? []);
+  }, [form]);
+
+  const questionById = useMemo(() => {
+    const map: Record<string, Question> = {};
+    for (const q of allQuestions) map[q.id] = q;
+    return map;
+  }, [allQuestions]);
+
+  const visibilityMap = useMemo(() => {
+    const map = new Map<string, boolean>();
+
+    if (!form) return map;
+
+    const visiting = new Set<string>();
+
+    const isVisibleById = (questionId: string): boolean => {
+      if (map.has(questionId)) return map.get(questionId) as boolean;
+      if (visiting.has(questionId)) return false; // avoid cycles
+
+      visiting.add(questionId);
+
+      const q = questionById[questionId];
+      if (!q) {
+        visiting.delete(questionId);
+        map.set(questionId, true);
+        return true;
+      }
+
+      const visibility = q.visibility;
+      if (!visibility) {
+        visiting.delete(questionId);
+        map.set(questionId, true);
+        return true;
+      }
+
+      const rules = Array.isArray(visibility.rules) ? visibility.rules : [];
+      if (rules.length === 0) {
+        visiting.delete(questionId);
+        map.set(questionId, false);
+        return false;
+      }
+
+      const results = rules.map(rule => {
+        // If parent is not visible, the child is not visible either.
+        if (!isVisibleById(rule.dependsOnQuestionId)) return false;
+
+        const parentAnswer = answers[rule.dependsOnQuestionId];
+        if (parentAnswer === undefined || parentAnswer === null) return false;
+
+        const optionIds = Array.isArray(rule.optionIds) ? rule.optionIds : [];
+        if (optionIds.length === 0) return false;
+
+        if (typeof parentAnswer === 'string') {
+          return optionIds.includes(parentAnswer);
+        }
+        if (Array.isArray(parentAnswer)) {
+          return parentAnswer.some(v => optionIds.includes(v));
+        }
+
+        return false;
+      });
+
+      const isVisible = visibility.mode === 'any' ? results.some(Boolean) : results.every(Boolean);
+      visiting.delete(questionId);
+      map.set(questionId, isVisible);
+      return isVisible;
+    };
+
+    for (const q of allQuestions) {
+      isVisibleById(q.id);
+    }
+
+    return map;
+  }, [form, allQuestions, questionById, answers]);
+
+  // Cleanup: si una pregunta deja de ser visible, eliminamos su respuesta y error.
+  useEffect(() => {
+    if (!form) return;
+
+    const invisibleQuestionIds: string[] = [];
+    for (const q of allQuestions) {
+      if (!visibilityMap.get(q.id)) invisibleQuestionIds.push(q.id);
+    }
+
+    if (invisibleQuestionIds.length === 0) return;
+
+    setAnswers(prev => {
+      let changed = false;
+      const next = { ...prev };
+      for (const qId of invisibleQuestionIds) {
+        if (qId in next) {
+          delete (next as any)[qId];
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+
+    setErrors(prev => {
+      let changed = false;
+      const next = { ...prev };
+      for (const qId of invisibleQuestionIds) {
+        if (qId in next) {
+          delete (next as any)[qId];
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [form, allQuestions, visibilityMap]);
+
   const validateCurrentSection = () => {
     if (!form) return true;
     const section = form.sections[currentSectionIndex];
     const newErrors: Record<string, string> = {};
     
-    section.questions.forEach(question => {
-      if (question.required && !answers[question.id]) {
+    const visibleQuestions = section.questions.filter(q => visibilityMap.get(q.id));
+    visibleQuestions.forEach(question => {
+      if (question.required && !isAnswered(answers[question.id])) {
         newErrors[question.id] = 'Esta pregunta es obligatoria';
       }
     });
@@ -499,7 +657,8 @@ export default function PublicFormView() {
       if (formId && sessionToken && !isLastSection) {
         // Solo enviar respuestas de la sección actual (reduce payload ~10x con archivos)
         const section = form.sections[currentSectionIndex];
-        const sectionAnswers = formatAnswersForApi(section.questions);
+        const visibleQuestions = section.questions.filter(q => visibilityMap.get(q.id));
+        const sectionAnswers = formatAnswersForApi(visibleQuestions);
         if (Object.keys(sectionAnswers).length > 0) {
           api.updateSubmissionFromSession(formId, sessionToken, sectionAnswers)
             .then(() => console.log('Progreso guardado'))
@@ -538,15 +697,24 @@ export default function PublicFormView() {
     }
     
     try {
-      const allQuestions = form.sections.flatMap(s => s.questions);
-      const formattedAnswers = formatAnswersForApi(allQuestions);
+      const visibleQuestions = form.sections
+        .flatMap(s => s.questions ?? [])
+        .filter(q => visibilityMap.get(q.id));
 
-      // Validate we have at least some answers
-      if (Object.keys(formattedAnswers).length === 0) {
-        console.warn('No answers to send!');
-        toast.error('Por favor, completa al menos una pregunta antes de enviar.');
+      const requiredVisibleQuestions = visibleQuestions.filter(q => q.required);
+      const missingRequired = requiredVisibleQuestions.filter(q => !isAnswered(answers[q.id]));
+
+      if (missingRequired.length > 0) {
+        const nextErrors: Record<string, string> = {};
+        missingRequired.forEach(q => {
+          nextErrors[q.id] = 'Esta pregunta es obligatoria';
+        });
+        setErrors(prev => ({ ...prev, ...nextErrors }));
+        toast.error('Por favor, completa las preguntas obligatorias.');
         return;
       }
+
+      const formattedAnswers = formatAnswersForApi(visibleQuestions);
 
       // Update the existing submission with final answers and mark as pending (completed)
       const response = await api.updateSubmissionFromSession(
@@ -1104,7 +1272,9 @@ export default function PublicFormView() {
 
               {/* Questions */}
               <div className="space-y-8">
-                {currentSection.questions.map((question, index) => (
+                {currentSection.questions
+                  .filter(question => visibilityMap.get(question.id))
+                  .map((question, index) => (
                   <div key={question.id} className="space-y-3">
                     <div>
                       <h3 className="font-medium text-foreground">

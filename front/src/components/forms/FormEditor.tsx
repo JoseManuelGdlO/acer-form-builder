@@ -81,6 +81,9 @@ export const FormEditor = ({
   );
   const [dragOverSectionId, setDragOverSectionId] = useState<string | null>(null);
 
+  const allQuestions = (Array.isArray(localForm.sections) ? localForm.sections : [])
+    .flatMap(s => s.questions ?? []);
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -425,6 +428,7 @@ export const FormEditor = ({
                         setHasUnsavedChanges(true);
                       }}
                       canDelete={localForm.sections.length > 1}
+                      allQuestions={allQuestions}
                     />
                   ))}
                 </SortableContext>

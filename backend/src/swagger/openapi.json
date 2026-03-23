@@ -4092,7 +4092,7 @@
                 "type": "object",
                 "properties": {
                   "type": {
-                    "type": "object"
+                    "type": "string"
                   },
                   "message": {
                     "type": "array"

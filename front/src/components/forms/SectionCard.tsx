@@ -42,6 +42,10 @@ interface SectionCardProps {
   onDeleteQuestion: (questionId: string) => void;
   onReorderQuestions: (questions: Question[]) => void;
   canDelete: boolean;
+  /**
+   * Lista completa de preguntas del formulario (para configurar dependencias).
+   */
+  allQuestions: Question[];
 }
 
 export const SectionCard = ({
@@ -59,6 +63,7 @@ export const SectionCard = ({
   onDeleteQuestion,
   onReorderQuestions,
   canDelete,
+  allQuestions,
 }: SectionCardProps) => {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
 
@@ -199,6 +204,7 @@ export const SectionCard = ({
                   sectionId={section.id}
                   onUpdate={updates => onUpdateQuestion(question.id, updates)}
                   onDelete={() => onDeleteQuestion(question.id)}
+                  allQuestions={allQuestions}
                 />
               ))}
             </div>

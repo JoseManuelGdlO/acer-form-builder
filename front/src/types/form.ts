@@ -13,6 +13,28 @@ export interface QuestionOption {
   label: string;
 }
 
+export type QuestionVisibilityMode = 'any' | 'all';
+
+export interface QuestionVisibilityRule {
+  /**
+   * id de la pregunta "padre" de la que depende esta pregunta.
+   */
+  dependsOnQuestionId: string;
+  /**
+   * ids de opciones (de la pregunta padre) que hacen que la regla sea verdadera.
+   */
+  optionIds: string[];
+}
+
+export interface QuestionVisibility {
+  /**
+   * - 'any': al menos una regla debe ser verdadera
+   * - 'all': todas las reglas deben ser verdaderas
+   */
+  mode: QuestionVisibilityMode;
+  rules: QuestionVisibilityRule[];
+}
+
 export interface Question {
   id: string;
   type: QuestionType;
@@ -20,6 +42,11 @@ export interface Question {
   description?: string;
   required: boolean;
   options?: QuestionOption[];
+  /**
+   * Lógica condicional opcional: controla si esta pregunta se muestra o no
+   * según la respuesta de otras preguntas.
+   */
+  visibility?: QuestionVisibility;
 }
 
 export interface FormSection {
