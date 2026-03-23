@@ -4,6 +4,12 @@ import { FormSubmission, Form, Client, FormSession } from '../models';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { Op } from 'sequelize';
 
+const normalizePhoneDigits = (phone: unknown): string | undefined => {
+  if (typeof phone !== 'string') return undefined;
+  const normalized = phone.replace(/\D/g, '').slice(0, 10);
+  return normalized || undefined;
+};
+
 export const getAllSubmissions = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const companyId = req.user?.companyId;
@@ -445,8 +451,7 @@ export const createSubmissionFromSession = [
       
       const companyId = (form as any).companyId;
       const assignedUserId = (session as any).assignedUserId ?? undefined;
-      const normalizedPhone =
-        typeof clientInfo.phone === 'string' ? clientInfo.phone.trim() : clientInfo.phone;
+      const normalizedPhone = normalizePhoneDigits(clientInfo.phone);
 
       if (email) {
         // Email provided - try to find existing client by email in this company
@@ -510,7 +515,7 @@ export const createSubmissionFromSession = [
         formName: form.name,
         respondentName: clientInfo.name,
         respondentEmail: email,
-        respondentPhone: clientInfo.phone || undefined,
+        respondentPhone: normalizedPhone,
         answers: {},
         clientId,
         status: 'in_progress',
