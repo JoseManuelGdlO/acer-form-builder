@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Trip, TripInvitation, Client, Group, BusTemplate, BusBathroomPosition } from '@/types/form';
+import { Trip, TripInvitation, Client, Group, BusTemplate, TripIncome, TripExpense, TripFinanceSummary } from '@/types/form';
 import { TripCard } from './TripCard';
 import { TripDetailView } from './TripDetailView';
 import { TripFormModal } from './TripFormModal';
@@ -45,6 +45,20 @@ interface TripListProps {
   onClearSeatAssignment: (tripId: string, opts: { clientId?: string; seatId?: string }) => Promise<void>;
   onUpdateTemplateSeatLabel?: (tripId: string, templateId: string, seatId: string, label: string) => Promise<void>;
   onLoadChangeLog: (tripId: string) => void;
+  onLoadTripFinance: (tripId: string) => void;
+  onCreateTripIncome: (
+    tripId: string,
+    data: { clientId: string; amount: number; paymentDate: string; paymentType?: 'tarjeta' | 'transferencia' | 'efectivo'; referenceNumber?: string; note?: string }
+  ) => Promise<void>;
+  onDeleteTripIncome: (tripId: string, incomeId: string) => Promise<void>;
+  onCreateTripExpense: (
+    tripId: string,
+    data: { amount: number; expenseDate: string; category?: string; referenceNumber?: string; note?: string }
+  ) => Promise<void>;
+  onDeleteTripExpense: (tripId: string, expenseId: string) => Promise<void>;
+  financeSummary: TripFinanceSummary | null;
+  tripIncomes: TripIncome[];
+  tripExpenses: TripExpense[];
   onFetchTrip?: (tripId: string) => void;
   busTemplates?: BusTemplate[];
   onCreateBusTemplate?: (data: { name: string; layout: import('@/types/form').BusLayout }) => Promise<void>;
@@ -71,6 +85,14 @@ export const TripList = ({
   onClearSeatAssignment,
   onUpdateTemplateSeatLabel,
   onLoadChangeLog,
+  onLoadTripFinance,
+  onCreateTripIncome,
+  onDeleteTripIncome,
+  onCreateTripExpense,
+  onDeleteTripExpense,
+  financeSummary,
+  tripIncomes,
+  tripExpenses,
   onFetchTrip,
   busTemplates = [],
   onCreateBusTemplate,
@@ -211,6 +233,14 @@ export const TripList = ({
           onOpenSeatPicker={() => setSeatPickerTrip(viewingTrip)}
           onResetSeatAssignments={async () => await onResetSeatAssignments(viewingTrip.id)}
           onLoadChangeLog={() => onLoadChangeLog(viewingTrip.id)}
+          onLoadTripFinance={() => onLoadTripFinance(viewingTrip.id)}
+          onCreateTripIncome={async (data) => onCreateTripIncome(viewingTrip.id, data)}
+          onDeleteTripIncome={async (incomeId) => onDeleteTripIncome(viewingTrip.id, incomeId)}
+          onCreateTripExpense={async (data) => onCreateTripExpense(viewingTrip.id, data)}
+          onDeleteTripExpense={async (expenseId) => onDeleteTripExpense(viewingTrip.id, expenseId)}
+          financeSummary={financeSummary}
+          tripIncomes={tripIncomes}
+          tripExpenses={tripExpenses}
           onInviteCompanies={async (invitedCompanyIds) => {
             await onUpdate(viewingTrip.id, { invitedCompanyIds });
             onFetchTrip?.(viewingTrip.id);

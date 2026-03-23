@@ -1,40 +1,37 @@
 import { DataTypes, Model, Optional } from 'sequelize';
 import sequelize from '../config/database';
-import { Client } from './Client';
 
-export type PaymentType = 'tarjeta' | 'transferencia' | 'efectivo';
-
-interface ClientPaymentAttributes {
+interface TripExpenseAttributes {
   id: string;
   companyId: string;
-  clientId: string;
-  tripId?: string | null;
+  tripId: string;
   amount: number;
-  paymentDate: string;
-  paymentType: PaymentType;
-  referenceNumber?: string;
-  note?: string;
+  expenseDate: string;
+  category?: string | null;
+  referenceNumber?: string | null;
+  note?: string | null;
+  createdBy?: string | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
 
-interface ClientPaymentCreationAttributes extends Optional<ClientPaymentAttributes, 'id' | 'note' | 'createdAt' | 'updatedAt'> {}
+interface TripExpenseCreationAttributes extends Optional<TripExpenseAttributes, 'id' | 'category' | 'referenceNumber' | 'note' | 'createdBy' | 'createdAt' | 'updatedAt'> {}
 
-export class ClientPayment extends Model<ClientPaymentAttributes, ClientPaymentCreationAttributes> implements ClientPaymentAttributes {
+export class TripExpense extends Model<TripExpenseAttributes, TripExpenseCreationAttributes> implements TripExpenseAttributes {
   public id!: string;
   public companyId!: string;
-  public clientId!: string;
-  public tripId?: string | null;
+  public tripId!: string;
   public amount!: number;
-  public paymentDate!: string;
-  public paymentType!: PaymentType;
-  public referenceNumber?: string;
-  public note?: string;
+  public expenseDate!: string;
+  public category?: string | null;
+  public referenceNumber?: string | null;
+  public note?: string | null;
+  public createdBy?: string | null;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
 }
 
-ClientPayment.init(
+TripExpense.init(
   {
     id: {
       type: DataTypes.UUID,
@@ -50,23 +47,14 @@ ClientPayment.init(
       },
       onDelete: 'CASCADE',
     },
-    clientId: {
-      type: DataTypes.UUID,
-      allowNull: false,
-      references: {
-        model: Client,
-        key: 'id',
-      },
-      onDelete: 'CASCADE',
-    },
     tripId: {
       type: DataTypes.UUID,
-      allowNull: true,
+      allowNull: false,
       references: {
         model: 'trips',
         key: 'id',
       },
-      onDelete: 'SET NULL',
+      onDelete: 'CASCADE',
     },
     amount: {
       type: DataTypes.DECIMAL(12, 2),
@@ -76,14 +64,13 @@ ClientPayment.init(
         return value != null ? parseFloat(String(value)) : value;
       },
     },
-    paymentDate: {
+    expenseDate: {
       type: DataTypes.DATEONLY,
       allowNull: false,
     },
-    paymentType: {
-      type: DataTypes.STRING(20),
-      allowNull: false,
-      defaultValue: 'efectivo',
+    category: {
+      type: DataTypes.STRING(100),
+      allowNull: true,
     },
     referenceNumber: {
       type: DataTypes.STRING(100),
@@ -93,10 +80,19 @@ ClientPayment.init(
       type: DataTypes.TEXT,
       allowNull: true,
     },
+    createdBy: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      references: {
+        model: 'users',
+        key: 'id',
+      },
+      onDelete: 'SET NULL',
+    },
   },
   {
     sequelize,
-    tableName: 'client_payments',
+    tableName: 'trip_expenses',
     timestamps: true,
     underscored: true,
   }

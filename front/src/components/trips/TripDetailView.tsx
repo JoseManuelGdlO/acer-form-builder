@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Trip, Client, Group, TripChangeLogEntry } from '@/types/form';
+import { Trip, Client, Group, TripChangeLogEntry, TripIncome, TripExpense, TripFinanceSummary } from '@/types/form';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -74,6 +74,14 @@ interface TripDetailViewProps {
   onOpenSeatPicker: () => void;
   onResetSeatAssignments: () => Promise<void>;
   onLoadChangeLog: () => void;
+  onLoadTripFinance: () => void;
+  onCreateTripIncome: (data: { clientId: string; amount: number; paymentDate: string; paymentType?: 'tarjeta' | 'transferencia' | 'efectivo'; referenceNumber?: string; note?: string }) => Promise<void>;
+  onDeleteTripIncome: (incomeId: string) => Promise<void>;
+  onCreateTripExpense: (data: { amount: number; expenseDate: string; category?: string; referenceNumber?: string; note?: string }) => Promise<void>;
+  onDeleteTripExpense: (expenseId: string) => Promise<void>;
+  financeSummary: TripFinanceSummary | null;
+  tripIncomes: TripIncome[];
+  tripExpenses: TripExpense[];
   onInviteCompanies: (invitedCompanyIds: string[]) => Promise<void>;
 }
 
@@ -91,6 +99,14 @@ export const TripDetailView = ({
   onOpenSeatPicker,
   onResetSeatAssignments,
   onLoadChangeLog,
+  onLoadTripFinance,
+  onCreateTripIncome,
+  onDeleteTripIncome,
+  onCreateTripExpense,
+  onDeleteTripExpense,
+  financeSummary,
+  tripIncomes,
+  tripExpenses,
   onInviteCompanies,
 }: TripDetailViewProps) => {
   const [memberSearch, setMemberSearch] = useState('');
@@ -101,6 +117,23 @@ export const TripDetailView = ({
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+  const [incomeForm, setIncomeForm] = useState({
+    clientId: '',
+    amount: '',
+    paymentDate: new Date().toISOString().slice(0, 10),
+    paymentType: 'efectivo' as 'tarjeta' | 'transferencia' | 'efectivo',
+    referenceNumber: '',
+    note: '',
+  });
+  const [expenseForm, setExpenseForm] = useState({
+    amount: '',
+    expenseDate: new Date().toISOString().slice(0, 10),
+    category: '',
+    referenceNumber: '',
+    note: '',
+  });
+  const [isCreatingIncome, setIsCreatingIncome] = useState(false);
+  const [isCreatingExpense, setIsCreatingExpense] = useState(false);
 
   const sharedIds = (trip.sharedCompanies ?? []).map(c => c.id);
   const companiesAvailableToInvite = companiesForInvite.filter(c => !sharedIds.includes(c.id));
@@ -108,12 +141,14 @@ export const TripDetailView = ({
   // Cargar historial al entrar al detalle del viaje (solo cuando cambia trip.id)
   useEffect(() => {
     onLoadChangeLog();
+    onLoadTripFinance();
   }, [trip.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Refrescar historial cada 30 minutos mientras se está en la pantalla
   useEffect(() => {
     const interval = setInterval(() => {
       onLoadChangeLog();
+      onLoadTripFinance();
     }, 30 * 60 * 1000);
     return () => clearInterval(interval);
   }, [trip.id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -194,6 +229,63 @@ export const TripDetailView = ({
 
   const departureStr = trip.departureDate ? format(new Date(trip.departureDate), "d 'de' MMMM yyyy", { locale: es }) : '';
   const returnStr = trip.returnDate ? format(new Date(trip.returnDate), "d 'de' MMMM yyyy", { locale: es }) : '';
+
+  const handleCreateIncome = async () => {
+    if (!incomeForm.clientId || !incomeForm.amount || !incomeForm.paymentDate) {
+      toast.error('Cliente, monto y fecha son obligatorios');
+      return;
+    }
+    const amount = Number(incomeForm.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      toast.error('El monto debe ser mayor a 0');
+      return;
+    }
+    setIsCreatingIncome(true);
+    try {
+      await onCreateTripIncome({
+        clientId: incomeForm.clientId,
+        amount,
+        paymentDate: incomeForm.paymentDate,
+        paymentType: incomeForm.paymentType,
+        referenceNumber: incomeForm.referenceNumber || undefined,
+        note: incomeForm.note || undefined,
+      });
+      setIncomeForm((prev) => ({ ...prev, amount: '', referenceNumber: '', note: '' }));
+      toast.success('Ingreso agregado');
+    } catch (err: any) {
+      toast.error(err.message || 'Error al agregar ingreso');
+    } finally {
+      setIsCreatingIncome(false);
+    }
+  };
+
+  const handleCreateExpense = async () => {
+    if (!expenseForm.amount || !expenseForm.expenseDate) {
+      toast.error('Monto y fecha son obligatorios');
+      return;
+    }
+    const amount = Number(expenseForm.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      toast.error('El monto debe ser mayor a 0');
+      return;
+    }
+    setIsCreatingExpense(true);
+    try {
+      await onCreateTripExpense({
+        amount,
+        expenseDate: expenseForm.expenseDate,
+        category: expenseForm.category || undefined,
+        referenceNumber: expenseForm.referenceNumber || undefined,
+        note: expenseForm.note || undefined,
+      });
+      setExpenseForm((prev) => ({ ...prev, amount: '', category: '', referenceNumber: '', note: '' }));
+      toast.success('Gasto agregado');
+    } catch (err: any) {
+      toast.error(err.message || 'Error al agregar gasto');
+    } finally {
+      setIsCreatingExpense(false);
+    }
+  };
 
   const handleDownloadTripDetails = () => {
     try {
@@ -533,6 +625,181 @@ export const TripDetailView = ({
           </Button>
         </div>
         </div>
+
+        <Card>
+          <CardContent className="p-4 space-y-4">
+            <h2 className="font-semibold text-lg mb-1 flex items-center gap-2">
+              <DollarSign className="w-5 h-5" />
+              Finanzas del viaje
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="rounded-lg border p-3 bg-muted/20">
+                <p className="text-xs text-muted-foreground">Ingresos</p>
+                <p className="text-xl font-semibold text-emerald-600 dark:text-emerald-400">
+                  ${Number(financeSummary?.totalIncome ?? 0).toLocaleString()}
+                </p>
+              </div>
+              <div className="rounded-lg border p-3 bg-muted/20">
+                <p className="text-xs text-muted-foreground">Gastos</p>
+                <p className="text-xl font-semibold text-rose-600 dark:text-rose-400">
+                  ${Number(financeSummary?.totalExpense ?? 0).toLocaleString()}
+                </p>
+              </div>
+              <div className="rounded-lg border p-3 bg-muted/20">
+                <p className="text-xs text-muted-foreground">Neto</p>
+                <p className="text-xl font-semibold">
+                  ${Number(financeSummary?.net ?? 0).toLocaleString()}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+              <div className="space-y-2 border rounded-lg p-3">
+                <h3 className="font-medium">Agregar ingreso</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <select
+                    className="h-10 rounded-md border bg-background px-3 text-sm"
+                    value={incomeForm.clientId}
+                    onChange={(e) => setIncomeForm((prev) => ({ ...prev, clientId: e.target.value }))}
+                  >
+                    <option value="">Seleccionar cliente</option>
+                    {participants.map((p) => (
+                      p.client ? <option key={p.client.id} value={p.client.id}>{p.client.name}</option> : null
+                    ))}
+                  </select>
+                  <Input
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    placeholder="Monto"
+                    value={incomeForm.amount}
+                    onChange={(e) => setIncomeForm((prev) => ({ ...prev, amount: e.target.value }))}
+                  />
+                  <Input
+                    type="date"
+                    value={incomeForm.paymentDate}
+                    onChange={(e) => setIncomeForm((prev) => ({ ...prev, paymentDate: e.target.value }))}
+                  />
+                  <select
+                    className="h-10 rounded-md border bg-background px-3 text-sm"
+                    value={incomeForm.paymentType}
+                    onChange={(e) => setIncomeForm((prev) => ({ ...prev, paymentType: e.target.value as 'tarjeta' | 'transferencia' | 'efectivo' }))}
+                  >
+                    <option value="efectivo">Efectivo</option>
+                    <option value="tarjeta">Tarjeta</option>
+                    <option value="transferencia">Transferencia</option>
+                  </select>
+                  <Input
+                    placeholder="Referencia (opcional)"
+                    value={incomeForm.referenceNumber}
+                    onChange={(e) => setIncomeForm((prev) => ({ ...prev, referenceNumber: e.target.value }))}
+                  />
+                  <Input
+                    placeholder="Nota (opcional)"
+                    value={incomeForm.note}
+                    onChange={(e) => setIncomeForm((prev) => ({ ...prev, note: e.target.value }))}
+                  />
+                </div>
+                <Button onClick={handleCreateIncome} disabled={isCreatingIncome}>
+                  {isCreatingIncome ? 'Guardando...' : 'Agregar ingreso'}
+                </Button>
+              </div>
+
+              <div className="space-y-2 border rounded-lg p-3">
+                <h3 className="font-medium">Agregar gasto</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <Input
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    placeholder="Monto"
+                    value={expenseForm.amount}
+                    onChange={(e) => setExpenseForm((prev) => ({ ...prev, amount: e.target.value }))}
+                  />
+                  <Input
+                    type="date"
+                    value={expenseForm.expenseDate}
+                    onChange={(e) => setExpenseForm((prev) => ({ ...prev, expenseDate: e.target.value }))}
+                  />
+                  <Input
+                    placeholder="Categoría (opcional)"
+                    value={expenseForm.category}
+                    onChange={(e) => setExpenseForm((prev) => ({ ...prev, category: e.target.value }))}
+                  />
+                  <Input
+                    placeholder="Referencia (opcional)"
+                    value={expenseForm.referenceNumber}
+                    onChange={(e) => setExpenseForm((prev) => ({ ...prev, referenceNumber: e.target.value }))}
+                  />
+                  <Input
+                    className="sm:col-span-2"
+                    placeholder="Nota (opcional)"
+                    value={expenseForm.note}
+                    onChange={(e) => setExpenseForm((prev) => ({ ...prev, note: e.target.value }))}
+                  />
+                </div>
+                <Button onClick={handleCreateExpense} disabled={isCreatingExpense}>
+                  {isCreatingExpense ? 'Guardando...' : 'Agregar gasto'}
+                </Button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+              <div>
+                <h3 className="font-medium mb-2">Ingresos</h3>
+                {tripIncomes.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Sin ingresos registrados.</p>
+                ) : (
+                  <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
+                    {tripIncomes.map((income) => (
+                      <div key={income.id} className="rounded-lg border p-3 flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-medium">${Number(income.amount).toLocaleString()} - {income.client?.name ?? income.clientId}</p>
+                          <p className="text-xs text-muted-foreground">{income.paymentDate} - {income.paymentType}</p>
+                          {income.referenceNumber && <p className="text-xs text-muted-foreground">Ref: {income.referenceNumber}</p>}
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => onDeleteTripIncome(income.id)}
+                        >
+                          Eliminar
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div>
+                <h3 className="font-medium mb-2">Gastos</h3>
+                {tripExpenses.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Sin gastos registrados.</p>
+                ) : (
+                  <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
+                    {tripExpenses.map((expense) => (
+                      <div key={expense.id} className="rounded-lg border p-3 flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-medium">${Number(expense.amount).toLocaleString()} {expense.category ? `- ${expense.category}` : ''}</p>
+                          <p className="text-xs text-muted-foreground">{expense.expenseDate}</p>
+                          {expense.referenceNumber && <p className="text-xs text-muted-foreground">Ref: {expense.referenceNumber}</p>}
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => onDeleteTripExpense(expense.id)}
+                        >
+                          Eliminar
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         <Card>
           <CardContent className="p-4">

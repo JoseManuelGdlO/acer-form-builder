@@ -147,8 +147,6 @@ export const SUBMISSION_STATUS_CONFIG: Record<SubmissionStatus, { label: string;
 
 // ============= Clients =============
 
-export type ClientStatus = 'active' | 'inactive' | 'pending';
-
 export interface ClientAssignedUser {
   id: string;
   name: string;
@@ -162,10 +160,17 @@ export interface Client {
   phone?: string;
   address?: string;
   notes?: string;
-  status: ClientStatus;
+  visaCasAppointmentDate?: string | null;
+  visaCasAppointmentLocation?: string | null;
+  visaConsularAppointmentDate?: string | null;
+  visaConsularAppointmentLocation?: string | null;
+  visaStatusTemplateId: string;
+  visaStatusTemplate?: { id: string; label: string; order?: number; isActive?: boolean } | null;
   formsCompleted: number;
   assignedUserId?: string;
   assignedUser?: ClientAssignedUser | null;
+  productId?: string;
+  product?: { id: string; title: string } | null;
   totalAmountDue?: number;
   totalPaid?: number;
   createdAt: Date;
@@ -188,9 +193,13 @@ export const PAYMENT_TYPE_LABELS: Record<PaymentType, string> = {
 
 export interface ClientPayment {
   id: string;
+  clientId?: string;
+  tripId?: string | null;
+  client?: { id: string; name: string };
   amount: number;
   paymentDate: string;
   paymentType: PaymentType;
+  referenceNumber?: string;
   note?: string;
   createdAt: Date;
 }
@@ -209,16 +218,11 @@ export interface PaymentDeletedLogEntry {
   amount: number;
   paymentDate: string;
   paymentType: string;
+  referenceNumber?: string | null;
   note?: string | null;
   createdAt: Date;
   deletedByUser?: { id: string; name: string; email?: string } | null;
 }
-
-export const CLIENT_STATUS_CONFIG: Record<ClientStatus, { label: string; color: string }> = {
-  active: { label: 'Activo', color: 'success' },
-  inactive: { label: 'Inactivo', color: 'destructive' },
-  pending: { label: 'Pendiente', color: 'warning' },
-};
 
 // ============= Groups =============
 
@@ -343,4 +347,34 @@ export interface TripChangeLogEntry {
   oldValue?: string | null;
   newValue?: string | null;
   createdAt: string;
+}
+
+export interface TripIncome {
+  id: string;
+  clientId: string;
+  tripId?: string | null;
+  client?: { id: string; name: string };
+  amount: number;
+  paymentDate: string;
+  paymentType: PaymentType;
+  referenceNumber?: string;
+  note?: string;
+  createdAt?: string;
+}
+
+export interface TripExpense {
+  id: string;
+  tripId: string;
+  amount: number;
+  expenseDate: string;
+  category?: string | null;
+  referenceNumber?: string | null;
+  note?: string | null;
+  createdAt?: string;
+}
+
+export interface TripFinanceSummary {
+  totalIncome: number;
+  totalExpense: number;
+  net: number;
 }

@@ -12,6 +12,7 @@ import { ClientNote } from './ClientNote';
 import { ClientPayment } from './ClientPayment';
 import { ClientAmountDueLog } from './ClientAmountDueLog';
 import { ClientPaymentDeletedLog } from './ClientPaymentDeletedLog';
+import { TripExpense } from './TripExpense';
 import { ClientMessage } from './ClientMessage';
 import { ClientGroup } from './ClientGroup';
 import { ClientGroupMember } from './ClientGroupMember';
@@ -31,6 +32,7 @@ import { NotificationRecipient } from './NotificationRecipient';
 import { Product } from './Product';
 import { ProductCategory } from './ProductCategory';
 import { Category } from './Category';
+import { VisaStatusTemplate } from './VisaStatusTemplate';
 import { PushSubscription } from './PushSubscription';
 
 // Company relationships (multi-tenant)
@@ -66,6 +68,8 @@ Company.hasMany(BotBehavior, { foreignKey: 'companyId', as: 'botBehaviors' });
 BotBehavior.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
 Company.hasMany(Product, { foreignKey: 'companyId', as: 'products' });
 Product.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+Company.hasMany(VisaStatusTemplate, { foreignKey: 'companyId', as: 'visaStatusTemplates' });
+VisaStatusTemplate.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
 
 // Notifications relationships (multi-tenant)
 Company.hasMany(Notification, { foreignKey: 'companyId', as: 'notifications' });
@@ -107,6 +111,10 @@ Category.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
 // Product relationships
 Product.hasMany(ProductCategory, { foreignKey: 'productId', as: 'categories' });
 ProductCategory.belongsTo(Product, { foreignKey: 'productId', as: 'product' });
+Product.hasMany(Client, { foreignKey: 'productId', as: 'clients' });
+Client.belongsTo(Product, { foreignKey: 'productId', as: 'product' });
+VisaStatusTemplate.hasMany(Client, { foreignKey: 'visaStatusTemplateId', as: 'clients' });
+Client.belongsTo(VisaStatusTemplate, { foreignKey: 'visaStatusTemplateId', as: 'visaStatusTemplate' });
 
 // User relationships
 User.hasMany(UserRole, { foreignKey: 'userId', as: 'roles' });
@@ -133,6 +141,8 @@ ClientNote.belongsTo(Client, { foreignKey: 'clientId', as: 'client' });
 
 Client.hasMany(ClientPayment, { foreignKey: 'clientId', as: 'clientPayments' });
 ClientPayment.belongsTo(Client, { foreignKey: 'clientId', as: 'client' });
+Trip.hasMany(ClientPayment, { foreignKey: 'tripId', as: 'payments' });
+ClientPayment.belongsTo(Trip, { foreignKey: 'tripId', as: 'trip' });
 
 Client.hasMany(ClientAmountDueLog, { foreignKey: 'clientId', as: 'amountDueLogs' });
 ClientAmountDueLog.belongsTo(Client, { foreignKey: 'clientId', as: 'client' });
@@ -196,6 +206,12 @@ Trip.hasMany(TripChangeLog, { foreignKey: 'tripId', as: 'changeLog' });
 TripChangeLog.belongsTo(Trip, { foreignKey: 'tripId', as: 'trip' });
 TripChangeLog.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 User.hasMany(TripChangeLog, { foreignKey: 'userId', as: 'tripChangeLogs' });
+Company.hasMany(TripExpense, { foreignKey: 'companyId', as: 'tripExpenses' });
+TripExpense.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+Trip.hasMany(TripExpense, { foreignKey: 'tripId', as: 'expenses' });
+TripExpense.belongsTo(Trip, { foreignKey: 'tripId', as: 'trip' });
+User.hasMany(TripExpense, { foreignKey: 'createdBy', as: 'createdTripExpenses' });
+TripExpense.belongsTo(User, { foreignKey: 'createdBy', as: 'createdByUser' });
 
 // Form relationships
 Form.hasMany(FormSession, { foreignKey: 'formId', as: 'sessions' });
@@ -237,6 +253,7 @@ export {
   ClientPayment,
   ClientAmountDueLog,
   ClientPaymentDeletedLog,
+  TripExpense,
   ClientMessage,
   FAQ,
   BotBehavior,
@@ -244,5 +261,6 @@ export {
   Product,
   ProductCategory,
   Category,
+  VisaStatusTemplate,
   PushSubscription,
 };

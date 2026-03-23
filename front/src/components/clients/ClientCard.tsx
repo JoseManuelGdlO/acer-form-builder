@@ -1,4 +1,4 @@
-import { Client, ClientStatus } from '@/types/form';
+import { Client } from '@/types/form';
 import { User as UserType } from '@/types/user';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -23,7 +23,6 @@ import { es } from 'date-fns/locale';
 
 interface ClientCardProps {
   client: Client;
-  onUpdateStatus: (status: ClientStatus) => void;
   onDelete: () => void;
   onView: () => void;
   onEdit: () => void;
@@ -34,7 +33,6 @@ interface ClientCardProps {
 
 export const ClientCard = ({
   client,
-  onUpdateStatus,
   onDelete,
   onView,
   onEdit,
@@ -69,7 +67,7 @@ export const ClientCard = ({
                   </div>
                 </div>
               </div>
-              <ClientStatusBadge status={client.status} />
+              <ClientStatusBadge label={client.visaStatusTemplate?.label} />
             </div>
 
             <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
@@ -154,16 +152,6 @@ export const ClientCard = ({
               <DropdownMenuItem onClick={onEdit}>
                 <Edit2 className="w-4 h-4 mr-2" />
                 Editar cliente
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => onUpdateStatus('active')}>
-                Marcar como Activo
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onUpdateStatus('pending')}>
-                Marcar como Pendiente
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onUpdateStatus('inactive')}>
-                Marcar como Inactivo
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem

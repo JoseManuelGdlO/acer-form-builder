@@ -1,23 +1,27 @@
 import { useState, useCallback } from 'react';
-import { Client, ClientStatus } from '@/types/form';
-import { ChecklistTemplate } from '@/types/settings';
+import { Client } from '@/types/form';
+import { ChecklistTemplate, VisaStatusTemplate } from '@/types/settings';
 import { api } from '@/lib/api';
 
 export const useClientStore = () => {
   const [clients, setClients] = useState<Client[]>([]);
   const [checklistTemplates, setChecklistTemplates] = useState<ChecklistTemplate[]>([]);
+  const [visaStatusTemplates, setVisaStatusTemplates] = useState<VisaStatusTemplate[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  const fetchClients = useCallback(async (token: string, params?: { status?: string; assignedUserId?: string }) => {
+  const fetchClients = useCallback(async (token: string, params?: { assignedUserId?: string; productId?: string; visaStatusTemplateId?: string }) => {
     setIsLoading(true);
     try {
       const response = await api.getClients(params, token);
       // Handle both old format (array) and new format (object with clients and templates)
       const clientsData = Array.isArray(response) ? response : (response.clients || response);
       const templates = response.templates || [];
+      const visaTemplates = response.visaStatusTemplates || [];
       
       const mapAssignedUser = (u: any) =>
         u ? { id: u.id, name: u.name, email: u.email } : null;
+      const mapProduct = (p: any) =>
+        p ? { id: p.id, title: p.title } : null;
       const clients: Client[] = clientsData.map((c: any) => ({
         id: c.id,
         name: c.name,
@@ -25,10 +29,17 @@ export const useClientStore = () => {
         phone: c.phone,
         address: c.address,
         notes: c.notes,
-        status: c.status,
+        visaCasAppointmentDate: c.visa_cas_appointment_date ?? c.visaCasAppointmentDate ?? null,
+        visaCasAppointmentLocation: c.visa_cas_appointment_location ?? c.visaCasAppointmentLocation ?? null,
+        visaConsularAppointmentDate: c.visa_consular_appointment_date ?? c.visaConsularAppointmentDate ?? null,
+        visaConsularAppointmentLocation: c.visa_consular_appointment_location ?? c.visaConsularAppointmentLocation ?? null,
+        visaStatusTemplateId: c.visa_status_template_id || c.visaStatusTemplateId,
+        visaStatusTemplate: c.visa_status_template || c.visaStatusTemplate || null,
         formsCompleted: c.forms_completed || c.formsCompleted || 0,
         assignedUserId: c.assigned_user_id || c.assignedUserId,
         assignedUser: mapAssignedUser(c.assigned_user || c.assignedUser),
+        productId: c.product_id || c.productId,
+        product: mapProduct(c.product),
         totalAmountDue: c.total_amount_due != null ? Number(c.total_amount_due) : (c.totalAmountDue != null ? Number(c.totalAmountDue) : undefined),
         totalPaid: c.total_paid != null ? Number(c.total_paid) : (c.totalPaid != null ? Number(c.totalPaid) : 0),
         createdAt: new Date(c.created_at || c.createdAt),
@@ -52,6 +63,16 @@ export const useClientStore = () => {
         }));
         setChecklistTemplates(mappedTemplates);
       }
+      if (visaTemplates.length > 0) {
+        const mappedVisaTemplates: VisaStatusTemplate[] = visaTemplates.map((t: any) => ({
+          id: t.id,
+          label: t.label,
+          order: t.order || 0,
+          isActive: t.is_active !== undefined ? t.is_active : t.isActive !== undefined ? t.isActive : true,
+          createdAt: new Date(t.created_at || t.createdAt || Date.now()),
+        }));
+        setVisaStatusTemplates(mappedVisaTemplates);
+      }
     } catch (error) {
       console.error('Failed to fetch clients:', error);
       throw error;
@@ -62,6 +83,8 @@ export const useClientStore = () => {
 
   const mapAssignedUser = (u: any) =>
     u ? { id: u.id, name: u.name, email: u.email } : null;
+  const mapProduct = (p: any) =>
+    p ? { id: p.id, title: p.title } : null;
 
   const createClient = useCallback(async (token: string, clientData: Omit<Client, 'id' | 'createdAt' | 'updatedAt' | 'formsCompleted'>) => {
     try {
@@ -73,10 +96,17 @@ export const useClientStore = () => {
         phone: newClient.phone,
         address: newClient.address,
         notes: newClient.notes,
-        status: newClient.status,
+        visaCasAppointmentDate: newClient.visa_cas_appointment_date ?? newClient.visaCasAppointmentDate ?? null,
+        visaCasAppointmentLocation: newClient.visa_cas_appointment_location ?? newClient.visaCasAppointmentLocation ?? null,
+        visaConsularAppointmentDate: newClient.visa_consular_appointment_date ?? newClient.visaConsularAppointmentDate ?? null,
+        visaConsularAppointmentLocation: newClient.visa_consular_appointment_location ?? newClient.visaConsularAppointmentLocation ?? null,
+        visaStatusTemplateId: newClient.visa_status_template_id || newClient.visaStatusTemplateId,
+        visaStatusTemplate: newClient.visa_status_template || newClient.visaStatusTemplate || null,
         formsCompleted: newClient.forms_completed || newClient.formsCompleted || 0,
         assignedUserId: newClient.assigned_user_id || newClient.assignedUserId,
         assignedUser: mapAssignedUser(newClient.assigned_user || newClient.assignedUser),
+        productId: newClient.product_id || newClient.productId,
+        product: mapProduct(newClient.product),
         totalAmountDue: newClient.total_amount_due != null ? Number(newClient.total_amount_due) : newClient.totalAmountDue,
         totalPaid: newClient.total_paid != null ? Number(newClient.total_paid) : (newClient.totalPaid ?? 0),
         createdAt: new Date(newClient.created_at || newClient.createdAt || Date.now()),
@@ -105,10 +135,17 @@ export const useClientStore = () => {
         phone: updatedClient.phone,
         address: updatedClient.address,
         notes: updatedClient.notes,
-        status: updatedClient.status,
+        visaCasAppointmentDate: updatedClient.visa_cas_appointment_date ?? updatedClient.visaCasAppointmentDate ?? null,
+        visaCasAppointmentLocation: updatedClient.visa_cas_appointment_location ?? updatedClient.visaCasAppointmentLocation ?? null,
+        visaConsularAppointmentDate: updatedClient.visa_consular_appointment_date ?? updatedClient.visaConsularAppointmentDate ?? null,
+        visaConsularAppointmentLocation: updatedClient.visa_consular_appointment_location ?? updatedClient.visaConsularAppointmentLocation ?? null,
+        visaStatusTemplateId: updatedClient.visa_status_template_id || updatedClient.visaStatusTemplateId,
+        visaStatusTemplate: updatedClient.visa_status_template || updatedClient.visaStatusTemplate || null,
         formsCompleted: updatedClient.forms_completed || updatedClient.formsCompleted || 0,
         assignedUserId: updatedClient.assigned_user_id || updatedClient.assignedUserId,
         assignedUser: mapAssignedUser(updatedClient.assigned_user || updatedClient.assignedUser),
+        productId: updatedClient.product_id || updatedClient.productId,
+        product: mapProduct(updatedClient.product),
         totalAmountDue: updatedClient.total_amount_due != null ? Number(updatedClient.total_amount_due) : updatedClient.totalAmountDue,
         totalPaid: updatedClient.total_paid != null ? Number(updatedClient.total_paid) : (updatedClient.totalPaid ?? 0),
         createdAt: new Date(updatedClient.created_at || updatedClient.createdAt),
@@ -138,8 +175,8 @@ export const useClientStore = () => {
     }
   }, []);
 
-  const updateClientStatus = useCallback(async (token: string, clientId: string, status: ClientStatus) => {
-    await updateClient(token, clientId, { status });
+  const updateClientStatus = useCallback(async (token: string, clientId: string, visaStatusTemplateId: string) => {
+    await updateClient(token, clientId, { visaStatusTemplateId });
   }, [updateClient]);
 
   const getClientStats = useCallback(async (token: string) => {
@@ -150,9 +187,7 @@ export const useClientStore = () => {
       console.error('Failed to get client stats:', error);
       return {
         total: clients.length,
-        active: clients.filter(c => c.status === 'active').length,
-        inactive: clients.filter(c => c.status === 'inactive').length,
-        pending: clients.filter(c => c.status === 'pending').length,
+        visaStatusCounts: [],
       };
     }
   }, [clients]);
@@ -160,6 +195,7 @@ export const useClientStore = () => {
   return {
     clients,
     checklistTemplates,
+    visaStatusTemplates,
     isLoading,
     fetchClients,
     createClient,

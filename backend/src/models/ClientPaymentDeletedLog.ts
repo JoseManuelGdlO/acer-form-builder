@@ -8,9 +8,11 @@ interface ClientPaymentDeletedLogAttributes {
   companyId: string;
   clientId: string;
   paymentId: string;
+  tripId?: string | null;
   amount: number;
   paymentDate: string;
   paymentType: string;
+  referenceNumber?: string | null;
   note?: string | null;
   deletedBy?: string | null;
   createdAt?: Date;
@@ -23,9 +25,11 @@ export class ClientPaymentDeletedLog extends Model<ClientPaymentDeletedLogAttrib
   public companyId!: string;
   public clientId!: string;
   public paymentId!: string;
+  public tripId?: string | null;
   public amount!: number;
   public paymentDate!: string;
   public paymentType!: string;
+  public referenceNumber?: string | null;
   public note?: string | null;
   public deletedBy?: string | null;
   public readonly createdAt!: Date;
@@ -60,6 +64,15 @@ ClientPaymentDeletedLog.init(
       type: DataTypes.UUID,
       allowNull: false,
     },
+    tripId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      references: {
+        model: 'trips',
+        key: 'id',
+      },
+      onDelete: 'SET NULL',
+    },
     amount: {
       type: DataTypes.DECIMAL(12, 2),
       allowNull: false,
@@ -76,6 +89,10 @@ ClientPaymentDeletedLog.init(
       type: DataTypes.STRING(20),
       allowNull: false,
       defaultValue: 'efectivo',
+    },
+    referenceNumber: {
+      type: DataTypes.STRING(100),
+      allowNull: true,
     },
     note: {
       type: DataTypes.TEXT,

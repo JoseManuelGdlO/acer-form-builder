@@ -188,7 +188,7 @@ class ApiClient {
   }
 
   // Clients
-  async getClients(params?: { status?: string; assignedUserId?: string }, token?: string | null) {
+  async getClients(params?: { assignedUserId?: string; productId?: string; visaStatusTemplateId?: string }, token?: string | null) {
     const queryParams = new URLSearchParams(params as any).toString();
     return this.request<any[]>(`/clients${queryParams ? `?${queryParams}` : ''}`, {
       method: 'GET',
@@ -539,6 +539,73 @@ class ApiClient {
     });
   }
 
+  async getTripFinance(tripId: string, token?: string | null) {
+    return this.request<{
+      summary: { totalIncome: number; totalExpense: number; net: number };
+      incomes: any[];
+      expenses: any[];
+    }>(`/trips/${tripId}/finance`, {
+      method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async createTripIncome(
+    tripId: string,
+    data: {
+      clientId: string;
+      amount: number;
+      paymentDate: string;
+      paymentType?: 'tarjeta' | 'transferencia' | 'efectivo';
+      referenceNumber?: string;
+      note?: string;
+    },
+    token?: string | null
+  ) {
+    return this.request<any>(`/trips/${tripId}/finance/incomes`, {
+      method: 'POST',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteTripIncome(tripId: string, paymentId: string, token?: string | null) {
+    return this.request<{ message: string }>(`/trips/${tripId}/finance/incomes/${paymentId}`, {
+      method: 'DELETE',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async createTripExpense(
+    tripId: string,
+    data: {
+      amount: number;
+      expenseDate: string;
+      category?: string;
+      referenceNumber?: string;
+      note?: string;
+    },
+    token?: string | null
+  ) {
+    return this.request<any>(`/trips/${tripId}/finance/expenses`, {
+      method: 'POST',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteTripExpense(tripId: string, expenseId: string, token?: string | null) {
+    return this.request<{ message: string }>(`/trips/${tripId}/finance/expenses/${expenseId}`, {
+      method: 'DELETE',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
   // Forms
   async getForms() {
     return this.request<any[]>('/forms', {
@@ -737,6 +804,41 @@ class ApiClient {
     });
   }
 
+  // Visa status templates
+  async getVisaStatusTemplates(token?: string | null) {
+    return this.request<any[]>('/visa-status-templates', {
+      method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async createVisaStatusTemplate(templateData: any, token?: string | null) {
+    return this.request<any>('/visa-status-templates', {
+      method: 'POST',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+      body: JSON.stringify(templateData),
+    });
+  }
+
+  async updateVisaStatusTemplate(id: string, templateData: any, token?: string | null) {
+    return this.request<any>(`/visa-status-templates/${id}`, {
+      method: 'PUT',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+      body: JSON.stringify(templateData),
+    });
+  }
+
+  async deleteVisaStatusTemplate(id: string, token?: string | null) {
+    return this.request<{ message: string }>(`/visa-status-templates/${id}`, {
+      method: 'DELETE',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
   async getClientChecklist(clientId: string, token?: string | null) {
     return this.request<any[]>(`/checklist/clients/${clientId}`, {
       method: 'GET',
@@ -808,7 +910,7 @@ class ApiClient {
 
   async createPayment(
     clientId: string,
-    data: { amount: number; paymentDate: string; paymentType?: 'tarjeta' | 'transferencia' | 'efectivo'; note?: string },
+    data: { amount: number; paymentDate: string; paymentType?: 'tarjeta' | 'transferencia' | 'efectivo'; referenceNumber?: string; note?: string },
     token?: string | null
   ) {
     return this.request<any>(`/payments/clients/${clientId}`, {

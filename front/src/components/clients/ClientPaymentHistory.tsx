@@ -41,7 +41,7 @@ interface ClientPaymentHistoryProps {
   payments: ClientPayment[];
   amountDueHistory?: AmountDueLogEntry[];
   paymentDeletedHistory?: PaymentDeletedLogEntry[];
-  onAddPayment: (data: { amount: number; paymentDate: string; paymentType: PaymentType; note?: string }) => void;
+  onAddPayment: (data: { amount: number; paymentDate: string; paymentType: PaymentType; referenceNumber?: string; note?: string }) => void;
   onDeletePayment?: (paymentId: string) => void;
 }
 
@@ -63,6 +63,7 @@ export const ClientPaymentHistory = ({
   const [amount, setAmount] = useState('');
   const [paymentDate, setPaymentDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [paymentType, setPaymentType] = useState<PaymentType>('efectivo');
+  const [referenceNumber, setReferenceNumber] = useState('');
   const [note, setNote] = useState('');
   const [isEditingTotal, setIsEditingTotal] = useState(false);
   const [editTotalValue, setEditTotalValue] = useState(
@@ -80,11 +81,13 @@ export const ClientPaymentHistory = ({
       amount: numAmount,
       paymentDate: paymentDate.trim(),
       paymentType,
+      referenceNumber: referenceNumber.trim() || undefined,
       note: note.trim() || undefined,
     });
     setAmount('');
     setPaymentDate(format(new Date(), 'yyyy-MM-dd'));
     setPaymentType('efectivo');
+    setReferenceNumber('');
     setNote('');
     setIsAdding(false);
   };
@@ -279,6 +282,11 @@ export const ClientPaymentHistory = ({
                           <span className="text-muted-foreground">
                             {format(new Date(entry.paymentDate), "d MMM yyyy", { locale: es })}
                           </span>
+                          {entry.referenceNumber && (
+                            <span className="block text-muted-foreground truncate mt-0.5">
+                              Ticket/Transferencia: {entry.referenceNumber}
+                            </span>
+                          )}
                           {entry.note && (
                             <span className="block text-muted-foreground truncate mt-0.5">— {entry.note}</span>
                           )}
@@ -340,6 +348,19 @@ export const ClientPaymentHistory = ({
               </Select>
             </div>
             <div>
+              <Label htmlFor="payment-reference" className="text-xs">
+                Numero de ticket/transferencia (opcional)
+              </Label>
+              <Input
+                id="payment-reference"
+                type="text"
+                placeholder="Ej: TKT-123456"
+                value={referenceNumber}
+                onChange={(e) => setReferenceNumber(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+            <div>
               <Label htmlFor="payment-note" className="text-xs">
                 Nota (opcional)
               </Label>
@@ -359,6 +380,7 @@ export const ClientPaymentHistory = ({
                   setIsAdding(false);
                   setAmount('');
                   setPaymentType('efectivo');
+                  setReferenceNumber('');
                   setNote('');
                 }}
                 className="gap-1.5"
@@ -409,6 +431,11 @@ export const ClientPaymentHistory = ({
                   {payment.note && (
                     <p className="text-xs text-muted-foreground mt-0.5 truncate">
                       {payment.note}
+                    </p>
+                  )}
+                  {payment.referenceNumber && (
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                      Ticket/Transferencia: {payment.referenceNumber}
                     </p>
                   )}
                   <span className="text-xs text-muted-foreground flex items-center gap-1 mt-1">

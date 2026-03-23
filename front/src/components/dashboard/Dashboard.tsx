@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { 
   Users, FileText, ClipboardList, CheckCircle2, Clock, 
   TrendingUp, Activity, UserPlus, FileCheck, MessageSquare,
-  ArrowUpRight, ArrowDownRight
+  ArrowUpRight, ArrowDownRight, Scale, Percent
 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -14,7 +14,6 @@ interface DashboardProps {
   forms: Form[];
   submissions: FormSubmission[];
   clients: Client[];
-  formStats: { total: number; published: number; draft: number };
   submissionStats: { total: number; pending: number; reviewed: number; completed: number };
   clientStats: { total: number; active: number; inactive: number; pending: number };
 }
@@ -91,7 +90,6 @@ export const Dashboard = ({
   forms, 
   submissions, 
   clients,
-  formStats,
   submissionStats,
   clientStats
 }: DashboardProps) => {
@@ -153,6 +151,21 @@ export const Dashboard = ({
     ? Math.round((clientStats.active / clientStats.total) * 100)
     : 0;
 
+  const visaApprovalStats = useMemo(() => {
+    const normalize = (value?: string | null) => (value || '').trim().toLowerCase();
+    const approved = clients.filter((client) =>
+      normalize(client.visaStatusTemplate?.label).includes('aprob')
+    ).length;
+    const denied = clients.filter((client) =>
+      normalize(client.visaStatusTemplate?.label).includes('negad')
+    ).length;
+    const rate = approved + denied > 0
+      ? Math.round((approved / (approved + denied)) * 100)
+      : 0;
+
+    return { approved, denied, rate };
+  }, [clients]);
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -164,7 +177,7 @@ export const Dashboard = ({
       </div>
 
       {/* Main Stats Grid */}
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <StatCard
           title="Total Clientes"
           value={clientStats.total}
@@ -173,13 +186,6 @@ export const Dashboard = ({
           color="primary"
           trend="up"
           trendValue={`${activeClientRate}% activos`}
-        />
-        <StatCard
-          title="Formularios"
-          value={formStats.total}
-          subtitle={`${formStats.published} publicados`}
-          icon={FileText}
-          color="accent"
         />
         <StatCard
           title="Respuestas"
@@ -195,6 +201,20 @@ export const Dashboard = ({
           value={`${completionRate}%`}
           subtitle={`${submissionStats.completed} completados`}
           icon={CheckCircle2}
+          color="success"
+        />
+        <StatCard
+          title="Visas Aprobadas vs Negadas"
+          value={`${visaApprovalStats.approved} / ${visaApprovalStats.denied}`}
+          subtitle="Aprobadas / Negadas"
+          icon={Scale}
+          color="accent"
+        />
+        <StatCard
+          title="Tasa de Aprobación de Visas"
+          value={`${visaApprovalStats.rate}%`}
+          subtitle={`${visaApprovalStats.approved + visaApprovalStats.denied} casos evaluados`}
+          icon={Percent}
           color="success"
         />
       </div>

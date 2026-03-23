@@ -1,12 +1,21 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { Client, ClientStatus } from '@/types/form';
+import { Client } from '@/types/form';
 import { User } from '@/types/user';
+import { Product } from '@/types/product';
+import { VisaStatusTemplate } from '@/types/settings';
 import { ClientCard } from './ClientCard';
 import { ClientFormModal } from './ClientFormModal';
 import { ClientProfileView } from './ClientProfileView';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search, Users, UserCheck, UserX, Clock, Plus, CheckCircle2, XCircle } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Search, Users, Plus, CheckCircle2, SlidersHorizontal, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useClientStore } from '@/hooks/useClientStore';
 import { useSettingsStore } from '@/hooks/useSettingsStore';
@@ -14,13 +23,11 @@ import { useAuth } from '@/contexts/AuthContext';
 
 interface ClientListProps {
   clients: Client[];
+  products?: Product[];
+  visaStatusTemplates?: VisaStatusTemplate[];
   stats: {
     total: number;
-    active: number;
-    inactive: number;
-    pending: number;
   };
-  onUpdateStatus: (clientId: string, status: ClientStatus) => Promise<void>;
   onDelete: (clientId: string) => Promise<void>;
   onCreate: (clientData: Omit<Client, 'id' | 'createdAt' | 'updatedAt' | 'formsCompleted'>) => Promise<void>;
   onUpdate: (clientId: string, updates: Partial<Client>) => Promise<void>;
@@ -29,13 +36,15 @@ interface ClientListProps {
   isAdmin?: boolean;
 }
 
-type StatusFilterType = 'all' | ClientStatus;
 type ChecklistFilterType = 'all' | string; // 'all' or templateId
+type ProductFilterType = 'all' | string;
+type VisaStatusFilterType = 'all' | string;
 
 export const ClientList = ({
   clients,
+  products = [],
+  visaStatusTemplates = [],
   stats,
-  onUpdateStatus,
   onDelete,
   onCreate,
   onUpdate,
@@ -44,10 +53,12 @@ export const ClientList = ({
   isAdmin = false,
 }: ClientListProps) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<StatusFilterType>('all');
+  const [visaStatusFilter, setVisaStatusFilter] = useState<VisaStatusFilterType>('all');
   const [checklistFilter, setChecklistFilter] = useState<ChecklistFilterType>('all');
+  const [productFilter, setProductFilter] = useState<ProductFilterType>('all');
   const [viewingClient, setViewingClient] = useState<Client | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isFiltersModalOpen, setIsFiltersModalOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const hasAutoOpenedInitialClient = useRef(false);
   
@@ -133,13 +144,20 @@ export const ClientList = ({
   }, [clients, checklistTemplates]);
 
   const filteredClients = useMemo(() => {
+    const normalizedSearchQuery = searchQuery.toLowerCase().trim();
+
     return clients.filter(client => {
+      const clientName = (client.name || '').toLowerCase();
+      const clientEmail = (client.email || '').toLowerCase();
+      const clientPhone = String(client.phone || '');
+
       const matchesSearch =
-        client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        client.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (client.phone && client.phone.includes(searchQuery));
+        clientName.includes(normalizedSearchQuery) ||
+        clientEmail.includes(normalizedSearchQuery) ||
+        clientPhone.includes(searchQuery);
       
-      const matchesStatusFilter = statusFilter === 'all' || client.status === statusFilter;
+      const matchesVisaStatusFilter = visaStatusFilter === 'all' || client.visaStatusTemplateId === visaStatusFilter;
+      const matchesProductFilter = productFilter === 'all' || client.productId === productFilter;
       
       // For checklist filter, check if client's LAST completed template matches
       let matchesChecklistFilter = true;
@@ -166,9 +184,9 @@ export const ClientList = ({
         }
       }
       
-      return matchesSearch && matchesStatusFilter && matchesChecklistFilter;
+      return matchesSearch && matchesVisaStatusFilter && matchesChecklistFilter && matchesProductFilter;
     });
-  }, [clients, searchQuery, statusFilter, checklistFilter, checklistTemplates]);
+  }, [clients, searchQuery, visaStatusFilter, checklistFilter, checklistTemplates, productFilter]);
 
   const handleDelete = async (clientId: string) => {
     try {
@@ -216,12 +234,21 @@ export const ClientList = ({
     setIsFormOpen(true);
   };
 
-  const statusFilterButtons: { key: StatusFilterType; label: string; icon: React.ReactNode; count: number }[] = [
-    { key: 'all', label: 'Todos', icon: <Users className="w-4 h-4" />, count: stats.total },
-    { key: 'active', label: 'Activos', icon: <UserCheck className="w-4 h-4" />, count: stats.active },
-    { key: 'pending', label: 'Pendientes', icon: <Clock className="w-4 h-4" />, count: stats.pending },
-    { key: 'inactive', label: 'Inactivos', icon: <UserX className="w-4 h-4" />, count: stats.inactive },
-  ];
+  const visaStatusFilterButtons = useMemo(() => {
+    const buttons: { key: VisaStatusFilterType; label: string; icon: React.ReactNode; count: number }[] = [
+      { key: 'all', label: 'Todos', icon: <Users className="w-4 h-4" />, count: stats.total },
+    ];
+    visaStatusTemplates.forEach((template) => {
+      const count = clients.filter((client) => client.visaStatusTemplateId === template.id).length;
+      buttons.push({
+        key: template.id,
+        label: template.label,
+        icon: <CheckCircle2 className="w-4 h-4" />,
+        count,
+      });
+    });
+    return buttons;
+  }, [clients, stats.total, visaStatusTemplates]);
 
   const checklistFilterButtons = useMemo(() => {
     const buttons: { key: ChecklistFilterType; label: string; icon: React.ReactNode; count: number; color: string }[] = [
@@ -249,6 +276,38 @@ export const ClientList = ({
     return buttons;
   }, [checklistTemplates, checklistStats, stats.total]);
 
+  const productFilterButtons = useMemo(() => {
+    const buttons: { key: ProductFilterType; label: string; icon: React.ReactNode; count: number }[] = [
+      { key: 'all', label: 'Todos', icon: <Users className="w-4 h-4" />, count: stats.total },
+    ];
+
+    products.forEach((product) => {
+      const count = clients.filter((client) => client.productId === product.id).length;
+      buttons.push({
+        key: product.id,
+        label: product.title,
+        icon: <CheckCircle2 className="w-4 h-4" />,
+        count,
+      });
+    });
+
+    return buttons;
+  }, [products, clients, stats.total]);
+
+  const hasActiveFilters = useMemo(() => {
+    return (
+      visaStatusFilter !== 'all' ||
+      checklistFilter !== 'all' ||
+      productFilter !== 'all'
+    );
+  }, [visaStatusFilter, checklistFilter, productFilter]);
+
+  const clearFilters = () => {
+    setVisaStatusFilter('all');
+    setChecklistFilter('all');
+    setProductFilter('all');
+  };
+
   // Show profile view if a client is selected
   if (viewingClient) {
     return (
@@ -260,6 +319,8 @@ export const ClientList = ({
         />
         <ClientFormModal
           client={editingClient}
+          products={products}
+          visaStatusTemplates={visaStatusTemplates}
           open={isFormOpen}
           onOpenChange={(open) => {
             setIsFormOpen(open);
@@ -298,48 +359,25 @@ export const ClientList = ({
           </Button>
         </div>
 
-        {/* Status Filter Cards */}
-        <div>
-          <h3 className="text-xs font-medium text-muted-foreground mb-2">Filtro por Estado</h3>
-          <div className="flex flex-wrap gap-2">
-            {statusFilterButtons.map(filter => (
-              <button
-                key={filter.key}
-                onClick={() => setStatusFilter(filter.key)}
-                className={`px-3 py-1.5 rounded-lg border transition-all duration-200 flex items-center gap-2 ${
-                  statusFilter === filter.key
-                    ? 'border-primary bg-primary/5 shadow-sm'
-                    : 'border-border/50 hover:border-primary/30 hover:bg-muted/30'
-                }`}
-              >
-                {filter.icon}
-                <span className="text-sm font-medium">{filter.label}</span>
-                <span className="text-sm font-bold text-primary">({filter.count})</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Checklist Filter Cards */}
-        <div>
-          <h3 className="text-xs font-medium text-muted-foreground mb-2">Filtro por Último Checklist Completado</h3>
-          <div className="flex flex-wrap gap-2">
-            {checklistFilterButtons.map(filter => (
-              <button
-                key={filter.key}
-                onClick={() => setChecklistFilter(filter.key)}
-                className={`px-3 py-1.5 rounded-lg border transition-all duration-200 flex items-center gap-2 ${
-                  checklistFilter === filter.key
-                    ? 'border-primary bg-primary/5 shadow-sm'
-                    : 'border-border/50 hover:border-primary/30 hover:bg-muted/30'
-                }`}
-              >
-                {filter.icon}
-                <span className="text-sm font-medium">{filter.label}</span>
-                <span className="text-sm font-bold text-primary">({filter.count})</span>
-              </button>
-            ))}
-          </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={() => setIsFiltersModalOpen(true)}
+          >
+            <SlidersHorizontal className="w-4 h-4" />
+            Filtros
+          </Button>
+          {hasActiveFilters && (
+            <Button
+              variant="ghost"
+              className="gap-2"
+              onClick={clearFilters}
+            >
+              <X className="w-4 h-4" />
+              Quitar filtros
+            </Button>
+          )}
         </div>
 
         {/* Search */}
@@ -363,11 +401,11 @@ export const ClientList = ({
               No hay clientes
             </h3>
             <p className="text-muted-foreground mb-4">
-              {searchQuery || statusFilter !== 'all' || checklistFilter !== 'all'
+              {searchQuery || visaStatusFilter !== 'all' || checklistFilter !== 'all' || productFilter !== 'all'
                 ? 'No se encontraron clientes con los filtros aplicados'
                 : 'Comienza agregando tu primer cliente'}
             </p>
-            {!searchQuery && statusFilter === 'all' && checklistFilter === 'all' && (
+            {!searchQuery && visaStatusFilter === 'all' && checklistFilter === 'all' && productFilter === 'all' && (
               <Button onClick={handleOpenNewClient} className="gap-2">
                 <Plus className="w-4 h-4" />
                 Agregar Cliente
@@ -380,7 +418,6 @@ export const ClientList = ({
               <ClientCard
                 key={client.id}
                 client={client}
-                onUpdateStatus={status => onUpdateStatus(client.id, status)}
                 onDelete={() => handleDelete(client.id)}
                 onView={() => handleViewClient(client)}
                 onEdit={() => handleEditClient(client)}
@@ -394,10 +431,99 @@ export const ClientList = ({
 
         <ClientFormModal
           client={editingClient}
+          products={products}
+          visaStatusTemplates={visaStatusTemplates}
           open={isFormOpen}
           onOpenChange={setIsFormOpen}
           onSave={handleCreateOrUpdate}
         />
+
+        <Dialog open={isFiltersModalOpen} onOpenChange={setIsFiltersModalOpen}>
+          <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Filtros de clientes</DialogTitle>
+              <DialogDescription>
+                Selecciona los filtros para acotar la lista de clientes.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-xs font-medium text-muted-foreground mb-2">Filtro por Estado de Visa</h3>
+                <div className="flex flex-wrap gap-2">
+                  {visaStatusFilterButtons.map(filter => (
+                    <button
+                      key={filter.key}
+                      onClick={() => setVisaStatusFilter(filter.key)}
+                      className={`px-3 py-1.5 rounded-lg border transition-all duration-200 flex items-center gap-2 ${
+                        visaStatusFilter === filter.key
+                          ? 'border-primary bg-primary/5 shadow-sm'
+                          : 'border-border/50 hover:border-primary/30 hover:bg-muted/30'
+                      }`}
+                    >
+                      {filter.icon}
+                      <span className="text-sm font-medium">{filter.label}</span>
+                      <span className="text-sm font-bold text-primary">({filter.count})</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-xs font-medium text-muted-foreground mb-2">Filtro por Último Checklist Completado</h3>
+                <div className="flex flex-wrap gap-2">
+                  {checklistFilterButtons.map(filter => (
+                    <button
+                      key={filter.key}
+                      onClick={() => setChecklistFilter(filter.key)}
+                      className={`px-3 py-1.5 rounded-lg border transition-all duration-200 flex items-center gap-2 ${
+                        checklistFilter === filter.key
+                          ? 'border-primary bg-primary/5 shadow-sm'
+                          : 'border-border/50 hover:border-primary/30 hover:bg-muted/30'
+                      }`}
+                    >
+                      {filter.icon}
+                      <span className="text-sm font-medium">{filter.label}</span>
+                      <span className="text-sm font-bold text-primary">({filter.count})</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-xs font-medium text-muted-foreground mb-2">Filtro por Producto Adquirido</h3>
+                <div className="flex flex-wrap gap-2">
+                  {productFilterButtons.map(filter => (
+                    <button
+                      key={filter.key}
+                      onClick={() => setProductFilter(filter.key)}
+                      className={`px-3 py-1.5 rounded-lg border transition-all duration-200 flex items-center gap-2 ${
+                        productFilter === filter.key
+                          ? 'border-primary bg-primary/5 shadow-sm'
+                          : 'border-border/50 hover:border-primary/30 hover:bg-muted/30'
+                      }`}
+                    >
+                      {filter.icon}
+                      <span className="text-sm font-medium">{filter.label}</span>
+                      <span className="text-sm font-bold text-primary">({filter.count})</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              {hasActiveFilters && (
+                <Button variant="outline" onClick={clearFilters}>
+                  Quitar filtros
+                </Button>
+              )}
+              <Button onClick={() => setIsFiltersModalOpen(false)}>
+                Listo
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

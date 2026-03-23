@@ -136,8 +136,9 @@ export const TripFormModal = ({
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 space-y-4 mt-4">
-          <div className="space-y-2">
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 mt-4">
+          <div className="flex-1 min-h-0 overflow-y-auto pr-1 space-y-4">
+            <div className="space-y-2">
             <Label htmlFor="trip-title">Título del viaje *</Label>
             <Input
               id="trip-title"
@@ -146,9 +147,9 @@ export const TripFormModal = ({
               placeholder="Ej. Viaje a consulado enero"
               required
             />
-          </div>
+            </div>
 
-          <div className="space-y-2">
+            <div className="space-y-2">
             <Label htmlFor="trip-destination" className="flex items-center gap-2">
               <MapPin className="w-4 h-4" />
               Destino
@@ -159,9 +160,9 @@ export const TripFormModal = ({
               onChange={e => setDestination(e.target.value)}
               placeholder="Ej. Ciudad de México"
             />
-          </div>
+            </div>
 
-          <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="trip-departure">Fecha partida *</Label>
               <Input
@@ -182,10 +183,10 @@ export const TripFormModal = ({
                 required
               />
             </div>
-          </div>
+            </div>
 
-          {busTemplates.length > 0 && (
-            <div className="space-y-2">
+            {busTemplates.length > 0 && (
+              <div className="space-y-2">
               <Label htmlFor="trip-bus-template">Usar plantilla de camión</Label>
               <select
                 id="trip-bus-template"
@@ -207,10 +208,10 @@ export const TripFormModal = ({
                   </option>
                 ))}
               </select>
-            </div>
-          )}
+              </div>
+            )}
 
-          <div className="space-y-2">
+            <div className="space-y-2">
             <Label htmlFor="trip-seats" className="flex items-center gap-2">
               <Users className="w-4 h-4" />
               Plazas del camión *
@@ -222,9 +223,9 @@ export const TripFormModal = ({
               value={totalSeats}
               onChange={e => setTotalSeats(Number(e.target.value) || 1)}
             />
-          </div>
+            </div>
 
-          <div className="space-y-2">
+            <div className="space-y-2">
             <Label htmlFor="trip-notes">Notas</Label>
             <Textarea
               id="trip-notes"
@@ -234,10 +235,10 @@ export const TripFormModal = ({
               rows={2}
               className="resize-none"
             />
-          </div>
+            </div>
 
-          {companiesForInvite.length > 0 && (
-            <div className="space-y-2 flex-1 min-h-0 flex flex-col">
+            {companiesForInvite.length > 0 && (
+              <div className="space-y-2 flex-1 min-h-0 flex flex-col">
               <Label>Invitar a compañías</Label>
               <ScrollArea className="border rounded-md flex-1 min-h-[80px] max-h-[120px]">
                 <div className="p-2 space-y-2">
@@ -255,16 +256,17 @@ export const TripFormModal = ({
                   ))}
                 </div>
               </ScrollArea>
-            </div>
-          )}
+              </div>
+            )}
 
-          {error && (
-            <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-md">
-              {error}
-            </div>
-          )}
+            {error && (
+              <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-md">
+                {error}
+              </div>
+            )}
+          </div>
 
-          <DialogFooter className="mt-4">
+          <DialogFooter className="mt-4 pt-3 border-t border-border">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
               Cancelar
             </Button>

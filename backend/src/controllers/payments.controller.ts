@@ -64,6 +64,7 @@ export const createPayment = [
   body('amount').isFloat({ min: 0.01 }).withMessage('Amount must be a positive number'),
   body('paymentDate').notEmpty().withMessage('Payment date is required').isISO8601().withMessage('Invalid date format'),
   body('paymentType').optional().isIn(PAYMENT_TYPES).withMessage('Payment type must be tarjeta, transferencia or efectivo'),
+  body('referenceNumber').optional({ values: 'falsy' }).isString().isLength({ max: 100 }).withMessage('Reference number must be up to 100 chars'),
   body('note').optional().isString(),
   async (req: AuthRequest, res: Response): Promise<void> => {
     try {
@@ -74,7 +75,7 @@ export const createPayment = [
       }
 
       const { clientId } = req.params;
-      const { amount, paymentDate, paymentType, note } = req.body;
+      const { amount, paymentDate, paymentType, referenceNumber, note } = req.body;
       const companyId = req.user?.companyId;
       if (!companyId) {
         res.status(401).json({ error: 'Authentication required' });
@@ -96,6 +97,7 @@ export const createPayment = [
         amount,
         paymentDate,
         paymentType: paymentType && PAYMENT_TYPES.includes(paymentType) ? paymentType : 'efectivo',
+        referenceNumber: referenceNumber || undefined,
         note: note || undefined,
       });
 
@@ -135,6 +137,7 @@ export const deletePayment = async (req: AuthRequest, res: Response): Promise<vo
       amount: payment.amount,
       paymentDate: payment.paymentDate,
       paymentType: payment.paymentType || 'efectivo',
+      referenceNumber: payment.referenceNumber || null,
       note: payment.note || null,
       deletedBy: req.user?.id,
     });

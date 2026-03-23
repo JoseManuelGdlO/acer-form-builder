@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Client, ClientPayment, AmountDueLogEntry, PaymentDeletedLogEntry } from '@/types/form';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { ClientStatusBadge } from './ClientStatusBadge';
@@ -78,6 +79,10 @@ export const ClientProfileView = ({ client, onBack, onEdit }: ClientProfileViewP
         setClientSnapshot({
           ...client,
           ...freshClientData,
+          visaCasAppointmentDate: freshClientData.visa_cas_appointment_date ?? freshClientData.visaCasAppointmentDate ?? null,
+          visaCasAppointmentLocation: freshClientData.visa_cas_appointment_location ?? freshClientData.visaCasAppointmentLocation ?? null,
+          visaConsularAppointmentDate: freshClientData.visa_consular_appointment_date ?? freshClientData.visaConsularAppointmentDate ?? null,
+          visaConsularAppointmentLocation: freshClientData.visa_consular_appointment_location ?? freshClientData.visaConsularAppointmentLocation ?? null,
           totalAmountDue: totalDue,
           assignedUserId: freshClientData.assigned_user_id ?? freshClientData.assignedUserId,
           assignedUser: assignedUser ? { id: assignedUser.id, name: assignedUser.name, email: assignedUser.email } : null,
@@ -99,6 +104,7 @@ export const ClientProfileView = ({ client, onBack, onEdit }: ClientProfileViewP
         amount: Number(p.amount),
         paymentDate: p.payment_date || p.paymentDate,
         paymentType: (p.payment_type || p.paymentType || 'efectivo') as ClientPayment['paymentType'],
+        referenceNumber: p.reference_number || p.referenceNumber,
         note: p.note,
         createdAt: new Date(p.created_at || p.createdAt),
       }));
@@ -119,6 +125,7 @@ export const ClientProfileView = ({ client, onBack, onEdit }: ClientProfileViewP
         amount: Number(h.amount),
         paymentDate: h.payment_date || h.paymentDate,
         paymentType: h.payment_type || h.paymentType || 'efectivo',
+        referenceNumber: h.reference_number || h.referenceNumber || null,
         note: h.note,
         createdAt: new Date(h.created_at || h.createdAt),
         deletedByUser: h.deletedByUser || h.deleted_by_user ? { id: (h.deletedByUser || h.deleted_by_user).id, name: (h.deletedByUser || h.deleted_by_user).name, email: (h.deletedByUser || h.deleted_by_user).email } : null,
@@ -330,7 +337,7 @@ export const ClientProfileView = ({ client, onBack, onEdit }: ClientProfileViewP
     }
   };
 
-  const handleAddPayment = async (data: { amount: number; paymentDate: string; paymentType: 'tarjeta' | 'transferencia' | 'efectivo'; note?: string }) => {
+  const handleAddPayment = async (data: { amount: number; paymentDate: string; paymentType: 'tarjeta' | 'transferencia' | 'efectivo'; referenceNumber?: string; note?: string }) => {
     if (!token) return;
     try {
       const newPayment = await api.createPayment(client.id, data, token);
@@ -339,6 +346,7 @@ export const ClientProfileView = ({ client, onBack, onEdit }: ClientProfileViewP
         amount: Number(newPayment.amount),
         paymentDate: newPayment.payment_date || newPayment.paymentDate,
         paymentType: (newPayment.payment_type || newPayment.paymentType || 'efectivo') as ClientPayment['paymentType'],
+        referenceNumber: newPayment.reference_number || newPayment.referenceNumber,
         note: newPayment.note,
         createdAt: new Date(newPayment.created_at || newPayment.createdAt),
       };
@@ -362,6 +370,7 @@ export const ClientProfileView = ({ client, onBack, onEdit }: ClientProfileViewP
           amount: Number(h.amount),
           paymentDate: h.payment_date || h.paymentDate,
           paymentType: h.payment_type || h.paymentType || 'efectivo',
+          referenceNumber: h.reference_number || h.referenceNumber || null,
           note: h.note,
           createdAt: new Date(h.created_at || h.createdAt),
           deletedByUser: h.deletedByUser || h.deleted_by_user ? { id: (h.deletedByUser || h.deleted_by_user).id, name: (h.deletedByUser || h.deleted_by_user).name, email: (h.deletedByUser || h.deleted_by_user).email } : null,
@@ -440,6 +449,18 @@ export const ClientProfileView = ({ client, onBack, onEdit }: ClientProfileViewP
   };
 
   const displayClient = clientSnapshot ?? client;
+  const formatVisaAppointmentDate = (value?: string | null) => {
+    if (!value) return 'Sin fecha';
+    const normalized = value.length >= 10 ? value.slice(0, 10) : value;
+    const parsedDate = new Date(`${normalized}T00:00:00`);
+    if (Number.isNaN(parsedDate.getTime())) return normalized;
+    return format(parsedDate, "d MMM yyyy", { locale: es });
+  };
+  const formatAppointmentLabel = (date?: string | null, location?: string | null) => {
+    const dateText = formatVisaAppointmentDate(date);
+    const locationText = location?.trim() ? ` - ${location.trim()}` : '';
+    return `${dateText}${locationText}`;
+  };
   const infoItems = [
     { icon: Mail, label: 'Correo', value: displayClient.email },
     { icon: Phone, label: 'Teléfono', value: displayClient.phone || 'No registrado' },
@@ -486,7 +507,17 @@ export const ClientProfileView = ({ client, onBack, onEdit }: ClientProfileViewP
                 <h1 className="text-2xl font-bold text-foreground">
                   {client.name}
                 </h1>
-                <ClientStatusBadge status={client.status} />
+                <ClientStatusBadge label={displayClient.visaStatusTemplate?.label} />
+                <div className="flex flex-wrap gap-2 mt-2">
+                  <Badge variant="secondary" className="gap-1">
+                    <Calendar className="w-3.5 h-3.5" />
+                    CAS: {formatAppointmentLabel(displayClient.visaCasAppointmentDate, displayClient.visaCasAppointmentLocation)}
+                  </Badge>
+                  <Badge variant="secondary" className="gap-1">
+                    <Calendar className="w-3.5 h-3.5" />
+                    Consulado: {formatAppointmentLabel(displayClient.visaConsularAppointmentDate, displayClient.visaConsularAppointmentLocation)}
+                  </Badge>
+                </div>
               </div>
             </div>
           </div>

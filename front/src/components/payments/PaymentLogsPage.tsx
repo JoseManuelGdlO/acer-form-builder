@@ -21,6 +21,7 @@ interface PaymentRow {
   amount: number;
   paymentDate: string;
   paymentType: string;
+  referenceNumber?: string;
   note?: string;
   clientId: string;
   clientName: string;
@@ -48,6 +49,7 @@ export const PaymentLogsPage = () => {
         amount: Number(p.amount),
         paymentDate: p.payment_date || p.paymentDate,
         paymentType: p.payment_type || p.paymentType || 'efectivo',
+        referenceNumber: p.reference_number || p.referenceNumber,
         note: p.note,
         clientId: p.clientId || p.client_id,
         clientName: p.client?.name || '—',
@@ -100,6 +102,7 @@ export const PaymentLogsPage = () => {
                   <TableHead>Cliente</TableHead>
                   <TableHead className="text-right">Monto</TableHead>
                   <TableHead>Tipo</TableHead>
+                  <TableHead>Ticket/Transferencia</TableHead>
                   <TableHead className="max-w-[200px]">Nota</TableHead>
                 </TableRow>
               </TableHeader>
@@ -117,6 +120,9 @@ export const PaymentLogsPage = () => {
                       <span className="text-xs bg-muted/60 px-2 py-0.5 rounded">
                         {PAYMENT_TYPE_LABELS[(p.paymentType as PaymentType) || 'efectivo']}
                       </span>
+                    </TableCell>
+                    <TableCell className="max-w-[200px] truncate text-muted-foreground">
+                      {p.referenceNumber || '—'}
                     </TableCell>
                     <TableCell className="max-w-[200px] truncate text-muted-foreground">
                       {p.note || '—'}

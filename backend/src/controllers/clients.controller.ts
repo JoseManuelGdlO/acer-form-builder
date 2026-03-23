@@ -1,7 +1,7 @@
 import { Response } from 'express';
 import { body, validationResult } from 'express-validator';
 import { fn, col } from 'sequelize';
-import { Client, ClientChecklist, ChecklistTemplate, ClientAmountDueLog, ClientPaymentDeletedLog, ClientPayment, User, TripParticipant, Trip } from '../models';
+import { Client, ClientChecklist, ChecklistTemplate, ClientAmountDueLog, ClientPaymentDeletedLog, ClientPayment, User, TripParticipant, Trip, Product, VisaStatusTemplate } from '../models';
 import { AuthRequest } from '../middleware/auth.middleware';
 
 export const getAllClients = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -11,7 +11,7 @@ export const getAllClients = async (req: AuthRequest, res: Response): Promise<vo
       res.status(401).json({ error: 'Authentication required' });
       return;
     }
-    const { status, assignedUserId } = req.query;
+    const { assignedUserId, productId, visaStatusTemplateId } = req.query;
     const where: any = { companyId };
 
     // If user is reviewer, only show assigned clients
@@ -21,8 +21,11 @@ export const getAllClients = async (req: AuthRequest, res: Response): Promise<vo
       where.assignedUserId = assignedUserId;
     }
 
-    if (status) {
-      where.status = status;
+    if (productId) {
+      where.productId = productId;
+    }
+    if (visaStatusTemplateId) {
+      where.visaStatusTemplateId = visaStatusTemplateId;
     }
 
     const clients = await Client.findAll({
@@ -33,6 +36,18 @@ export const getAllClients = async (req: AuthRequest, res: Response): Promise<vo
           model: User,
           as: 'assignedUser',
           attributes: ['id', 'name', 'email'],
+          required: false,
+        },
+        {
+          model: Product,
+          as: 'product',
+          attributes: ['id', 'title'],
+          required: false,
+        },
+        {
+          model: VisaStatusTemplate,
+          as: 'visaStatusTemplate',
+          attributes: ['id', 'label', 'order', 'isActive'],
           required: false,
         },
         {
@@ -53,6 +68,10 @@ export const getAllClients = async (req: AuthRequest, res: Response): Promise<vo
 
     // Get all active checklist templates for this company
     const activeTemplates = await ChecklistTemplate.findAll({
+      where: { companyId, isActive: true },
+      order: [['order', 'ASC']],
+    });
+    const activeVisaStatusTemplates = await VisaStatusTemplate.findAll({
       where: { companyId, isActive: true },
       order: [['order', 'ASC']],
     });
@@ -137,6 +156,12 @@ export const getAllClients = async (req: AuthRequest, res: Response): Promise<vo
         order: t.order,
         isActive: t.isActive,
       })),
+      visaStatusTemplates: activeVisaStatusTemplates.map(t => ({
+        id: t.id,
+        label: t.label,
+        order: t.order,
+        isActive: t.isActive,
+      })),
     };
 
     res.json(response);
@@ -159,6 +184,8 @@ export const getClientById = async (req: AuthRequest, res: Response): Promise<vo
       where: { id, companyId },
       include: [
         { model: User, as: 'assignedUser', attributes: ['id', 'name', 'email'], required: false },
+        { model: Product, as: 'product', attributes: ['id', 'title'], required: false },
+        { model: VisaStatusTemplate, as: 'visaStatusTemplate', attributes: ['id', 'label', 'order', 'isActive'], required: false },
       ],
     });
     if (!client) {
@@ -253,7 +280,12 @@ export const getClientPaymentDeletedHistory = async (req: AuthRequest, res: Resp
 export const createClient = [
   body('name').notEmpty().withMessage('Name is required'),
   body('email').optional().isEmail().normalizeEmail(),
-  body('status').optional().isIn(['active', 'inactive', 'pending']),
+  body('visaCasAppointmentDate').optional({ values: 'null' }).isISO8601().withMessage('CAS appointment date must be a valid date'),
+  body('visaCasAppointmentLocation').optional({ values: 'null' }).isString().isLength({ max: 255 }).withMessage('CAS appointment location must be a valid string'),
+  body('visaConsularAppointmentDate').optional({ values: 'null' }).isISO8601().withMessage('Consular appointment date must be a valid date'),
+  body('visaConsularAppointmentLocation').optional({ values: 'null' }).isString().isLength({ max: 255 }).withMessage('Consular appointment location must be a valid string'),
+  body('visaStatusTemplateId').isUUID().withMessage('Visa status template id is required'),
+  body('productId').optional({ values: 'null' }).isUUID().withMessage('Product id must be a valid UUID'),
   async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       const errors = validationResult(req);
@@ -284,7 +316,28 @@ export const createClient = [
         }
       }
 
+      if (req.body.productId) {
+        const product = await Product.findOne({ where: { id: req.body.productId, companyId } });
+        if (!product) {
+          res.status(400).json({ error: 'Product not found' });
+          return;
+        }
+      }
+      const visaStatusTemplate = await VisaStatusTemplate.findOne({
+        where: { id: req.body.visaStatusTemplateId, companyId },
+      });
+      if (!visaStatusTemplate) {
+        res.status(400).json({ error: 'Visa status template not found' });
+        return;
+      }
+
       const client = await Client.create({ ...req.body, companyId });
+      await client.reload({
+        include: [
+          { model: Product, as: 'product', attributes: ['id', 'title'], required: false },
+          { model: VisaStatusTemplate, as: 'visaStatusTemplate', attributes: ['id', 'label', 'order', 'isActive'], required: false },
+        ],
+      });
       
       // Get checklist stats for the new client
       const checklistItems = await ClientChecklist.findAll({
@@ -358,7 +411,12 @@ export const createClient = [
 export const updateClient = [
   body('name').optional().notEmpty(),
   body('email').optional().isEmail().normalizeEmail(),
-  body('status').optional().isIn(['active', 'inactive', 'pending']),
+  body('visaCasAppointmentDate').optional({ values: 'null' }).isISO8601().withMessage('CAS appointment date must be a valid date'),
+  body('visaCasAppointmentLocation').optional({ values: 'null' }).isString().isLength({ max: 255 }).withMessage('CAS appointment location must be a valid string'),
+  body('visaConsularAppointmentDate').optional({ values: 'null' }).isISO8601().withMessage('Consular appointment date must be a valid date'),
+  body('visaConsularAppointmentLocation').optional({ values: 'null' }).isString().isLength({ max: 255 }).withMessage('Consular appointment location must be a valid string'),
+  body('visaStatusTemplateId').optional({ values: 'falsy' }).isUUID().withMessage('Visa status template id must be a valid UUID'),
+  body('productId').optional({ values: 'null' }).isUUID().withMessage('Product id must be a valid UUID'),
   body('totalAmountDue').optional({ values: 'null' }).custom((val) => val === null || val === undefined || (typeof val === 'number' && !Number.isNaN(val) && val >= 0)).withMessage('Total amount due must be a non-negative number or null'),
   async (req: AuthRequest, res: Response): Promise<void> => {
     try {
@@ -395,7 +453,14 @@ export const updateClient = [
       if (req.body.phone !== undefined) updates.phone = req.body.phone;
       if (req.body.address !== undefined) updates.address = req.body.address;
       if (req.body.notes !== undefined) updates.notes = req.body.notes;
-      if (req.body.status !== undefined) updates.status = req.body.status;
+      if (req.body.visaCasAppointmentDate !== undefined) updates.visaCasAppointmentDate = req.body.visaCasAppointmentDate;
+      if (req.body.visaCasAppointmentLocation !== undefined) updates.visaCasAppointmentLocation = req.body.visaCasAppointmentLocation;
+      if (req.body.visaConsularAppointmentDate !== undefined) updates.visaConsularAppointmentDate = req.body.visaConsularAppointmentDate;
+      if (req.body.visaConsularAppointmentLocation !== undefined) updates.visaConsularAppointmentLocation = req.body.visaConsularAppointmentLocation;
+      if (req.body.visaStatusTemplateId !== undefined && req.body.visaStatusTemplateId !== '') {
+        updates.visaStatusTemplateId = req.body.visaStatusTemplateId;
+      }
+      if (req.body.productId !== undefined) updates.productId = req.body.productId;
       if (req.body.assignedUserId !== undefined && req.user?.roles.includes('super_admin')) {
         updates.assignedUserId = req.body.assignedUserId || null;
       }
@@ -403,10 +468,31 @@ export const updateClient = [
         updates.totalAmountDue = req.body.totalAmountDue;
       }
 
+      if (req.body.productId) {
+        const product = await Product.findOne({ where: { id: req.body.productId, companyId } });
+        if (!product) {
+          res.status(400).json({ error: 'Product not found' });
+          return;
+        }
+      }
+      if (req.body.visaStatusTemplateId) {
+        const visaStatusTemplate = await VisaStatusTemplate.findOne({
+          where: { id: req.body.visaStatusTemplateId, companyId },
+        });
+        if (!visaStatusTemplate) {
+          res.status(400).json({ error: 'Visa status template not found' });
+          return;
+        }
+      }
+
       const previousTotalAmountDue = client.totalAmountDue != null ? Number(client.totalAmountDue) : null;
       await client.update(updates);
       await client.reload({
-        include: [{ model: User, as: 'assignedUser', attributes: ['id', 'name', 'email'], required: false }],
+        include: [
+          { model: User, as: 'assignedUser', attributes: ['id', 'name', 'email'], required: false },
+          { model: Product, as: 'product', attributes: ['id', 'title'], required: false },
+          { model: VisaStatusTemplate, as: 'visaStatusTemplate', attributes: ['id', 'label', 'order', 'isActive'], required: false },
+        ],
       });
       if (req.body.totalAmountDue !== undefined) {
         const newVal = req.body.totalAmountDue === null || req.body.totalAmountDue === undefined
@@ -521,15 +607,24 @@ export const getClientStats = async (req: AuthRequest, res: Response): Promise<v
     }
 
     const total = await Client.count({ where });
-    const active = await Client.count({ where: { ...where, status: 'active' } });
-    const inactive = await Client.count({ where: { ...where, status: 'inactive' } });
-    const pending = await Client.count({ where: { ...where, status: 'pending' } });
+    const clients = await Client.findAll({
+      where,
+      attributes: ['visaStatusTemplateId'],
+      include: [{ model: VisaStatusTemplate, as: 'visaStatusTemplate', attributes: ['id', 'label'], required: false }],
+    });
+    const visaStatusCounts: Record<string, { id: string; label: string; count: number }> = {};
+    clients.forEach((client) => {
+      const tpl = (client as any).visaStatusTemplate;
+      if (!tpl?.id) return;
+      if (!visaStatusCounts[tpl.id]) {
+        visaStatusCounts[tpl.id] = { id: tpl.id, label: tpl.label, count: 0 };
+      }
+      visaStatusCounts[tpl.id].count += 1;
+    });
 
     res.json({
       total,
-      active,
-      inactive,
-      pending,
+      visaStatusCounts: Object.values(visaStatusCounts),
     });
   } catch (error) {
     console.error('Get client stats error:', error);

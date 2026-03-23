@@ -533,12 +533,32 @@
                 "type": "object",
                 "properties": {
                   "name": {
-                    "type": "string"
+                    "type": "string",
+                    "format": "date-time"
                   },
                   "email": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "visaCasAppointmentDate": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "visaCasAppointmentLocation": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "visaConsularAppointmentDate": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "visaConsularAppointmentLocation": {
                     "type": "string"
                   },
-                  "status": {
+                  "visaStatusTemplateId": {
+                    "type": "string"
+                  },
+                  "productId": {
                     "type": "string"
                   }
                 }
@@ -714,12 +734,32 @@
                 "type": "object",
                 "properties": {
                   "name": {
-                    "type": "string"
+                    "type": "string",
+                    "format": "date-time"
                   },
                   "email": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "visaCasAppointmentDate": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "visaCasAppointmentLocation": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "visaConsularAppointmentDate": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "visaConsularAppointmentLocation": {
                     "type": "string"
                   },
-                  "status": {
+                  "visaStatusTemplateId": {
+                    "type": "string"
+                  },
+                  "productId": {
                     "type": "string"
                   },
                   "totalAmountDue": {
@@ -1541,6 +1581,262 @@
             "in": "path",
             "required": true,
             "description": "ID: clientId",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/trips/{id}/finance": {
+      "get": {
+        "tags": [
+          "trips"
+        ],
+        "operationId": "get__api_trips__id__finance",
+        "summary": "GET /api/trips/{id}/finance",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID: id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/trips/{id}/finance/incomes": {
+      "post": {
+        "tags": [
+          "trips"
+        ],
+        "operationId": "post__api_trips__id__finance_incomes",
+        "summary": "POST /api/trips/{id}/finance/incomes",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID: id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "clientId": {
+                    "type": "number"
+                  },
+                  "amount": {
+                    "type": "number"
+                  },
+                  "paymentDate": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "paymentType": {
+                    "type": "string"
+                  },
+                  "referenceNumber": {
+                    "type": "string"
+                  },
+                  "note": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "clientId"
+                ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request (validation errors)"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/trips/{id}/finance/incomes/{paymentId}": {
+      "delete": {
+        "tags": [
+          "trips"
+        ],
+        "operationId": "delete__api_trips__id__finance_incomes__paymentId_",
+        "summary": "DELETE /api/trips/{id}/finance/incomes/{paymentId}",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID: id",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "paymentId",
+            "in": "path",
+            "required": true,
+            "description": "ID: paymentId",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/trips/{id}/finance/expenses": {
+      "post": {
+        "tags": [
+          "trips"
+        ],
+        "operationId": "post__api_trips__id__finance_expenses",
+        "summary": "POST /api/trips/{id}/finance/expenses",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID: id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "amount": {
+                    "type": "number"
+                  },
+                  "expenseDate": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "category": {
+                    "type": "string"
+                  },
+                  "referenceNumber": {
+                    "type": "string"
+                  },
+                  "note": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request (validation errors)"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/trips/{id}/finance/expenses/{expenseId}": {
+      "delete": {
+        "tags": [
+          "trips"
+        ],
+        "operationId": "delete__api_trips__id__finance_expenses__expenseId_",
+        "summary": "DELETE /api/trips/{id}/finance/expenses/{expenseId}",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID: id",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "expenseId",
+            "in": "path",
+            "required": true,
+            "description": "ID: expenseId",
             "schema": {
               "type": "string"
             }
@@ -3028,6 +3324,9 @@
                   "paymentType": {
                     "type": "string"
                   },
+                  "referenceNumber": {
+                    "type": "string"
+                  },
                   "note": {
                     "type": "string"
                   }
@@ -4263,6 +4562,170 @@
           },
           "401": {
             "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/visa-status-templates": {
+      "get": {
+        "tags": [
+          "visa-status-templates"
+        ],
+        "operationId": "get__api_visa_status_templates",
+        "summary": "GET /api/visa-status-templates",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "visa-status-templates"
+        ],
+        "operationId": "post__api_visa_status_templates",
+        "summary": "POST /api/visa-status-templates",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion y rol admin.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "integer"
+                  },
+                  "order": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request (validation errors)"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        }
+      }
+    },
+    "/api/visa-status-templates/{id}": {
+      "put": {
+        "tags": [
+          "visa-status-templates"
+        ],
+        "operationId": "put__api_visa_status_templates__id_",
+        "summary": "PUT /api/visa-status-templates/{id}",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion y rol admin.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID: id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "integer"
+                  },
+                  "order": {
+                    "type": "integer"
+                  },
+                  "isActive": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request (validation errors)"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "visa-status-templates"
+        ],
+        "operationId": "delete__api_visa_status_templates__id_",
+        "summary": "DELETE /api/visa-status-templates/{id}",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion y rol admin.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID: id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
           }
         }
       }

@@ -35,7 +35,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { LayoutDashboard, FileText, Users, UsersRound, UserCog, Bot, Settings, Receipt, ChevronDown, ShoppingBag, MapPin } from 'lucide-react';
 import { User } from '@/types/user';
-import { Client, ClientStatus } from '@/types/form';
+import { Client } from '@/types/form';
 import { Product } from '@/types/product';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
@@ -97,11 +97,11 @@ const Index = () => {
   const {
     clients,
     checklistTemplates,
+    visaStatusTemplates,
     fetchClients,
     createClient: createClientStore,
     updateClient: updateClientStore,
     deleteClient: deleteClientStore,
-    updateClientStatus: updateClientStatusStore,
     getClientStats,
   } = useClientStore();
   const {
@@ -138,6 +138,14 @@ const Index = () => {
     setSeatAssignment,
     clearSeatAssignment,
     resetSeatAssignments,
+    tripFinanceSummary,
+    tripIncomes,
+    tripExpenses,
+    fetchTripFinance,
+    createTripIncome,
+    deleteTripIncome,
+    createTripExpense,
+    deleteTripExpense,
   } = useTripStore();
   const {
     templates: busTemplates,
@@ -214,6 +222,9 @@ const Index = () => {
       fetchClients(token).catch((error) => {
         console.error('Failed to fetch clients:', error);
       });
+      fetchProducts(token).catch((error) => {
+        console.error('Failed to fetch products:', error);
+      });
       if (hasRole('super_admin')) {
         fetchUsers(token).catch((error) => {
           console.error('Failed to fetch users:', error);
@@ -286,13 +297,6 @@ const Index = () => {
     return deleteClientStore(token, clientId);
   };
 
-  const updateClientStatus = async (clientId: string, status: ClientStatus) => {
-    if (!token) {
-      throw new Error('No token available');
-    }
-    return updateClientStatusStore(token, clientId, status);
-  };
-
   const createGroup = async (data: { title: string; clientIds?: string[] }) => {
     if (!token) throw new Error('No token available');
     return createGroupStore(token, data);
@@ -315,11 +319,18 @@ const Index = () => {
   }, [clients, viewingAs]);
 
   const filteredClientStats = useMemo(() => {
+    const normalize = (s?: string | null) => (s || '').trim().toLowerCase();
+    const approved = filteredClients.filter(c => normalize(c.visaStatusTemplate?.label).includes('aprob')).length;
+    const denied = filteredClients.filter(c => normalize(c.visaStatusTemplate?.label).includes('negad')).length;
+    const inProcess = filteredClients.filter(c => {
+      const label = normalize(c.visaStatusTemplate?.label);
+      return !label.includes('aprob') && !label.includes('negad');
+    }).length;
     return {
       total: filteredClients.length,
-      active: filteredClients.filter(c => c.status === 'active').length,
-      inactive: filteredClients.filter(c => c.status === 'inactive').length,
-      pending: filteredClients.filter(c => c.status === 'pending').length,
+      active: approved,
+      inactive: denied,
+      pending: inProcess,
     };
   }, [filteredClients]);
 
@@ -329,75 +340,80 @@ const Index = () => {
         variant={current === 'dashboard' ? 'default' : 'ghost'}
         size="sm"
         onClick={() => setActiveView('dashboard')}
-        className="gap-1.5 shrink-0"
+        className="h-8 gap-1.5 px-2 text-xs sm:text-sm"
       >
         <LayoutDashboard className="w-4 h-4 shrink-0" />
         <span className="hidden sm:inline">Dashboard</span>
       </Button>
-      <Button
-        variant={current === 'forms' ? 'default' : 'ghost'}
-        size="sm"
-        onClick={() => setActiveView('forms')}
-        className="gap-1.5 shrink-0"
-      >
-        <FileText className="w-4 h-4 shrink-0" />
-        <span className="hidden sm:inline">Formularios</span>
-      </Button>
-      <Button
-        variant={current === 'clients' ? 'default' : 'ghost'}
-        size="sm"
-        onClick={() => setActiveView('clients')}
-        className="gap-1.5 shrink-0"
-      >
-        <Users className="w-4 h-4 shrink-0" />
-        <span className="hidden sm:inline">Clientes</span>
-        {filteredClients.length > 0 && (
-          <span className="px-1.5 py-0.5 text-xs rounded-full bg-secondary/20 text-secondary">
-            {filteredClients.length}
-          </span>
-        )}
-      </Button>
-      <Button
-        variant={current === 'products' ? 'default' : 'ghost'}
-        size="sm"
-        onClick={() => setActiveView('products')}
-        className="gap-1.5 shrink-0"
-      >
-        <ShoppingBag className="w-4 h-4 shrink-0" />
-        <span className="hidden sm:inline">Productos</span>
-      </Button>
-      <Button
-        variant={current === 'groups' ? 'default' : 'ghost'}
-        size="sm"
-        onClick={() => setActiveView('groups')}
-        className="gap-2"
-      >
-        <UsersRound className="w-4 h-4" />
-        <span className="hidden sm:inline">Grupos</span>
-        {groups.length > 0 && (
-          <span className="px-1.5 py-0.5 text-xs rounded-full bg-secondary/20 text-secondary">
-            {groups.length}
-          </span>
-        )}
-      </Button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant={['clients', 'groups'].includes(current) ? 'default' : 'ghost'}
+            size="sm"
+            className="h-8 gap-1.5 px-2 text-xs sm:text-sm"
+          >
+            <Users className="w-4 h-4 shrink-0" />
+            <span className="hidden sm:inline">Clientes</span>
+            <ChevronDown className="w-3.5 h-3.5 shrink-0 opacity-70" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-52">
+          <DropdownMenuItem onClick={() => setActiveView('clients')} className="gap-2 cursor-pointer">
+            <Users className="w-4 h-4" />
+            Clientes
+            {filteredClients.length > 0 && (
+              <span className="ml-auto px-1.5 py-0.5 text-xs rounded-full bg-secondary/20 text-secondary">
+                {filteredClients.length}
+              </span>
+            )}
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setActiveView('groups')} className="gap-2 cursor-pointer">
+            <UsersRound className="w-4 h-4" />
+            Grupos
+            {groups.length > 0 && (
+              <span className="ml-auto px-1.5 py-0.5 text-xs rounded-full bg-secondary/20 text-secondary">
+                {groups.length}
+              </span>
+            )}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
       {hasRole('super_admin') && (
         <Button
           variant={current === 'trips' ? 'default' : 'ghost'}
           size="sm"
           onClick={() => setActiveView('trips')}
-          className="gap-2"
+          className="h-8 gap-1.5 px-2 text-xs sm:text-sm"
         >
-          <MapPin className="w-4 h-4" />
+          <MapPin className="w-4 h-4 shrink-0" />
           <span className="hidden sm:inline">Viajes</span>
         </Button>
       )}
+      <Button
+        variant={current === 'forms' ? 'default' : 'ghost'}
+        size="sm"
+        onClick={() => setActiveView('forms')}
+        className="h-8 gap-1.5 px-2 text-xs sm:text-sm"
+      >
+        <FileText className="w-4 h-4 shrink-0" />
+        <span className="hidden sm:inline">Formularios</span>
+      </Button>
+      <Button
+        variant={current === 'products' ? 'default' : 'ghost'}
+        size="sm"
+        onClick={() => setActiveView('products')}
+        className="h-8 gap-1.5 px-2 text-xs sm:text-sm"
+      >
+        <ShoppingBag className="w-4 h-4 shrink-0" />
+        <span className="hidden sm:inline">Productos</span>
+      </Button>
       <RoleGuard allowedRoles={['super_admin']}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
               variant={['paymentLogs', 'users', 'chatbot', 'settings'].includes(current) ? 'default' : 'ghost'}
               size="sm"
-              className="gap-1.5 shrink-0"
+              className="h-8 gap-1.5 px-2 text-xs sm:text-sm"
             >
               <Settings className="w-4 h-4 shrink-0" />
               <span className="hidden sm:inline">Administración</span>
@@ -498,9 +514,10 @@ const Index = () => {
           </AppHeader>
           <ClientList
             clients={filteredClients}
+            products={products}
+            visaStatusTemplates={visaStatusTemplates}
             stats={filteredClientStats}
             initialClientId={initialNavigation.initialClientId}
-            onUpdateStatus={updateClientStatus}
             onDelete={deleteClient}
             onCreate={async (data) => { await createClient(data); }}
             onUpdate={async (id, data) => { await updateClient(id, data); }}
@@ -827,6 +844,14 @@ const Index = () => {
               await fetchTrip(tripId, token!);
             }}
             onLoadChangeLog={handleLoadTripChangeLog}
+            onLoadTripFinance={(tripId) => { fetchTripFinance(tripId, token!); }}
+            onCreateTripIncome={async (tripId, data) => { await createTripIncome(tripId, data, token!); await fetchTrip(tripId, token!); }}
+            onDeleteTripIncome={async (tripId, incomeId) => { await deleteTripIncome(tripId, incomeId, token!); await fetchTrip(tripId, token!); }}
+            onCreateTripExpense={async (tripId, data) => { await createTripExpense(tripId, data, token!); }}
+            onDeleteTripExpense={async (tripId, expenseId) => { await deleteTripExpense(tripId, expenseId, token!); }}
+            financeSummary={tripFinanceSummary}
+            tripIncomes={tripIncomes}
+            tripExpenses={tripExpenses}
             onFetchTrip={(tripId) => { fetchTrip(tripId, token!); }}
             busTemplates={busTemplates}
             onCreateBusTemplate={async (data) => { await createBusTemplateStore(token!, data); }}
@@ -900,11 +925,6 @@ const Index = () => {
 
   // Vista del dashboard
   if (activeView === 'dashboard') {
-    const formStats = {
-      total: forms.length,
-      published: forms.length,
-      draft: 0,
-    };
     const submissionStats = getSubmissionStats();
 
     return (
@@ -919,7 +939,6 @@ const Index = () => {
               forms={forms}
               submissions={submissions}
               clients={filteredClients}
-              formStats={formStats}
               submissionStats={{
                 total: submissionStats.total,
                 pending: submissionStats.pending,

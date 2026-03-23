@@ -6,6 +6,7 @@ import usersRoutes from './users.routes';
 import clientsRoutes from './clients.routes';
 import groupsRoutes from './groups.routes';
 import tripsRoutes from './trips.routes';
+import tripFinanceRoutes from './trip-finance.routes';
 import busTemplatesRoutes from './bus-templates.routes';
 import formsRoutes from './forms.routes';
 import submissionsRoutes from './submissions.routes';
@@ -19,6 +20,7 @@ import conversacionesChatRoutes from './conversations.routes';
 import productsRoutes from './products.routes';
 import categoriesRoutes from './categories.routes';
 import notificationsRoutes from './notifications.routes';
+import visaStatusTemplatesRoutes from './visa-status-templates.routes';
 
 const router = Router();
 
@@ -29,6 +31,7 @@ router.use('/users', usersRoutes);
 router.use('/clients', clientsRoutes);
 router.use('/groups', groupsRoutes);
 router.use('/trips', tripsRoutes);
+router.use('/trips', tripFinanceRoutes);
 router.use('/bus-templates', busTemplatesRoutes);
 router.use('/forms', formsRoutes);
 router.use('/submissions', submissionsRoutes);
@@ -42,5 +45,6 @@ router.use('/addChat', conversacionesChatRoutes);
 router.use('/products', productsRoutes);
 router.use('/categories', categoriesRoutes);
 router.use('/notifications', notificationsRoutes);
+router.use('/visa-status-templates', visaStatusTemplatesRoutes);
 
 export default router;

@@ -192,7 +192,7 @@ export function AppHeader({ children }: AppHeaderProps) {
             </div>
             
             {/* Navigation - Single Row, compacto */}
-            <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-center overflow-hidden">
+            <div className="flex items-center gap-1 flex-1 min-w-0 justify-center flex-wrap">
               {childrenArray}
             </div>
             

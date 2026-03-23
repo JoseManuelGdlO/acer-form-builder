@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Client, ClientStatus } from '@/types/form';
+import { Client } from '@/types/form';
+import { Product } from '@/types/product';
+import { VisaStatusTemplate } from '@/types/settings';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -19,10 +21,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { User, Mail, Phone, MapPin, FileText } from 'lucide-react';
+import { User, Mail, Phone, MapPin, FileText, ShoppingBag } from 'lucide-react';
 
 interface ClientFormModalProps {
   client?: Client | null;
+  products?: Product[];
+  visaStatusTemplates?: VisaStatusTemplate[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSave: (clientData: Omit<Client, 'id' | 'createdAt' | 'updatedAt' | 'formsCompleted'>) => Promise<void>;
@@ -30,6 +34,8 @@ interface ClientFormModalProps {
 
 export const ClientFormModal = ({
   client,
+  products = [],
+  visaStatusTemplates = [],
   open,
   onOpenChange,
   onSave,
@@ -40,7 +46,12 @@ export const ClientFormModal = ({
     phone: '',
     address: '',
     notes: '',
-    status: 'pending' as ClientStatus,
+    visaCasAppointmentDate: '',
+    visaCasAppointmentLocation: '',
+    visaConsularAppointmentDate: '',
+    visaConsularAppointmentLocation: '',
+    visaStatusTemplateId: '',
+    productId: undefined as string | undefined,
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -53,7 +64,12 @@ export const ClientFormModal = ({
         phone: client.phone || '',
         address: client.address || '',
         notes: client.notes || '',
-        status: client.status,
+        visaCasAppointmentDate: client.visaCasAppointmentDate || '',
+        visaCasAppointmentLocation: client.visaCasAppointmentLocation || '',
+        visaConsularAppointmentDate: client.visaConsularAppointmentDate || '',
+        visaConsularAppointmentLocation: client.visaConsularAppointmentLocation || '',
+        visaStatusTemplateId: client.visaStatusTemplateId || '',
+        productId: client.productId || undefined,
       });
     } else {
       setFormData({
@@ -62,12 +78,17 @@ export const ClientFormModal = ({
         phone: '',
         address: '',
         notes: '',
-        status: 'pending',
+        visaCasAppointmentDate: '',
+        visaCasAppointmentLocation: '',
+        visaConsularAppointmentDate: '',
+        visaConsularAppointmentLocation: '',
+        visaStatusTemplateId: visaStatusTemplates[0]?.id || '',
+        productId: undefined,
       });
     }
     setError('');
     setIsLoading(false);
-  }, [client, open]);
+  }, [client, open, visaStatusTemplates]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,7 +96,13 @@ export const ClientFormModal = ({
     setError('');
 
     try {
-      await onSave(formData);
+      await onSave({
+        ...formData,
+        visaCasAppointmentDate: formData.visaCasAppointmentDate || null,
+        visaCasAppointmentLocation: formData.visaCasAppointmentLocation.trim() || null,
+        visaConsularAppointmentDate: formData.visaConsularAppointmentDate || null,
+        visaConsularAppointmentLocation: formData.visaConsularAppointmentLocation.trim() || null,
+      });
       onOpenChange(false);
     } catch (error: any) {
       console.error('Error saving client:', error);
@@ -90,7 +117,7 @@ export const ClientFormModal = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-sm max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl">
             {isEditing ? 'Editar Cliente' : 'Nuevo Cliente'}
@@ -155,18 +182,85 @@ export const ClientFormModal = ({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="status">Estado</Label>
+            <Label htmlFor="visaStatusTemplateId">Estado de visa *</Label>
             <Select
-              value={formData.status}
-              onValueChange={(value: ClientStatus) => setFormData(prev => ({ ...prev, status: value }))}
+              value={formData.visaStatusTemplateId}
+              onValueChange={(value) => setFormData(prev => ({ ...prev, visaStatusTemplateId: value }))}
             >
-              <SelectTrigger>
-                <SelectValue />
+              <SelectTrigger id="visaStatusTemplateId">
+                <SelectValue placeholder="Selecciona un estado de visa" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="active">Activo</SelectItem>
-                <SelectItem value="pending">Pendiente</SelectItem>
-                <SelectItem value="inactive">Inactivo</SelectItem>
+                {visaStatusTemplates.map((template) => (
+                  <SelectItem key={template.id} value={template.id}>
+                    {template.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="visaCasAppointmentDate">Fecha cita CAS</Label>
+              <Input
+                id="visaCasAppointmentDate"
+                type="date"
+                value={formData.visaCasAppointmentDate}
+                onChange={e => setFormData(prev => ({ ...prev, visaCasAppointmentDate: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="visaCasAppointmentLocation">Lugar cita CAS</Label>
+              <Input
+                id="visaCasAppointmentLocation"
+                value={formData.visaCasAppointmentLocation}
+                onChange={e => setFormData(prev => ({ ...prev, visaCasAppointmentLocation: e.target.value }))}
+                placeholder="Ej: CAS Monterrey"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="visaConsularAppointmentDate">Fecha cita Consulado</Label>
+              <Input
+                id="visaConsularAppointmentDate"
+                type="date"
+                value={formData.visaConsularAppointmentDate}
+                onChange={e => setFormData(prev => ({ ...prev, visaConsularAppointmentDate: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="visaConsularAppointmentLocation">Lugar cita Consulado</Label>
+              <Input
+                id="visaConsularAppointmentLocation"
+                value={formData.visaConsularAppointmentLocation}
+                onChange={e => setFormData(prev => ({ ...prev, visaConsularAppointmentLocation: e.target.value }))}
+                placeholder="Ej: Consulado CDMX"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="product" className="flex items-center gap-2">
+              <ShoppingBag className="w-4 h-4" />
+              Producto adquirido
+            </Label>
+            <Select
+              value={formData.productId ?? 'none'}
+              onValueChange={(value) => setFormData(prev => ({ ...prev, productId: value === 'none' ? undefined : value }))}
+            >
+              <SelectTrigger id="product">
+                <SelectValue placeholder="Selecciona un producto (opcional)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Sin producto</SelectItem>
+                {products.map((product) => (
+                  <SelectItem key={product.id} value={product.id}>
+                    {product.title}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

@@ -6,6 +6,14 @@ export interface ChecklistTemplate {
   createdAt: Date;
 }
 
+export interface VisaStatusTemplate {
+  id: string;
+  label: string;
+  order: number;
+  isActive: boolean;
+  createdAt: Date;
+}
+
 export const DEFAULT_CHECKLIST_TEMPLATES: ChecklistTemplate[] = [
   { id: '1', label: 'Derecho a visa', order: 0, isActive: true, createdAt: new Date() },
   { id: '2', label: 'Cita agendada', order: 1, isActive: true, createdAt: new Date() },

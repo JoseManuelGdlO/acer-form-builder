@@ -1,4 +1,4 @@
-import { Client, CLIENT_STATUS_CONFIG } from '@/types/form';
+import { Client } from '@/types/form';
 import {
   Dialog,
   DialogContent,
@@ -54,7 +54,7 @@ export const ClientDetailModal = ({
                 <DialogTitle className="text-xl font-bold">
                   {client.name}
                 </DialogTitle>
-                <ClientStatusBadge status={client.status} />
+                <ClientStatusBadge label={client.visaStatusTemplate?.label} />
               </div>
             </div>
           </div>

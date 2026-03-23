@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { Trip, TripInvitation, TripChangeLogEntry, TripParticipantClient, TripSeatAssignmentEntry, BusTemplate } from '@/types/form';
+import { Trip, TripInvitation, TripChangeLogEntry, TripParticipantClient, TripSeatAssignmentEntry, BusTemplate, TripIncome, TripExpense, TripFinanceSummary } from '@/types/form';
 import { api } from '@/lib/api';
 
 function parseJsonIfString<T>(value: unknown): T | null {
@@ -25,7 +25,8 @@ function mapParticipant(p: any) {
     phone: client.phone,
     address: client.address,
     notes: client.notes,
-    status: client.status,
+    visaStatusTemplateId: client.visa_status_template_id ?? client.visaStatusTemplateId ?? '',
+    visaStatusTemplate: client.visa_status_template ?? client.visaStatusTemplate ?? null,
     formsCompleted: client.forms_completed ?? client.formsCompleted ?? 0,
     assignedUserId: client.assigned_user_id ?? client.assignedUserId,
     totalAmountDue: client.total_amount_due ?? client.totalAmountDue,
@@ -142,12 +143,43 @@ function mapChangeLogEntry(raw: any): TripChangeLogEntry {
   };
 }
 
+function mapTripIncome(raw: any): TripIncome {
+  return {
+    id: raw.id,
+    clientId: raw.client_id ?? raw.clientId,
+    tripId: raw.trip_id ?? raw.tripId ?? null,
+    client: raw.client ? { id: raw.client.id, name: raw.client.name } : undefined,
+    amount: Number(raw.amount ?? 0),
+    paymentDate: raw.payment_date ?? raw.paymentDate,
+    paymentType: raw.payment_type ?? raw.paymentType ?? 'efectivo',
+    referenceNumber: raw.reference_number ?? raw.referenceNumber ?? undefined,
+    note: raw.note ?? undefined,
+    createdAt: raw.created_at ?? raw.createdAt,
+  };
+}
+
+function mapTripExpense(raw: any): TripExpense {
+  return {
+    id: raw.id,
+    tripId: raw.trip_id ?? raw.tripId,
+    amount: Number(raw.amount ?? 0),
+    expenseDate: raw.expense_date ?? raw.expenseDate,
+    category: raw.category ?? null,
+    referenceNumber: raw.reference_number ?? raw.referenceNumber ?? null,
+    note: raw.note ?? null,
+    createdAt: raw.created_at ?? raw.createdAt,
+  };
+}
+
 export const useTripStore = () => {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [currentTrip, setCurrentTrip] = useState<Trip | null>(null);
   const [invitations, setInvitations] = useState<TripInvitation[]>([]);
   const [changeLog, setChangeLog] = useState<TripChangeLogEntry[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [tripFinanceSummary, setTripFinanceSummary] = useState<TripFinanceSummary | null>(null);
+  const [tripIncomes, setTripIncomes] = useState<TripIncome[]>([]);
+  const [tripExpenses, setTripExpenses] = useState<TripExpense[]>([]);
 
   const fetchTrips = useCallback(async (token: string) => {
     setIsLoading(true);
@@ -317,12 +349,75 @@ export const useTripStore = () => {
 
   const clearCurrentTrip = useCallback(() => setCurrentTrip(null), []);
 
+  const fetchTripFinance = useCallback(async (tripId: string, token: string) => {
+    const response = await api.getTripFinance(tripId, token);
+    const incomes = Array.isArray(response.incomes) ? response.incomes.map(mapTripIncome) : [];
+    const expenses = Array.isArray(response.expenses) ? response.expenses.map(mapTripExpense) : [];
+    setTripIncomes(incomes);
+    setTripExpenses(expenses);
+    setTripFinanceSummary({
+      totalIncome: Number(response.summary?.totalIncome ?? 0),
+      totalExpense: Number(response.summary?.totalExpense ?? 0),
+      net: Number(response.summary?.net ?? 0),
+    });
+  }, []);
+
+  const createTripIncome = useCallback(
+    async (
+      tripId: string,
+      data: {
+        clientId: string;
+        amount: number;
+        paymentDate: string;
+        paymentType?: 'tarjeta' | 'transferencia' | 'efectivo';
+        referenceNumber?: string;
+        note?: string;
+      },
+      token: string
+    ) => {
+      await api.createTripIncome(tripId, data, token);
+      await fetchTripFinance(tripId, token);
+    },
+    [fetchTripFinance]
+  );
+
+  const deleteTripIncome = useCallback(async (tripId: string, incomeId: string, token: string) => {
+    await api.deleteTripIncome(tripId, incomeId, token);
+    await fetchTripFinance(tripId, token);
+  }, [fetchTripFinance]);
+
+  const createTripExpense = useCallback(
+    async (
+      tripId: string,
+      data: {
+        amount: number;
+        expenseDate: string;
+        category?: string;
+        referenceNumber?: string;
+        note?: string;
+      },
+      token: string
+    ) => {
+      await api.createTripExpense(tripId, data, token);
+      await fetchTripFinance(tripId, token);
+    },
+    [fetchTripFinance]
+  );
+
+  const deleteTripExpense = useCallback(async (tripId: string, expenseId: string, token: string) => {
+    await api.deleteTripExpense(tripId, expenseId, token);
+    await fetchTripFinance(tripId, token);
+  }, [fetchTripFinance]);
+
   return {
     trips,
     currentTrip,
     invitations,
     changeLog,
     isLoading,
+    tripFinanceSummary,
+    tripIncomes,
+    tripExpenses,
     fetchTrips,
     fetchTrip,
     fetchInvitations,
@@ -338,5 +433,10 @@ export const useTripStore = () => {
     resetSeatAssignments,
     clearSeatAssignment,
     clearCurrentTrip,
+    fetchTripFinance,
+    createTripIncome,
+    deleteTripIncome,
+    createTripExpense,
+    deleteTripExpense,
   };
 };
