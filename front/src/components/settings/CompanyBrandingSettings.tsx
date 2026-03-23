@@ -80,6 +80,18 @@ const ALL_THEME_KEYS = [
   'muted', 'muted-foreground', 'accent', 'border', 'ring', 'radius',
 ] as const;
 
+function parseSavedTheme(raw: unknown): Record<string, string> {
+  if (raw == null || typeof raw !== 'object' || Array.isArray(raw)) {
+    return {};
+  }
+  return { ...(raw as Record<string, string>) };
+}
+
+/** Estado del formulario: siempre parte de DEFAULT_THEME y se superpone lo guardado en API. */
+function mergeWithDefaultTheme(saved: Record<string, string>): Record<string, string> {
+  return { ...DEFAULT_THEME, ...saved };
+}
+
 function getEffectiveTheme(theme: Record<string, string>): Record<string, string> {
   const out: Record<string, string> = {};
   ALL_THEME_KEYS.forEach((key) => {
@@ -121,7 +133,7 @@ export function CompanyBrandingSettings() {
           setDomain(company.domain ?? '');
           setLogoUrl(company.logoUrl ?? '');
           setFaviconUrl(company.faviconUrl ?? '');
-          setTheme((company.theme && typeof company.theme === 'object') ? { ...company.theme } : {});
+          setTheme(mergeWithDefaultTheme(parseSavedTheme(company.theme)));
         }
       })
       .catch(() => {
@@ -140,9 +152,11 @@ export function CompanyBrandingSettings() {
         domain: domain.trim() || null,
         logoUrl: logoUrl.trim() || null,
         faviconUrl: faviconUrl.trim() || null,
-        theme: Object.keys(theme).length ? theme : null,
+        theme,
       });
-      applyTheme(res.theme ?? null);
+      const mergedAfterSave = mergeWithDefaultTheme(parseSavedTheme(res.theme));
+      setTheme(mergedAfterSave);
+      applyTheme(mergedAfterSave);
       applyFavicon(res.faviconUrl ?? res.logoUrl ?? null);
       const hostname = window.location.hostname;
       const domainToUse = hostname === 'localhost' || hostname === '127.0.0.1' ? 'saru' : hostname;
@@ -165,7 +179,7 @@ export function CompanyBrandingSettings() {
   };
 
   const handleResetTheme = () => {
-    setTheme({});
+    setTheme({ ...DEFAULT_THEME });
     toast.success('Tema restablecido a valores por defecto');
   };
 

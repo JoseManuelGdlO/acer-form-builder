@@ -81,10 +81,10 @@ export const getMyCompany = async (req: AuthRequest, res: Response): Promise<voi
 };
 
 export const updateMyCompany = [
-  body('domain').optional().isString().trim(),
-  body('logoUrl').optional().isString().trim(),
-  body('faviconUrl').optional().isString().trim(),
-  body('theme').optional().isObject(),
+  body('domain').optional({ nullable: true }).isString().trim(),
+  body('logoUrl').optional({ nullable: true }).isString().trim(),
+  body('faviconUrl').optional({ nullable: true }).isString().trim(),
+  body('theme').optional({ nullable: true }).isObject(),
   async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       const errors = validationResult(req);
