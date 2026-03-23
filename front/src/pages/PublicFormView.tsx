@@ -127,6 +127,10 @@ const defaultClientInfo = {
   email: '',
 };
 
+const normalizePhoneDigits = (value: string): string => {
+  return value.replace(/\D/g, '').slice(0, 10);
+};
+
 const normalizeFormSections = (rawSections: unknown): FormSection[] => {
   let candidate: unknown = rawSections;
 
@@ -256,7 +260,11 @@ export default function PublicFormView() {
   const applyProgress = useCallback((progress: any) => {
     if (!progress) return;
     if (progress.clientInfo) {
-      setClientInfo({ ...defaultClientInfo, ...progress.clientInfo });
+      const nextClientInfo = { ...defaultClientInfo, ...progress.clientInfo };
+      if (typeof nextClientInfo.phone === 'string') {
+        nextClientInfo.phone = normalizePhoneDigits(nextClientInfo.phone);
+      }
+      setClientInfo(nextClientInfo);
     }
     if (progress.submissionId) {
       setSubmissionId(progress.submissionId);
@@ -392,7 +400,7 @@ export default function PublicFormView() {
 
   // Get clean phone number (only digits)
   const getCleanPhone = (phone: string): string => {
-    return phone.replace(/\D/g, '');
+    return normalizePhoneDigits(phone);
   };
 
   const validateClientInfo = () => {
@@ -1169,12 +1177,10 @@ export default function PublicFormView() {
                     id="phone"
                     type="tel"
                     placeholder="(XXX)-XXXX-XXXX"
-                    value={clientInfo.phone}
+                    value={formatPhoneNumber(clientInfo.phone)}
                     onChange={e => {
-                      const inputValue = e.target.value;
-                      const formatted = formatPhoneNumber(inputValue);
-                      setClientInfo(prev => ({ ...prev, phone: formatted }));
-                      const cleanPhone = getCleanPhone(formatted);
+                      const cleanPhone = normalizePhoneDigits(e.target.value);
+                      setClientInfo(prev => ({ ...prev, phone: cleanPhone }));
                       if (cleanPhone.length === 0) {
                         setErrors(prev => ({ ...prev, phone: '' }));
                       } else if (cleanPhone.length !== 10) {
@@ -1185,10 +1191,9 @@ export default function PublicFormView() {
                     }}
                     onBlur={() => {
                       saveProgress();
-                      const cleanPhone = getCleanPhone(clientInfo.phone);
-                      if (cleanPhone.length === 0) {
+                      if (clientInfo.phone.length === 0) {
                         setErrors(prev => ({ ...prev, phone: 'El teléfono es obligatorio' }));
-                      } else if (cleanPhone.length !== 10) {
+                      } else if (clientInfo.phone.length !== 10) {
                         setErrors(prev => ({ ...prev, phone: 'El teléfono debe tener exactamente 10 dígitos' }));
                       }
                     }}

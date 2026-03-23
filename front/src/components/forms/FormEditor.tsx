@@ -40,6 +40,7 @@ interface FormEditorProps {
   onUpdateQuestion: (sectionId: string, questionId: string, updates: Partial<Question>) => void | Promise<void>;
   onDeleteQuestion: (sectionId: string, questionId: string) => void | Promise<void>;
   onReorderQuestions: (sectionId: string, questions: Question[]) => void | Promise<void>;
+  onUnsavedChangesChange?: (hasUnsavedChanges: boolean) => void;
 }
 
 export const FormEditor = ({
@@ -54,6 +55,7 @@ export const FormEditor = ({
   onUpdateQuestion,
   onDeleteQuestion,
   onReorderQuestions,
+  onUnsavedChangesChange,
 }: FormEditorProps) => {
   // Local state for unsaved changes
   const [localForm, setLocalForm] = useState<Form>({
@@ -62,6 +64,10 @@ export const FormEditor = ({
   });
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    onUnsavedChangesChange?.(hasUnsavedChanges);
+  }, [hasUnsavedChanges, onUnsavedChangesChange]);
 
   // Update local form when prop changes (only when form ID changes or when saved)
   useEffect(() => {

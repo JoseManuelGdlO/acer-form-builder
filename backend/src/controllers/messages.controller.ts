@@ -1,7 +1,105 @@
 import { Response } from 'express';
 import { body, validationResult } from 'express-validator';
-import { ClientMessage, Client } from '../models';
+import { ClientMessage, Client, Conversations } from '../models';
 import { AuthRequest } from '../middleware/auth.middleware';
+
+const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
+
+class MessageBusinessError extends Error {
+  status: number;
+  code: string;
+  details?: Record<string, unknown>;
+
+  constructor(status: number, code: string, message: string, details?: Record<string, unknown>) {
+    super(message);
+    this.status = status;
+    this.code = code;
+    this.details = details;
+  }
+}
+
+const normalizePhoneForWhatsapp = (phone: string): string => {
+  const normalized = phone.replace(/\D/g, '');
+  return normalized || phone.trim();
+};
+
+const getConversationDateParts = (): { fecha: Date; hora: string } => {
+  const now = new Date();
+  const fecha = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const hora = [
+    now.getHours().toString().padStart(2, '0'),
+    now.getMinutes().toString().padStart(2, '0'),
+    now.getSeconds().toString().padStart(2, '0'),
+  ].join(':');
+
+  return { fecha, hora };
+};
+
+const sendTextMessage = async (to: string, bodyText: string): Promise<void> => {
+  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
+  const version = process.env.WHATSAPP_VERSION || 'v22.0';
+
+  if (!phoneNumberId || !accessToken) {
+    throw new MessageBusinessError(
+      500,
+      'WHATSAPP_CONFIG_MISSING',
+      'No se pudo enviar el mensaje de WhatsApp por configuración faltante.'
+    );
+  }
+
+  const response = await fetch(`https://graph.facebook.com/${version}/${phoneNumberId}/messages`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to,
+      type: 'text',
+      text: {
+        preview_url: false,
+        body: bodyText,
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    const errorPayload = (await response.json().catch(() => null)) as
+      | { error?: { message?: string } }
+      | null;
+    const metaMessage = errorPayload?.error?.message;
+    throw new MessageBusinessError(
+      502,
+      'WHATSAPP_SEND_FAILED',
+      metaMessage || 'No se pudo enviar el mensaje de WhatsApp.'
+    );
+  }
+};
+
+const createInternalMessage = async ({
+  companyId,
+  clientId,
+  content,
+  sender,
+  senderId,
+}: {
+  companyId: string;
+  clientId: string;
+  content: string;
+  sender: 'user' | 'client';
+  senderId?: string;
+}) => {
+  return ClientMessage.create({
+    companyId,
+    clientId,
+    content,
+    sender,
+    senderId: sender === 'user' ? senderId : undefined,
+  });
+};
 
 export const getClientMessages = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -61,16 +159,112 @@ export const createMessage = [
         return;
       }
 
-      const message = await ClientMessage.create({
+      if (sender !== 'user') {
+        const message = await createInternalMessage({
+          companyId,
+          clientId,
+          content,
+          sender,
+          senderId: req.user?.id,
+        });
+        res.status(201).json(message);
+        return;
+      }
+
+      const clientPhone = (client.phone || '').trim();
+      if (!clientPhone) {
+        const message = await createInternalMessage({
+          companyId,
+          clientId,
+          content,
+          sender,
+          senderId: req.user?.id,
+        });
+        res.status(422).json({
+          error: 'El cliente no tiene teléfono registrado para enviar WhatsApp.',
+          code: 'CLIENT_PHONE_REQUIRED',
+          message,
+        });
+        return;
+      }
+
+      const lastUserConversation = await Conversations.findOne({
+        where: { phone: clientPhone, from: 'usuario' },
+        order: [['created_at', 'DESC']],
+      });
+
+      if (!lastUserConversation) {
+        const message = await createInternalMessage({
+          companyId,
+          clientId,
+          content,
+          sender,
+          senderId: req.user?.id,
+        });
+        res.status(409).json({
+          error:
+            'No se puede enviar por WhatsApp porque el cliente no ha enviado mensajes previos en esta conversación.',
+          code: 'NO_PREVIOUS_USER_MESSAGE',
+          message,
+        });
+        return;
+      }
+
+      const lastUserMessageAt = new Date(lastUserConversation.createdAt);
+      const windowExpiredAt = new Date(lastUserMessageAt.getTime() + TWENTY_FOUR_HOURS_MS);
+      const isWindowExpired = Date.now() - lastUserMessageAt.getTime() >= TWENTY_FOUR_HOURS_MS;
+
+      if (isWindowExpired) {
+        const message = await createInternalMessage({
+          companyId,
+          clientId,
+          content,
+          sender,
+          senderId: req.user?.id,
+        });
+        res.status(422).json({
+          error:
+            'La ventana de 24 horas expiró. Pide al cliente que responda para volver a enviar mensajes.',
+          code: 'WHATSAPP_24H_WINDOW_EXPIRED',
+          details: {
+            lastUserMessageAt: lastUserMessageAt.toISOString(),
+            windowExpiredAt: windowExpiredAt.toISOString(),
+          },
+          message,
+        });
+        return;
+      }
+
+      await sendTextMessage(normalizePhoneForWhatsapp(clientPhone), content);
+
+      const { fecha, hora } = getConversationDateParts();
+      await Conversations.create({
+        phone: clientPhone,
+        mensaje: content,
+        from: 'bot',
+        fecha,
+        hora: hora as unknown as Date,
+        baja_logica: false,
+      });
+
+      const message = await createInternalMessage({
         companyId,
         clientId,
         content,
         sender,
-        senderId: sender === 'user' ? req.user?.id : undefined,
+        senderId: req.user?.id,
       });
 
       res.status(201).json(message);
     } catch (error) {
+      if (error instanceof MessageBusinessError) {
+        res.status(error.status).json({
+          error: error.message,
+          code: error.code,
+          details: error.details,
+        });
+        return;
+      }
       console.error('Create message error:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
