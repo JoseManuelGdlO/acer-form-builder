@@ -72,6 +72,7 @@ const Index = () => {
   const initialNavigation = useMemo(parseInitialClientNavigation, []);
   const [activeView, setActiveView] = useState<View>(initialNavigation.initialView);
   const [viewingAs, setViewingAs] = useState<User | null>(null);
+  const [editorHasUnsavedChanges, setEditorHasUnsavedChanges] = useState(false);
   
   const {
     forms,
@@ -154,6 +155,11 @@ const Index = () => {
   const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
   const [selectedFilterCategories, setSelectedFilterCategories] = useState<string[]>([]);
   const { categories, fetchCategories, createCategory, updateCategory, deleteCategory } = useCategoryStore();
+
+  useEffect(() => {
+    // When leaving the editor (or when it isn't mounted), reset the flag.
+    if (!currentForm) setEditorHasUnsavedChanges(false);
+  }, [currentForm]);
 
   const normalizeCategoryKey = (input: string): string | null => {
     const v = String(input || '')
@@ -323,12 +329,34 @@ const Index = () => {
     };
   }, [filteredClients]);
 
+  const handleNavigate = useCallback(
+    async (next: View) => {
+      // If we're editing a form, the editor view "wins" over activeView in the render tree.
+      // Clear currentForm first so the navbar navigation actually takes effect.
+      if (currentForm && next !== 'forms') {
+        if (editorHasUnsavedChanges) {
+          const confirmed = window.confirm('Tienes cambios sin guardar. ¿Estás seguro de que quieres salir?');
+          if (!confirmed) return;
+        }
+
+        await selectForm(null);
+        if (token) {
+          // Refresh the forms list after leaving the editor.
+          await fetchForms();
+        }
+      }
+
+      setActiveView(next);
+    },
+    [currentForm, editorHasUnsavedChanges, selectForm, token, fetchForms]
+  );
+
   const NavigationButtons = ({ current }: { current: View }) => (
     <>
       <Button
         variant={current === 'dashboard' ? 'default' : 'ghost'}
         size="sm"
-        onClick={() => setActiveView('dashboard')}
+        onClick={() => handleNavigate('dashboard')}
         className="gap-1.5 shrink-0"
       >
         <LayoutDashboard className="w-4 h-4 shrink-0" />
@@ -337,7 +365,7 @@ const Index = () => {
       <Button
         variant={current === 'forms' ? 'default' : 'ghost'}
         size="sm"
-        onClick={() => setActiveView('forms')}
+        onClick={() => handleNavigate('forms')}
         className="gap-1.5 shrink-0"
       >
         <FileText className="w-4 h-4 shrink-0" />
@@ -346,7 +374,7 @@ const Index = () => {
       <Button
         variant={current === 'clients' ? 'default' : 'ghost'}
         size="sm"
-        onClick={() => setActiveView('clients')}
+        onClick={() => handleNavigate('clients')}
         className="gap-1.5 shrink-0"
       >
         <Users className="w-4 h-4 shrink-0" />
@@ -360,7 +388,7 @@ const Index = () => {
       <Button
         variant={current === 'products' ? 'default' : 'ghost'}
         size="sm"
-        onClick={() => setActiveView('products')}
+        onClick={() => handleNavigate('products')}
         className="gap-1.5 shrink-0"
       >
         <ShoppingBag className="w-4 h-4 shrink-0" />
@@ -369,7 +397,7 @@ const Index = () => {
       <Button
         variant={current === 'groups' ? 'default' : 'ghost'}
         size="sm"
-        onClick={() => setActiveView('groups')}
+        onClick={() => handleNavigate('groups')}
         className="gap-2"
       >
         <UsersRound className="w-4 h-4" />
@@ -384,7 +412,7 @@ const Index = () => {
         <Button
           variant={current === 'trips' ? 'default' : 'ghost'}
           size="sm"
-          onClick={() => setActiveView('trips')}
+          onClick={() => handleNavigate('trips')}
           className="gap-2"
         >
           <MapPin className="w-4 h-4" />
@@ -405,19 +433,19 @@ const Index = () => {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-52">
-            <DropdownMenuItem onClick={() => setActiveView('paymentLogs')} className="gap-2 cursor-pointer">
+            <DropdownMenuItem onClick={() => handleNavigate('paymentLogs')} className="gap-2 cursor-pointer">
               <Receipt className="w-4 h-4" />
               Logs de pagos
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setActiveView('users')} className="gap-2 cursor-pointer">
+            <DropdownMenuItem onClick={() => handleNavigate('users')} className="gap-2 cursor-pointer">
               <UserCog className="w-4 h-4" />
               Usuarios
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setActiveView('chatbot')} className="gap-2 cursor-pointer">
+            <DropdownMenuItem onClick={() => handleNavigate('chatbot')} className="gap-2 cursor-pointer">
               <Bot className="w-4 h-4" />
               Chatbot
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setActiveView('settings')} className="gap-2 cursor-pointer">
+            <DropdownMenuItem onClick={() => handleNavigate('settings')} className="gap-2 cursor-pointer">
               <Settings className="w-4 h-4" />
               Configuración
             </DropdownMenuItem>
@@ -454,6 +482,7 @@ const Index = () => {
                 await fetchForms();
               }
             }}
+            onUnsavedChangesChange={setEditorHasUnsavedChanges}
             onUpdateForm={async (updates) => {
               await updateForm(currentForm.id, updates);
             }}
