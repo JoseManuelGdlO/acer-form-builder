@@ -564,7 +564,7 @@ export const ClientProfileView = ({ client, onBack, onEdit }: ClientProfileViewP
 
         {/* Main Content - Two Columns */}
         <div className="grid lg:grid-cols-2 gap-6">
-          {/* Left Column - Info, Checklist, Form Data */}
+          {/* Left Column - Info, checklist, notes, payments, forms */}
           <div className="space-y-6">
             {/* Client Info Card */}
             <Card className="border-border/50">
@@ -608,6 +608,13 @@ export const ClientProfileView = ({ client, onBack, onEdit }: ClientProfileViewP
               </CardContent>
             </Card>
 
+            {/* Checklist */}
+            <ClientChecklist
+              clientId={client.id}
+              items={checklist}
+              onToggle={handleToggleChecklist}
+            />
+
             {/* Client Notes */}
             <ClientNotes
               clientId={client.id}
@@ -625,13 +632,6 @@ export const ClientProfileView = ({ client, onBack, onEdit }: ClientProfileViewP
               paymentDeletedHistory={paymentDeletedHistory}
               onAddPayment={handleAddPayment}
               onDeletePayment={handleDeletePayment}
-            />
-
-            {/* Checklist */}
-            <ClientChecklist 
-              clientId={client.id}
-              items={checklist}
-              onToggle={handleToggleChecklist}
             />
 
             {/* Form Submissions */}

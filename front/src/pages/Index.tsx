@@ -397,7 +397,7 @@ const Index = () => {
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => handleNavigate('groups')} className="gap-2 cursor-pointer">
             <UsersRound className="w-4 h-4" />
-            Grupos
+            Familias
             {groups.length > 0 && (
               <span className="ml-auto px-1.5 py-0.5 text-xs rounded-full bg-secondary/20 text-secondary">
                 {groups.length}
