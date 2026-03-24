@@ -15,12 +15,11 @@ import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
 import { 
   User, Mail, Phone, MapPin, Calendar, Clock, 
-  ArrowLeft, Edit2, FileText, UserCircle 
+  ArrowLeft, Edit2, FileText, UserCircle, ShoppingBag,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
 import { formatPhoneOptional } from '@/lib/phone';
 
 interface ClientProfileViewProps {
@@ -80,6 +79,10 @@ export const ClientProfileView = ({ client, onBack, onEdit }: ClientProfileViewP
           ? Number(freshClientData.total_amount_due)
           : (freshClientData.totalAmountDue != null ? Number(freshClientData.totalAmountDue) : undefined);
         const assignedUser = freshClientData.assigned_user || freshClientData.assignedUser;
+        const productRaw = freshClientData.product;
+        const visaTplRaw =
+          freshClientData.visaStatusTemplate ??
+          (freshClientData as { visa_status_template?: Client['visaStatusTemplate'] }).visa_status_template;
         setClientSnapshot({
           ...client,
           ...freshClientData,
@@ -90,6 +93,23 @@ export const ClientProfileView = ({ client, onBack, onEdit }: ClientProfileViewP
           totalAmountDue: totalDue,
           assignedUserId: freshClientData.assigned_user_id ?? freshClientData.assignedUserId,
           assignedUser: assignedUser ? { id: assignedUser.id, name: assignedUser.name, email: assignedUser.email } : null,
+          product: productRaw && typeof productRaw === 'object' && 'title' in productRaw
+            ? { id: String(productRaw.id), title: String(productRaw.title) }
+            : productRaw === null
+              ? null
+              : client.product ?? null,
+          visaStatusTemplate:
+            visaTplRaw && typeof visaTplRaw === 'object' && 'label' in visaTplRaw
+              ? {
+                  id: String(visaTplRaw.id),
+                  label: String(visaTplRaw.label),
+                  order: typeof visaTplRaw.order === 'number' ? visaTplRaw.order : undefined,
+                  isActive: typeof visaTplRaw.isActive === 'boolean' ? visaTplRaw.isActive : undefined,
+                  color: visaTplRaw.color != null ? String(visaTplRaw.color) : null,
+                }
+              : visaTplRaw === null
+                ? null
+                : client.visaStatusTemplate ?? null,
           createdAt: new Date(freshClientData.created_at || freshClientData.createdAt),
           updatedAt: new Date(freshClientData.updated_at || freshClientData.updatedAt),
         } as Client);
@@ -500,6 +520,11 @@ export const ClientProfileView = ({ client, onBack, onEdit }: ClientProfileViewP
     { icon: Mail, label: 'Correo', value: displayClient.email },
     { icon: Phone, label: 'Teléfono', value: formatPhoneOptional(displayClient.phone) },
     { icon: MapPin, label: 'Dirección', value: displayClient.address || 'No registrada' },
+    {
+      icon: ShoppingBag,
+      label: 'Tipo de trámite',
+      value: displayClient.product?.title?.trim() || 'Sin asignar',
+    },
     { icon: UserCircle, label: 'Asesor', value: displayClient.assignedUser?.name ?? 'Sin asignar' },
     { icon: FileText, label: 'Formularios', value: `${displayClient.formsCompleted} completados` },
     { 
@@ -575,14 +600,11 @@ export const ClientProfileView = ({ client, onBack, onEdit }: ClientProfileViewP
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
                   {infoItems.map((item, index) => (
                     <div
                       key={index}
-                      className={cn(
-                        'flex items-start gap-3',
-                        item.label === 'Dirección' && 'sm:col-span-2'
-                      )}
+                      className="flex items-start gap-3 min-w-0"
                     >
                       <div className="w-9 h-9 rounded-lg bg-muted/50 flex items-center justify-center flex-shrink-0">
                         <item.icon className="w-4 h-4 text-muted-foreground" />
