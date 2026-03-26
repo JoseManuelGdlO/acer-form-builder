@@ -2,6 +2,15 @@ import { useState, useCallback } from 'react';
 import { Trip, TripInvitation, TripChangeLogEntry, TripParticipantClient, TripSeatAssignmentEntry, BusTemplate, TripIncome, TripExpense, TripFinanceSummary } from '@/types/form';
 import { api } from '@/lib/api';
 
+const isProbablyJwt = (value: string): boolean => {
+  const parts = value.split('.');
+  return parts.length === 3 && parts.every((p) => p.length > 0);
+};
+
+const isUuid = (value: string): boolean => {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+};
+
 function parseJsonIfString<T>(value: unknown): T | null {
   if (value == null) return null;
   if (typeof value === 'string') {
@@ -231,13 +240,21 @@ export const useTripStore = () => {
   }, []);
 
   const acceptInvitation = useCallback(async (invitationId: string, token: string) => {
-    await api.acceptTripInvitation(invitationId, token);
-    setInvitations(prev => prev.filter(i => i.id !== invitationId));
+    // Defensive guard: if caller accidentally swaps args, recover automatically.
+    const maybeSwapped = isProbablyJwt(invitationId) && isUuid(token);
+    const finalInvitationId = maybeSwapped ? token : invitationId;
+    const finalToken = maybeSwapped ? invitationId : token;
+    await api.acceptTripInvitation(finalInvitationId, finalToken);
+    setInvitations(prev => prev.filter(i => i.id !== finalInvitationId));
   }, []);
 
   const rejectInvitation = useCallback(async (invitationId: string, token: string) => {
-    await api.rejectTripInvitation(invitationId, token);
-    setInvitations(prev => prev.filter(i => i.id !== invitationId));
+    // Defensive guard: if caller accidentally swaps args, recover automatically.
+    const maybeSwapped = isProbablyJwt(invitationId) && isUuid(token);
+    const finalInvitationId = maybeSwapped ? token : invitationId;
+    const finalToken = maybeSwapped ? invitationId : token;
+    await api.rejectTripInvitation(finalInvitationId, finalToken);
+    setInvitations(prev => prev.filter(i => i.id !== finalInvitationId));
   }, []);
 
   const createTrip = useCallback(

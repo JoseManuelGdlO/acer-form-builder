@@ -75,11 +75,14 @@ export const useClientStore = () => {
         ...params,
       };
       const response = await api.getClients(nextQuery, token);
-      const clientsData = response.data || [];
-      const templates = response.templates || [];
-      const visaTemplates = response.visaStatusTemplates || [];
+      const normalizedResponse = Array.isArray(response)
+        ? { data: response, meta: undefined, templates: [], visaStatusTemplates: [] }
+        : (response || {});
+      const clientsData = Array.isArray(normalizedResponse.data) ? normalizedResponse.data : [];
+      const templates = Array.isArray(normalizedResponse.templates) ? normalizedResponse.templates : [];
+      const visaTemplates = Array.isArray(normalizedResponse.visaStatusTemplates) ? normalizedResponse.visaStatusTemplates : [];
       setQuery(nextQuery);
-      setPagination(response.meta || {
+      setPagination(normalizedResponse.meta || {
         page: nextQuery.page || 1,
         limit: nextQuery.limit || 20,
         total: clientsData.length,
