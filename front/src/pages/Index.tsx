@@ -875,8 +875,8 @@ const Index = () => {
             onDelete={async (tripId) => { await deleteTrip(token!, tripId); }}
             onAddParticipants={async (tripId, payload) => { await addParticipants(token!, tripId, payload); await fetchTrip(tripId, token!); }}
             onRemoveParticipant={async (tripId, clientId) => { await removeParticipant(token!, tripId, clientId); await fetchTrip(tripId, token!); }}
-            onAcceptInvitation={async (invitationId) => { await acceptInvitation(token!, invitationId); await fetchTrips(token!); await fetchInvitations(token!); }}
-            onRejectInvitation={async (invitationId) => { await rejectInvitation(token!, invitationId); await fetchInvitations(token!); }}
+            onAcceptInvitation={async (invitationId) => { await acceptInvitation(invitationId, token!); await fetchTrips(token!); await fetchInvitations(token!); }}
+            onRejectInvitation={async (invitationId) => { await rejectInvitation(invitationId, token!); await fetchInvitations(token!); }}
             onResetSeatAssignments={async (tripId) => { await resetSeatAssignments(token!, tripId); await fetchTrip(tripId, token!); }}
             onSetSeatAssignment={async (tripId, clientId, seat) => { await setSeatAssignment(token!, tripId, clientId, seat); await fetchTrip(tripId, token!); }}
             onClearSeatAssignment={async (tripId, opts) => { await clearSeatAssignment(token!, tripId, opts); await fetchTrip(tripId, token!); }}

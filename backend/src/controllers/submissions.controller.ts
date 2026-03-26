@@ -551,7 +551,7 @@ export const createSubmissionFromSession = [
         formId,
         formName: form.name,
         respondentName,
-        respondentEmail: email,
+        respondentEmail: email ?? undefined,
         respondentPhone: normalizedPhone,
         answers: {},
         clientId,
