@@ -18,6 +18,7 @@ import { ChatbotSettings } from '@/components/chatbot/ChatbotSettings';
 import { SettingsPage } from '@/components/settings/SettingsPage';
 import { PaymentLogsPage } from '@/components/payments/PaymentLogsPage';
 import { ProductsList } from '@/components/products/ProductsList';
+import { FinanceDashboard } from '@/components/finance/FinanceDashboard';
 import { ProductFormModal } from '@/components/products/ProductFormModal';
 import { CategoryManagerModal } from '@/components/products/CategoryManagerModal';
 import { useCategoryStore } from '@/hooks/useCategoryStore';
@@ -33,7 +34,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { LayoutDashboard, FileText, Users, UserCog, Bot, Settings, Receipt, ChevronDown, ShoppingBag, MapPin } from 'lucide-react';
+import { LayoutDashboard, FileText, Users, UserCog, Bot, Settings, Receipt, ChevronDown, ShoppingBag, MapPin, ChartNoAxesCombined } from 'lucide-react';
 import { User } from '@/types/user';
 import { Client } from '@/types/form';
 import { Product } from '@/types/product';
@@ -45,6 +46,7 @@ type View =
   | 'forms'
   | 'clients'
   | 'products'
+  | 'finance'
   | 'paymentLogs'
   | 'groups'
   | 'trips'
@@ -503,7 +505,7 @@ const Index = () => {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
-              variant={['paymentLogs', 'users', 'chatbot', 'settings'].includes(current) ? 'default' : 'ghost'}
+              variant={['finance', 'paymentLogs', 'users', 'chatbot', 'settings'].includes(current) ? 'default' : 'ghost'}
               size="sm"
               className="h-8 gap-1.5 px-2 text-xs sm:text-sm"
             >
@@ -513,6 +515,10 @@ const Index = () => {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-52">
+            <DropdownMenuItem onClick={() => handleNavigate('finance')} className="gap-2 cursor-pointer">
+              <ChartNoAxesCombined className="w-4 h-4" />
+              Finanzas
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => handleNavigate('paymentLogs')} className="gap-2 cursor-pointer">
               <Receipt className="w-4 h-4" />
               Logs de pagos
@@ -835,6 +841,24 @@ const Index = () => {
           />
         </div>
       </>
+    );
+  }
+
+  if (activeView === 'finance') {
+    return (
+      <RoleGuard allowedRoles={['super_admin']} fallback={<div className="min-h-screen flex items-center justify-center"><p className="text-muted-foreground">No tienes permisos para acceder a esta sección</p></div>}>
+        <>
+          <FloatingViewAs />
+          <div className={`min-h-screen bg-background ${viewingAs ? 'pt-10' : ''}`}>
+            <AppHeader>
+              <NavigationButtons current="finance" />
+            </AppHeader>
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+              <FinanceDashboard />
+            </div>
+          </div>
+        </>
+      </RoleGuard>
     );
   }
 

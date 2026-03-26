@@ -1,3 +1,5 @@
+import type { FinanceGranularity, FinanceOverviewResponse } from '@/types/finance';
+
 function getApiBaseURL(): string {
   const configured = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
   if (typeof window === 'undefined') return configured;
@@ -922,6 +924,32 @@ class ApiClient {
   // Payments
   async getCompanyPayments(token?: string | null) {
     return this.request<any[]>(`/payments`, {
+      method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async getFinanceOverview(
+    params?: {
+      from?: string;
+      to?: string;
+      granularity?: FinanceGranularity;
+      paymentType?: 'tarjeta' | 'transferencia' | 'efectivo';
+      productId?: string;
+    },
+    token?: string | null
+  ) {
+    const queryParams = new URLSearchParams(
+      Object.entries(params || {}).reduce<Record<string, string>>((acc, [key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          acc[key] = String(value);
+        }
+        return acc;
+      }, {})
+    ).toString();
+
+    return this.request<FinanceOverviewResponse>(`/finance/overview${queryParams ? `?${queryParams}` : ''}`, {
       method: 'GET',
       token: token ?? this.getToken(),
       requireAuth: true,

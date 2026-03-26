@@ -21,6 +21,7 @@ import productsRoutes from './products.routes';
 import categoriesRoutes from './categories.routes';
 import notificationsRoutes from './notifications.routes';
 import visaStatusTemplatesRoutes from './visa-status-templates.routes';
+import financeRoutes from './finance.routes';
 
 const router = Router();
 
@@ -46,5 +47,6 @@ router.use('/products', productsRoutes);
 router.use('/categories', categoriesRoutes);
 router.use('/notifications', notificationsRoutes);
 router.use('/visa-status-templates', visaStatusTemplatesRoutes);
+router.use('/finance', financeRoutes);
 
 export default router;

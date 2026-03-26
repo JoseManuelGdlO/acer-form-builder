@@ -4792,6 +4792,29 @@
         }
       }
     },
+    "/api/finance/overview": {
+      "get": {
+        "tags": [
+          "finance"
+        ],
+        "operationId": "get__api_finance_overview",
+        "summary": "GET /api/finance/overview",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
     "/health": {
       "get": {
         "tags": [
