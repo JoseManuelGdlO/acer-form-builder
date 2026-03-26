@@ -10,6 +10,16 @@ const parseNullableParentClientId = (value: unknown): string | null | undefined 
   return String(value);
 };
 
+const getDefaultVisaStatusTemplateId = async (companyId: string): Promise<string | null> => {
+  const templates = await VisaStatusTemplate.findAll({
+    where: { companyId, isActive: true },
+    order: [['order', 'ASC']],
+  });
+  if (templates.length === 0) return null;
+  const inProgress = templates.find((t) => t.label.toLowerCase().includes('proceso'));
+  return (inProgress || templates[0]).id;
+};
+
 const getWhatsappReplyStatusByPhone = async (
   phones: string[]
 ): Promise<Record<string, { hasWhatsappReply: boolean; lastUserMessageAt: Date | null; lastBotMessageAt: Date | null }>> => {
@@ -511,7 +521,7 @@ export const createClient = [
   body('visaCasAppointmentLocation').optional({ values: 'null' }).isString().isLength({ max: 255 }).withMessage('CAS appointment location must be a valid string'),
   body('visaConsularAppointmentDate').optional({ values: 'null' }).isISO8601().withMessage('Consular appointment date must be a valid date'),
   body('visaConsularAppointmentLocation').optional({ values: 'null' }).isString().isLength({ max: 255 }).withMessage('Consular appointment location must be a valid string'),
-  body('visaStatusTemplateId').isUUID().withMessage('Visa status template id is required'),
+  body('visaStatusTemplateId').optional({ values: 'falsy' }).isUUID().withMessage('Visa status template id must be a valid UUID'),
   body('productId').optional({ values: 'null' }).isUUID().withMessage('Product id must be a valid UUID'),
   body('parentClientId').optional({ values: 'null' }).isUUID().withMessage('Parent client id must be a valid UUID'),
   async (req: AuthRequest, res: Response): Promise<void> => {
@@ -555,8 +565,21 @@ export const createClient = [
           return;
         }
       }
+
+      // If not provided, assign default visa status template (same logic as submissions).
+      let visaStatusTemplateId: string | undefined = req.body.visaStatusTemplateId;
+      if (!visaStatusTemplateId) {
+        const defaultVisaStatusTemplateId = await getDefaultVisaStatusTemplateId(companyId);
+        if (!defaultVisaStatusTemplateId) {
+          res.status(400).json({ error: 'No visa status templates configured' });
+          return;
+        }
+        visaStatusTemplateId = defaultVisaStatusTemplateId;
+        req.body.visaStatusTemplateId = visaStatusTemplateId;
+      }
+
       const visaStatusTemplate = await VisaStatusTemplate.findOne({
-        where: { id: req.body.visaStatusTemplateId, companyId },
+        where: { id: visaStatusTemplateId, companyId },
       });
       if (!visaStatusTemplate) {
         res.status(400).json({ error: 'Visa status template not found' });
