@@ -68,6 +68,18 @@ const parseInitialClientNavigation = (): { initialView: View; initialClientId: s
   return { initialView: 'dashboard', initialClientId: null };
 };
 
+type NotificationSyncEventData = {
+  type?: string;
+  notificationType?: string;
+  notificationData?: { type?: string } | null;
+};
+
+const isWhatsappReplyEvent = (eventData: NotificationSyncEventData | null | undefined): boolean => {
+  if (!eventData || eventData.type !== 'NOTIFICATIONS_UPDATED') return false;
+  if (eventData.notificationType === 'whatsapp_reply') return true;
+  return eventData.notificationData?.type === 'whatsapp_reply';
+};
+
 const Index = () => {
   const initialNavigation = useMemo(parseInitialClientNavigation, []);
   const [activeView, setActiveView] = useState<View>(initialNavigation.initialView);
@@ -258,6 +270,38 @@ const Index = () => {
       }
     }
   }, [activeView, token, clientListQuery]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!('serviceWorker' in navigator) || !token) return;
+
+    const handleServiceWorkerMessage = (event: MessageEvent) => {
+      if (!isWhatsappReplyEvent(event.data)) return;
+      fetchClients(token, clientListQuery).catch((error) => {
+        console.error('Failed to refresh clients after WhatsApp reply:', error);
+      });
+      fetchSubmissions().catch((error) => {
+        console.error('Failed to refresh submissions after WhatsApp reply:', error);
+      });
+    };
+
+    navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
+    return () => navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage);
+  }, [token, clientListQuery, fetchClients, fetchSubmissions]);
+
+  useEffect(() => {
+    if (!token || activeView !== 'clients') return;
+
+    const intervalId = window.setInterval(() => {
+      fetchClients(token, clientListQuery).catch((error) => {
+        console.error('Failed to refresh clients by polling:', error);
+      });
+      fetchSubmissions().catch((error) => {
+        console.error('Failed to refresh submissions by polling:', error);
+      });
+    }, 60000);
+
+    return () => window.clearInterval(intervalId);
+  }, [token, activeView, clientListQuery, fetchClients, fetchSubmissions]);
 
   // Load products & categories when switching to products view
   useEffect(() => {

@@ -6,6 +6,17 @@ import { Notification, NotificationRecipient, PushSubscription, User, UserRole }
 import { AuthRequest } from '../middleware/auth.middleware';
 
 const VAPID_ADMIN_EMAIL = process.env.VAPID_ADMIN_EMAIL || 'admin@example.com';
+type AudienceRole = 'super_admin' | 'reviewer';
+
+type CreateCompanyNotificationInput = {
+  companyId: string;
+  type: string;
+  message: string;
+  title?: string | null;
+  actionUrl?: string | null;
+  data?: Record<string, unknown> | null;
+  audienceRoles?: AudienceRole[];
+};
 
 const normalizeNotificationActionUrl = (
   type: string,
@@ -39,6 +50,123 @@ const configureWebPush = (): boolean => {
   if (!publicKey || !privateKey) return false;
   webpush.setVapidDetails(VAPID_ADMIN_EMAIL, publicKey, privateKey);
   return true;
+};
+
+export const createCompanyNotification = async ({
+  companyId,
+  type,
+  message,
+  title = null,
+  actionUrl = null,
+  data = null,
+  audienceRoles,
+}: CreateCompanyNotificationInput): Promise<{
+  notificationId: string;
+  recipientsCount: number;
+  pushedCount: number;
+}> => {
+  const normalizedActionUrl = normalizeNotificationActionUrl(type, actionUrl, data);
+
+  const users = await User.findAll({
+    where: { companyId },
+    include: [
+      {
+        model: UserRole,
+        as: 'roles',
+        attributes: ['role'],
+      },
+    ],
+  });
+
+  const allowedRoles = Array.isArray(audienceRoles) && audienceRoles.length > 0 ? audienceRoles : null;
+  const recipients = users.filter((u) => {
+    const roles = (u as any).roles as Array<{ role: AudienceRole }> | undefined;
+    if (!allowedRoles) return true;
+    return roles?.some((r) => allowedRoles.includes(r.role)) ?? false;
+  });
+
+  const notification = await Notification.create({
+    companyId,
+    type,
+    title,
+    message,
+    data,
+    actionUrl: normalizedActionUrl,
+  });
+
+  const recipientUserIds = recipients.map((u) => u.id);
+
+  if (recipientUserIds.length > 0) {
+    await NotificationRecipient.bulkCreate(
+      recipientUserIds.map((userId) => ({
+        companyId,
+        notificationId: notification.id,
+        recipientUserId: userId,
+      }))
+    );
+  }
+
+  const canPush = configureWebPush();
+  if (!canPush || recipientUserIds.length === 0) {
+    return {
+      notificationId: notification.id,
+      recipientsCount: recipientUserIds.length,
+      pushedCount: 0,
+    };
+  }
+
+  const subs = await PushSubscription.findAll({
+    where: {
+      companyId,
+      userId: { [Op.in]: recipientUserIds },
+    },
+  });
+
+  if (subs.length === 0) {
+    return {
+      notificationId: notification.id,
+      recipientsCount: recipientUserIds.length,
+      pushedCount: 0,
+    };
+  }
+
+  const payload = JSON.stringify({
+    kind: 'notification',
+    notificationId: notification.id,
+    type: notification.type,
+    data: notification.data,
+    title: notification.title || 'Notificación',
+    body: notification.message,
+    actionUrl: normalizedActionUrl,
+  });
+
+  let pushedCount = 0;
+  for (const sub of subs) {
+    try {
+      await webpush.sendNotification(
+        {
+          endpoint: sub.endpoint,
+          keys: {
+            auth: sub.keysAuth,
+            p256dh: sub.keysP256dh,
+          },
+        } as any,
+        payload
+      );
+      pushedCount++;
+    } catch (err: any) {
+      const statusCode = err?.statusCode;
+      if (statusCode === 410 || statusCode === 404) {
+        await sub.destroy();
+      }
+    }
+  }
+
+  return {
+    notificationId: notification.id,
+    recipientsCount: recipientUserIds.length,
+    pushedCount,
+  };
 };
 
 export const getVapidPublicKey = async (_req: Request, res: Response): Promise<void> => {
@@ -277,102 +405,20 @@ export const createNotification = [
         data?: Record<string, unknown> | null;
         audienceRoles?: Array<'super_admin' | 'reviewer'>;
       };
-      const normalizedActionUrl = normalizeNotificationActionUrl(type, actionUrl, data);
-
-      // Resolve recipients from roles within the same company.
-      const users = await User.findAll({
-        where: { companyId },
-        include: [
-          {
-            model: UserRole,
-            as: 'roles',
-            attributes: ['role'],
-          },
-        ],
-      });
-
-      const allowedRoles = Array.isArray(audienceRoles) && audienceRoles.length > 0 ? audienceRoles : null;
-
-      const recipients = users.filter((u) => {
-        const roles = (u as any).roles as Array<{ role: 'super_admin' | 'reviewer' }> | undefined;
-        if (!allowedRoles) return true;
-        return roles?.some((r) => allowedRoles.includes(r.role)) ?? false;
-      });
-
-      const notification = await Notification.create({
+      const result = await createCompanyNotification({
         companyId,
         type,
-        title,
         message,
+        title,
+        actionUrl,
         data,
-        actionUrl: normalizedActionUrl,
+        audienceRoles,
       });
 
-      const recipientUserIds = recipients.map((u) => u.id);
-
-      if (recipientUserIds.length > 0) {
-        await NotificationRecipient.bulkCreate(
-          recipientUserIds.map((userId) => ({
-            companyId,
-            notificationId: notification.id,
-            recipientUserId: userId,
-          }))
-        );
-      }
-
-      const pushed = await (async () => {
-        const canPush = configureWebPush();
-        if (!canPush) return { pushedCount: 0 };
-        if (recipientUserIds.length === 0) return { pushedCount: 0 };
-
-        const subs = await PushSubscription.findAll({
-          where: {
-            companyId,
-            userId: { [Op.in]: recipientUserIds },
-          },
-        });
-
-        if (subs.length === 0) return { pushedCount: 0 };
-
-        const payload = JSON.stringify({
-          kind: 'notification',
-          notificationId: notification.id,
-          title: notification.title || 'Notificación',
-          body: notification.message,
-          actionUrl: normalizedActionUrl,
-        });
-
-        let pushedCount = 0;
-
-        for (const sub of subs) {
-          try {
-            await webpush.sendNotification(
-              {
-                endpoint: sub.endpoint,
-                keys: {
-                  auth: sub.keysAuth,
-                  p256dh: sub.keysP256dh,
-                },
-              } as any,
-              payload
-            );
-            pushedCount++;
-          } catch (err: any) {
-            const statusCode = err?.statusCode;
-            // Subscription is gone/expired -> delete locally so we stop trying.
-            if (statusCode === 410 || statusCode === 404) {
-              await sub.destroy();
-            }
-          }
-        }
-
-        return { pushedCount };
-      })();
-
       res.status(201).json({
-        notificationId: notification.id,
-        recipientsCount: recipientUserIds.length,
-        pushedCount: (pushed as any).pushedCount ?? 0,
+        notificationId: result.notificationId,
+        recipientsCount: result.recipientsCount,
+        pushedCount: result.pushedCount,
       });
     } catch (error) {
       console.error('createNotification error:', error);

@@ -12,6 +12,8 @@ self.addEventListener('push', (event) => {
   const body = payload.body || '';
   const actionUrl = payload.actionUrl || null;
   const notificationId = payload.notificationId || null;
+  const notificationType = payload.type || null;
+  const notificationData = payload.data || null;
 
   const notifyPromise = self.registration.showNotification(title, {
     body,
@@ -26,7 +28,7 @@ self.addEventListener('push', (event) => {
       includeUncontrolled: true,
     });
     for (const client of clientList) {
-      client.postMessage({ type: 'NOTIFICATIONS_UPDATED', notificationId });
+      client.postMessage({ type: 'NOTIFICATIONS_UPDATED', notificationId, notificationType, notificationData });
     }
   })();
 

@@ -1,13 +1,67 @@
 import { Response } from 'express';
 import { body, validationResult } from 'express-validator';
 import { fn, col, Op, where as sequelizeWhere } from 'sequelize';
-import { Client, ClientChecklist, ChecklistTemplate, ClientAmountDueLog, ClientPaymentDeletedLog, ClientPayment, User, TripParticipant, Trip, Product, VisaStatusTemplate } from '../models';
+import { Client, ClientChecklist, ChecklistTemplate, ClientAmountDueLog, ClientPaymentDeletedLog, ClientPayment, User, TripParticipant, Trip, Product, VisaStatusTemplate, Conversations } from '../models';
 import { AuthRequest } from '../middleware/auth.middleware';
 
 const parseNullableParentClientId = (value: unknown): string | null | undefined => {
   if (value === undefined) return undefined;
   if (value === null || value === '') return null;
   return String(value);
+};
+
+const getWhatsappReplyStatusByPhone = async (
+  phones: string[]
+): Promise<Record<string, { hasWhatsappReply: boolean; lastUserMessageAt: Date | null; lastBotMessageAt: Date | null }>> => {
+  const uniquePhones = Array.from(new Set(phones.map((phone) => String(phone || '').trim()).filter(Boolean)));
+  if (uniquePhones.length === 0) return {};
+
+  const conversations = await Conversations.findAll({
+    where: {
+      phone: { [Op.in]: uniquePhones },
+      from: { [Op.in]: ['usuario', 'bot'] },
+    },
+    attributes: ['phone', 'from', 'createdAt'],
+    order: [['created_at', 'DESC']],
+  });
+
+  const statusByPhone: Record<
+    string,
+    { hasWhatsappReply: boolean; lastUserMessageAt: Date | null; lastBotMessageAt: Date | null }
+  > = {};
+
+  for (const phone of uniquePhones) {
+    statusByPhone[phone] = {
+      hasWhatsappReply: false,
+      lastUserMessageAt: null,
+      lastBotMessageAt: null,
+    };
+  }
+
+  for (const conversation of conversations) {
+    const phone = String((conversation as any).phone || '').trim();
+    if (!phone || !statusByPhone[phone]) continue;
+
+    const createdAt = conversation.createdAt ? new Date(conversation.createdAt) : null;
+    if (!createdAt) continue;
+
+    if (conversation.from === 'usuario' && !statusByPhone[phone].lastUserMessageAt) {
+      statusByPhone[phone].lastUserMessageAt = createdAt;
+    }
+    if (conversation.from === 'bot' && !statusByPhone[phone].lastBotMessageAt) {
+      statusByPhone[phone].lastBotMessageAt = createdAt;
+    }
+  }
+
+  for (const phone of uniquePhones) {
+    const status = statusByPhone[phone];
+    status.hasWhatsappReply = Boolean(
+      status.lastUserMessageAt &&
+        (!status.lastBotMessageAt || status.lastUserMessageAt.getTime() > status.lastBotMessageAt.getTime())
+    );
+  }
+
+  return statusByPhone;
 };
 
 export const getAllClients = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -239,6 +293,7 @@ export const getAllClients = async (req: AuthRequest, res: Response): Promise<vo
       const id = row.clientId || row.client_id;
       if (id) totalPaidByClientId[id] = parseFloat(row.totalPaid || '0') || 0;
     });
+    const whatsappStatusByPhone = await getWhatsappReplyStatusByPhone(clients.map((client) => client.phone || ''));
 
     // Add checklist stats and payment totals to each client
     const clientsWithStats = clients.map(client => {
@@ -270,6 +325,8 @@ export const getAllClients = async (req: AuthRequest, res: Response): Promise<vo
 
       const clientData = client.toJSON();
       const totalPaid = totalPaidByClientId[client.id] ?? 0;
+      const normalizedPhone = String(client.phone || '').trim();
+      const whatsappStatus = normalizedPhone ? whatsappStatusByPhone[normalizedPhone] : undefined;
       return {
         ...clientData,
         children: childrenByParentId[client.id] || [],
@@ -280,6 +337,9 @@ export const getAllClients = async (req: AuthRequest, res: Response): Promise<vo
         checklistByTemplate,
         totalPaid,
         assignedTrips: assignedTripsByClientId[client.id] || [],
+        hasWhatsappReply: whatsappStatus?.hasWhatsappReply ?? false,
+        lastWhatsappUserMessageAt: whatsappStatus?.lastUserMessageAt ?? null,
+        lastWhatsappBotMessageAt: whatsappStatus?.lastBotMessageAt ?? null,
       };
     });
 
@@ -372,6 +432,11 @@ export const getClientById = async (req: AuthRequest, res: Response): Promise<vo
       updatedAt: child.updated_at || child.updatedAt,
     }));
     (clientJson as any).assignedTrips = assignedTrips;
+    const clientWhatsappStatusByPhone = await getWhatsappReplyStatusByPhone([client.phone || '']);
+    const clientWhatsappStatus = client.phone ? clientWhatsappStatusByPhone[String(client.phone).trim()] : undefined;
+    (clientJson as any).hasWhatsappReply = clientWhatsappStatus?.hasWhatsappReply ?? false;
+    (clientJson as any).lastWhatsappUserMessageAt = clientWhatsappStatus?.lastUserMessageAt ?? null;
+    (clientJson as any).lastWhatsappBotMessageAt = clientWhatsappStatus?.lastBotMessageAt ?? null;
     res.json(clientJson);
   } catch (error) {
     console.error('Get client by id error:', error);

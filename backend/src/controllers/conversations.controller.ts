@@ -2,6 +2,9 @@ import { Request, Response } from 'express';
 import { body, validationResult } from 'express-validator';
 import { Conversations, Client } from '../models';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { createCompanyNotification } from './notifications.controller';
+
+const normalizePhone = (phone: string): string => phone.replace(/\D/g, '');
 
 const addConv = [
   body('phone').notEmpty().withMessage('phone is required').trim(),
@@ -37,6 +40,46 @@ const addConv = [
         hora: hora as unknown as Date,
         baja_logica: false,
       });
+
+      if (from === 'usuario') {
+        const incomingPhone = typeof phone === 'string' ? phone.trim() : '';
+        const incomingPhoneNormalized = normalizePhone(incomingPhone);
+        if (incomingPhoneNormalized) {
+          const candidateClients = await Client.findAll({
+            where: {
+              parentClientId: null,
+            },
+            attributes: ['id', 'name', 'phone', 'companyId'],
+          });
+
+          const matchedClients = candidateClients.filter((client) => {
+            const clientPhone = typeof client.phone === 'string' ? client.phone.trim() : '';
+            if (!clientPhone) return false;
+            return normalizePhone(clientPhone) === incomingPhoneNormalized;
+          });
+
+          await Promise.all(
+            matchedClients.map((client) =>
+              createCompanyNotification({
+                companyId: client.companyId,
+                type: 'whatsapp_reply',
+                title: 'Nueva respuesta por WhatsApp',
+                message: `${client.name} respondió por WhatsApp.`,
+                actionUrl: `/?view=clients&clientId=${encodeURIComponent(client.id)}`,
+                data: {
+                  type: 'whatsapp_reply',
+                  clientId: client.id,
+                  clientName: client.name,
+                  phone: incomingPhone,
+                },
+                audienceRoles: ['super_admin', 'reviewer'],
+              }).catch((notificationError) => {
+                console.error('Failed to create WhatsApp reply notification:', notificationError);
+              })
+            )
+          );
+        }
+      }
 
       res.status(201).json(record);
     } catch (error: unknown) {
