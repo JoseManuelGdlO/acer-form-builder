@@ -7,7 +7,7 @@ interface UserStore {
   users: User[];
   isLoading: boolean;
   fetchUsers: (token: string) => Promise<void>;
-  addUser: (token: string, name: string, email: string, role: UserRole, password: string) => Promise<void>;
+  addUser: (token: string, name: string, email: string, role: UserRole, password: string, branchId?: string | null) => Promise<void>;
   updateUser: (token: string, id: string, updates: Partial<Omit<User, 'id' | 'createdAt'>>) => Promise<void>;
   deleteUser: (token: string, id: string) => Promise<void>;
   toggleUserStatus: (token: string, id: string) => Promise<void>;
@@ -21,14 +21,27 @@ export const useUserStore = create<UserStore>((set, get) => ({
     set({ isLoading: true });
     try {
       const usersData = await api.getUsers(token);
-      const users: User[] = usersData.map((u: any) => ({
-        id: u.id,
-        name: u.name,
-        email: u.email,
-        roles: u.roles || ['reviewer'],
-        status: u.status,
-        createdAt: new Date(u.createdAt),
-      }));
+      const users: User[] = usersData.map(
+        (u: {
+          id: string;
+          name: string;
+          email: string;
+          roles?: UserRole[];
+          status: 'active' | 'inactive';
+          createdAt: string | Date;
+          branchId?: string | null;
+          branch?: { id: string; name: string; isActive: boolean } | null;
+        }) => ({
+          id: u.id,
+          name: u.name,
+          email: u.email,
+          roles: u.roles || ['reviewer'],
+          status: u.status,
+          createdAt: new Date(u.createdAt),
+          branchId: u.branchId ?? null,
+          branch: u.branch ?? null,
+        }),
+      );
       set({ users, isLoading: false });
     } catch (error) {
       console.error('Failed to fetch users:', error);
@@ -37,9 +50,12 @@ export const useUserStore = create<UserStore>((set, get) => ({
     }
   },
   
-  addUser: async (token, name, email, role, password) => {
+  addUser: async (token, name, email, role, password, branchId) => {
     try {
-      const newUser = await api.createUser({ name, email, role, password }, token);
+      const newUser = await api.createUser(
+        { name, email, role, password, branchId: branchId ?? null },
+        token,
+      );
       const user: User = {
         id: newUser.id,
         name: newUser.name,
@@ -47,6 +63,8 @@ export const useUserStore = create<UserStore>((set, get) => ({
         roles: newUser.roles || [role],
         status: newUser.status,
         createdAt: new Date(newUser.createdAt || Date.now()),
+        branchId: newUser.branchId ?? null,
+        branch: newUser.branch ?? null,
       };
       set((state) => ({ users: [...state.users, user] }));
     } catch (error) {
@@ -68,6 +86,8 @@ export const useUserStore = create<UserStore>((set, get) => ({
         createdAt: updatedUser.createdAt 
           ? new Date(updatedUser.createdAt) 
           : (existingUser?.createdAt || new Date()),
+        branchId: updatedUser.branchId ?? existingUser?.branchId ?? null,
+        branch: updatedUser.branch ?? existingUser?.branch ?? null,
       };
       set((state) => ({
         users: state.users.map((u) => (u.id === id ? user : u)),

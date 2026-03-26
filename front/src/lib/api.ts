@@ -869,6 +869,41 @@ class ApiClient {
     });
   }
 
+  // Branches (sucursales)
+  async getBranches(token?: string | null) {
+    return this.request<any[]>('/branches', {
+      method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async createBranch(data: { name: string; isActive?: boolean }, token?: string | null) {
+    return this.request<any>('/branches', {
+      method: 'POST',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateBranch(id: string, data: { name?: string; isActive?: boolean }, token?: string | null) {
+    return this.request<any>(`/branches/${id}`, {
+      method: 'PUT',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteBranch(id: string, token?: string | null) {
+    return this.request<{ message: string }>(`/branches/${id}`, {
+      method: 'DELETE',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
   async getClientChecklist(clientId: string, token?: string | null) {
     return this.request<any[]>(`/checklist/clients/${clientId}`, {
       method: 'GET',
@@ -937,6 +972,8 @@ class ApiClient {
       granularity?: FinanceGranularity;
       paymentType?: 'tarjeta' | 'transferencia' | 'efectivo';
       productId?: string;
+      assignedUserId?: string;
+      branchId?: string;
     },
     token?: string | null
   ) {

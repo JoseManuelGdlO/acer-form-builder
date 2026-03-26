@@ -15,4 +15,6 @@ export interface User {
   createdAt: Date;
   status: 'active' | 'inactive';
   company?: Company | null;
+  branchId?: string | null;
+  branch?: { id: string; name: string; isActive: boolean } | null;
 }

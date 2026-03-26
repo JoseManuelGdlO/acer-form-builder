@@ -329,13 +329,13 @@
                   },
                   "role": {
                     "type": "string"
+                  },
+                  "branchId": {
+                    "type": "string"
                   }
                 },
                 "required": [
-                  "email",
-                  "password",
-                  "name",
-                  "role"
+                  "email"
                 ]
               }
             }
@@ -433,6 +433,9 @@
                     "type": "string"
                   },
                   "role": {
+                    "type": "string"
+                  },
+                  "branchId": {
                     "type": "string"
                   }
                 }
@@ -4811,6 +4814,170 @@
           },
           "401": {
             "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/branches": {
+      "get": {
+        "tags": [
+          "branches"
+        ],
+        "operationId": "get__api_branches",
+        "summary": "GET /api/branches",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion y rol admin.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "branches"
+        ],
+        "operationId": "post__api_branches",
+        "summary": "POST /api/branches",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion y rol admin.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "boolean"
+                  },
+                  "isActive": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request (validation errors)"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        }
+      }
+    },
+    "/api/branches/{id}": {
+      "put": {
+        "tags": [
+          "branches"
+        ],
+        "operationId": "put__api_branches__id_",
+        "summary": "PUT /api/branches/{id}",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion y rol admin.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID: id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "boolean"
+                  },
+                  "isActive": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request (validation errors)"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "branches"
+        ],
+        "operationId": "delete__api_branches__id_",
+        "summary": "DELETE /api/branches/{id}",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion y rol admin.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID: id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
           }
         }
       }

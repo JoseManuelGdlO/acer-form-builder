@@ -7,6 +7,8 @@ export interface FinanceOverviewResponse {
     granularity: FinanceGranularity;
     paymentType: string | null;
     productId: string | null;
+    assignedUserId: string | null;
+    branchId: string | null;
   };
   kpis: {
     totalIncome: number;

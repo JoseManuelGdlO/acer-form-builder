@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { User } from '@/types/user';
+import { User, UserRole } from '@/types/user';
 import { useUserStore } from '@/hooks/useUserStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { UserCard } from './UserCard';
@@ -54,26 +54,27 @@ export function UserList() {
     setEditingUser(null);
   };
 
-  const handleSave = async (name: string, email: string, role: string, password: string) => {
+  const handleSave = async (name: string, email: string, role: UserRole, password: string, branchId?: string | null) => {
     if (!token) {
       console.error('No token available');
       return;
     }
     try {
-      await addUser(token, name, email, role as any, password);
+      await addUser(token, name, email, role, password, branchId ?? null);
     } catch (error) {
       console.error('Error creating user:', error);
       throw error;
     }
   };
 
-  const handleUpdate = async (id: string, updates: Partial<Omit<User, 'id' | 'createdAt'>>) => {
+  type UserUpdatePayload = { name?: string; email?: string; role?: UserRole; branchId?: string | null };
+  const handleUpdate = async (id: string, updates: UserUpdatePayload) => {
     if (!token) {
       console.error('No token available');
       return;
     }
     try {
-      await updateUser(token, id, updates);
+      await updateUser(token, id, updates as unknown as Partial<Omit<User, 'id' | 'createdAt'>>);
     } catch (error) {
       console.error('Error updating user:', error);
       throw error;

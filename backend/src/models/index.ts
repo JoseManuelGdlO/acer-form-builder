@@ -2,6 +2,7 @@ import sequelize from '../config/database';
 import { Company } from './Company';
 import { User } from './User';
 import { UserRole } from './UserRole';
+import { Branch } from './Branch';
 import { Client } from './Client';
 import { Form } from './Form';
 import { FormSession } from './FormSession';
@@ -38,6 +39,10 @@ import { PushSubscription } from './PushSubscription';
 // Company relationships (multi-tenant)
 Company.hasMany(User, { foreignKey: 'companyId', as: 'users' });
 User.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+Company.hasMany(Branch, { foreignKey: 'companyId', as: 'branches' });
+Branch.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+Branch.hasMany(User, { foreignKey: 'branchId', as: 'usersByBranch' });
+User.belongsTo(Branch, { foreignKey: 'branchId', as: 'branch' });
 Company.hasMany(Client, { foreignKey: 'companyId', as: 'clients' });
 Client.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
 Company.hasMany(Form, { foreignKey: 'companyId', as: 'forms' });
@@ -234,6 +239,7 @@ ClientChecklist.belongsTo(ChecklistTemplate, { foreignKey: 'templateId', as: 'te
 export {
   sequelize,
   Company,
+  Branch,
   User,
   UserRole,
   Notification,

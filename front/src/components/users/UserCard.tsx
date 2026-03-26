@@ -44,6 +44,9 @@ export function UserCard({ user, onEdit, onDelete, onToggleStatus }: UserCardPro
               <div className="flex items-center gap-2 mt-2 flex-wrap">
                 <UserRoleBadge role={user.roles[0] || 'reviewer'} />
                 <span className="text-xs text-muted-foreground">
+                  {user.branch?.name ? `Sucursal: ${user.branch.name}` : 'Sin sucursal'}
+                </span>
+                <span className="text-xs text-muted-foreground">
                   Creado {format(user.createdAt, "d 'de' MMMM, yyyy", { locale: es })}
                 </span>
               </div>

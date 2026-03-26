@@ -55,6 +55,8 @@ type LoadParams = {
   to?: string;
   paymentType?: string;
   productId?: string;
+  assignedUserId?: string;
+  branchId?: string;
 };
 
 export const FinanceDashboard = () => {
@@ -66,15 +68,45 @@ export const FinanceDashboard = () => {
   const [to, setTo] = useState('');
   const [paymentType, setPaymentType] = useState('');
   const [productId, setProductId] = useState('');
+  const [assignedUserId, setAssignedUserId] = useState('');
+  const [branchId, setBranchId] = useState('');
   const [products, setProducts] = useState<Array<{ id: string; title: string }>>([]);
+  const [advisors, setAdvisors] = useState<Array<{ id: string; name: string }>>([]);
+  const [branches, setBranches] = useState<Array<{ id: string; name: string }>>([]);
 
   // Load product list for the product filter dropdown
   useEffect(() => {
     if (!token) return;
     api.getProducts(token).then((list) => {
-      const mapped = (Array.isArray(list) ? list : []).map((p: any) => ({ id: p.id, title: p.title }));
+      const mapped = (Array.isArray(list) ? list : []).map((p: { id: string; title: string }) => ({ id: p.id, title: p.title }));
       setProducts(mapped);
     }).catch(() => setProducts([]));
+  }, [token]);
+
+  useEffect(() => {
+    if (!token) return;
+
+    api.getUsers(token)
+      .then((list) => {
+        const users = (Array.isArray(list) ? list : []) as Array<{ id: string; name: string; roles?: string[] }>;
+        const mapped = users
+          .filter((u) => Array.isArray(u.roles) && u.roles.includes('reviewer'))
+          .map((u) => ({ id: u.id, name: u.name }))
+          .sort((a, b) => a.name.localeCompare(b.name));
+        setAdvisors(mapped);
+      })
+      .catch(() => setAdvisors([]));
+
+    api.getBranches(token)
+      .then((list) => {
+        const bs = (Array.isArray(list) ? list : []) as Array<{ id: string; name: string; isActive?: boolean; is_active?: boolean }>;
+        const mapped = bs
+          .filter((b) => (b.isActive ?? b.is_active ?? true) === true)
+          .map((b) => ({ id: b.id, name: b.name }))
+          .sort((a, b) => a.name.localeCompare(b.name));
+        setBranches(mapped);
+      })
+      .catch(() => setBranches([]));
   }, [token]);
 
   // Core load function — accepts optional param overrides so reset can bypass stale state
@@ -87,6 +119,8 @@ export const FinanceDashboard = () => {
       const t = overrides?.to !== undefined ? overrides.to : to;
       const pt = overrides?.paymentType !== undefined ? overrides.paymentType : paymentType;
       const pid = overrides?.productId !== undefined ? overrides.productId : productId;
+      const au = overrides?.assignedUserId !== undefined ? overrides.assignedUserId : assignedUserId;
+      const bid = overrides?.branchId !== undefined ? overrides.branchId : branchId;
 
       const response = await api.getFinanceOverview(
         {
@@ -95,6 +129,8 @@ export const FinanceDashboard = () => {
           to: t || undefined,
           paymentType: (pt as 'tarjeta' | 'transferencia' | 'efectivo') || undefined,
           productId: pid || undefined,
+          assignedUserId: au || undefined,
+          branchId: bid || undefined,
         },
         token
       );
@@ -118,6 +154,8 @@ export const FinanceDashboard = () => {
     setTo('');
     setPaymentType('');
     setProductId('');
+    setAssignedUserId('');
+    setBranchId('');
     setGranularity(DEFAULT_GRANULARITY);
     loadOverview({
       granularity: DEFAULT_GRANULARITY,
@@ -125,6 +163,8 @@ export const FinanceDashboard = () => {
       to: '',
       paymentType: '',
       productId: '',
+      assignedUserId: '',
+      branchId: '',
     });
   };
 
@@ -164,7 +204,7 @@ export const FinanceDashboard = () => {
           </div>
 
           {/* Inputs de filtro */}
-          <div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+          <div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3">
             <input
               type="date"
               value={from}
@@ -198,6 +238,30 @@ export const FinanceDashboard = () => {
               {products.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.title}
+                </option>
+              ))}
+            </select>
+            <select
+              value={assignedUserId}
+              onChange={(e) => setAssignedUserId(e.target.value)}
+              className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+            >
+              <option value="">Asesor (todos)</option>
+              {advisors.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+            </select>
+            <select
+              value={branchId}
+              onChange={(e) => setBranchId(e.target.value)}
+              className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+            >
+              <option value="">Sucursal (todas)</option>
+              {branches.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
                 </option>
               ))}
             </select>

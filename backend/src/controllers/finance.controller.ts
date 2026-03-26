@@ -1,12 +1,14 @@
 import { Response } from 'express';
 import { Op } from 'sequelize';
 import { AuthRequest } from '../middleware/auth.middleware';
-import { ClientPayment, TripExpense, Client, Product, Trip } from '../models';
+import { ClientPayment, TripExpense, Client, Product, Trip, User } from '../models';
 
 type Granularity = 'hourly' | 'daily' | 'weekly' | 'monthly' | 'bimonthly' | 'quarterly' | 'semiannual' | 'annual';
 
 const ALLOWED_GRANULARITIES: Granularity[] = ['hourly', 'daily', 'weekly', 'monthly', 'bimonthly', 'quarterly', 'semiannual', 'annual'];
 const ALLOWED_PAYMENT_TYPES = ['tarjeta', 'transferencia', 'efectivo'] as const;
+const UUID_V4_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 type OverviewQuery = {
   from?: string;
@@ -14,6 +16,8 @@ type OverviewQuery = {
   granularity?: string;
   paymentType?: string;
   productId?: string;
+  assignedUserId?: string;
+  branchId?: string;
 };
 
 const toIsoDate = (value: Date): string => value.toISOString().slice(0, 10);
@@ -170,6 +174,18 @@ export const getFinanceOverview = async (req: AuthRequest, res: Response): Promi
       return;
     }
 
+    const assignedUserIdFilter = query.assignedUserId && query.assignedUserId !== '' ? String(query.assignedUserId) : null;
+    if (assignedUserIdFilter && !UUID_V4_REGEX.test(assignedUserIdFilter)) {
+      res.status(400).json({ error: 'Invalid assignedUserId. Use UUID.' });
+      return;
+    }
+
+    const branchIdFilter = query.branchId && query.branchId !== '' ? String(query.branchId) : null;
+    if (branchIdFilter && !UUID_V4_REGEX.test(branchIdFilter)) {
+      res.status(400).json({ error: 'Invalid branchId. Use UUID.' });
+      return;
+    }
+
     const now = new Date();
     const toDate = endOfDayUtc(parsedTo || now);
     const fromDate = startOfDayUtc(parsedFrom || addDaysUtc(toDate, -getDefaultRangeDays(granularity)));
@@ -216,43 +232,136 @@ export const getFinanceOverview = async (req: AuthRequest, res: Response): Promi
       {
         model: Client,
         as: 'client',
-        attributes: ['id', 'name'],
+        attributes: ['id', 'name', 'assignedUserId'],
         include: [
           {
             model: Product,
             as: 'product',
             attributes: ['id', 'title'],
           },
+          {
+            model: User,
+            as: 'assignedUser',
+            attributes: ['id', 'branchId'],
+          },
         ],
       },
       { model: Trip, as: 'trip', attributes: ['id', 'title'] },
     ];
 
+    const includeTripWithAdvisorBranch = [
+      {
+        model: Trip,
+        as: 'trip',
+        attributes: ['id', 'title'],
+        include: [
+          {
+            model: User,
+            as: 'assignedUser',
+            attributes: ['id', 'branchId'],
+          },
+        ],
+      },
+    ];
+
     const [paymentsRows, expenseRows, previousPaymentsRows, previousExpenseRows] = await Promise.all([
       ClientPayment.findAll({ where: paymentWhere, include: includeClientProduct }),
-      TripExpense.findAll({ where: expenseWhere, include: [{ model: Trip, as: 'trip', attributes: ['id', 'title'] }] }),
-      ClientPayment.findAll({ where: previousPaymentWhere }),
-      TripExpense.findAll({ where: previousExpenseWhere }),
+      TripExpense.findAll({ where: expenseWhere, include: includeTripWithAdvisorBranch }),
+      ClientPayment.findAll({ where: previousPaymentWhere, include: includeClientProduct }),
+      TripExpense.findAll({ where: previousExpenseWhere, include: includeTripWithAdvisorBranch }),
     ]);
 
     const payments = paymentsRows as Array<
-      ClientPayment & { client?: (Client & { product?: Product | null }) | null; trip?: Trip | null }
+      ClientPayment & {
+        client?: (Client & { product?: Product | null; assignedUser?: User | null }) | null;
+        trip?: Trip | null;
+      }
     >;
-    const expenses = expenseRows as Array<TripExpense & { trip?: Trip | null }>;
+    const expenses = expenseRows as Array<TripExpense & { trip?: (Trip & { assignedUser?: User | null }) | null }>;
 
     const productIdFilter = query.productId || null;
-    const filteredPayments = productIdFilter
-      ? payments.filter((payment) => (payment.client?.product as (Product & { id?: string }) | null | undefined)?.id === productIdFilter)
+    let filteredPayments = productIdFilter
+      ? payments.filter(
+          (payment) =>
+            (payment.client?.product as (Product & { id?: string }) | null | undefined)?.id === productIdFilter,
+        )
       : payments;
 
+    if (assignedUserIdFilter) {
+      filteredPayments = filteredPayments.filter(
+        (payment) => payment.client?.assignedUser?.id === assignedUserIdFilter,
+      );
+    }
+
+    if (branchIdFilter) {
+      filteredPayments = filteredPayments.filter(
+        (payment) => payment.client?.assignedUser?.branchId === branchIdFilter,
+      );
+    }
+
+    let filteredExpenses = expenses;
+    if (assignedUserIdFilter) {
+      filteredExpenses = filteredExpenses.filter(
+        (expense) => expense.trip?.assignedUser?.id === assignedUserIdFilter,
+      );
+    }
+
+    if (branchIdFilter) {
+      filteredExpenses = filteredExpenses.filter(
+        (expense) => expense.trip?.assignedUser?.branchId === branchIdFilter,
+      );
+    }
+
+    const previousPayments = previousPaymentsRows as Array<
+      ClientPayment & {
+        client?: (Client & { product?: Product | null; assignedUser?: User | null }) | null;
+        trip?: Trip | null;
+      }
+    >;
+    const previousExpenses = previousExpenseRows as Array<
+      TripExpense & { trip?: (Trip & { assignedUser?: User | null }) | null }
+    >;
+
+    let filteredPreviousPayments = productIdFilter
+      ? previousPayments.filter(
+          (payment) =>
+            (payment.client?.product as (Product & { id?: string }) | null | undefined)?.id === productIdFilter,
+        )
+      : previousPayments;
+
+    if (assignedUserIdFilter) {
+      filteredPreviousPayments = filteredPreviousPayments.filter(
+        (payment) => payment.client?.assignedUser?.id === assignedUserIdFilter,
+      );
+    }
+
+    if (branchIdFilter) {
+      filteredPreviousPayments = filteredPreviousPayments.filter(
+        (payment) => payment.client?.assignedUser?.branchId === branchIdFilter,
+      );
+    }
+
+    let filteredPreviousExpenses = previousExpenses;
+    if (assignedUserIdFilter) {
+      filteredPreviousExpenses = filteredPreviousExpenses.filter(
+        (expense) => expense.trip?.assignedUser?.id === assignedUserIdFilter,
+      );
+    }
+
+    if (branchIdFilter) {
+      filteredPreviousExpenses = filteredPreviousExpenses.filter(
+        (expense) => expense.trip?.assignedUser?.branchId === branchIdFilter,
+      );
+    }
+
     const totalIncome = sumAmounts(filteredPayments);
-    const totalExpense = sumAmounts(expenses);
+    const totalExpense = sumAmounts(filteredExpenses);
     const netProfit = totalIncome - totalExpense;
     const netMarginPct = totalIncome > 0 ? Number(((netProfit / totalIncome) * 100).toFixed(2)) : 0;
     const averageTicket = filteredPayments.length > 0 ? Number((totalIncome / filteredPayments.length).toFixed(2)) : 0;
 
-    const previousIncome = sumAmounts(previousPaymentsRows as Array<{ amount: number }>);
-    const previousExpense = sumAmounts(previousExpenseRows as Array<{ amount: number }>);
+    const previousIncome = sumAmounts(filteredPreviousPayments);
+    const previousExpense = sumAmounts(filteredPreviousExpenses);
     const previousNet = previousIncome - previousExpense;
     const growthVsPreviousPct = previousNet !== 0 ? Number((((netProfit - previousNet) / Math.abs(previousNet)) * 100).toFixed(2)) : 0;
 
@@ -271,7 +380,7 @@ export const getFinanceOverview = async (req: AuthRequest, res: Response): Promi
       const bucket = getBucket(sourceDate, granularity);
       ensureBucket(bucket).income += Number(payment.amount || 0);
     });
-    expenses.forEach((expense) => {
+    filteredExpenses.forEach((expense) => {
       const sourceDate = granularity === 'hourly'
         ? new Date((expense as unknown as { createdAt?: Date }).createdAt || expense.expenseDate)
         : new Date(expense.expenseDate);
@@ -335,7 +444,7 @@ export const getFinanceOverview = async (req: AuthRequest, res: Response): Promi
       }
       tripRankMap.get(tripId)!.income += Number(payment.amount || 0);
     });
-    expenses.forEach((expense) => {
+    filteredExpenses.forEach((expense) => {
       const tripId = expense.tripId;
       const title = expense.trip?.title || 'Viaje sin título';
       if (!tripRankMap.has(tripId)) {
@@ -351,6 +460,8 @@ export const getFinanceOverview = async (req: AuthRequest, res: Response): Promi
         granularity,
         paymentType: query.paymentType || null,
         productId: query.productId || null,
+        assignedUserId: assignedUserIdFilter || null,
+        branchId: branchIdFilter || null,
       },
       kpis: {
         totalIncome: Number(totalIncome.toFixed(2)),
