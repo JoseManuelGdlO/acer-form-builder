@@ -24,11 +24,28 @@ export const ClientDetailModal = ({
   onOpenChange,
 }: ClientDetailModalProps) => {
   if (!client) return null;
+  const formatBirthDate = (value?: string | null) => {
+    if (!value) return 'No registrada';
+    const normalized = value.length >= 10 ? value.slice(0, 10) : value;
+    const parsedDate = new Date(`${normalized}T00:00:00`);
+    if (Number.isNaN(parsedDate.getTime())) return normalized;
+    return format(parsedDate, "d 'de' MMMM, yyyy", { locale: es });
+  };
 
   const infoItems = [
-    { icon: Mail, label: 'Correo electrónico', value: client.email },
-    { icon: Phone, label: 'Teléfono', value: formatPhoneOptional(client.phone) },
-    { icon: MapPin, label: 'Dirección', value: client.address || 'No registrada' },
+    ...(client.parentClientId
+      ? []
+      : [
+          { icon: Mail, label: 'Correo electrónico', value: client.email },
+          { icon: Phone, label: 'Teléfono', value: formatPhoneOptional(client.phone) },
+          { icon: MapPin, label: 'Dirección', value: client.address || 'No registrada' },
+        ]),
+    ...(client.parentClientId
+      ? [
+          { icon: Calendar, label: 'Fecha de nacimiento', value: formatBirthDate(client.birthDate) },
+          { icon: User, label: 'Parentesco con titular', value: client.relationshipToHolder?.trim() || 'No registrado' },
+        ]
+      : []),
     { icon: FileText, label: 'Formularios completados', value: `${client.formsCompleted}` },
     { 
       icon: Calendar, 

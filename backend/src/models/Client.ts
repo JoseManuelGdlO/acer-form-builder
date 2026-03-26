@@ -12,6 +12,8 @@ interface ClientAttributes {
   email?: string;
   phone?: string;
   address?: string;
+  birthDate?: string;
+  relationshipToHolder?: string;
   notes?: string;
   visaCasAppointmentDate?: string;
   visaCasAppointmentLocation?: string;
@@ -37,6 +39,8 @@ export class Client extends Model<ClientAttributes, ClientCreationAttributes> im
   public email?: string;
   public phone?: string;
   public address?: string;
+  public birthDate?: string;
+  public relationshipToHolder?: string;
   public notes?: string;
   public visaCasAppointmentDate?: string;
   public visaCasAppointmentLocation?: string;
@@ -94,6 +98,14 @@ Client.init(
     },
     address: {
       type: DataTypes.TEXT,
+      allowNull: true,
+    },
+    birthDate: {
+      type: DataTypes.DATEONLY,
+      allowNull: true,
+    },
+    relationshipToHolder: {
+      type: DataTypes.STRING(120),
       allowNull: true,
     },
     notes: {

@@ -31,6 +31,8 @@ export const useClientStore = () => {
     email: c.email,
     phone: c.phone,
     address: c.address,
+    birthDate: c.birth_date ?? c.birthDate ?? null,
+    relationshipToHolder: c.relationship_to_holder ?? c.relationshipToHolder ?? null,
     notes: c.notes,
     visaCasAppointmentDate: c.visa_cas_appointment_date ?? c.visaCasAppointmentDate ?? null,
     visaCasAppointmentLocation: c.visa_cas_appointment_location ?? c.visaCasAppointmentLocation ?? null,

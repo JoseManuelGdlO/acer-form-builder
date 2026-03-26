@@ -134,6 +134,8 @@ export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpe
         setClientSnapshot({
           ...client,
           ...freshClientData,
+          birthDate: freshClientData.birth_date ?? freshClientData.birthDate ?? null,
+          relationshipToHolder: freshClientData.relationship_to_holder ?? freshClientData.relationshipToHolder ?? null,
           visaCasAppointmentDate: freshClientData.visa_cas_appointment_date ?? freshClientData.visaCasAppointmentDate ?? null,
           visaCasAppointmentLocation: freshClientData.visa_cas_appointment_location ?? freshClientData.visaCasAppointmentLocation ?? null,
           visaConsularAppointmentDate: freshClientData.visa_consular_appointment_date ?? freshClientData.visaConsularAppointmentDate ?? null,
@@ -625,10 +627,26 @@ export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpe
     const locationText = location?.trim() ? ` - ${location.trim()}` : '';
     return `${dateText}${locationText}`;
   };
+  const formatBirthDate = (value?: string | null) => {
+    if (!value) return 'No registrada';
+    return formatVisaAppointmentDate(value);
+  };
+  const familyInfoItems = displayClient.parentClientId
+    ? [
+        { icon: Calendar, label: 'Fecha de nacimiento', value: formatBirthDate(displayClient.birthDate) },
+        { icon: UserCircle, label: 'Parentesco con titular', value: displayClient.relationshipToHolder?.trim() || 'No registrado' },
+      ]
+    : [];
+  const contactInfoItems = displayClient.parentClientId
+    ? []
+    : [
+        { icon: Mail, label: 'Correo', value: displayClient.email },
+        { icon: Phone, label: 'Teléfono', value: formatPhoneOptional(displayClient.phone) },
+        { icon: MapPin, label: 'Dirección', value: displayClient.address || 'No registrada' },
+      ];
   const infoItems = [
-    { icon: Mail, label: 'Correo', value: displayClient.email },
-    { icon: Phone, label: 'Teléfono', value: formatPhoneOptional(displayClient.phone) },
-    { icon: MapPin, label: 'Dirección', value: displayClient.address || 'No registrada' },
+    ...contactInfoItems,
+    ...familyInfoItems,
     {
       icon: ShoppingBag,
       label: 'Tipo de trámite',
@@ -712,7 +730,7 @@ export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpe
             {!displayClient.parentClientId && (
               <Button onClick={onCreateChild} variant="outline" className="gap-2">
                 <Plus className="w-4 h-4" />
-                Agregar cliente hijo
+                Agregar familiar
               </Button>
             )}
             <Button onClick={onEdit} variant="outline" className="gap-2">

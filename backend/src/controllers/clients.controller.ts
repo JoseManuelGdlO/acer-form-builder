@@ -504,7 +504,9 @@ export const getClientPaymentDeletedHistory = async (req: AuthRequest, res: Resp
 
 export const createClient = [
   body('name').notEmpty().withMessage('Name is required'),
-  body('email').optional().isEmail().normalizeEmail(),
+  body('email').optional({ values: 'falsy' }).isEmail().normalizeEmail(),
+  body('birthDate').optional({ values: 'null' }).isISO8601().withMessage('Birth date must be a valid date'),
+  body('relationshipToHolder').optional({ values: 'null' }).isString().isLength({ max: 120 }).withMessage('Relationship to holder must be a valid string'),
   body('visaCasAppointmentDate').optional({ values: 'null' }).isISO8601().withMessage('CAS appointment date must be a valid date'),
   body('visaCasAppointmentLocation').optional({ values: 'null' }).isString().isLength({ max: 255 }).withMessage('CAS appointment location must be a valid string'),
   body('visaConsularAppointmentDate').optional({ values: 'null' }).isISO8601().withMessage('Consular appointment date must be a valid date'),
@@ -529,6 +531,9 @@ export const createClient = [
       const normalizedPhone = typeof req.body.phone === 'string' ? req.body.phone.trim() : req.body.phone;
       if (normalizedPhone !== undefined) {
         req.body.phone = normalizedPhone;
+      }
+      if (typeof req.body.email === 'string' && req.body.email.trim() === '') {
+        req.body.email = null;
       }
       const parentClientId = parseNullableParentClientId(req.body.parentClientId);
 
@@ -646,7 +651,9 @@ export const createClient = [
 
 export const updateClient = [
   body('name').optional().notEmpty(),
-  body('email').optional().isEmail().normalizeEmail(),
+  body('email').optional({ values: 'falsy' }).isEmail().normalizeEmail(),
+  body('birthDate').optional({ values: 'null' }).isISO8601().withMessage('Birth date must be a valid date'),
+  body('relationshipToHolder').optional({ values: 'null' }).isString().isLength({ max: 120 }).withMessage('Relationship to holder must be a valid string'),
   body('visaCasAppointmentDate').optional({ values: 'null' }).isISO8601().withMessage('CAS appointment date must be a valid date'),
   body('visaCasAppointmentLocation').optional({ values: 'null' }).isString().isLength({ max: 255 }).withMessage('CAS appointment location must be a valid string'),
   body('visaConsularAppointmentDate').optional({ values: 'null' }).isISO8601().withMessage('Consular appointment date must be a valid date'),
@@ -686,9 +693,13 @@ export const updateClient = [
 
       const updates: Record<string, unknown> = {};
       if (req.body.name !== undefined) updates.name = req.body.name;
-      if (req.body.email !== undefined) updates.email = req.body.email;
+      if (req.body.email !== undefined) {
+        updates.email = typeof req.body.email === 'string' && req.body.email.trim() === '' ? null : req.body.email;
+      }
       if (req.body.phone !== undefined) updates.phone = req.body.phone;
       if (req.body.address !== undefined) updates.address = req.body.address;
+      if (req.body.birthDate !== undefined) updates.birthDate = req.body.birthDate;
+      if (req.body.relationshipToHolder !== undefined) updates.relationshipToHolder = req.body.relationshipToHolder;
       if (req.body.notes !== undefined) updates.notes = req.body.notes;
       if (req.body.visaCasAppointmentDate !== undefined) updates.visaCasAppointmentDate = req.body.visaCasAppointmentDate;
       if (req.body.visaCasAppointmentLocation !== undefined) updates.visaCasAppointmentLocation = req.body.visaCasAppointmentLocation;

@@ -540,6 +540,14 @@
                     "type": "string",
                     "format": "date-time"
                   },
+                  "birthDate": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "relationshipToHolder": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
                   "visaCasAppointmentDate": {
                     "type": "string",
                     "format": "date-time"
@@ -741,6 +749,14 @@
                     "format": "date-time"
                   },
                   "email": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "birthDate": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "relationshipToHolder": {
                     "type": "string",
                     "format": "date-time"
                   },
@@ -2153,6 +2169,40 @@
           },
           "403": {
             "description": "Forbidden"
+          }
+        }
+      }
+    },
+    "/api/forms/sessions/client/{clientId}": {
+      "get": {
+        "tags": [
+          "forms"
+        ],
+        "operationId": "get__api_forms_sessions_client__clientId_",
+        "summary": "GET /api/forms/sessions/client/{clientId}",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "parameters": [
+          {
+            "name": "clientId",
+            "in": "path",
+            "required": true,
+            "description": "ID: clientId",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         }
       }

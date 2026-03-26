@@ -160,6 +160,8 @@ export interface Client {
   email: string;
   phone?: string;
   address?: string;
+  birthDate?: string | null;
+  relationshipToHolder?: string | null;
   notes?: string;
   visaCasAppointmentDate?: string | null;
   visaCasAppointmentLocation?: string | null;

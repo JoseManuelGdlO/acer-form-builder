@@ -20,6 +20,7 @@ import { toast } from 'sonner';
 import { useClientStore } from '@/hooks/useClientStore';
 import { useSettingsStore } from '@/hooks/useSettingsStore';
 import { useAuth } from '@/contexts/AuthContext';
+import { api } from '@/lib/api';
 
 interface ClientListProps {
   clients: Client[];
@@ -253,6 +254,53 @@ export const ClientList = ({
     setIsFormOpen(true);
   };
 
+  const mapApiClientToViewClient = (raw: any): Client => ({
+    id: raw.id,
+    parentClientId: raw.parent_client_id ?? raw.parentClientId ?? null,
+    name: raw.name,
+    email: raw.email ?? '',
+    phone: raw.phone ?? '',
+    address: raw.address ?? '',
+    birthDate: raw.birth_date ?? raw.birthDate ?? null,
+    relationshipToHolder: raw.relationship_to_holder ?? raw.relationshipToHolder ?? null,
+    notes: raw.notes ?? '',
+    visaCasAppointmentDate: raw.visa_cas_appointment_date ?? raw.visaCasAppointmentDate ?? null,
+    visaCasAppointmentLocation: raw.visa_cas_appointment_location ?? raw.visaCasAppointmentLocation ?? null,
+    visaConsularAppointmentDate: raw.visa_consular_appointment_date ?? raw.visaConsularAppointmentDate ?? null,
+    visaConsularAppointmentLocation: raw.visa_consular_appointment_location ?? raw.visaConsularAppointmentLocation ?? null,
+    visaStatusTemplateId: raw.visa_status_template_id ?? raw.visaStatusTemplateId ?? '',
+    visaStatusTemplate: raw.visa_status_template ?? raw.visaStatusTemplate ?? null,
+    formsCompleted: raw.forms_completed ?? raw.formsCompleted ?? 0,
+    assignedUserId: raw.assigned_user_id ?? raw.assignedUserId,
+    assignedUser: raw.assigned_user ?? raw.assignedUser ?? null,
+    productId: raw.product_id ?? raw.productId,
+    product: raw.product ?? null,
+    totalAmountDue: raw.total_amount_due != null ? Number(raw.total_amount_due) : (raw.totalAmountDue != null ? Number(raw.totalAmountDue) : undefined),
+    totalPaid: raw.total_paid != null ? Number(raw.total_paid) : (raw.totalPaid != null ? Number(raw.totalPaid) : 0),
+    createdAt: new Date(raw.created_at || raw.createdAt || Date.now()),
+    updatedAt: new Date(raw.updated_at || raw.updatedAt || Date.now()),
+    checklistProgress: raw.checklist_progress ?? raw.checklistProgress ?? 0,
+    checklistStatus: raw.checklist_status ?? raw.checklistStatus ?? 'not_started',
+    checklistCompleted: raw.checklist_completed ?? raw.checklistCompleted ?? 0,
+    checklistTotal: raw.checklist_total ?? raw.checklistTotal ?? 0,
+    checklistByTemplate: raw.checklist_by_template ?? raw.checklistByTemplate ?? {},
+    parent: raw.parent
+      ? { id: raw.parent.id, name: raw.parent.name, email: raw.parent.email, phone: raw.parent.phone }
+      : null,
+    children: Array.isArray(raw.children)
+      ? raw.children.map((child: any) => ({
+          id: child.id,
+          name: child.name,
+          email: child.email,
+          phone: child.phone,
+          parentClientId: child.parent_client_id ?? child.parentClientId ?? null,
+          createdAt: new Date(child.created_at || child.createdAt || Date.now()),
+          updatedAt: new Date(child.updated_at || child.updatedAt || Date.now()),
+        }))
+      : [],
+    assignedTrips: raw.assignedTrips || raw.assigned_trips || [],
+  });
+
   const visaStatusFilterButtons = useMemo(() => {
     const buttons: { key: VisaStatusFilterType; label: string; icon: React.ReactNode; count: number }[] = [
       { key: 'all', label: 'Todos', icon: <Users className="w-4 h-4" />, count: stats.total },
@@ -341,9 +389,23 @@ export const ClientList = ({
           onBack={handleBackFromProfile}
           onEdit={handleEditFromProfile}
           onCreateChild={handleCreateChildFromProfile}
-          onOpenClient={(clientId) => {
+          onOpenClient={async (clientId) => {
             const nextClient = clients.find((c) => c.id === clientId);
-            if (nextClient) setViewingClient(nextClient);
+            if (nextClient) {
+              setViewingClient(nextClient);
+              return;
+            }
+            if (!token) {
+              toast.error('No se pudo abrir el cliente');
+              return;
+            }
+            try {
+              const fetched = await api.getClient(clientId, token);
+              setViewingClient(mapApiClientToViewClient(fetched));
+            } catch (error) {
+              console.error('Failed to open child client from profile:', error);
+              toast.error('No se pudo abrir el cliente hijo');
+            }
           }}
         />
         <ClientFormModal

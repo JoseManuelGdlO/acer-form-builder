@@ -53,6 +53,8 @@ export const ClientFormModal = ({
     email: '',
     phone: '',
     address: '',
+    birthDate: '',
+    relationshipToHolder: '',
     notes: '',
     visaCasAppointmentDate: '',
     visaCasAppointmentLocation: '',
@@ -73,6 +75,8 @@ export const ClientFormModal = ({
         email: client.email,
         phone: normalizePhoneDigits(client.phone || ''),
         address: client.address || '',
+        birthDate: client.birthDate || '',
+        relationshipToHolder: client.relationshipToHolder || '',
         notes: client.notes || '',
         visaCasAppointmentDate: client.visaCasAppointmentDate || '',
         visaCasAppointmentLocation: client.visaCasAppointmentLocation || '',
@@ -88,6 +92,8 @@ export const ClientFormModal = ({
         email: '',
         phone: '',
         address: '',
+        birthDate: '',
+        relationshipToHolder: '',
         notes: '',
         visaCasAppointmentDate: '',
         visaCasAppointmentLocation: '',
@@ -130,6 +136,8 @@ export const ClientFormModal = ({
     try {
       await onSave({
         ...formData,
+        birthDate: formData.birthDate || null,
+        relationshipToHolder: formData.relationshipToHolder.trim() || null,
         phone: formData.phone || '',
         visaCasAppointmentDate: formData.visaCasAppointmentDate || null,
         visaCasAppointmentLocation: formData.visaCasAppointmentLocation.trim() || null,
@@ -148,13 +156,14 @@ export const ClientFormModal = ({
   };
 
   const isEditing = !!client;
+  const isFamilyMode = !!defaultParentClientId && !isEditing;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl">
-            {isEditing ? 'Editar Cliente' : 'Nuevo Cliente'}
+            {isEditing ? 'Editar Cliente' : isFamilyMode ? 'Nuevo Familiar' : 'Nuevo Cliente'}
           </DialogTitle>
         </DialogHeader>
 
@@ -173,66 +182,95 @@ export const ClientFormModal = ({
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="email" className="flex items-center gap-2">
-              <Mail className="w-4 h-4" />
-              Correo electrónico *
-            </Label>
-            <Input
-              id="email"
-              type="email"
-              value={formData.email}
-              onChange={e => setFormData(prev => ({ ...prev, email: e.target.value }))}
-              placeholder="correo@ejemplo.com"
-              required
-            />
-          </div>
+          {!isFamilyMode && (
+            <div className="space-y-2">
+              <Label htmlFor="email" className="flex items-center gap-2">
+                <Mail className="w-4 h-4" />
+                Correo electrónico *
+              </Label>
+              <Input
+                id="email"
+                type="email"
+                value={formData.email}
+                onChange={e => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                placeholder="correo@ejemplo.com"
+                required
+              />
+            </div>
+          )}
 
-          <div className="space-y-2">
-            <Label htmlFor="phone" className="flex items-center gap-2">
-              <Phone className="w-4 h-4" />
-              Teléfono
-            </Label>
-            <Input
-              id="phone"
-              type="tel"
-              value={formatPhoneNumberDisplay(formData.phone)}
-              onChange={e => {
-                const digits = normalizePhoneDigits(e.target.value);
-                setFormData(prev => ({ ...prev, phone: digits }));
-                if (!digits) {
-                  setPhoneError('');
-                } else if (digits.length !== 10) {
-                  setPhoneError('El teléfono debe tener exactamente 10 dígitos (máximo 10).');
-                } else {
-                  setPhoneError('');
-                }
-              }}
-              onBlur={() => validatePhone(formData.phone)}
-              placeholder="(618)-290-1223"
-              maxLength={14}
-              className={cn(phoneError && 'border-destructive')}
-              aria-invalid={!!phoneError}
-            />
-            {phoneError ? (
-              <p className="text-sm text-destructive">{phoneError}</p>
-            ) : (
-              <p className="text-xs text-muted-foreground">10 dígitos; se guarda sin formato en el sistema.</p>
-            )}
-          </div>
+          {!isFamilyMode && (
+            <div className="space-y-2">
+              <Label htmlFor="phone" className="flex items-center gap-2">
+                <Phone className="w-4 h-4" />
+                Teléfono
+              </Label>
+              <Input
+                id="phone"
+                type="tel"
+                value={formatPhoneNumberDisplay(formData.phone)}
+                onChange={e => {
+                  const digits = normalizePhoneDigits(e.target.value);
+                  setFormData(prev => ({ ...prev, phone: digits }));
+                  if (!digits) {
+                    setPhoneError('');
+                  } else if (digits.length !== 10) {
+                    setPhoneError('El teléfono debe tener exactamente 10 dígitos (máximo 10).');
+                  } else {
+                    setPhoneError('');
+                  }
+                }}
+                onBlur={() => validatePhone(formData.phone)}
+                placeholder="(618)-290-1223"
+                maxLength={14}
+                className={cn(phoneError && 'border-destructive')}
+                aria-invalid={!!phoneError}
+              />
+              {phoneError ? (
+                <p className="text-sm text-destructive">{phoneError}</p>
+              ) : (
+                <p className="text-xs text-muted-foreground">10 dígitos; se guarda sin formato en el sistema.</p>
+              )}
+            </div>
+          )}
 
-          <div className="space-y-2">
-            <Label htmlFor="address" className="flex items-center gap-2">
-              <MapPin className="w-4 h-4" />
-              Dirección
-            </Label>
-            <Input
-              id="address"
-              value={formData.address}
-              onChange={e => setFormData(prev => ({ ...prev, address: e.target.value }))}
-              placeholder="Calle, Ciudad, Estado"
-            />
-          </div>
+          {!isFamilyMode && (
+            <div className="space-y-2">
+              <Label htmlFor="address" className="flex items-center gap-2">
+                <MapPin className="w-4 h-4" />
+                Dirección
+              </Label>
+              <Input
+                id="address"
+                value={formData.address}
+                onChange={e => setFormData(prev => ({ ...prev, address: e.target.value }))}
+                placeholder="Calle, Ciudad, Estado"
+              />
+            </div>
+          )}
+
+          {isFamilyMode && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="birthDate">Fecha de nacimiento</Label>
+                <Input
+                  id="birthDate"
+                  type="date"
+                  value={formData.birthDate}
+                  onChange={e => setFormData(prev => ({ ...prev, birthDate: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="relationshipToHolder">Parentesco con titular</Label>
+                <Input
+                  id="relationshipToHolder"
+                  value={formData.relationshipToHolder}
+                  onChange={e => setFormData(prev => ({ ...prev, relationshipToHolder: e.target.value }))}
+                  placeholder="Ej: Hijo, Esposa, Hermano"
+                />
+              </div>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="visaStatusTemplateId">Estado de visa *</Label>
