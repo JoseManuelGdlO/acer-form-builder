@@ -221,6 +221,8 @@ Form.hasMany(FormSession, { foreignKey: 'formId', as: 'sessions' });
 FormSession.belongsTo(Form, { foreignKey: 'formId', as: 'form' });
 User.hasMany(FormSession, { foreignKey: 'assignedUserId', as: 'assignedFormSessions' });
 FormSession.belongsTo(User, { foreignKey: 'assignedUserId', as: 'assignedUser' });
+Client.hasMany(FormSession, { foreignKey: 'clientId', as: 'formSessions' });
+FormSession.belongsTo(Client, { foreignKey: 'clientId', as: 'client' });
 
 Form.hasMany(FormSubmission, { foreignKey: 'formId', as: 'submissions' });
 FormSubmission.belongsTo(Form, { foreignKey: 'formId', as: 'form' });

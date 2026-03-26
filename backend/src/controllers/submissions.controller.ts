@@ -407,8 +407,8 @@ export const getSubmissionStats = async (req: AuthRequest, res: Response): Promi
  * Called after user completes the 'info' step
  */
 export const createSubmissionFromSession = [
-  body('clientInfo.name').notEmpty().withMessage('Client name is required'),
-  body('clientInfo.phone').notEmpty().withMessage('Client phone is required'),
+  body('clientInfo.name').optional().isString(),
+  body('clientInfo.phone').optional().isString(),
   body('clientInfo.email').optional({ checkFalsy: true }).isEmail().normalizeEmail(),
   async (req: Request, res: Response): Promise<void> => {
     try {
@@ -453,82 +453,96 @@ export const createSubmissionFromSession = [
         return;
       }
 
-      // Email is optional - don't use placeholder
-      let email = clientInfo.email;
-      if (email && typeof email === 'string') {
-        email = email.trim() || null;
-      } else {
-        email = null;
-      }
-
-      // Find or create client
-      let client;
-      let clientId;
-      
       const companyId = (form as any).companyId;
       const assignedUserId = (session as any).assignedUserId ?? undefined;
-      const defaultVisaStatusTemplateId = await getDefaultVisaStatusTemplateId(companyId);
-      if (!defaultVisaStatusTemplateId) {
-        res.status(400).json({ error: 'No visa status templates configured' });
-        return;
-      }
-      const normalizedPhone = normalizePhoneDigits(clientInfo.phone);
+      let clientId = session.clientId;
+      let respondentName = '';
+      let email: string | null = null;
+      let normalizedPhone: string | undefined = undefined;
 
-      if (email) {
-        // Email provided - try to find existing client by email in this company
-        client = await Client.findOne({ where: { email, companyId } });
-        if (!client && normalizedPhone) {
-          // Fallback by phone to avoid duplicates when client was pre-created without email
-          client = await Client.findOne({ where: { phone: normalizedPhone, companyId } });
+      if (clientId) {
+        const existingClient = await Client.findOne({ where: { id: clientId, companyId } });
+        if (!existingClient) {
+          res.status(404).json({ error: 'Assigned client not found for this session' });
+          return;
         }
-        if (!client) {
-          client = await Client.create({
-            companyId,
-            name: clientInfo.name,
-            email: email,
-            phone: normalizedPhone || undefined,
-            status: 'pending',
-            visaStatusTemplateId: defaultVisaStatusTemplateId,
-            assignedUserId,
-          });
-        } else {
-          // Update existing client with new information
-          const updateData: any = {};
-          if (clientInfo.name) updateData.name = clientInfo.name;
-          if (normalizedPhone) updateData.phone = normalizedPhone;
-          if (email && !client.email) updateData.email = email;
-          if (assignedUserId && !client.assignedUserId) updateData.assignedUserId = assignedUserId;
-          if (Object.keys(updateData).length > 0) {
-            await client.update(updateData);
-          }
-        }
-        clientId = client.id;
+        respondentName = existingClient.name;
+        email = existingClient.email || null;
+        normalizedPhone = existingClient.phone ? normalizePhoneDigits(existingClient.phone) : undefined;
       } else {
-        // No email provided - first try to find existing client by phone
-        if (normalizedPhone) {
-          client = await Client.findOne({ where: { phone: normalizedPhone, companyId } });
+        if (!clientInfo?.name || !clientInfo?.phone) {
+          res.status(400).json({ error: 'Client info is required for legacy session links' });
+          return;
         }
-        if (!client) {
-          client = await Client.create({
-            companyId,
-            name: clientInfo.name,
-            email: undefined,
-            phone: normalizedPhone || undefined,
-            status: 'pending',
-            visaStatusTemplateId: defaultVisaStatusTemplateId,
-            assignedUserId,
-          });
+        const defaultVisaStatusTemplateId = await getDefaultVisaStatusTemplateId(companyId);
+        if (!defaultVisaStatusTemplateId) {
+          res.status(400).json({ error: 'No visa status templates configured' });
+          return;
+        }
+
+        // Email is optional - don't use placeholder
+        email = clientInfo.email;
+        if (email && typeof email === 'string') {
+          email = email.trim() || null;
         } else {
-          // Update existing client with latest info from form
-          const updateData: any = {};
-          if (clientInfo.name) updateData.name = clientInfo.name;
-          if (normalizedPhone) updateData.phone = normalizedPhone;
-          if (assignedUserId && !client.assignedUserId) updateData.assignedUserId = assignedUserId;
-          if (Object.keys(updateData).length > 0) {
-            await client.update(updateData);
-          }
+          email = null;
         }
-        clientId = client.id;
+        normalizedPhone = normalizePhoneDigits(clientInfo.phone);
+        respondentName = clientInfo.name;
+
+        // Find or create client (legacy flow)
+        let client;
+        if (email) {
+          client = await Client.findOne({ where: { email, companyId } });
+          if (!client && normalizedPhone) {
+            client = await Client.findOne({ where: { phone: normalizedPhone, companyId } });
+          }
+          if (!client) {
+            client = await Client.create({
+              companyId,
+              name: clientInfo.name,
+              email: email,
+              phone: normalizedPhone || undefined,
+              status: 'pending',
+              visaStatusTemplateId: defaultVisaStatusTemplateId,
+              assignedUserId,
+            });
+          } else {
+            const updateData: any = {};
+            if (clientInfo.name) updateData.name = clientInfo.name;
+            if (normalizedPhone) updateData.phone = normalizedPhone;
+            if (email && !client.email) updateData.email = email;
+            if (assignedUserId && !client.assignedUserId) updateData.assignedUserId = assignedUserId;
+            if (Object.keys(updateData).length > 0) {
+              await client.update(updateData);
+            }
+          }
+          clientId = client.id;
+        } else {
+          if (normalizedPhone) {
+            client = await Client.findOne({ where: { phone: normalizedPhone, companyId } });
+          }
+          if (!client) {
+            client = await Client.create({
+              companyId,
+              name: clientInfo.name,
+              email: undefined,
+              phone: normalizedPhone || undefined,
+              status: 'pending',
+              visaStatusTemplateId: defaultVisaStatusTemplateId,
+              assignedUserId,
+            });
+          } else {
+            const updateData: any = {};
+            if (clientInfo.name) updateData.name = clientInfo.name;
+            if (normalizedPhone) updateData.phone = normalizedPhone;
+            if (assignedUserId && !client.assignedUserId) updateData.assignedUserId = assignedUserId;
+            if (Object.keys(updateData).length > 0) {
+              await client.update(updateData);
+            }
+          }
+          clientId = client.id;
+        }
       }
 
       // Create submission with status 'in_progress'
@@ -536,7 +550,7 @@ export const createSubmissionFromSession = [
         companyId,
         formId,
         formName: form.name,
-        respondentName: clientInfo.name,
+        respondentName,
         respondentEmail: email,
         respondentPhone: normalizedPhone,
         answers: {},

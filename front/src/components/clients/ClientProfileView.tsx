@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Client, ClientPayment, AmountDueLogEntry, PaymentDeletedLogEntry } from '@/types/form';
+import { Client, ClientPayment, AmountDueLogEntry, PaymentDeletedLogEntry, Form } from '@/types/form';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,6 +22,14 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { formatPhoneOptional } from '@/lib/phone';
+
+interface AssignedFormSession {
+  id: string;
+  formId: string;
+  formName: string;
+  status: string;
+  createdAt: Date;
+}
 
 const contrastTextColor = (backgroundHex?: string | null): string => {
   if (!backgroundHex) return '#ffffff';
@@ -54,6 +62,10 @@ export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpe
   const [amountDueHistory, setAmountDueHistory] = useState<AmountDueLogEntry[]>([]);
   const [paymentDeletedHistory, setPaymentDeletedHistory] = useState<PaymentDeletedLogEntry[]>([]);
   const [submissions, setSubmissions] = useState<ClientFormSubmission[]>([]);
+  const [availableForms, setAvailableForms] = useState<Form[]>([]);
+  const [assignedFormSessions, setAssignedFormSessions] = useState<AssignedFormSession[]>([]);
+  const [selectedFormId, setSelectedFormId] = useState('');
+  const [isAssigningForm, setIsAssigningForm] = useState(false);
   const [clientSnapshot, setClientSnapshot] = useState<Client>(client);
   const [isConversationPaused, setIsConversationPaused] = useState(false);
   const [hasConversationHistory, setHasConversationHistory] = useState(false);
@@ -76,7 +88,7 @@ export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpe
     setIsLoading(true);
     try {
       // Refetch client to get latest data (e.g. totalAmountDue) from DB. Historial solo para admin.
-      const [freshClientData, notesData, messagesData, conversationsData, submissionsData, checklistData, paymentsData, amountDueHistoryData, paymentDeletedHistoryData] = await Promise.all([
+      const [freshClientData, notesData, messagesData, conversationsData, submissionsData, checklistData, paymentsData, amountDueHistoryData, paymentDeletedHistoryData, formsData, formSessionsData] = await Promise.all([
         api.getClient(client.id, token).catch(() => null),
         api.getClientNotes(client.id, token).catch(() => []),
         api.getClientMessages(client.id, token).catch(() => []),
@@ -86,7 +98,29 @@ export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpe
         api.getClientPayments(client.id, token).catch(() => []),
         isAdmin ? api.getClientAmountDueHistory(client.id, token).catch(() => []) : Promise.resolve([]),
         isAdmin ? api.getClientPaymentDeletedHistory(client.id, token).catch(() => []) : Promise.resolve([]),
+        api.getForms().catch(() => []),
+        api.getClientFormSessions(client.id, token).catch(() => []),
       ]);
+
+      setAvailableForms(
+        (Array.isArray(formsData) ? formsData : []).map((f: any) => ({
+          id: f.id,
+          name: f.name,
+          description: f.description || '',
+          sections: Array.isArray(f.sections) ? f.sections : [],
+          createdAt: new Date(f.created_at || f.createdAt || Date.now()),
+          updatedAt: new Date(f.updated_at || f.updatedAt || Date.now()),
+        }))
+      );
+      setAssignedFormSessions(
+        (Array.isArray(formSessionsData) ? formSessionsData : []).map((s: any) => ({
+          id: s.id,
+          formId: s.form_id || s.formId || s.form?.id,
+          formName: s.form?.name || 'Formulario',
+          status: s.status || 'in_progress',
+          createdAt: new Date(s.created_at || s.createdAt || Date.now()),
+        }))
+      );
 
       if (freshClientData) {
         const totalDue = freshClientData.total_amount_due != null
@@ -537,6 +571,47 @@ export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpe
     }
   };
 
+  const handleAssignForm = async () => {
+    if (!token) return;
+    if (!selectedFormId) {
+      toast.error('Selecciona un formulario para asignar');
+      return;
+    }
+    const isAlreadyAssigned = assignedFormSessions.some((s) => s.formId === selectedFormId);
+    if (isAlreadyAssigned) {
+      toast.error('Este formulario ya está asignado a este cliente');
+      return;
+    }
+
+    setIsAssigningForm(true);
+    try {
+      await api.createFormSession(selectedFormId, token, client.id);
+      setSelectedFormId('');
+      await loadClientData();
+      toast.success('Formulario asignado correctamente');
+    } catch (error: any) {
+      toast.error(error.message || 'No se pudo asignar el formulario');
+    } finally {
+      setIsAssigningForm(false);
+    }
+  };
+
+  const handleCopyAssignedLink = async (session: AssignedFormSession) => {
+    const publicUrl = `${window.location.origin}/form/${session.formId}?token=${session.id}`;
+    try {
+      await navigator.clipboard.writeText(publicUrl);
+      toast.success('Link del formulario copiado');
+    } catch {
+      toast.success(
+        <span>
+          Enlace generado. Cópialo manualmente: <br />
+          <code className="text-xs break-all bg-muted px-1 rounded">{publicUrl}</code>
+        </span>,
+        { duration: 15000 }
+      );
+    }
+  };
+
   const displayClient = clientSnapshot ?? client;
   const formatVisaAppointmentDate = (value?: string | null) => {
     if (!value) return 'Sin fecha';
@@ -778,7 +853,54 @@ export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpe
                   </span>
                 </AccordionTrigger>
                 <AccordionContent>
-                  <ClientFormData submissions={submissions} />
+                  <div className="space-y-4">
+                    <div className="rounded-lg border border-border/60 p-4 space-y-3">
+                      <p className="text-sm font-medium text-foreground">Asignar formulario al cliente</p>
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <select
+                          className="h-10 rounded-md border border-input bg-background px-3 text-sm flex-1"
+                          value={selectedFormId}
+                          onChange={(e) => setSelectedFormId(e.target.value)}
+                          disabled={isAssigningForm}
+                        >
+                          <option value="">Selecciona un formulario</option>
+                          {availableForms.map((f) => (
+                            <option key={f.id} value={f.id}>
+                              {f.name}
+                            </option>
+                          ))}
+                        </select>
+                        <Button onClick={handleAssignForm} disabled={isAssigningForm || !selectedFormId}>
+                          {isAssigningForm ? 'Asignando...' : 'Asignar formulario'}
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-border/60 p-4 space-y-3">
+                      <p className="text-sm font-medium text-foreground">Formularios asignados</p>
+                      {assignedFormSessions.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">No hay formularios asignados todavía.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {assignedFormSessions.map((session) => (
+                            <div key={session.id} className="flex items-center justify-between gap-3 rounded-md border border-border/50 p-3">
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium truncate">{session.formName}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  Asignado: {format(session.createdAt, "d 'de' MMM, yyyy", { locale: es })}
+                                </p>
+                              </div>
+                              <Button variant="outline" size="sm" onClick={() => handleCopyAssignedLink(session)}>
+                                Copiar link
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <ClientFormData submissions={submissions} />
+                  </div>
                 </AccordionContent>
               </AccordionItem>
             </Accordion>

@@ -17,7 +17,7 @@ import {
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
-import { User, Mail, Phone, CalendarIcon, CheckCircle2, ArrowRight, ArrowLeft, Send, Loader2, Upload, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { User, Mail, Phone, CheckCircle2, ArrowRight, ArrowLeft, Send, Loader2, Upload, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { format, getYear, getMonth } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -243,6 +243,7 @@ export default function PublicFormView() {
   const [isLoading, setIsLoading] = useState(true);
   const [step, setStep] = useState<'info' | 'sections' | 'success'>('info');
   const [currentSectionIndex, setCurrentSectionIndex] = useState(0);
+  const [assignedClientName, setAssignedClientName] = useState<string | null>(null);
   
   // Client info
   const [clientInfo, setClientInfo] = useState(defaultClientInfo);
@@ -336,6 +337,11 @@ export default function PublicFormView() {
         }
 
         const sessionData = await api.getFormSessionProgress(formId, sessionToken);
+        const sessionClientName = sessionData.clientInfo?.name?.trim() || null;
+        if (sessionClientName) {
+          setAssignedClientName(sessionClientName);
+          setClientInfo((prev) => ({ ...prev, name: sessionClientName }));
+        }
         if (sessionData.status === 'completed') {
           setStep('success');
         } else if (sessionData.progress && Object.keys(sessionData.progress).length > 0) {
@@ -362,6 +368,21 @@ export default function PublicFormView() {
             } catch {
               // Fallback: usar progress.answers si existe (compatibilidad con datos antiguos)
               if (prog.answers) applyProgress({ answers: prog.answers });
+            }
+          }
+        }
+
+        if (sessionClientName) {
+          setStep('sections');
+          const progressSubmissionId = (sessionData.progress as any)?.submissionId;
+          if (progressSubmissionId) {
+            setSubmissionId(progressSubmissionId);
+          } else {
+            try {
+              const submission = await api.createSubmissionFromSession(formId, sessionToken, {});
+              setSubmissionId(submission.id);
+            } catch (error) {
+              console.error('Failed to create assigned-client submission:', error);
             }
           }
         }
@@ -691,7 +712,7 @@ export default function PublicFormView() {
     if (currentSectionIndex > 0) {
       setCurrentSectionIndex(prev => prev - 1);
       window.scrollTo({ top: 0, behavior: 'smooth' });
-    } else {
+    } else if (!assignedClientName) {
       setStep('info');
     }
   };
@@ -1081,13 +1102,9 @@ export default function PublicFormView() {
     );
   }
 
-  const totalQuestions = form.sections.reduce((acc, s) => acc + s.questions.length, 0);
-  const answeredQuestions = Object.keys(answers).length;
-  const progress = step === 'info' 
-    ? 0 
-    : form.sections.length > 0
-      ? ((currentSectionIndex + 1) / form.sections.length) * 100
-      : 0;
+  const progress = form.sections.length > 0
+    ? ((currentSectionIndex + 1) / form.sections.length) * 100
+    : 0;
 
   if (step === 'sections' && form.sections.length === 0) {
     return (
@@ -1126,6 +1143,11 @@ export default function PublicFormView() {
           </div>
           {step === 'sections' && (
             <div className="mt-2">
+              {assignedClientName && (
+                <p className="text-sm text-muted-foreground mb-2">
+                  Cliente: <span className="font-medium text-foreground">{assignedClientName}</span>
+                </p>
+              )}
               <div className="flex items-center justify-between text-sm text-muted-foreground mb-1">
                 <span>Sección {currentSectionIndex + 1} de {form.sections.length}</span>
                 <span>{Math.round(progress)}%</span>
@@ -1137,7 +1159,7 @@ export default function PublicFormView() {
       </div>
 
       <div className="max-w-2xl mx-auto px-4 py-8">
-        {step === 'info' ? (
+        {step === 'info' && !assignedClientName ? (
           <Card>
             <CardContent className="p-6 md:p-8">
               <div className="text-center mb-8">

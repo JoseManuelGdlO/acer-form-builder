@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { body, validationResult } from 'express-validator';
-import { FormSession, Form } from '../models';
+import { FormSession, Form, Client } from '../models';
 import { AuthRequest } from '../middleware/auth.middleware';
 
 /**
@@ -11,6 +11,7 @@ export const createFormSession = async (req: AuthRequest, res: Response): Promis
   const formId = req.params.id;
   const userId = req.user?.id;
   const userEmail = req.user?.email;
+  const { clientId } = (req.body ?? {}) as { clientId?: string };
 
   console.log('[form-sessions] createFormSession: inicio', { formId, userId, userEmail });
 
@@ -29,10 +30,23 @@ export const createFormSession = async (req: AuthRequest, res: Response): Promis
 
     console.log('[form-sessions] createFormSession: formulario encontrado', { formId, formName: form.name });
 
+    let validatedClientId: string | undefined;
+    if (clientId) {
+      const client = await Client.findOne({
+        where: { id: clientId, companyId },
+      });
+      if (!client) {
+        res.status(404).json({ error: 'Client not found for this form company' });
+        return;
+      }
+      validatedClientId = client.id;
+    }
+
     const session = await FormSession.create({
       companyId,
       formId,
       assignedUserId: userId ?? undefined,
+      clientId: validatedClientId,
       progress: {},
       status: 'in_progress',
     });
@@ -66,9 +80,21 @@ export const getFormSessionProgress = async (req: Request, res: Response): Promi
       return;
     }
 
+    let clientInfo: { id: string; name: string } | null = null;
+    if (session.clientId) {
+      const client = await Client.findByPk(session.clientId);
+      if (client) {
+        clientInfo = {
+          id: client.id,
+          name: client.name,
+        };
+      }
+    }
+
     res.json({
       progress: session.progress,
       status: session.status,
+      clientInfo,
     });
   } catch (error) {
     console.error('Get form session progress error:', error);
@@ -137,6 +163,37 @@ export const completeFormSession = async (req: Request, res: Response): Promise<
     res.json({ status: 'completed' });
   } catch (error) {
     console.error('Complete form session error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+/**
+ * List form sessions assigned to a client (protected).
+ */
+export const getClientFormSessions = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { clientId } = req.params;
+    const companyId = req.user?.companyId;
+    if (!companyId) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+
+    const sessions = await FormSession.findAll({
+      where: { clientId, companyId },
+      include: [
+        {
+          model: Form,
+          as: 'form',
+          attributes: ['id', 'name', 'description'],
+        },
+      ],
+      order: [['createdAt', 'DESC']],
+    });
+
+    res.json(sessions);
+  } catch (error) {
+    console.error('Get client form sessions error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };

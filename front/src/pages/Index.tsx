@@ -33,7 +33,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { LayoutDashboard, FileText, Users, UsersRound, UserCog, Bot, Settings, Receipt, ChevronDown, ShoppingBag, MapPin } from 'lucide-react';
+import { LayoutDashboard, FileText, Users, UserCog, Bot, Settings, Receipt, ChevronDown, ShoppingBag, MapPin } from 'lucide-react';
 import { User } from '@/types/user';
 import { Client } from '@/types/form';
 import { Product } from '@/types/product';
@@ -412,39 +412,20 @@ const Index = () => {
         <LayoutDashboard className="w-4 h-4 shrink-0" />
         <span className="hidden sm:inline">Dashboard</span>
       </Button>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant={['clients', 'groups'].includes(current) ? 'default' : 'ghost'}
-            size="sm"
-            className="h-8 gap-1.5 px-2 text-xs sm:text-sm"
-          >
-            <Users className="w-4 h-4 shrink-0" />
-            <span className="hidden sm:inline">Clientes</span>
-            <ChevronDown className="w-3.5 h-3.5 shrink-0 opacity-70" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-52">
-          <DropdownMenuItem onClick={() => handleNavigate('clients')} className="gap-2 cursor-pointer">
-            <Users className="w-4 h-4" />
-            Clientes
-            {filteredClients.length > 0 && (
-              <span className="ml-auto px-1.5 py-0.5 text-xs rounded-full bg-secondary/20 text-secondary">
-                {filteredClients.length}
-              </span>
-            )}
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => handleNavigate('groups')} className="gap-2 cursor-pointer">
-            <UsersRound className="w-4 h-4" />
-            Familias
-            {groups.length > 0 && (
-              <span className="ml-auto px-1.5 py-0.5 text-xs rounded-full bg-secondary/20 text-secondary">
-                {groups.length}
-              </span>
-            )}
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <Button
+        variant={current === 'clients' ? 'default' : 'ghost'}
+        size="sm"
+        onClick={() => handleNavigate('clients')}
+        className="h-8 gap-1.5 px-2 text-xs sm:text-sm"
+      >
+        <Users className="w-4 h-4 shrink-0" />
+        <span className="hidden sm:inline">Clientes</span>
+        {filteredClients.length > 0 && (
+          <span className="px-1.5 py-0.5 text-xs rounded-full bg-secondary/20 text-secondary">
+            {filteredClients.length}
+          </span>
+        )}
+      </Button>
       {hasRole('super_admin') && (
         <Button
           variant={current === 'trips' ? 'default' : 'ghost'}

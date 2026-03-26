@@ -1,4 +1,4 @@
-import { FileText, MoreVertical, Trash2, Edit, Copy, Link2 } from 'lucide-react';
+import { FileText, MoreVertical, Trash2, Edit, Copy } from 'lucide-react';
 import { Form } from '@/types/form';
 import { Button } from '@/components/ui/button';
 import {
@@ -9,9 +9,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
-import { toast } from 'sonner';
-import { api } from '@/lib/api';
-import { useAuth } from '@/contexts/AuthContext';
 
 interface FormCardProps {
   form: Form;
@@ -21,62 +18,12 @@ interface FormCardProps {
 }
 
 export const FormCard = ({ form, onEdit, onDelete, onDuplicate }: FormCardProps) => {
-  const { hasRole } = useAuth();
-  const canCopyLink = hasRole('super_admin');
-
   const formatDate = (date: Date) => {
     return new Intl.DateTimeFormat('es-MX', {
       day: 'numeric',
       month: 'short',
       year: 'numeric',
     }).format(date);
-  };
-
-  const handleCopyLink = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    const formId = form.id;
-    const formName = form.name;
-    console.log('[FormCard] Copiar link: inicio', { formId, formName });
-
-    try {
-      console.log('[FormCard] Copiar link: llamando API createFormSession', { formId });
-      const { sessionId } = await api.createFormSession(form.id);
-      const publicUrl = `${window.location.origin}/form/${form.id}?token=${sessionId}`;
-      console.log('[FormCard] Copiar link: sesión creada OK', { formId, sessionId, publicUrl });
-
-      try {
-        await navigator.clipboard.writeText(publicUrl);
-        console.log('[FormCard] Copiar link: portapapeles OK', { formId });
-        toast.success('Link único copiado al portapapeles. El progreso se guardará en la nube.');
-      } catch (clipboardErr) {
-        console.warn('[FormCard] Copiar link: portapapeles falló (mostrando URL en toast)', {
-          formId,
-          error: clipboardErr,
-        });
-        toast.success(
-          <span>
-            Enlace generado. Cópialo manualmente: <br />
-            <code className="text-xs break-all bg-muted px-1 rounded">{publicUrl}</code>
-          </span>,
-          { duration: 15000 }
-        );
-      }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : '';
-      console.error('[FormCard] Copiar link: error', {
-        formId,
-        formName,
-        message,
-        err,
-      });
-      if (message.includes('Insufficient permissions') || message.includes('403')) {
-        toast.error('Solo un administrador puede generar enlaces de formulario. Pide a un admin que copie el link.');
-      } else if (message.includes('Authentication required') || message.includes('401')) {
-        toast.error('Tu sesión ha expirado. Inicia sesión de nuevo.');
-      } else {
-        toast.error('No se pudo generar el enlace. Intenta de nuevo.');
-      }
-    }
   };
 
   return (
@@ -93,17 +40,6 @@ export const FormCard = ({ form, onEdit, onDelete, onDuplicate }: FormCardProps)
           <FileText className="w-6 h-6 text-primary-foreground" />
         </div>
         <div className="flex items-center gap-1">
-          {canCopyLink && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleCopyLink}
-              className="opacity-0 group-hover:opacity-100 transition-opacity"
-              title="Copiar link público"
-            >
-              <Link2 className="w-4 h-4" />
-            </Button>
-          )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
               <Button
@@ -119,12 +55,6 @@ export const FormCard = ({ form, onEdit, onDelete, onDuplicate }: FormCardProps)
                 <Edit className="w-4 h-4 mr-2" />
                 Editar
               </DropdownMenuItem>
-              {canCopyLink && (
-                <DropdownMenuItem onClick={handleCopyLink}>
-                  <Link2 className="w-4 h-4 mr-2" />
-                  Copiar link público
-                </DropdownMenuItem>
-              )}
               <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onDuplicate(); }}>
                 <Copy className="w-4 h-4 mr-2" />
                 Duplicar

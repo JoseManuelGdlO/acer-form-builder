@@ -516,6 +516,183 @@ export const TripDetailView = ({
     }
   };
 
+  const financeCard = (
+    <Card>
+      <CardContent className="p-4 space-y-4">
+        <h2 className="font-semibold text-lg mb-1 flex items-center gap-2">
+          <DollarSign className="w-5 h-5" />
+          Finanzas del viaje
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="rounded-lg border p-3 bg-muted/20">
+            <p className="text-xs text-muted-foreground">Ingresos</p>
+            <p className="text-xl font-semibold text-emerald-600 dark:text-emerald-400">
+              ${Number(financeSummary?.totalIncome ?? 0).toLocaleString()}
+            </p>
+          </div>
+          <div className="rounded-lg border p-3 bg-muted/20">
+            <p className="text-xs text-muted-foreground">Gastos</p>
+            <p className="text-xl font-semibold text-rose-600 dark:text-rose-400">
+              ${Number(financeSummary?.totalExpense ?? 0).toLocaleString()}
+            </p>
+          </div>
+          <div className="rounded-lg border p-3 bg-muted/20">
+            <p className="text-xs text-muted-foreground">Neto</p>
+            <p className="text-xl font-semibold">
+              ${Number(financeSummary?.net ?? 0).toLocaleString()}
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          <div className="space-y-2 border rounded-lg p-3">
+            <h3 className="font-medium">Agregar ingreso</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <select
+                className="h-10 rounded-md border bg-background px-3 text-sm"
+                value={incomeForm.clientId}
+                onChange={(e) => setIncomeForm((prev) => ({ ...prev, clientId: e.target.value }))}
+              >
+                <option value="">Seleccionar cliente</option>
+                {participants.map((p) => (
+                  p.client ? <option key={p.client.id} value={p.client.id}>{p.client.name}</option> : null
+                ))}
+              </select>
+              <Input
+                type="number"
+                min="0.01"
+                step="0.01"
+                placeholder="Monto"
+                value={incomeForm.amount}
+                onChange={(e) => setIncomeForm((prev) => ({ ...prev, amount: e.target.value }))}
+              />
+              <Input
+                type="date"
+                value={incomeForm.paymentDate}
+                onChange={(e) => setIncomeForm((prev) => ({ ...prev, paymentDate: e.target.value }))}
+              />
+              <select
+                className="h-10 rounded-md border bg-background px-3 text-sm"
+                value={incomeForm.paymentType}
+                onChange={(e) => setIncomeForm((prev) => ({ ...prev, paymentType: e.target.value as 'tarjeta' | 'transferencia' | 'efectivo' }))}
+              >
+                <option value="efectivo">Efectivo</option>
+                <option value="tarjeta">Tarjeta</option>
+                <option value="transferencia">Transferencia</option>
+              </select>
+              <Input
+                placeholder="Referencia (opcional)"
+                value={incomeForm.referenceNumber}
+                onChange={(e) => setIncomeForm((prev) => ({ ...prev, referenceNumber: e.target.value }))}
+              />
+              <Input
+                placeholder="Nota (opcional)"
+                value={incomeForm.note}
+                onChange={(e) => setIncomeForm((prev) => ({ ...prev, note: e.target.value }))}
+              />
+            </div>
+            <Button onClick={handleCreateIncome} disabled={isCreatingIncome}>
+              {isCreatingIncome ? 'Guardando...' : 'Agregar ingreso'}
+            </Button>
+          </div>
+
+          <div className="space-y-2 border rounded-lg p-3">
+            <h3 className="font-medium">Agregar gasto</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <Input
+                type="number"
+                min="0.01"
+                step="0.01"
+                placeholder="Monto"
+                value={expenseForm.amount}
+                onChange={(e) => setExpenseForm((prev) => ({ ...prev, amount: e.target.value }))}
+              />
+              <Input
+                type="date"
+                value={expenseForm.expenseDate}
+                onChange={(e) => setExpenseForm((prev) => ({ ...prev, expenseDate: e.target.value }))}
+              />
+              <Input
+                placeholder="Categoría (opcional)"
+                value={expenseForm.category}
+                onChange={(e) => setExpenseForm((prev) => ({ ...prev, category: e.target.value }))}
+              />
+              <Input
+                placeholder="Referencia (opcional)"
+                value={expenseForm.referenceNumber}
+                onChange={(e) => setExpenseForm((prev) => ({ ...prev, referenceNumber: e.target.value }))}
+              />
+              <Input
+                className="sm:col-span-2"
+                placeholder="Nota (opcional)"
+                value={expenseForm.note}
+                onChange={(e) => setExpenseForm((prev) => ({ ...prev, note: e.target.value }))}
+              />
+            </div>
+            <Button onClick={handleCreateExpense} disabled={isCreatingExpense}>
+              {isCreatingExpense ? 'Guardando...' : 'Agregar gasto'}
+            </Button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          <div>
+            <h3 className="font-medium mb-2">Ingresos</h3>
+            {tripIncomes.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Sin ingresos registrados.</p>
+            ) : (
+              <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
+                {tripIncomes.map((income) => (
+                  <div key={income.id} className="rounded-lg border p-3 flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-medium">${Number(income.amount).toLocaleString()} - {income.client?.name ?? income.clientId}</p>
+                      <p className="text-xs text-muted-foreground">{income.paymentDate} - {income.paymentType}</p>
+                      {income.referenceNumber && <p className="text-xs text-muted-foreground">Ref: {income.referenceNumber}</p>}
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive hover:text-destructive"
+                      onClick={() => onDeleteTripIncome(income.id)}
+                    >
+                      Eliminar
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <div>
+            <h3 className="font-medium mb-2">Gastos</h3>
+            {tripExpenses.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Sin gastos registrados.</p>
+            ) : (
+              <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
+                {tripExpenses.map((expense) => (
+                  <div key={expense.id} className="rounded-lg border p-3 flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-medium">${Number(expense.amount).toLocaleString()} {expense.category ? `- ${expense.category}` : ''}</p>
+                      <p className="text-xs text-muted-foreground">{expense.expenseDate}</p>
+                      {expense.referenceNumber && <p className="text-xs text-muted-foreground">Ref: {expense.referenceNumber}</p>}
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive hover:text-destructive"
+                      onClick={() => onDeleteTripExpense(expense.id)}
+                    >
+                      Eliminar
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-6xl mx-auto p-6 space-y-6">
@@ -623,181 +800,6 @@ export const TripDetailView = ({
           </Button>
         </div>
         </div>
-
-        <Card>
-          <CardContent className="p-4 space-y-4">
-            <h2 className="font-semibold text-lg mb-1 flex items-center gap-2">
-              <DollarSign className="w-5 h-5" />
-              Finanzas del viaje
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div className="rounded-lg border p-3 bg-muted/20">
-                <p className="text-xs text-muted-foreground">Ingresos</p>
-                <p className="text-xl font-semibold text-emerald-600 dark:text-emerald-400">
-                  ${Number(financeSummary?.totalIncome ?? 0).toLocaleString()}
-                </p>
-              </div>
-              <div className="rounded-lg border p-3 bg-muted/20">
-                <p className="text-xs text-muted-foreground">Gastos</p>
-                <p className="text-xl font-semibold text-rose-600 dark:text-rose-400">
-                  ${Number(financeSummary?.totalExpense ?? 0).toLocaleString()}
-                </p>
-              </div>
-              <div className="rounded-lg border p-3 bg-muted/20">
-                <p className="text-xs text-muted-foreground">Neto</p>
-                <p className="text-xl font-semibold">
-                  ${Number(financeSummary?.net ?? 0).toLocaleString()}
-                </p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-              <div className="space-y-2 border rounded-lg p-3">
-                <h3 className="font-medium">Agregar ingreso</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <select
-                    className="h-10 rounded-md border bg-background px-3 text-sm"
-                    value={incomeForm.clientId}
-                    onChange={(e) => setIncomeForm((prev) => ({ ...prev, clientId: e.target.value }))}
-                  >
-                    <option value="">Seleccionar cliente</option>
-                    {participants.map((p) => (
-                      p.client ? <option key={p.client.id} value={p.client.id}>{p.client.name}</option> : null
-                    ))}
-                  </select>
-                  <Input
-                    type="number"
-                    min="0.01"
-                    step="0.01"
-                    placeholder="Monto"
-                    value={incomeForm.amount}
-                    onChange={(e) => setIncomeForm((prev) => ({ ...prev, amount: e.target.value }))}
-                  />
-                  <Input
-                    type="date"
-                    value={incomeForm.paymentDate}
-                    onChange={(e) => setIncomeForm((prev) => ({ ...prev, paymentDate: e.target.value }))}
-                  />
-                  <select
-                    className="h-10 rounded-md border bg-background px-3 text-sm"
-                    value={incomeForm.paymentType}
-                    onChange={(e) => setIncomeForm((prev) => ({ ...prev, paymentType: e.target.value as 'tarjeta' | 'transferencia' | 'efectivo' }))}
-                  >
-                    <option value="efectivo">Efectivo</option>
-                    <option value="tarjeta">Tarjeta</option>
-                    <option value="transferencia">Transferencia</option>
-                  </select>
-                  <Input
-                    placeholder="Referencia (opcional)"
-                    value={incomeForm.referenceNumber}
-                    onChange={(e) => setIncomeForm((prev) => ({ ...prev, referenceNumber: e.target.value }))}
-                  />
-                  <Input
-                    placeholder="Nota (opcional)"
-                    value={incomeForm.note}
-                    onChange={(e) => setIncomeForm((prev) => ({ ...prev, note: e.target.value }))}
-                  />
-                </div>
-                <Button onClick={handleCreateIncome} disabled={isCreatingIncome}>
-                  {isCreatingIncome ? 'Guardando...' : 'Agregar ingreso'}
-                </Button>
-              </div>
-
-              <div className="space-y-2 border rounded-lg p-3">
-                <h3 className="font-medium">Agregar gasto</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <Input
-                    type="number"
-                    min="0.01"
-                    step="0.01"
-                    placeholder="Monto"
-                    value={expenseForm.amount}
-                    onChange={(e) => setExpenseForm((prev) => ({ ...prev, amount: e.target.value }))}
-                  />
-                  <Input
-                    type="date"
-                    value={expenseForm.expenseDate}
-                    onChange={(e) => setExpenseForm((prev) => ({ ...prev, expenseDate: e.target.value }))}
-                  />
-                  <Input
-                    placeholder="Categoría (opcional)"
-                    value={expenseForm.category}
-                    onChange={(e) => setExpenseForm((prev) => ({ ...prev, category: e.target.value }))}
-                  />
-                  <Input
-                    placeholder="Referencia (opcional)"
-                    value={expenseForm.referenceNumber}
-                    onChange={(e) => setExpenseForm((prev) => ({ ...prev, referenceNumber: e.target.value }))}
-                  />
-                  <Input
-                    className="sm:col-span-2"
-                    placeholder="Nota (opcional)"
-                    value={expenseForm.note}
-                    onChange={(e) => setExpenseForm((prev) => ({ ...prev, note: e.target.value }))}
-                  />
-                </div>
-                <Button onClick={handleCreateExpense} disabled={isCreatingExpense}>
-                  {isCreatingExpense ? 'Guardando...' : 'Agregar gasto'}
-                </Button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-              <div>
-                <h3 className="font-medium mb-2">Ingresos</h3>
-                {tripIncomes.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">Sin ingresos registrados.</p>
-                ) : (
-                  <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
-                    {tripIncomes.map((income) => (
-                      <div key={income.id} className="rounded-lg border p-3 flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="font-medium">${Number(income.amount).toLocaleString()} - {income.client?.name ?? income.clientId}</p>
-                          <p className="text-xs text-muted-foreground">{income.paymentDate} - {income.paymentType}</p>
-                          {income.referenceNumber && <p className="text-xs text-muted-foreground">Ref: {income.referenceNumber}</p>}
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => onDeleteTripIncome(income.id)}
-                        >
-                          Eliminar
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div>
-                <h3 className="font-medium mb-2">Gastos</h3>
-                {tripExpenses.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">Sin gastos registrados.</p>
-                ) : (
-                  <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
-                    {tripExpenses.map((expense) => (
-                      <div key={expense.id} className="rounded-lg border p-3 flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="font-medium">${Number(expense.amount).toLocaleString()} {expense.category ? `- ${expense.category}` : ''}</p>
-                          <p className="text-xs text-muted-foreground">{expense.expenseDate}</p>
-                          {expense.referenceNumber && <p className="text-xs text-muted-foreground">Ref: {expense.referenceNumber}</p>}
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => onDeleteTripExpense(expense.id)}
-                        >
-                          Eliminar
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
 
         <Card>
           <CardContent className="p-4">
@@ -913,6 +915,8 @@ export const TripDetailView = ({
             )}
           </CardContent>
         </Card>
+
+        {financeCard}
 
         <AddParticipantsToTripModal
           open={addModalOpen}

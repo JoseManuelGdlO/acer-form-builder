@@ -9,6 +9,7 @@ import {
   TripGroup,
   TripSeatAssignment,
   TripChangeLog,
+  ClientPayment,
   BusTemplate,
   Client,
   ClientGroupMember,
@@ -451,6 +452,37 @@ export const addParticipants = [
       }
       for (const cid of newClients) {
         await TripParticipant.create({ tripId: id, clientId: cid });
+      }
+      if (newClients.length > 0) {
+        const existingPayments = await ClientPayment.findAll({
+          where: { tripId: id, companyId, clientId: { [Op.in]: newClients } },
+          attributes: ['clientId'],
+        });
+        const paidClientSet = new Set(existingPayments.map(p => p.clientId));
+        const clientsForAutoIncome = await Client.findAll({
+          where: { id: { [Op.in]: newClients }, companyId },
+          attributes: ['id', 'totalAmountDue'],
+        });
+        const today = new Date().toISOString().slice(0, 10);
+        for (const client of clientsForAutoIncome) {
+          const amount = Number((client as any).totalAmountDue ?? 0);
+          if (!Number.isFinite(amount) || amount <= 0) continue;
+          if (paidClientSet.has(client.id)) continue;
+          const payment = await ClientPayment.create({
+            companyId,
+            tripId: id,
+            clientId: client.id,
+            amount,
+            paymentDate: today,
+            paymentType: 'efectivo',
+            note: 'Ingreso automático por agregar participante al viaje',
+          });
+          await logTripChange(id, req.user!.id, 'trip_income_created', {
+            entityType: 'payment',
+            entityId: payment.id,
+            newValue: JSON.stringify({ amount: Number(payment.amount), clientId: client.id, source: 'auto_participant_add' }),
+          });
+        }
       }
       await logTripChange(id, req.user!.id, 'participant_added', {
         newValue: JSON.stringify({ clientIds: newClients, groupIds }),

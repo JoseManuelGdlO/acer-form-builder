@@ -667,16 +667,25 @@ class ApiClient {
   }
 
   // Form sessions (unique link + progress in DB)
-  async createFormSession(formId: string, token?: string | null) {
+  async createFormSession(formId: string, token?: string | null, clientId?: string) {
     return this.request<{ sessionId: string }>(`/forms/${formId}/sessions`, {
       method: 'POST',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+      body: JSON.stringify(clientId ? { clientId } : {}),
+    });
+  }
+
+  async getClientFormSessions(clientId: string, token?: string | null) {
+    return this.request<any[]>(`/forms/sessions/client/${clientId}`, {
+      method: 'GET',
       token: token ?? this.getToken(),
       requireAuth: true,
     });
   }
 
   async getFormSessionProgress(formId: string, sessionId: string) {
-    return this.request<{ progress: any; status: string }>(`/forms/${formId}/sessions/${sessionId}`, {
+    return this.request<{ progress: any; status: string; clientInfo?: { id: string; name: string } | null }>(`/forms/${formId}/sessions/${sessionId}`, {
       method: 'GET',
     });
   }
