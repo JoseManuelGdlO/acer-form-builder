@@ -3,11 +3,23 @@ import { Client } from '@/types/form';
 import { ChecklistTemplate, VisaStatusTemplate } from '@/types/settings';
 import { api } from '@/lib/api';
 
+type ClientQueryParams = {
+  q?: string;
+  assignedUserId?: string;
+  productId?: string;
+  visaStatusTemplateId?: string;
+  checklistTemplateId?: string;
+  page?: number;
+  limit?: number;
+};
+
 export const useClientStore = () => {
   const [clients, setClients] = useState<Client[]>([]);
   const [checklistTemplates, setChecklistTemplates] = useState<ChecklistTemplate[]>([]);
   const [visaStatusTemplates, setVisaStatusTemplates] = useState<VisaStatusTemplate[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [query, setQuery] = useState<ClientQueryParams>({ page: 1, limit: 20 });
+  const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 0 });
   const mapAssignedUser = (u: any) =>
     u ? { id: u.id, name: u.name, email: u.email } : null;
   const mapProduct = (p: any) =>
@@ -55,14 +67,24 @@ export const useClientStore = () => {
     assignedTrips: c.assignedTrips || c.assigned_trips || [],
   });
 
-  const fetchClients = useCallback(async (token: string, params?: { assignedUserId?: string; productId?: string; visaStatusTemplateId?: string }) => {
+  const fetchClients = useCallback(async (token: string, params?: ClientQueryParams) => {
     setIsLoading(true);
     try {
-      const response = await api.getClients(params, token);
-      // Handle both old format (array) and new format (object with clients and templates)
-      const clientsData = Array.isArray(response) ? response : (response.clients || response);
+      const nextQuery: ClientQueryParams = {
+        ...query,
+        ...params,
+      };
+      const response = await api.getClients(nextQuery, token);
+      const clientsData = response.data || [];
       const templates = response.templates || [];
       const visaTemplates = response.visaStatusTemplates || [];
+      setQuery(nextQuery);
+      setPagination(response.meta || {
+        page: nextQuery.page || 1,
+        limit: nextQuery.limit || 20,
+        total: clientsData.length,
+        totalPages: clientsData.length > 0 ? 1 : 0,
+      });
       
       const clients: Client[] = clientsData.map((c: any) => mapClient(c));
       setClients(clients);
@@ -95,7 +117,7 @@ export const useClientStore = () => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [query]);
 
   const createClient = useCallback(async (token: string, clientData: Omit<Client, 'id' | 'createdAt' | 'updatedAt' | 'formsCompleted'>) => {
     try {
@@ -177,7 +199,10 @@ export const useClientStore = () => {
     clients,
     checklistTemplates,
     visaStatusTemplates,
+    query,
+    pagination,
     isLoading,
+    setQuery,
     fetchClients,
     createClient,
     updateClient,

@@ -188,9 +188,28 @@ class ApiClient {
   }
 
   // Clients
-  async getClients(params?: { assignedUserId?: string; productId?: string; visaStatusTemplateId?: string }, token?: string | null) {
-    const queryParams = new URLSearchParams(params as any).toString();
-    return this.request<any[]>(`/clients${queryParams ? `?${queryParams}` : ''}`, {
+  async getClients(
+    params?: {
+      q?: string;
+      assignedUserId?: string;
+      productId?: string;
+      visaStatusTemplateId?: string;
+      checklistTemplateId?: string;
+      page?: number;
+      limit?: number;
+    },
+    token?: string | null
+  ) {
+    const normalizedParams = Object.fromEntries(
+      Object.entries(params || {}).filter(([, value]) => value !== undefined && value !== null && value !== '')
+    );
+    const queryParams = new URLSearchParams(normalizedParams as Record<string, string>).toString();
+    return this.request<{
+      data: any[];
+      meta: { page: number; limit: number; total: number; totalPages: number };
+      templates?: any[];
+      visaStatusTemplates?: any[];
+    }>(`/clients${queryParams ? `?${queryParams}` : ''}`, {
       method: 'GET',
       token: token ?? this.getToken(),
       requireAuth: true,

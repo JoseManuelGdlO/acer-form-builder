@@ -1,6 +1,6 @@
 import { Response } from 'express';
 import { body, validationResult } from 'express-validator';
-import { fn, col, Op } from 'sequelize';
+import { fn, col, Op, where as sequelizeWhere } from 'sequelize';
 import { Client, ClientChecklist, ChecklistTemplate, ClientAmountDueLog, ClientPaymentDeletedLog, ClientPayment, User, TripParticipant, Trip, Product, VisaStatusTemplate } from '../models';
 import { AuthRequest } from '../middleware/auth.middleware';
 
@@ -17,8 +17,19 @@ export const getAllClients = async (req: AuthRequest, res: Response): Promise<vo
       res.status(401).json({ error: 'Authentication required' });
       return;
     }
-    const { assignedUserId, productId, visaStatusTemplateId } = req.query;
-    const where: any = { companyId };
+    const {
+      assignedUserId,
+      productId,
+      visaStatusTemplateId,
+      checklistTemplateId,
+      q,
+      page,
+      limit,
+    } = req.query;
+    const where: any = { companyId, parentClientId: null };
+    const parsedPage = Math.max(1, parseInt(String(page || '1'), 10) || 1);
+    const parsedLimit = Math.min(100, Math.max(1, parseInt(String(limit || '20'), 10) || 20));
+    const offset = (parsedPage - 1) * parsedLimit;
 
     // If user is reviewer, only show assigned clients
     if (req.user && !req.user.roles.includes('super_admin')) {
@@ -33,10 +44,104 @@ export const getAllClients = async (req: AuthRequest, res: Response): Promise<vo
     if (visaStatusTemplateId) {
       where.visaStatusTemplateId = visaStatusTemplateId;
     }
+    if (q) {
+      const searchTerm = String(q).trim();
+      if (searchTerm) {
+        const loweredSearchTerm = searchTerm.toLowerCase();
+        where[Op.or] = [
+          sequelizeWhere(fn('LOWER', col('Client.name')), { [Op.like]: `%${loweredSearchTerm}%` }),
+          sequelizeWhere(fn('LOWER', col('Client.email')), { [Op.like]: `%${loweredSearchTerm}%` }),
+          sequelizeWhere(fn('LOWER', col('Client.phone')), { [Op.like]: `%${loweredSearchTerm}%` }),
+        ];
+      }
+    }
+
+    if (checklistTemplateId) {
+      const selectedTemplate = await ChecklistTemplate.findOne({
+        where: { id: String(checklistTemplateId), companyId, isActive: true },
+        attributes: ['id', 'order'],
+      });
+      if (!selectedTemplate) {
+        res.json({
+          data: [],
+          meta: { page: parsedPage, limit: parsedLimit, total: 0, totalPages: 0 },
+          templates: [],
+          visaStatusTemplates: [],
+        });
+        return;
+      }
+
+      const higherTemplates = await ChecklistTemplate.findAll({
+        where: {
+          companyId,
+          isActive: true,
+          order: { [Op.gt]: selectedTemplate.order ?? 0 },
+        },
+        attributes: ['id'],
+        raw: true,
+      });
+      const higherTemplateIds = higherTemplates.map((template: any) => template.id);
+
+      const targetRows = await ClientChecklist.findAll({
+        where: {
+          companyId,
+          templateId: selectedTemplate.id,
+          isCompleted: true,
+        },
+        attributes: ['clientId'],
+        raw: true,
+      });
+      const targetClientIds = Array.from(new Set(targetRows.map((row: any) => row.clientId).filter(Boolean)));
+
+      if (targetClientIds.length === 0) {
+        res.json({
+          data: [],
+          meta: { page: parsedPage, limit: parsedLimit, total: 0, totalPages: 0 },
+          templates: [],
+          visaStatusTemplates: [],
+        });
+        return;
+      }
+
+      let clientIdsWithHigherStep = new Set<string>();
+      if (higherTemplateIds.length > 0) {
+        const higherRows = await ClientChecklist.findAll({
+          where: {
+            companyId,
+            clientId: { [Op.in]: targetClientIds },
+            templateId: { [Op.in]: higherTemplateIds },
+            isCompleted: true,
+          },
+          attributes: ['clientId'],
+          raw: true,
+        });
+        clientIdsWithHigherStep = new Set(higherRows.map((row: any) => row.clientId).filter(Boolean));
+      }
+
+      const filteredByChecklist = targetClientIds.filter((id) => !clientIdsWithHigherStep.has(id));
+      if (filteredByChecklist.length === 0) {
+        res.json({
+          data: [],
+          meta: { page: parsedPage, limit: parsedLimit, total: 0, totalPages: 0 },
+          templates: [],
+          visaStatusTemplates: [],
+        });
+        return;
+      }
+      where.id = { [Op.in]: filteredByChecklist };
+    }
+
+    const total = await Client.count({
+      where,
+      distinct: true,
+      col: 'id',
+    });
 
     const clients = await Client.findAll({
       where,
       order: [['created_at', 'DESC']],
+      limit: parsedLimit,
+      offset,
       include: [
         {
           model: User,
@@ -180,7 +285,13 @@ export const getAllClients = async (req: AuthRequest, res: Response): Promise<vo
 
     // Include templates info in response
     const response = {
-      clients: clientsWithStats,
+      data: clientsWithStats,
+      meta: {
+        page: parsedPage,
+        limit: parsedLimit,
+        total,
+        totalPages: total > 0 ? Math.ceil(total / parsedLimit) : 0,
+      },
       templates: activeTemplates.map(t => ({
         id: t.id,
         label: t.label,

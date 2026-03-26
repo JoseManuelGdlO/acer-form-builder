@@ -34,6 +34,25 @@ interface ClientListProps {
   initialClientId?: string | null;
   users?: User[];
   isAdmin?: boolean;
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+  initialQuery?: {
+    q?: string;
+    visaStatusTemplateId?: string;
+    checklistTemplateId?: string;
+    productId?: string;
+  };
+  onFiltersChange: (filters: {
+    q?: string;
+    visaStatusTemplateId?: string;
+    checklistTemplateId?: string;
+    productId?: string;
+  }) => void;
+  onPageChange: (page: number) => void;
 }
 
 type ChecklistFilterType = 'all' | string; // 'all' or templateId
@@ -51,11 +70,15 @@ export const ClientList = ({
   initialClientId = null,
   users = [],
   isAdmin = false,
+  pagination,
+  initialQuery,
+  onFiltersChange,
+  onPageChange,
 }: ClientListProps) => {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [visaStatusFilter, setVisaStatusFilter] = useState<VisaStatusFilterType>('all');
-  const [checklistFilter, setChecklistFilter] = useState<ChecklistFilterType>('all');
-  const [productFilter, setProductFilter] = useState<ProductFilterType>('all');
+  const [searchQuery, setSearchQuery] = useState(initialQuery?.q || '');
+  const [visaStatusFilter, setVisaStatusFilter] = useState<VisaStatusFilterType>(initialQuery?.visaStatusTemplateId || 'all');
+  const [checklistFilter, setChecklistFilter] = useState<ChecklistFilterType>(initialQuery?.checklistTemplateId || 'all');
+  const [productFilter, setProductFilter] = useState<ProductFilterType>(initialQuery?.productId || 'all');
   const [viewingClient, setViewingClient] = useState<Client | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isFiltersModalOpen, setIsFiltersModalOpen] = useState(false);
@@ -153,51 +176,17 @@ export const ClientList = ({
     return stats;
   }, [clients, checklistTemplates]);
 
-  const filteredClients = useMemo(() => {
-    const normalizedSearchQuery = searchQuery.toLowerCase().trim();
-
-    return clients.filter(client => {
-      if (client.parentClientId) return false;
-      const clientName = (client.name || '').toLowerCase();
-      const clientEmail = (client.email || '').toLowerCase();
-      const clientPhone = String(client.phone || '');
-
-      const matchesSearch =
-        clientName.includes(normalizedSearchQuery) ||
-        clientEmail.includes(normalizedSearchQuery) ||
-        clientPhone.includes(searchQuery);
-      
-      const matchesVisaStatusFilter = visaStatusFilter === 'all' || client.visaStatusTemplateId === visaStatusFilter;
-      const matchesProductFilter = productFilter === 'all' || client.productId === productFilter;
-      
-      // For checklist filter, check if client's LAST completed template matches
-      let matchesChecklistFilter = true;
-      if (checklistFilter !== 'all') {
-        if (!client.checklistByTemplate) {
-          matchesChecklistFilter = false;
-        } else {
-          // Get all completed templates for this client, sorted by order
-          const completedTemplates = checklistTemplates
-            .filter(template => {
-              const templateChecklist = client.checklistByTemplate?.[template.id];
-              return templateChecklist?.completed === true;
-            })
-            .sort((a, b) => (a.order || 0) - (b.order || 0));
-          
-          // Check if the last completed template matches the filter
-          if (completedTemplates.length > 0) {
-            const lastCompletedTemplate = completedTemplates[completedTemplates.length - 1];
-            matchesChecklistFilter = lastCompletedTemplate.id === checklistFilter;
-          } else {
-            // If no completed templates, only show if filter is 'all'
-            matchesChecklistFilter = false;
-          }
-        }
-      }
-      
-      return matchesSearch && matchesVisaStatusFilter && matchesChecklistFilter && matchesProductFilter;
-    });
-  }, [clients, searchQuery, visaStatusFilter, checklistFilter, checklistTemplates, productFilter]);
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      onFiltersChange({
+        q: searchQuery.trim() || undefined,
+        visaStatusTemplateId: visaStatusFilter === 'all' ? undefined : visaStatusFilter,
+        checklistTemplateId: checklistFilter === 'all' ? undefined : checklistFilter,
+        productId: productFilter === 'all' ? undefined : productFilter,
+      });
+    }, 350);
+    return () => window.clearTimeout(timeout);
+  }, [searchQuery, visaStatusFilter, checklistFilter, productFilter, onFiltersChange]);
 
   const handleDelete = async (clientId: string) => {
     try {
@@ -445,7 +434,7 @@ export const ClientList = ({
         </div>
 
         {/* Clients List */}
-        {filteredClients.length === 0 ? (
+        {clients.length === 0 ? (
           <div className="text-center py-16">
             <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted/50 flex items-center justify-center">
               <Users className="w-8 h-8 text-muted-foreground" />
@@ -467,7 +456,7 @@ export const ClientList = ({
           </div>
         ) : (
           <div className="space-y-3">
-            {filteredClients.map(client => (
+            {clients.map(client => (
               <ClientCard
                 key={client.id}
                 client={client}
@@ -479,6 +468,32 @@ export const ClientList = ({
                 isAdmin={isAdmin}
               />
             ))}
+          </div>
+        )}
+
+        {pagination.totalPages > 0 && (
+          <div className="flex items-center justify-between pt-2">
+            <p className="text-sm text-muted-foreground">
+              Pagina {pagination.page} de {pagination.totalPages} - {pagination.total} clientes
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={pagination.page <= 1}
+                onClick={() => onPageChange(pagination.page - 1)}
+              >
+                Anterior
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={pagination.page >= pagination.totalPages}
+                onClick={() => onPageChange(pagination.page + 1)}
+              >
+                Siguiente
+              </Button>
+            </div>
           </div>
         )}
 

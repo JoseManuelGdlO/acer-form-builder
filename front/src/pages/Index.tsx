@@ -99,6 +99,7 @@ const Index = () => {
     clients,
     checklistTemplates,
     visaStatusTemplates,
+    pagination: clientPagination,
     fetchClients,
     createClient: createClientStore,
     updateClient: updateClientStore,
@@ -162,7 +163,26 @@ const Index = () => {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
   const [selectedFilterCategories, setSelectedFilterCategories] = useState<string[]>([]);
+  const [clientListQuery, setClientListQuery] = useState<{
+    q?: string;
+    visaStatusTemplateId?: string;
+    checklistTemplateId?: string;
+    productId?: string;
+    page: number;
+    limit: number;
+  }>({ page: 1, limit: 20 });
   const { categories, fetchCategories, createCategory, updateCategory, deleteCategory } = useCategoryStore();
+
+  const areClientQueriesEqual = (
+    a: { q?: string; visaStatusTemplateId?: string; checklistTemplateId?: string; productId?: string; page: number; limit: number },
+    b: { q?: string; visaStatusTemplateId?: string; checklistTemplateId?: string; productId?: string; page: number; limit: number }
+  ) =>
+    a.q === b.q &&
+    a.visaStatusTemplateId === b.visaStatusTemplateId &&
+    a.checklistTemplateId === b.checklistTemplateId &&
+    a.productId === b.productId &&
+    a.page === b.page &&
+    a.limit === b.limit;
 
   useEffect(() => {
     // When leaving the editor (or when it isn't mounted), reset the flag.
@@ -208,7 +228,7 @@ const Index = () => {
       
       // Load clients
       if (clients.length === 0) {
-        fetchClients(token).catch((error) => {
+        fetchClients(token, clientListQuery).catch((error) => {
           console.error('Failed to fetch clients:', error);
         });
       }
@@ -225,7 +245,7 @@ const Index = () => {
   // Load clients (and users for admin assign dropdown) when switching to clients view
   useEffect(() => {
     if (token && activeView === 'clients') {
-      fetchClients(token).catch((error) => {
+      fetchClients(token, clientListQuery).catch((error) => {
         console.error('Failed to fetch clients:', error);
       });
       fetchProducts(token).catch((error) => {
@@ -237,7 +257,7 @@ const Index = () => {
         });
       }
     }
-  }, [activeView, token]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activeView, token, clientListQuery]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load products & categories when switching to products view
   useEffect(() => {
@@ -339,6 +359,25 @@ const Index = () => {
       pending: inProcess,
     };
   }, [filteredClients]);
+
+  const handleClientFiltersChange = useCallback((filters: {
+    q?: string;
+    visaStatusTemplateId?: string;
+    checklistTemplateId?: string;
+    productId?: string;
+  }) => {
+    setClientListQuery((prev) => {
+      const next = { ...prev, ...filters, page: 1 };
+      return areClientQueriesEqual(prev, next) ? prev : next;
+    });
+  }, []);
+
+  const handleClientPageChange = useCallback((page: number) => {
+    setClientListQuery((prev) => {
+      const next = { ...prev, page };
+      return areClientQueriesEqual(prev, next) ? prev : next;
+    });
+  }, []);
 
   const handleNavigate = useCallback(
     async (next: View) => {
@@ -552,6 +591,10 @@ const Index = () => {
             onUpdate={async (id, data) => { await updateClient(id, data); }}
             users={users}
             isAdmin={hasRole('super_admin')}
+            pagination={clientPagination}
+            initialQuery={clientListQuery}
+            onFiltersChange={handleClientFiltersChange}
+            onPageChange={handleClientPageChange}
           />
         </div>
       </>
