@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Client, Group } from '@/types/form';
+import { Client } from '@/types/form';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Search, UserPlus, UsersRound } from 'lucide-react';
+import { Search, UserPlus } from 'lucide-react';
 
 interface AddParticipantsToTripModalProps {
   open: boolean;
@@ -21,10 +21,9 @@ interface AddParticipantsToTripModalProps {
   tripTitle: string;
   currentParticipantIds: string[];
   availableClients: Client[];
-  availableGroups: Group[];
   totalSeats: number;
   currentCount: number;
-  onAdd: (data: { clientIds?: string[]; groupIds?: string[] }) => Promise<void>;
+  onAdd: (data: { clientIds?: string[] }) => Promise<void>;
 }
 
 export const AddParticipantsToTripModal = ({
@@ -33,15 +32,12 @@ export const AddParticipantsToTripModal = ({
   tripTitle,
   currentParticipantIds,
   availableClients,
-  availableGroups,
   totalSeats,
   currentCount,
   onAdd,
 }: AddParticipantsToTripModalProps) => {
   const [clientSearch, setClientSearch] = useState('');
-  const [groupSearch, setGroupSearch] = useState('');
   const [selectedClientIds, setSelectedClientIds] = useState<Set<string>>(new Set());
-  const [selectedGroupIds, setSelectedGroupIds] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(false);
 
   const currentSet = useMemo(() => new Set(currentParticipantIds), [currentParticipantIds]);
@@ -49,7 +45,6 @@ export const AddParticipantsToTripModal = ({
     () => availableClients.filter(c => !currentSet.has(c.id)),
     [availableClients, currentSet]
   );
-  const candidateGroups = useMemo(() => availableGroups, [availableGroups]);
 
   const filteredClients = useMemo(() => {
     if (!clientSearch.trim()) return candidateClients;
@@ -62,20 +57,6 @@ export const AddParticipantsToTripModal = ({
     );
   }, [candidateClients, clientSearch]);
 
-  const filteredGroups = useMemo(() => {
-    if (!groupSearch.trim()) return candidateGroups;
-    const q = groupSearch.toLowerCase();
-    return candidateGroups.filter(
-      g =>
-        g.title.toLowerCase().includes(q) ||
-        (g.clients ?? []).some(
-          c =>
-            c.name.toLowerCase().includes(q) ||
-            (c.email && c.email.toLowerCase().includes(q))
-        )
-    );
-  }, [candidateGroups, groupSearch]);
-
   const toggleClient = (id: string) => {
     setSelectedClientIds(prev => {
       const next = new Set(prev);
@@ -85,34 +66,13 @@ export const AddParticipantsToTripModal = ({
     });
   };
 
-  const toggleGroup = (id: string) => {
-    setSelectedGroupIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const countNewFromGroups = useMemo(() => {
-    let count = 0;
-    for (const g of candidateGroups) {
-      if (selectedGroupIds.has(g.id)) {
-        const memberIds = (g.clients ?? []).map(c => c.id).filter(id => !currentSet.has(id));
-        count += memberIds.length;
-      }
-    }
-    return count;
-  }, [candidateGroups, selectedGroupIds, currentSet]);
-
-  const countNewClients = selectedClientIds.size + countNewFromGroups;
+  const countNewClients = selectedClientIds.size;
   const wouldExceed = currentCount + countNewClients > totalSeats;
 
   const handleSubmit = async () => {
     const clientIds = Array.from(selectedClientIds);
-    const groupIds = Array.from(selectedGroupIds);
-    if (clientIds.length === 0 && groupIds.length === 0) {
-      toast.info('Selecciona al menos un cliente o un grupo');
+    if (clientIds.length === 0) {
+      toast.info('Selecciona al menos un cliente');
       return;
     }
     if (wouldExceed) {
@@ -121,11 +81,9 @@ export const AddParticipantsToTripModal = ({
     }
     setIsLoading(true);
     try {
-      await onAdd({ clientIds: clientIds.length ? clientIds : undefined, groupIds: groupIds.length ? groupIds : undefined });
+      await onAdd({ clientIds: clientIds.length ? clientIds : undefined });
       setSelectedClientIds(new Set());
-      setSelectedGroupIds(new Set());
       setClientSearch('');
-      setGroupSearch('');
       onOpenChange(false);
       toast.success('Participantes agregados al viaje');
     } catch (err: any) {
@@ -142,7 +100,7 @@ export const AddParticipantsToTripModal = ({
           <DialogTitle className="text-xl">Agregar participantes a &quot;{tripTitle}&quot;</DialogTitle>
         </DialogHeader>
         <p className="text-sm text-muted-foreground">
-          Plazas: {currentCount}/{totalSeats}. Solo puedes agregar clientes y grupos de tu compañía.
+          Plazas: {currentCount}/{totalSeats}. Al seleccionar un cliente principal, se incluiran automaticamente sus hijos.
         </p>
 
         <div className="space-y-4 flex-1 min-h-0 flex flex-col">
@@ -176,37 +134,6 @@ export const AddParticipantsToTripModal = ({
             </ScrollArea>
           </div>
 
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              <UsersRound className="w-4 h-4" />
-              Grupos (se agregan todos sus miembros)
-            </Label>
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar grupo..."
-                value={groupSearch}
-                onChange={e => setGroupSearch(e.target.value)}
-                className="pl-8 h-9"
-              />
-            </div>
-            <ScrollArea className="border rounded-md h-[100px]">
-              <div className="p-2 space-y-1">
-                {filteredGroups.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-2">No hay grupos con miembros.</p>
-                ) : (
-                  filteredGroups.map(g => (
-                    <label key={g.id} className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-muted/50 cursor-pointer">
-                      <Checkbox checked={selectedGroupIds.has(g.id)} onCheckedChange={() => toggleGroup(g.id)} />
-                      <span className="text-sm truncate">{g.title}</span>
-                      <span className="text-xs text-muted-foreground">({(g.clients ?? []).length} miembros)</span>
-                    </label>
-                  ))
-                )}
-              </div>
-            </ScrollArea>
-          </div>
-
           {countNewClients > 0 && (
             <p className="text-sm text-muted-foreground">
               Se agregarán {countNewClients} participante(s). Total: {currentCount + countNewClients}/{totalSeats}.
@@ -221,7 +148,7 @@ export const AddParticipantsToTripModal = ({
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
             Cancelar
           </Button>
-          <Button type="button" onClick={handleSubmit} disabled={isLoading || (selectedClientIds.size === 0 && selectedGroupIds.size === 0) || wouldExceed}>
+          <Button type="button" onClick={handleSubmit} disabled={isLoading || selectedClientIds.size === 0 || wouldExceed}>
             {isLoading ? 'Agregando...' : 'Agregar'}
           </Button>
         </DialogFooter>

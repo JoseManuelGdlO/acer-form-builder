@@ -8,6 +8,52 @@ export const useClientStore = () => {
   const [checklistTemplates, setChecklistTemplates] = useState<ChecklistTemplate[]>([]);
   const [visaStatusTemplates, setVisaStatusTemplates] = useState<VisaStatusTemplate[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const mapAssignedUser = (u: any) =>
+    u ? { id: u.id, name: u.name, email: u.email } : null;
+  const mapProduct = (p: any) =>
+    p ? { id: p.id, title: p.title } : null;
+  const mapClient = (c: any): Client => ({
+    id: c.id,
+    parentClientId: c.parent_client_id ?? c.parentClientId ?? null,
+    name: c.name,
+    email: c.email,
+    phone: c.phone,
+    address: c.address,
+    notes: c.notes,
+    visaCasAppointmentDate: c.visa_cas_appointment_date ?? c.visaCasAppointmentDate ?? null,
+    visaCasAppointmentLocation: c.visa_cas_appointment_location ?? c.visaCasAppointmentLocation ?? null,
+    visaConsularAppointmentDate: c.visa_consular_appointment_date ?? c.visaConsularAppointmentDate ?? null,
+    visaConsularAppointmentLocation: c.visa_consular_appointment_location ?? c.visaConsularAppointmentLocation ?? null,
+    visaStatusTemplateId: c.visa_status_template_id || c.visaStatusTemplateId,
+    visaStatusTemplate: c.visa_status_template || c.visaStatusTemplate || null,
+    formsCompleted: c.forms_completed || c.formsCompleted || 0,
+    assignedUserId: c.assigned_user_id || c.assignedUserId,
+    assignedUser: mapAssignedUser(c.assigned_user || c.assignedUser),
+    productId: c.product_id || c.productId,
+    product: mapProduct(c.product),
+    totalAmountDue: c.total_amount_due != null ? Number(c.total_amount_due) : (c.totalAmountDue != null ? Number(c.totalAmountDue) : undefined),
+    totalPaid: c.total_paid != null ? Number(c.total_paid) : (c.totalPaid != null ? Number(c.totalPaid) : 0),
+    createdAt: new Date(c.created_at || c.createdAt),
+    updatedAt: new Date(c.updated_at || c.updatedAt),
+    checklistProgress: c.checklist_progress || c.checklistProgress || 0,
+    checklistStatus: c.checklist_status || c.checklistStatus || 'not_started',
+    checklistCompleted: c.checklist_completed || c.checklistCompleted || 0,
+    checklistTotal: c.checklist_total || c.checklistTotal || 0,
+    checklistByTemplate: c.checklist_by_template || c.checklistByTemplate || {},
+    parent: c.parent ? { id: c.parent.id, name: c.parent.name, email: c.parent.email, phone: c.parent.phone } : null,
+    children: Array.isArray(c.children)
+      ? c.children.map((ch: any) => ({
+          id: ch.id,
+          name: ch.name,
+          email: ch.email,
+          phone: ch.phone,
+          parentClientId: ch.parent_client_id ?? ch.parentClientId ?? null,
+          createdAt: new Date(ch.created_at || ch.createdAt),
+          updatedAt: new Date(ch.updated_at || ch.updatedAt),
+        }))
+      : [],
+    assignedTrips: c.assignedTrips || c.assigned_trips || [],
+  });
 
   const fetchClients = useCallback(async (token: string, params?: { assignedUserId?: string; productId?: string; visaStatusTemplateId?: string }) => {
     setIsLoading(true);
@@ -18,38 +64,7 @@ export const useClientStore = () => {
       const templates = response.templates || [];
       const visaTemplates = response.visaStatusTemplates || [];
       
-      const mapAssignedUser = (u: any) =>
-        u ? { id: u.id, name: u.name, email: u.email } : null;
-      const mapProduct = (p: any) =>
-        p ? { id: p.id, title: p.title } : null;
-      const clients: Client[] = clientsData.map((c: any) => ({
-        id: c.id,
-        name: c.name,
-        email: c.email,
-        phone: c.phone,
-        address: c.address,
-        notes: c.notes,
-        visaCasAppointmentDate: c.visa_cas_appointment_date ?? c.visaCasAppointmentDate ?? null,
-        visaCasAppointmentLocation: c.visa_cas_appointment_location ?? c.visaCasAppointmentLocation ?? null,
-        visaConsularAppointmentDate: c.visa_consular_appointment_date ?? c.visaConsularAppointmentDate ?? null,
-        visaConsularAppointmentLocation: c.visa_consular_appointment_location ?? c.visaConsularAppointmentLocation ?? null,
-        visaStatusTemplateId: c.visa_status_template_id || c.visaStatusTemplateId,
-        visaStatusTemplate: c.visa_status_template || c.visaStatusTemplate || null,
-        formsCompleted: c.forms_completed || c.formsCompleted || 0,
-        assignedUserId: c.assigned_user_id || c.assignedUserId,
-        assignedUser: mapAssignedUser(c.assigned_user || c.assignedUser),
-        productId: c.product_id || c.productId,
-        product: mapProduct(c.product),
-        totalAmountDue: c.total_amount_due != null ? Number(c.total_amount_due) : (c.totalAmountDue != null ? Number(c.totalAmountDue) : undefined),
-        totalPaid: c.total_paid != null ? Number(c.total_paid) : (c.totalPaid != null ? Number(c.totalPaid) : 0),
-        createdAt: new Date(c.created_at || c.createdAt),
-        updatedAt: new Date(c.updated_at || c.updatedAt),
-        checklistProgress: c.checklist_progress || c.checklistProgress || 0,
-        checklistStatus: c.checklist_status || c.checklistStatus || 'not_started',
-        checklistCompleted: c.checklist_completed || c.checklistCompleted || 0,
-        checklistTotal: c.checklist_total || c.checklistTotal || 0,
-        checklistByTemplate: c.checklist_by_template || c.checklistByTemplate || {},
-      }));
+      const clients: Client[] = clientsData.map((c: any) => mapClient(c));
       setClients(clients);
       
       // Store templates if provided
@@ -82,43 +97,35 @@ export const useClientStore = () => {
     }
   }, []);
 
-  const mapAssignedUser = (u: any) =>
-    u ? { id: u.id, name: u.name, email: u.email } : null;
-  const mapProduct = (p: any) =>
-    p ? { id: p.id, title: p.title } : null;
-
   const createClient = useCallback(async (token: string, clientData: Omit<Client, 'id' | 'createdAt' | 'updatedAt' | 'formsCompleted'>) => {
     try {
       const newClient = await api.createClient(clientData, token);
-      const client: Client = {
-        id: newClient.id,
-        name: newClient.name,
-        email: newClient.email,
-        phone: newClient.phone,
-        address: newClient.address,
-        notes: newClient.notes,
-        visaCasAppointmentDate: newClient.visa_cas_appointment_date ?? newClient.visaCasAppointmentDate ?? null,
-        visaCasAppointmentLocation: newClient.visa_cas_appointment_location ?? newClient.visaCasAppointmentLocation ?? null,
-        visaConsularAppointmentDate: newClient.visa_consular_appointment_date ?? newClient.visaConsularAppointmentDate ?? null,
-        visaConsularAppointmentLocation: newClient.visa_consular_appointment_location ?? newClient.visaConsularAppointmentLocation ?? null,
-        visaStatusTemplateId: newClient.visa_status_template_id || newClient.visaStatusTemplateId,
-        visaStatusTemplate: newClient.visa_status_template || newClient.visaStatusTemplate || null,
-        formsCompleted: newClient.forms_completed || newClient.formsCompleted || 0,
-        assignedUserId: newClient.assigned_user_id || newClient.assignedUserId,
-        assignedUser: mapAssignedUser(newClient.assigned_user || newClient.assignedUser),
-        productId: newClient.product_id || newClient.productId,
-        product: mapProduct(newClient.product),
-        totalAmountDue: newClient.total_amount_due != null ? Number(newClient.total_amount_due) : newClient.totalAmountDue,
-        totalPaid: newClient.total_paid != null ? Number(newClient.total_paid) : (newClient.totalPaid ?? 0),
-        createdAt: new Date(newClient.created_at || newClient.createdAt || Date.now()),
-        updatedAt: new Date(newClient.updated_at || newClient.updatedAt || Date.now()),
-        checklistProgress: newClient.checklist_progress || newClient.checklistProgress || 0,
-        checklistStatus: newClient.checklist_status || newClient.checklistStatus || 'not_started',
-        checklistCompleted: newClient.checklist_completed || newClient.checklistCompleted || 0,
-        checklistTotal: newClient.checklist_total || newClient.checklistTotal || 0,
-        checklistByTemplate: newClient.checklist_by_template || newClient.checklistByTemplate || {},
-      };
-      setClients(prev => [client, ...prev]);
+      const client = mapClient(newClient);
+      setClients(prev => {
+        const next = [client, ...prev];
+        if (!client.parentClientId) return next;
+        return next.map((existing) => {
+          if (existing.id !== client.parentClientId) return existing;
+          const currentChildren = existing.children ?? [];
+          const alreadyExists = currentChildren.some((child) => child.id === client.id);
+          if (alreadyExists) return existing;
+          return {
+            ...existing,
+            children: [
+              ...currentChildren,
+              {
+                id: client.id,
+                name: client.name,
+                email: client.email,
+                phone: client.phone,
+                parentClientId: client.parentClientId ?? null,
+                createdAt: client.createdAt,
+                updatedAt: client.updatedAt,
+              },
+            ],
+          };
+        });
+      });
       return client;
     } catch (error) {
       console.error('Failed to create client:', error);
@@ -129,34 +136,7 @@ export const useClientStore = () => {
   const updateClient = useCallback(async (token: string, clientId: string, updates: Partial<Client>) => {
     try {
       const updatedClient = await api.updateClient(clientId, updates, token);
-      const client: Client = {
-        id: updatedClient.id,
-        name: updatedClient.name,
-        email: updatedClient.email,
-        phone: updatedClient.phone,
-        address: updatedClient.address,
-        notes: updatedClient.notes,
-        visaCasAppointmentDate: updatedClient.visa_cas_appointment_date ?? updatedClient.visaCasAppointmentDate ?? null,
-        visaCasAppointmentLocation: updatedClient.visa_cas_appointment_location ?? updatedClient.visaCasAppointmentLocation ?? null,
-        visaConsularAppointmentDate: updatedClient.visa_consular_appointment_date ?? updatedClient.visaConsularAppointmentDate ?? null,
-        visaConsularAppointmentLocation: updatedClient.visa_consular_appointment_location ?? updatedClient.visaConsularAppointmentLocation ?? null,
-        visaStatusTemplateId: updatedClient.visa_status_template_id || updatedClient.visaStatusTemplateId,
-        visaStatusTemplate: updatedClient.visa_status_template || updatedClient.visaStatusTemplate || null,
-        formsCompleted: updatedClient.forms_completed || updatedClient.formsCompleted || 0,
-        assignedUserId: updatedClient.assigned_user_id || updatedClient.assignedUserId,
-        assignedUser: mapAssignedUser(updatedClient.assigned_user || updatedClient.assignedUser),
-        productId: updatedClient.product_id || updatedClient.productId,
-        product: mapProduct(updatedClient.product),
-        totalAmountDue: updatedClient.total_amount_due != null ? Number(updatedClient.total_amount_due) : updatedClient.totalAmountDue,
-        totalPaid: updatedClient.total_paid != null ? Number(updatedClient.total_paid) : (updatedClient.totalPaid ?? 0),
-        createdAt: new Date(updatedClient.created_at || updatedClient.createdAt),
-        updatedAt: new Date(updatedClient.updated_at || updatedClient.updatedAt),
-        checklistProgress: updatedClient.checklist_progress || updatedClient.checklistProgress || 0,
-        checklistStatus: updatedClient.checklist_status || updatedClient.checklistStatus || 'not_started',
-        checklistCompleted: updatedClient.checklist_completed || updatedClient.checklistCompleted || 0,
-        checklistTotal: updatedClient.checklist_total || updatedClient.checklistTotal || 0,
-        checklistByTemplate: updatedClient.checklist_by_template || updatedClient.checklistByTemplate || {},
-      };
+      const client = mapClient(updatedClient);
       setClients(prev =>
         prev.map(c => c.id === clientId ? client : c)
       );

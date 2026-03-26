@@ -1,8 +1,14 @@
 import { Response } from 'express';
 import { body, validationResult } from 'express-validator';
-import { fn, col } from 'sequelize';
+import { fn, col, Op } from 'sequelize';
 import { Client, ClientChecklist, ChecklistTemplate, ClientAmountDueLog, ClientPaymentDeletedLog, ClientPayment, User, TripParticipant, Trip, Product, VisaStatusTemplate } from '../models';
 import { AuthRequest } from '../middleware/auth.middleware';
+
+const parseNullableParentClientId = (value: unknown): string | null | undefined => {
+  if (value === undefined) return undefined;
+  if (value === null || value === '') return null;
+  return String(value);
+};
 
 export const getAllClients = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -77,6 +83,30 @@ export const getAllClients = async (req: AuthRequest, res: Response): Promise<vo
     });
 
     const clientIds = clients.map(c => c.id);
+    const children = await Client.findAll({
+      where: {
+        companyId,
+        parentClientId: { [Op.in]: clientIds },
+      },
+      attributes: ['id', 'name', 'email', 'phone', 'parentClientId', 'createdAt', 'updatedAt'],
+      order: [['created_at', 'ASC']],
+      raw: true,
+    });
+    const childrenByParentId: Record<string, any[]> = {};
+    for (const child of children) {
+      const parentId = (child as any).parent_client_id || (child as any).parentClientId;
+      if (!parentId) continue;
+      if (!childrenByParentId[parentId]) childrenByParentId[parentId] = [];
+      childrenByParentId[parentId].push({
+        id: (child as any).id,
+        name: (child as any).name,
+        email: (child as any).email,
+        phone: (child as any).phone,
+        parentClientId: parentId,
+        createdAt: (child as any).created_at || (child as any).createdAt,
+        updatedAt: (child as any).updated_at || (child as any).updatedAt,
+      });
+    }
 
     // Trips each client is assigned to (for "En viaje(s)" badge)
     const tripParticipations = await TripParticipant.findAll({
@@ -137,6 +167,7 @@ export const getAllClients = async (req: AuthRequest, res: Response): Promise<vo
       const totalPaid = totalPaidByClientId[client.id] ?? 0;
       return {
         ...clientData,
+        children: childrenByParentId[client.id] || [],
         checklistProgress: progress,
         checklistStatus,
         checklistCompleted: completedItems,
@@ -187,6 +218,8 @@ export const getClientById = async (req: AuthRequest, res: Response): Promise<vo
         { model: User, as: 'assignedUser', attributes: ['id', 'name', 'email'], required: false },
         { model: Product, as: 'product', attributes: ['id', 'title'], required: false },
         { model: VisaStatusTemplate, as: 'visaStatusTemplate', attributes: ['id', 'label', 'order', 'isActive', 'color'], required: false },
+        { model: Client, as: 'parent', attributes: ['id', 'name', 'email', 'phone'], required: false },
+        { model: Client, as: 'children', attributes: ['id', 'name', 'email', 'phone', 'parentClientId', 'createdAt', 'updatedAt'], required: false },
       ],
     });
     if (!client) {
@@ -212,6 +245,21 @@ export const getClientById = async (req: AuthRequest, res: Response): Promise<vo
       .map((t: any) => ({ id: t.id, title: t.title }));
 
     const clientJson = client.toJSON();
+    const children = await Client.findAll({
+      where: { companyId, parentClientId: id },
+      attributes: ['id', 'name', 'email', 'phone', 'parentClientId', 'createdAt', 'updatedAt'],
+      order: [['created_at', 'ASC']],
+      raw: true,
+    });
+    (clientJson as any).children = children.map((child: any) => ({
+      id: child.id,
+      name: child.name,
+      email: child.email,
+      phone: child.phone,
+      parentClientId: child.parent_client_id ?? child.parentClientId ?? null,
+      createdAt: child.created_at || child.createdAt,
+      updatedAt: child.updated_at || child.updatedAt,
+    }));
     (clientJson as any).assignedTrips = assignedTrips;
     res.json(clientJson);
   } catch (error) {
@@ -287,6 +335,7 @@ export const createClient = [
   body('visaConsularAppointmentLocation').optional({ values: 'null' }).isString().isLength({ max: 255 }).withMessage('Consular appointment location must be a valid string'),
   body('visaStatusTemplateId').isUUID().withMessage('Visa status template id is required'),
   body('productId').optional({ values: 'null' }).isUUID().withMessage('Product id must be a valid UUID'),
+  body('parentClientId').optional({ values: 'null' }).isUUID().withMessage('Parent client id must be a valid UUID'),
   async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       const errors = validationResult(req);
@@ -305,9 +354,10 @@ export const createClient = [
       if (normalizedPhone !== undefined) {
         req.body.phone = normalizedPhone;
       }
+      const parentClientId = parseNullableParentClientId(req.body.parentClientId);
 
-      if (normalizedPhone) {
-        const existingClient = await Client.findOne({ where: { companyId, phone: normalizedPhone } });
+      if (normalizedPhone && !parentClientId) {
+        const existingClient = await Client.findOne({ where: { companyId, phone: normalizedPhone, parentClientId: null } });
         if (existingClient) {
           res.status(200).json({
             message: 'Cliente ya existe',
@@ -331,12 +381,21 @@ export const createClient = [
         res.status(400).json({ error: 'Visa status template not found' });
         return;
       }
+      if (parentClientId) {
+        const parentClient = await Client.findOne({ where: { id: parentClientId, companyId } });
+        if (!parentClient) {
+          res.status(400).json({ error: 'Parent client not found' });
+          return;
+        }
+      }
 
-      const client = await Client.create({ ...req.body, companyId });
+      const client = await Client.create({ ...req.body, companyId, parentClientId: parentClientId ?? null });
       await client.reload({
         include: [
           { model: Product, as: 'product', attributes: ['id', 'title'], required: false },
           { model: VisaStatusTemplate, as: 'visaStatusTemplate', attributes: ['id', 'label', 'order', 'isActive', 'color'], required: false },
+          { model: Client, as: 'parent', attributes: ['id', 'name', 'email', 'phone'], required: false },
+          { model: Client, as: 'children', attributes: ['id', 'name', 'email', 'phone', 'parentClientId', 'createdAt', 'updatedAt'], required: false },
         ],
       });
       
@@ -418,6 +477,7 @@ export const updateClient = [
   body('visaConsularAppointmentLocation').optional({ values: 'null' }).isString().isLength({ max: 255 }).withMessage('Consular appointment location must be a valid string'),
   body('visaStatusTemplateId').optional({ values: 'falsy' }).isUUID().withMessage('Visa status template id must be a valid UUID'),
   body('productId').optional({ values: 'null' }).isUUID().withMessage('Product id must be a valid UUID'),
+  body('parentClientId').optional({ values: 'null' }).isUUID().withMessage('Parent client id must be a valid UUID'),
   body('totalAmountDue').optional({ values: 'null' }).custom((val) => val === null || val === undefined || (typeof val === 'number' && !Number.isNaN(val) && val >= 0)).withMessage('Total amount due must be a non-negative number or null'),
   async (req: AuthRequest, res: Response): Promise<void> => {
     try {
@@ -462,6 +522,10 @@ export const updateClient = [
         updates.visaStatusTemplateId = req.body.visaStatusTemplateId;
       }
       if (req.body.productId !== undefined) updates.productId = req.body.productId;
+      if (req.body.parentClientId !== undefined) {
+        const parentClientId = parseNullableParentClientId(req.body.parentClientId);
+        updates.parentClientId = parentClientId;
+      }
       if (req.body.assignedUserId !== undefined && req.user?.roles.includes('super_admin')) {
         updates.assignedUserId = req.body.assignedUserId || null;
       }
@@ -485,6 +549,40 @@ export const updateClient = [
           return;
         }
       }
+      if (req.body.parentClientId !== undefined) {
+        const parentClientId = parseNullableParentClientId(req.body.parentClientId);
+        if (parentClientId === id) {
+          res.status(400).json({ error: 'A client cannot be its own parent' });
+          return;
+        }
+        if (parentClientId) {
+          const parentClient = await Client.findOne({ where: { id: parentClientId, companyId } });
+          if (!parentClient) {
+            res.status(400).json({ error: 'Parent client not found' });
+            return;
+          }
+        }
+      }
+      const targetParentClientId = req.body.parentClientId !== undefined
+        ? parseNullableParentClientId(req.body.parentClientId)
+        : ((client as any).parentClientId ?? null);
+      const targetPhone = req.body.phone !== undefined
+        ? (typeof req.body.phone === 'string' ? req.body.phone.trim() : req.body.phone)
+        : client.phone;
+      if (targetPhone && !targetParentClientId) {
+        const conflict = await Client.findOne({
+          where: {
+            companyId,
+            phone: targetPhone,
+            parentClientId: null,
+            id: { [Op.ne]: id },
+          },
+        });
+        if (conflict) {
+          res.status(400).json({ error: 'Phone already in use by another primary client' });
+          return;
+        }
+      }
 
       const previousTotalAmountDue = client.totalAmountDue != null ? Number(client.totalAmountDue) : null;
       await client.update(updates);
@@ -493,6 +591,8 @@ export const updateClient = [
           { model: User, as: 'assignedUser', attributes: ['id', 'name', 'email'], required: false },
           { model: Product, as: 'product', attributes: ['id', 'title'], required: false },
           { model: VisaStatusTemplate, as: 'visaStatusTemplate', attributes: ['id', 'label', 'order', 'isActive', 'color'], required: false },
+          { model: Client, as: 'parent', attributes: ['id', 'name', 'email', 'phone'], required: false },
+          { model: Client, as: 'children', attributes: ['id', 'name', 'email', 'phone', 'parentClientId', 'createdAt', 'updatedAt'], required: false },
         ],
       });
       if (req.body.totalAmountDue !== undefined) {

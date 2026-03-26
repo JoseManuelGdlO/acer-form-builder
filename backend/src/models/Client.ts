@@ -7,6 +7,7 @@ import { VisaStatusTemplate } from './VisaStatusTemplate';
 interface ClientAttributes {
   id: string;
   companyId: string;
+  parentClientId?: string | null;
   name: string;
   email?: string;
   phone?: string;
@@ -31,6 +32,7 @@ interface ClientCreationAttributes extends Optional<ClientAttributes, 'id' | 'fo
 export class Client extends Model<ClientAttributes, ClientCreationAttributes> implements ClientAttributes {
   public id!: string;
   public companyId!: string;
+  public parentClientId?: string | null;
   public name!: string;
   public email?: string;
   public phone?: string;
@@ -66,6 +68,15 @@ Client.init(
       },
       onDelete: 'CASCADE',
     },
+    parentClientId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      references: {
+        model: 'clients',
+        key: 'id',
+      },
+      onDelete: 'SET NULL',
+    },
     name: {
       type: DataTypes.STRING(255),
       allowNull: false,
@@ -80,7 +91,6 @@ Client.init(
     phone: {
       type: DataTypes.STRING(50),
       allowNull: true,
-      unique: true,
     },
     address: {
       type: DataTypes.TEXT,

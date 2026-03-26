@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Trip, Client, Group, TripChangeLogEntry, TripIncome, TripExpense, TripFinanceSummary } from '@/types/form';
+import { Trip, Client, TripChangeLogEntry, TripIncome, TripExpense, TripFinanceSummary } from '@/types/form';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -63,13 +63,12 @@ const ACTION_LABELS: Record<string, string> = {
 interface TripDetailViewProps {
   trip: Trip;
   availableClients: Client[];
-  availableGroups: Group[];
   companiesForInvite: { id: string; name: string }[];
   changeLog: TripChangeLogEntry[];
   onBack: () => void;
   onEdit: (trip: Trip) => void;
   onDelete: (tripId: string) => Promise<void>;
-  onAddParticipants: (data: { clientIds?: string[]; groupIds?: string[] }) => Promise<void>;
+  onAddParticipants: (data: { clientIds?: string[] }) => Promise<void>;
   onRemoveParticipant: (clientId: string) => Promise<void>;
   onOpenSeatPicker: () => void;
   onResetSeatAssignments: () => Promise<void>;
@@ -88,7 +87,6 @@ interface TripDetailViewProps {
 export const TripDetailView = ({
   trip,
   availableClients,
-  availableGroups,
   companiesForInvite,
   changeLog,
   onBack,
@@ -819,7 +817,7 @@ export const TripDetailView = ({
             {filteredParticipants.length === 0 ? (
               <p className="text-muted-foreground py-6 text-center">
                 {participants.length === 0
-                  ? 'Aún no hay participantes. Agrega clientes o grupos.'
+                  ? 'Aún no hay participantes. Agrega clientes.'
                   : 'No hay resultados para la búsqueda.'}
               </p>
             ) : (
@@ -922,7 +920,6 @@ export const TripDetailView = ({
           tripTitle={trip.title}
           currentParticipantIds={participants.map(p => p.client?.id).filter(Boolean) as string[]}
           availableClients={availableClients}
-          availableGroups={availableGroups}
           totalSeats={trip.totalSeats}
           currentCount={participants.length}
           onAdd={onAddParticipants}

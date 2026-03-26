@@ -27,6 +27,9 @@ import { formatPhoneNumberDisplay, normalizePhoneDigits } from '@/lib/phone';
 
 interface ClientFormModalProps {
   client?: Client | null;
+  availableClients?: Client[];
+  defaultParentClientId?: string | null;
+  hideParentSelector?: boolean;
   products?: Product[];
   visaStatusTemplates?: VisaStatusTemplate[];
   open: boolean;
@@ -36,6 +39,9 @@ interface ClientFormModalProps {
 
 export const ClientFormModal = ({
   client,
+  availableClients = [],
+  defaultParentClientId = null,
+  hideParentSelector = false,
   products = [],
   visaStatusTemplates = [],
   open,
@@ -54,6 +60,7 @@ export const ClientFormModal = ({
     visaConsularAppointmentLocation: '',
     visaStatusTemplateId: '',
     productId: undefined as string | undefined,
+    parentClientId: 'none',
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -73,6 +80,7 @@ export const ClientFormModal = ({
         visaConsularAppointmentLocation: client.visaConsularAppointmentLocation || '',
         visaStatusTemplateId: client.visaStatusTemplateId || '',
         productId: client.productId || undefined,
+        parentClientId: client.parentClientId || 'none',
       });
     } else {
       setFormData({
@@ -87,12 +95,13 @@ export const ClientFormModal = ({
         visaConsularAppointmentLocation: '',
         visaStatusTemplateId: visaStatusTemplates[0]?.id || '',
         productId: undefined,
+        parentClientId: defaultParentClientId || 'none',
       });
     }
     setError('');
     setPhoneError('');
     setIsLoading(false);
-  }, [client, open, visaStatusTemplates]);
+  }, [client, open, visaStatusTemplates, defaultParentClientId]);
 
   const validatePhone = (digits: string): boolean => {
     if (!digits) {
@@ -126,6 +135,7 @@ export const ClientFormModal = ({
         visaCasAppointmentLocation: formData.visaCasAppointmentLocation.trim() || null,
         visaConsularAppointmentDate: formData.visaConsularAppointmentDate || null,
         visaConsularAppointmentLocation: formData.visaConsularAppointmentLocation.trim() || null,
+        parentClientId: formData.parentClientId === 'none' ? null : formData.parentClientId,
       });
       onOpenChange(false);
     } catch (error: any) {
@@ -290,6 +300,30 @@ export const ClientFormModal = ({
               />
             </div>
           </div>
+
+          {!defaultParentClientId && !hideParentSelector && (
+            <div className="space-y-2">
+              <Label htmlFor="parentClientId">Cliente principal</Label>
+              <Select
+                value={formData.parentClientId}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, parentClientId: value }))}
+              >
+                <SelectTrigger id="parentClientId">
+                  <SelectValue placeholder="Selecciona un cliente principal (opcional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sin cliente principal</SelectItem>
+                  {availableClients
+                    .filter((candidate) => !candidate.parentClientId && candidate.id !== client?.id)
+                    .map((candidate) => (
+                      <SelectItem key={candidate.id} value={candidate.id}>
+                        {candidate.name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="product" className="flex items-center gap-2">

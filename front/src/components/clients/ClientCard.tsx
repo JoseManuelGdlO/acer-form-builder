@@ -41,6 +41,12 @@ export const ClientCard = ({
   users = [],
   isAdmin = false,
 }: ClientCardProps) => {
+  const handleCardClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement;
+    if (target.closest('[data-no-view="true"]')) return;
+    onView();
+  };
+
   const handleAssignAdvisor = (userId: string) => {
     if (!onUpdate) return;
     onUpdate(client.id, {
@@ -49,8 +55,8 @@ export const ClientCard = ({
   };
 
   return (
-    <Card className="group hover:shadow-card-hover transition-all duration-300 border-border/50 hover:border-primary/30">
-      <CardContent className="p-5">
+    <Card className="group hover:shadow-card-hover transition-all duration-300 border-border/50 hover:border-primary/30 cursor-pointer">
+      <CardContent className="p-5" onClick={handleCardClick}>
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1 min-w-0 space-y-3">
             <div className="flex items-center gap-3 flex-wrap">
@@ -82,6 +88,12 @@ export const ClientCard = ({
                 <FileText className="w-4 h-4" />
                 <span>{client.formsCompleted} formularios completados</span>
               </div>
+              {(client.children?.length ?? 0) > 0 && (
+                <div className="flex items-center gap-1.5">
+                  <User className="w-4 h-4" />
+                  <span>{client.children?.length} hijo(s)</span>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center gap-2 text-sm">
@@ -91,7 +103,7 @@ export const ClientCard = ({
                   value={client.assignedUserId ?? '__none__'}
                   onValueChange={handleAssignAdvisor}
                 >
-                  <SelectTrigger className="h-8 w-[200px] border-muted/60 bg-muted/20">
+                  <SelectTrigger data-no-view="true" className="h-8 w-[200px] border-muted/60 bg-muted/20">
                     <SelectValue placeholder="Asignar asesor" />
                   </SelectTrigger>
                   <SelectContent>
@@ -138,6 +150,7 @@ export const ClientCard = ({
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
+                data-no-view="true"
                 variant="ghost"
                 size="icon"
                 className="opacity-0 group-hover:opacity-100 transition-opacity"
@@ -145,17 +158,18 @@ export const ClientCard = ({
                 <MoreHorizontal className="w-4 h-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem onClick={onView}>
+            <DropdownMenuContent data-no-view="true" align="end" className="w-48">
+              <DropdownMenuItem data-no-view="true" onClick={onView}>
                 <Eye className="w-4 h-4 mr-2" />
                 Ver detalles
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={onEdit}>
+              <DropdownMenuItem data-no-view="true" onClick={onEdit}>
                 <Edit2 className="w-4 h-4 mr-2" />
                 Editar cliente
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
+                data-no-view="true"
                 onClick={onDelete}
                 className="text-destructive focus:text-destructive"
               >

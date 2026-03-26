@@ -418,6 +418,22 @@ export const addParticipants = [
         const alreadyLinked = await TripGroup.findOne({ where: { tripId: id, groupId: gid } });
         if (!alreadyLinked) await TripGroup.create({ tripId: id, groupId: gid });
       }
+      if (toAdd.length > 0) {
+        const selectedClients = await Client.findAll({
+          where: { id: { [Op.in]: toAdd }, companyId },
+          attributes: ['id', 'parentClientId'],
+        });
+        if (selectedClients.length !== toAdd.length) {
+          res.status(400).json({ error: 'Solo puedes añadir clientes de tu compañía' });
+          return;
+        }
+        const selectedIds = selectedClients.map(c => c.id);
+        const children = await Client.findAll({
+          where: { parentClientId: { [Op.in]: selectedIds }, companyId },
+          attributes: ['id'],
+        });
+        toAdd = toAdd.concat(children.map(c => c.id));
+      }
       toAdd = [...new Set(toAdd)];
       for (const cid of toAdd) {
         const client = await Client.findByPk(cid);

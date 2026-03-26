@@ -560,6 +560,9 @@
                   },
                   "productId": {
                     "type": "string"
+                  },
+                  "parentClientId": {
+                    "type": "string"
                   }
                 }
               }
@@ -760,6 +763,9 @@
                     "type": "string"
                   },
                   "productId": {
+                    "type": "string"
+                  },
+                  "parentClientId": {
                     "type": "string"
                   },
                   "totalAmountDue": {
@@ -4391,7 +4397,7 @@
                 "type": "object",
                 "properties": {
                   "type": {
-                    "type": "object"
+                    "type": "string"
                   },
                   "message": {
                     "type": "array"

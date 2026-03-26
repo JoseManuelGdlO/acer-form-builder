@@ -130,6 +130,9 @@ User.hasMany(ClientMessage, { foreignKey: 'senderId', as: 'sentMessages' });
 ClientMessage.belongsTo(User, { foreignKey: 'senderId', as: 'senderUser' });
 
 // Client relationships
+Client.belongsTo(Client, { foreignKey: 'parentClientId', as: 'parent' });
+Client.hasMany(Client, { foreignKey: 'parentClientId', as: 'children' });
+
 Client.hasMany(FormSubmission, { foreignKey: 'clientId', as: 'submissions' });
 FormSubmission.belongsTo(Client, { foreignKey: 'clientId', as: 'client' });
 

@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Trip, TripInvitation, Client, Group, BusTemplate, TripIncome, TripExpense, TripFinanceSummary } from '@/types/form';
+import { Trip, TripInvitation, Client, BusTemplate, TripIncome, TripExpense, TripFinanceSummary } from '@/types/form';
 import { TripCard } from './TripCard';
 import { TripDetailView } from './TripDetailView';
 import { TripFormModal } from './TripFormModal';
@@ -22,7 +22,6 @@ interface TripListProps {
   trips: Trip[];
   invitations: TripInvitation[];
   availableClients: Client[];
-  availableGroups: Group[];
   companiesForInvite: { id: string; name: string }[];
   onCreate: (data: {
     title: string;
@@ -36,7 +35,7 @@ interface TripListProps {
   }) => Promise<void>;
   onUpdate: (tripId: string, data: Partial<Trip> & { invitedCompanyIds?: string[] }) => Promise<void>;
   onDelete: (tripId: string) => Promise<void>;
-  onAddParticipants: (tripId: string, data: { clientIds?: string[]; groupIds?: string[] }) => Promise<void>;
+  onAddParticipants: (tripId: string, data: { clientIds?: string[] }) => Promise<void>;
   onRemoveParticipant: (tripId: string, clientId: string) => Promise<void>;
   onAcceptInvitation: (invitationId: string) => Promise<void>;
   onRejectInvitation: (invitationId: string) => Promise<void>;
@@ -71,7 +70,6 @@ export const TripList = ({
   trips,
   invitations,
   availableClients,
-  availableGroups,
   companiesForInvite,
   onCreate,
   onUpdate,
@@ -210,7 +208,6 @@ export const TripList = ({
         <TripDetailView
           trip={viewingTrip}
           availableClients={availableClients}
-          availableGroups={availableGroups}
           companiesForInvite={companiesForInvite}
           changeLog={changeLog.filter(e => e.tripId === viewingTrip.id)}
           onBack={() => {

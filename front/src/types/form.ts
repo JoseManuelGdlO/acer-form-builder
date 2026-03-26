@@ -155,6 +155,7 @@ export interface ClientAssignedUser {
 
 export interface Client {
   id: string;
+  parentClientId?: string | null;
   name: string;
   email: string;
   phone?: string;
@@ -181,6 +182,8 @@ export interface Client {
   checklistTotal?: number;
   checklistByTemplate?: Record<string, { completed: boolean; templateId: string }>;
   assignedTrips?: { id: string; title: string }[];
+  parent?: Pick<Client, 'id' | 'name' | 'email' | 'phone'> | null;
+  children?: Pick<Client, 'id' | 'name' | 'email' | 'phone' | 'parentClientId' | 'createdAt' | 'updatedAt'>[];
 }
 
 export type PaymentType = 'tarjeta' | 'transferencia' | 'efectivo';

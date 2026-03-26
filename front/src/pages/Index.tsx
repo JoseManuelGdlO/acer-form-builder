@@ -831,7 +831,6 @@ const Index = () => {
             trips={trips}
             invitations={invitations}
             availableClients={filteredClients}
-            availableGroups={groups}
             companiesForInvite={companiesForTripShare}
             onCreate={async (data) => {
               await createTrip(token!, data);

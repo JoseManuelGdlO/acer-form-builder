@@ -292,7 +292,7 @@ export const useTripStore = () => {
     if (currentTrip?.id === tripId) setCurrentTrip(null);
   }, [currentTrip?.id]);
 
-  const addParticipants = useCallback(async (token: string, tripId: string, data: { clientIds?: string[]; groupIds?: string[] }) => {
+  const addParticipants = useCallback(async (token: string, tripId: string, data: { clientIds?: string[] }) => {
     const updated = await api.addTripParticipants(tripId, data, token);
     const trip = mapTrip(updated);
     setTrips(prev => prev.map(t => (t.id === tripId ? trip : t)));

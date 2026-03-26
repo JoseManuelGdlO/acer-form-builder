@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { ClientStatusBadge } from './ClientStatusBadge';
 import { ClientChecklist, ChecklistItem } from './ClientChecklist';
 import { ClientChat, ChatMessage } from './ClientChat';
@@ -15,20 +16,33 @@ import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
 import { 
   User, Mail, Phone, MapPin, Calendar, Clock, 
-  ArrowLeft, Edit2, FileText, UserCircle, ShoppingBag,
+  ArrowLeft, Edit2, FileText, UserCircle, ShoppingBag, Plus, ListChecks, NotebookPen, Wallet,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { formatPhoneOptional } from '@/lib/phone';
 
+const contrastTextColor = (backgroundHex?: string | null): string => {
+  if (!backgroundHex) return '#ffffff';
+  const raw = backgroundHex.replace('#', '');
+  if (!/^[0-9A-Fa-f]{6}$/.test(raw)) return '#ffffff';
+  const r = parseInt(raw.slice(0, 2), 16) / 255;
+  const g = parseInt(raw.slice(2, 4), 16) / 255;
+  const b = parseInt(raw.slice(4, 6), 16) / 255;
+  const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  return lum > 0.6 ? '#0f172a' : '#ffffff';
+};
+
 interface ClientProfileViewProps {
   client: Client;
   onBack: () => void;
   onEdit: () => void;
+  onCreateChild?: () => void;
+  onOpenClient?: (clientId: string) => void;
 }
 
-export const ClientProfileView = ({ client, onBack, onEdit }: ClientProfileViewProps) => {
+export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpenClient }: ClientProfileViewProps) => {
   const { getActiveChecklistItems, fetchChecklistTemplates } = useSettingsStore();
   const { token, hasRole } = useAuth();
   const isAdmin = hasRole('super_admin');
@@ -110,6 +124,26 @@ export const ClientProfileView = ({ client, onBack, onEdit }: ClientProfileViewP
               : visaTplRaw === null
                 ? null
                 : client.visaStatusTemplate ?? null,
+          parentClientId: freshClientData.parent_client_id ?? freshClientData.parentClientId ?? null,
+          parent: freshClientData.parent
+            ? {
+                id: freshClientData.parent.id,
+                name: freshClientData.parent.name,
+                email: freshClientData.parent.email,
+                phone: freshClientData.parent.phone,
+              }
+            : null,
+          children: Array.isArray(freshClientData.children)
+            ? freshClientData.children.map((child: any) => ({
+                id: child.id,
+                name: child.name,
+                email: child.email,
+                phone: child.phone,
+                parentClientId: child.parent_client_id ?? child.parentClientId ?? null,
+                createdAt: new Date(child.created_at || child.createdAt),
+                updatedAt: new Date(child.updated_at || child.updatedAt),
+              }))
+            : [],
           createdAt: new Date(freshClientData.created_at || freshClientData.createdAt),
           updatedAt: new Date(freshClientData.updated_at || freshClientData.updatedAt),
         } as Client);
@@ -567,7 +601,25 @@ export const ClientProfileView = ({ client, onBack, onEdit }: ClientProfileViewP
                 <h1 className="text-2xl font-bold text-foreground">
                   {client.name}
                 </h1>
-                <ClientStatusBadge label={displayClient.visaStatusTemplate?.label} color={displayClient.visaStatusTemplate?.color} />
+                <Badge
+                  variant="secondary"
+                  className="gap-1.5 border-transparent"
+                  style={
+                    displayClient.visaStatusTemplate?.color
+                      ? {
+                          backgroundColor: displayClient.visaStatusTemplate.color,
+                          color: contrastTextColor(displayClient.visaStatusTemplate.color),
+                        }
+                      : undefined
+                  }
+                >
+                  {displayClient.visaStatusTemplate?.label || 'Sin estado'}
+                </Badge>
+                {displayClient.parentClientId && (
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Estas viendo un cliente hijo, no el cliente principal.
+                  </p>
+                )}
                 <div className="flex flex-wrap gap-2 mt-2">
                   <Badge variant="secondary" className="gap-1">
                     <Calendar className="w-3.5 h-3.5" />
@@ -581,103 +633,182 @@ export const ClientProfileView = ({ client, onBack, onEdit }: ClientProfileViewP
               </div>
             </div>
           </div>
-          <Button onClick={onEdit} variant="outline" className="gap-2">
-            <Edit2 className="w-4 h-4" />
-            Editar
-          </Button>
+          <div className="flex items-center gap-2">
+            {!displayClient.parentClientId && (
+              <Button onClick={onCreateChild} variant="outline" className="gap-2">
+                <Plus className="w-4 h-4" />
+                Agregar cliente hijo
+              </Button>
+            )}
+            <Button onClick={onEdit} variant="outline" className="gap-2">
+              <Edit2 className="w-4 h-4" />
+              Editar
+            </Button>
+          </div>
         </div>
 
         {/* Main Content - Two Columns */}
         <div className="grid lg:grid-cols-2 gap-6">
           {/* Left Column - Info, checklist, notes, payments, forms */}
           <div className="space-y-6">
-            {/* Client Info Card */}
-            <Card className="border-border/50">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <User className="w-5 h-5 text-primary" />
-                  Información del Cliente
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
-                  {infoItems.map((item, index) => (
-                    <div
-                      key={index}
-                      className="flex items-start gap-3 min-w-0"
-                    >
-                      <div className="w-9 h-9 rounded-lg bg-muted/50 flex items-center justify-center flex-shrink-0">
-                        <item.icon className="w-4 h-4 text-muted-foreground" />
+            <Accordion type="multiple" defaultValue={['info']} className="w-full rounded-lg border border-border/50 px-4">
+              <AccordionItem value="info">
+                <AccordionTrigger className="text-base">
+                  <span className="flex items-center gap-2">
+                    <User className="w-5 h-5 text-primary" />
+                    Información del Cliente
+                  </span>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+                    {infoItems.map((item, index) => (
+                      <div
+                        key={index}
+                        className="flex items-start gap-3 min-w-0"
+                      >
+                        <div className="w-9 h-9 rounded-lg bg-muted/50 flex items-center justify-center flex-shrink-0">
+                          <item.icon className="w-4 h-4 text-muted-foreground" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs text-muted-foreground">{item.label}</p>
+                          <p className="text-sm font-medium text-foreground break-words">{item.value}</p>
+                        </div>
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs text-muted-foreground">{item.label}</p>
-                        <p className="text-sm font-medium text-foreground break-words">{item.value}</p>
+                    ))}
+                  </div>
+                  {client.notes && (
+                    <>
+                      <Separator className="my-4" />
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-2">Notas</p>
+                        <p className="text-sm text-foreground bg-muted/30 p-3 rounded-lg">
+                          {client.notes}
+                        </p>
                       </div>
-                    </div>
-                  ))}
-                </div>
-                {client.notes && (
-                  <>
-                    <Separator className="my-4" />
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-2">Notas</p>
-                      <p className="text-sm text-foreground bg-muted/30 p-3 rounded-lg">
-                        {client.notes}
-                      </p>
-                    </div>
-                  </>
-                )}
-              </CardContent>
-            </Card>
+                    </>
+                  )}
+                  {displayClient.parent && (
+                    <>
+                      <Separator className="my-4" />
+                      <div className="space-y-2">
+                        <p className="text-xs text-muted-foreground">Cliente principal</p>
+                        <Button variant="outline" size="sm" onClick={() => onOpenClient?.(displayClient.parent!.id)}>
+                          {displayClient.parent.name}
+                        </Button>
+                      </div>
+                    </>
+                  )}
+                  {(displayClient.children?.length ?? 0) > 0 && (
+                    <>
+                      <Separator className="my-4" />
+                      <div className="space-y-2">
+                        <p className="text-xs text-muted-foreground">Hijos de este cliente</p>
+                        <div className="flex flex-wrap gap-2">
+                          {displayClient.children!.map((child) => (
+                            <Button key={child.id} variant="outline" size="sm" onClick={() => onOpenClient?.(child.id)}>
+                              {child.name}
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </AccordionContent>
+              </AccordionItem>
 
-            {/* Checklist */}
-            <ClientChecklist
-              clientId={client.id}
-              items={checklist}
-              onToggle={handleToggleChecklist}
-            />
+              <AccordionItem value="checklist">
+                <AccordionTrigger className="text-base">
+                  <span className="flex items-center gap-2">
+                    <ListChecks className="w-5 h-5 text-primary" />
+                    Checklist
+                  </span>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <ClientChecklist
+                    clientId={client.id}
+                    items={checklist}
+                    onToggle={handleToggleChecklist}
+                  />
+                </AccordionContent>
+              </AccordionItem>
 
-            {/* Client Notes */}
-            <ClientNotes
-              clientId={client.id}
-              notes={clientNotes}
-              onAddNote={handleAddNote}
-              onDeleteNote={handleDeleteNote}
-            />
+              <AccordionItem value="notes">
+                <AccordionTrigger className="text-base">
+                  <span className="flex items-center gap-2">
+                    <NotebookPen className="w-5 h-5 text-primary" />
+                    Notas del cliente
+                  </span>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <ClientNotes
+                    clientId={client.id}
+                    notes={clientNotes}
+                    onAddNote={handleAddNote}
+                    onDeleteNote={handleDeleteNote}
+                  />
+                </AccordionContent>
+              </AccordionItem>
 
-            <ClientPaymentHistory
-              clientId={client.id}
-              totalAmountDue={clientSnapshot.totalAmountDue}
-              onUpdateTotalAmountDue={handleUpdateTotalAmountDue}
-              payments={payments}
-              amountDueHistory={amountDueHistory}
-              paymentDeletedHistory={paymentDeletedHistory}
-              onAddPayment={handleAddPayment}
-              onDeletePayment={handleDeletePayment}
-            />
+              <AccordionItem value="payments">
+                <AccordionTrigger className="text-base">
+                  <span className="flex items-center gap-2">
+                    <Wallet className="w-5 h-5 text-primary" />
+                    Pagos e historial
+                  </span>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <ClientPaymentHistory
+                    clientId={client.id}
+                    totalAmountDue={clientSnapshot.totalAmountDue}
+                    onUpdateTotalAmountDue={handleUpdateTotalAmountDue}
+                    payments={payments}
+                    amountDueHistory={amountDueHistory}
+                    paymentDeletedHistory={paymentDeletedHistory}
+                    onAddPayment={handleAddPayment}
+                    onDeletePayment={handleDeletePayment}
+                  />
+                </AccordionContent>
+              </AccordionItem>
 
-            {/* Form Submissions */}
-            <div>
-              <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
-                <FileText className="w-5 h-5 text-primary" />
-                Información de Formularios
-              </h3>
-              <ClientFormData submissions={submissions} />
-            </div>
+              <AccordionItem value="forms">
+                <AccordionTrigger className="text-base">
+                  <span className="flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-primary" />
+                    Información de Formularios
+                  </span>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <ClientFormData submissions={submissions} />
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
           </div>
 
           {/* Right Column - Chat */}
           <div className="lg:sticky lg:top-6 lg:h-[calc(100vh-7rem)]">
-            <ClientChat
-              clientId={client.id}
-              clientName={client.name.split(' ')[0]}
-              messages={messages}
-              onSendMessage={handleSendMessage}
-              isConversationPaused={isConversationPaused}
-              isTogglingConversationPause={isTogglingConversationPause}
-              canToggleConversationPause={Boolean(displayClient.phone) && hasConversationHistory}
-              onToggleConversationPause={handleToggleConversationPause}
-            />
+            {displayClient.parentClientId ? (
+              <Card className="border-border/50">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Chat no disponible</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">
+                    El chat solo esta disponible para clientes principales.
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <ClientChat
+                clientId={client.id}
+                clientName={client.name.split(' ')[0]}
+                messages={messages}
+                onSendMessage={handleSendMessage}
+                isConversationPaused={isConversationPaused}
+                isTogglingConversationPause={isTogglingConversationPause}
+                canToggleConversationPause={Boolean(displayClient.phone) && hasConversationHistory}
+                onToggleConversationPause={handleToggleConversationPause}
+              />
+            )}
           </div>
         </div>
       </div>

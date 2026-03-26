@@ -60,6 +60,7 @@ export const ClientList = ({
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isFiltersModalOpen, setIsFiltersModalOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const [defaultParentClientId, setDefaultParentClientId] = useState<string | null>(null);
   const hasAutoOpenedInitialClient = useRef(false);
   
   const { checklistTemplates: clientStoreTemplates } = useClientStore();
@@ -111,6 +112,15 @@ export const ClientList = ({
     }
   }, [clients, initialClientId]);
 
+  useEffect(() => {
+    if (!viewingClient) return;
+    const latest = clients.find((c) => c.id === viewingClient.id);
+    if (!latest) return;
+    if (latest !== viewingClient) {
+      setViewingClient(latest);
+    }
+  }, [clients, viewingClient]);
+
   // Calculate checklist stats for each template
   // Count clients by their LAST completed checklist item
   const checklistStats = useMemo(() => {
@@ -147,6 +157,7 @@ export const ClientList = ({
     const normalizedSearchQuery = searchQuery.toLowerCase().trim();
 
     return clients.filter(client => {
+      if (client.parentClientId) return false;
       const clientName = (client.name || '').toLowerCase();
       const clientEmail = (client.email || '').toLowerCase();
       const clientPhone = String(client.phone || '');
@@ -201,6 +212,17 @@ export const ClientList = ({
     setViewingClient(client);
   };
 
+  const handleBackFromProfile = () => {
+    if (viewingClient?.parentClientId) {
+      const parentClient = clients.find((c) => c.id === viewingClient.parentClientId);
+      if (parentClient) {
+        setViewingClient(parentClient);
+        return;
+      }
+    }
+    setViewingClient(null);
+  };
+
   const handleEditClient = (client: Client) => {
     setEditingClient(client);
     setIsFormOpen(true);
@@ -231,6 +253,14 @@ export const ClientList = ({
 
   const handleOpenNewClient = () => {
     setEditingClient(null);
+    setDefaultParentClientId(null);
+    setIsFormOpen(true);
+  };
+
+  const handleCreateChildFromProfile = () => {
+    if (!viewingClient) return;
+    setEditingClient(null);
+    setDefaultParentClientId(viewingClient.id);
     setIsFormOpen(true);
   };
 
@@ -319,26 +349,44 @@ export const ClientList = ({
       <>
         <ClientProfileView
           client={viewingClient}
-          onBack={() => setViewingClient(null)}
+          onBack={handleBackFromProfile}
           onEdit={handleEditFromProfile}
+          onCreateChild={handleCreateChildFromProfile}
+          onOpenClient={(clientId) => {
+            const nextClient = clients.find((c) => c.id === clientId);
+            if (nextClient) setViewingClient(nextClient);
+          }}
         />
         <ClientFormModal
           client={editingClient}
+          availableClients={clients}
+          hideParentSelector={!editingClient}
           products={products}
           visaStatusTemplates={visaStatusTemplates}
           open={isFormOpen}
           onOpenChange={(open) => {
             setIsFormOpen(open);
-            if (!open) setEditingClient(null);
+            if (!open) {
+              setEditingClient(null);
+              setDefaultParentClientId(null);
+            }
           }}
-          onSave={(data) => {
+          defaultParentClientId={defaultParentClientId}
+          onSave={async (data) => {
             if (editingClient) {
-              onUpdate(editingClient.id, data);
+              await onUpdate(editingClient.id, data);
               // Update the viewing client with new data
               setViewingClient({ ...viewingClient, ...data, updatedAt: new Date() });
               toast.success('Cliente actualizado');
+            } else {
+              await onCreate({
+                ...data,
+                parentClientId: defaultParentClientId ?? data.parentClientId ?? null,
+              });
+              toast.success('Cliente creado');
             }
             setEditingClient(null);
+            setDefaultParentClientId(null);
           }}
         />
       </>
@@ -436,10 +484,18 @@ export const ClientList = ({
 
         <ClientFormModal
           client={editingClient}
+          availableClients={clients}
+          hideParentSelector={!editingClient}
           products={products}
           visaStatusTemplates={visaStatusTemplates}
           open={isFormOpen}
-          onOpenChange={setIsFormOpen}
+          onOpenChange={(open) => {
+            setIsFormOpen(open);
+            if (!open) {
+              setDefaultParentClientId(null);
+            }
+          }}
+          defaultParentClientId={defaultParentClientId}
           onSave={handleCreateOrUpdate}
         />
 
