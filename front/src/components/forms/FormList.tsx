@@ -11,6 +11,16 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 
@@ -26,6 +36,8 @@ export const FormList = ({ forms, onSelectForm, onCreateForm, onDeleteForm }: Fo
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [newFormName, setNewFormName] = useState('');
   const [newFormDescription, setNewFormDescription] = useState('');
+  const [formToDelete, setFormToDelete] = useState<{ id: string; name: string } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const filteredForms = forms.filter(
     form =>
@@ -54,11 +66,21 @@ export const FormList = ({ forms, onSelectForm, onCreateForm, onDeleteForm }: Fo
     }
   };
 
-  const handleDelete = async (formId: string) => {
+  const handleDelete = (form: Form) => {
+    setFormToDelete({ id: form.id, name: form.name });
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!formToDelete || isDeleting) return;
+
+    setIsDeleting(true);
     try {
-      await onDeleteForm(formId);
+      await onDeleteForm(formToDelete.id);
+      setFormToDelete(null);
     } catch (error) {
       console.error('Failed to delete form:', error);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -102,7 +124,7 @@ export const FormList = ({ forms, onSelectForm, onCreateForm, onDeleteForm }: Fo
                 key={form.id}
                 form={form}
                 onEdit={() => onSelectForm(form.id)}
-                onDelete={() => handleDelete(form.id)}
+                onDelete={() => handleDelete(form)}
                 onDuplicate={() => handleDuplicate(form)}
               />
             ))}
@@ -174,6 +196,36 @@ export const FormList = ({ forms, onSelectForm, onCreateForm, onDeleteForm }: Fo
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog
+        open={!!formToDelete}
+        onOpenChange={(open) => {
+          if (!open && !isDeleting) {
+            setFormToDelete(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar formulario?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. El formulario
+              {formToDelete ? ` "${formToDelete.name}"` : ''} se marcará como eliminado y dejará de estar disponible.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? 'Eliminando...' : 'Eliminar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

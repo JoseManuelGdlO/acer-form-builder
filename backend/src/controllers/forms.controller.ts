@@ -11,7 +11,7 @@ export const getAllForms = async (req: AuthRequest, res: Response): Promise<void
       return;
     }
     const forms = await Form.findAll({
-      where: { companyId },
+      where: { companyId, isDeleted: false },
       order: [['created_at', 'DESC']],
     });
 
@@ -28,7 +28,7 @@ export const getFormById = async (req: AuthRequest, res: Response): Promise<void
 
     if (req.user?.companyId) {
       // Authenticated: scope by company
-      const form = await Form.findOne({ where: { id, companyId: req.user.companyId } });
+      const form = await Form.findOne({ where: { id, companyId: req.user.companyId, isDeleted: false } });
       if (!form) {
         res.status(404).json({ error: 'Form not found' });
         return;
@@ -38,7 +38,8 @@ export const getFormById = async (req: AuthRequest, res: Response): Promise<void
     }
 
     // Public (no auth): return form with company for branding
-    const form = await Form.findByPk(id, {
+    const form = await Form.findOne({
+      where: { id, isDeleted: false },
       include: [{ model: Company, as: 'company', attributes: ['id', 'name', 'slug', 'logoUrl'] }],
     });
     if (!form) {
@@ -107,7 +108,7 @@ export const updateForm = [
         res.status(401).json({ error: 'Authentication required' });
         return;
       }
-      const form = await Form.findOne({ where: { id, companyId } });
+      const form = await Form.findOne({ where: { id, companyId, isDeleted: false } });
 
       if (!form) {
         res.status(404).json({ error: 'Form not found' });
@@ -131,15 +132,15 @@ export const deleteForm = async (req: AuthRequest, res: Response): Promise<void>
       res.status(401).json({ error: 'Authentication required' });
       return;
     }
-    const form = await Form.findOne({ where: { id, companyId } });
+    const form = await Form.findOne({ where: { id, companyId, isDeleted: false } });
 
     if (!form) {
       res.status(404).json({ error: 'Form not found' });
       return;
     }
 
-    await form.destroy();
-    res.json({ message: 'Form deleted successfully' });
+    await form.update({ isDeleted: true });
+    res.json({ message: 'Form soft deleted successfully' });
   } catch (error) {
     console.error('Delete form error:', error);
     res.status(500).json({ error: 'Internal server error' });

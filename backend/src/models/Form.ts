@@ -21,11 +21,13 @@ interface FormAttributes {
   name: string;
   description?: string;
   sections: FormSection[];
+  isDeleted: boolean;
   createdAt?: Date;
   updatedAt?: Date;
 }
 
-interface FormCreationAttributes extends Optional<FormAttributes, 'id' | 'sections' | 'createdAt' | 'updatedAt'> {}
+interface FormCreationAttributes
+  extends Optional<FormAttributes, 'id' | 'sections' | 'isDeleted' | 'createdAt' | 'updatedAt'> {}
 
 export class Form extends Model<FormAttributes, FormCreationAttributes> implements FormAttributes {
   public id!: string;
@@ -33,6 +35,7 @@ export class Form extends Model<FormAttributes, FormCreationAttributes> implemen
   public name!: string;
   public description?: string;
   public sections!: FormSection[];
+  public isDeleted!: boolean;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
 }
@@ -65,6 +68,12 @@ Form.init(
       type: DataTypes.JSON,
       allowNull: false,
       defaultValue: [],
+    },
+    isDeleted: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+      field: 'is_deleted',
     },
   },
   {
