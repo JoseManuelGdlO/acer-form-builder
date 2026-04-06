@@ -170,7 +170,7 @@ export const Dashboard = ({
     <div className="space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
+        <h1 className="text-3xl font-bold text-foreground">Inicio</h1>
         <p className="text-muted-foreground mt-1">
           Resumen general del sistema • {format(new Date(), "EEEE, d 'de' MMMM yyyy", { locale: es })}
         </p>

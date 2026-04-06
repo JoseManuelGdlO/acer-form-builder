@@ -466,7 +466,7 @@ const Index = () => {
         className="h-8 gap-1.5 px-2 text-xs sm:text-sm"
       >
         <LayoutDashboard className="w-4 h-4 shrink-0" />
-        <span className="hidden sm:inline">Dashboard</span>
+        <span className="hidden sm:inline">Inicio</span>
       </Button>
       <Button
         variant={current === 'clients' ? 'default' : 'ghost'}

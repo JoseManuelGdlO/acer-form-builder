@@ -124,6 +124,11 @@
     @apply bg-background text-foreground font-sans antialiased;
     font-family: 'Montserrat', sans-serif;
   }
+
+  /* Imagen de fondo global (company.theme.appBackgroundImage): capa semitransparente para legibilidad */
+  [data-app-bg-image="true"] .min-h-screen.bg-background {
+    background-color: hsl(var(--background) / 0.88) !important;
+  }
 }
 
 @layer utilities {

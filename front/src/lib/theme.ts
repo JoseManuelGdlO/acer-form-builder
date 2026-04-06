@@ -1,6 +1,39 @@
 /** HSL string format used in CSS: "H S% L%" (e.g. "234 66% 30%"). */
 export type HslString = string;
 
+/** Keys stored in company.theme that are not CSS color variables. */
+export const APP_BACKGROUND_IMAGE_KEY = 'appBackgroundImage' as const;
+
+/** Only these keys are applied as :root CSS variables (not data URLs / metadata). */
+export const THEME_COLOR_KEYS = [
+  'primary',
+  'primary-foreground',
+  'secondary',
+  'secondary-foreground',
+  'background',
+  'foreground',
+  'card',
+  'card-foreground',
+  'muted',
+  'muted-foreground',
+  'accent',
+  'border',
+  'ring',
+  'radius',
+  'sidebar-background',
+  'sidebar-foreground',
+  'sidebar-primary',
+  'sidebar-primary-foreground',
+  'sidebar-accent',
+  'sidebar-accent-foreground',
+  'sidebar-border',
+  'sidebar-ring',
+] as const;
+
+export type ThemeColorKey = (typeof THEME_COLOR_KEYS)[number];
+
+const THEME_META_KEYS = new Set<string>([APP_BACKGROUND_IMAGE_KEY]);
+
 /**
  * Parse "H S% L%" to HSL numbers [h, s, l]. S and L are 0-100.
  */
@@ -49,9 +82,15 @@ function hexToHsl(hex: string): [number, number, number] {
     const d = max - min;
     s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
     switch (max) {
-      case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
-      case g: h = ((b - r) / d + 2) / 6; break;
-      case b: h = ((r - g) / d + 4) / 6; break;
+      case r:
+        h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+        break;
+      case g:
+        h = ((b - r) / d + 2) / 6;
+        break;
+      case b:
+        h = ((r - g) / d + 4) / 6;
+        break;
     }
     h *= 360;
   }
@@ -77,22 +116,57 @@ export function hexToHslString(hex: string): HslString {
   return `${h} ${s}% ${l}%`;
 }
 
+function cssVarName(key: string): string {
+  return key.startsWith('--') ? key : `--${key}`;
+}
+
+/**
+ * Full data URL (e.g. data:image/jpeg;base64,...) on body; toggles data-app-bg-image on html.
+ */
+export function applyAppBackground(theme: Record<string, string> | null | undefined): void {
+  const raw = theme?.[APP_BACKGROUND_IMAGE_KEY]?.trim();
+  const html = document.documentElement;
+  if (raw) {
+    html.setAttribute('data-app-bg-image', 'true');
+    const escaped = raw.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    document.body.style.backgroundImage = `url("${escaped}")`;
+    document.body.style.backgroundSize = 'cover';
+    document.body.style.backgroundPosition = 'center';
+    document.body.style.backgroundAttachment = 'fixed';
+  } else {
+    html.setAttribute('data-app-bg-image', 'false');
+    document.body.style.backgroundImage = '';
+    document.body.style.backgroundSize = '';
+    document.body.style.backgroundPosition = '';
+    document.body.style.backgroundAttachment = '';
+  }
+}
+
 /**
  * Apply company theme (CSS variables) to the document.
- * Keys should match :root vars in index.css (e.g. "primary", "primary-foreground").
- * Values are HSL without hsl() wrapper, e.g. "234 66% 30%".
+ * Values are HSL without hsl() wrapper, e.g. "234 66% 30%", except `radius` which is e.g. "0.75rem".
+ * Ignores metadata keys such as appBackgroundImage.
  */
 export function applyTheme(theme: Record<string, string> | null): void {
   const root = document.documentElement;
   if (!theme || typeof theme !== 'object') {
+    THEME_COLOR_KEYS.forEach((key) => {
+      root.style.removeProperty(cssVarName(key));
+    });
+    applyAppBackground(null);
     return;
   }
-  Object.entries(theme).forEach(([key, value]) => {
+
+  THEME_COLOR_KEYS.forEach((key) => {
+    const value = theme[key];
+    const prop = cssVarName(key);
     if (value != null && value !== '') {
-      const cssVar = key.startsWith('--') ? key : `--${key}`;
-      root.style.setProperty(cssVar, value);
+      root.style.setProperty(prop, value);
+    } else {
+      root.style.removeProperty(prop);
     }
   });
+  applyAppBackground(theme);
 }
 
 /**
@@ -101,9 +175,9 @@ export function applyTheme(theme: Record<string, string> | null): void {
  */
 export function clearTheme(themeKeys?: string[]): void {
   const root = document.documentElement;
-  const keys = themeKeys ?? [];
+  const keys = themeKeys ?? [...THEME_COLOR_KEYS];
   keys.forEach((key) => {
-    const cssVar = key.startsWith('--') ? key : `--${key}`;
-    root.style.removeProperty(cssVar);
+    if (THEME_META_KEYS.has(key)) return;
+    root.style.removeProperty(cssVarName(key));
   });
 }

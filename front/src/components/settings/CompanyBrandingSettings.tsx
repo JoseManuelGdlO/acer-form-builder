@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,11 +11,30 @@ import {
 import { Slider } from '@/components/ui/slider';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
-import { applyTheme, hslStringToHex, hexToHslString } from '@/lib/theme';
+import {
+  applyTheme,
+  hslStringToHex,
+  hexToHslString,
+  THEME_COLOR_KEYS,
+  APP_BACKGROUND_IMAGE_KEY,
+} from '@/lib/theme';
 import { applyFavicon } from '@/lib/favicon';
 import { useTenant } from '@/contexts/TenantContext';
-import { Globe, Palette, Eye, ChevronDown, ChevronRight, RotateCcw, Image, Bookmark } from 'lucide-react';
+import {
+  Globe,
+  Palette,
+  Eye,
+  ChevronDown,
+  ChevronRight,
+  RotateCcw,
+  Image,
+  Bookmark,
+  Wallpaper,
+  Upload,
+  X,
+} from 'lucide-react';
 
+/** Valores por defecto alineados con index.css y THEME_COLOR_KEYS. */
 const DEFAULT_THEME: Record<string, string> = {
   primary: '234 66% 30%',
   'primary-foreground': '0 0% 100%',
@@ -31,6 +50,14 @@ const DEFAULT_THEME: Record<string, string> = {
   border: '234 20% 90%',
   ring: '234 66% 30%',
   radius: '0.75rem',
+  'sidebar-background': '234 66% 30%',
+  'sidebar-foreground': '0 0% 100%',
+  'sidebar-primary': '0 67% 47%',
+  'sidebar-primary-foreground': '0 0% 100%',
+  'sidebar-accent': '230 45% 47%',
+  'sidebar-accent-foreground': '0 0% 100%',
+  'sidebar-border': '234 50% 40%',
+  'sidebar-ring': '0 67% 47%',
 };
 
 const COLOR_GROUPS: { title: string; keys: { key: string; label: string }[] }[] = [
@@ -72,13 +99,51 @@ const COLOR_GROUPS: { title: string; keys: { key: string; label: string }[] }[] 
       { key: 'ring', label: 'Ring (focus)' },
     ],
   },
+  {
+    title: 'Cabecera y barra lateral (tokens sidebar)',
+    keys: [
+      { key: 'sidebar-background', label: 'Fondo barra lateral' },
+      { key: 'sidebar-foreground', label: 'Texto barra lateral' },
+      { key: 'sidebar-primary', label: 'Elemento activo / primario' },
+      { key: 'sidebar-primary-foreground', label: 'Texto sobre primario sidebar' },
+      { key: 'sidebar-accent', label: 'Acento sidebar' },
+      { key: 'sidebar-accent-foreground', label: 'Texto sobre acento sidebar' },
+      { key: 'sidebar-border', label: 'Borde sidebar' },
+      { key: 'sidebar-ring', label: 'Ring sidebar' },
+    ],
+  },
 ];
 
-const ALL_THEME_KEYS = [
-  'primary', 'primary-foreground', 'secondary', 'secondary-foreground',
-  'background', 'foreground', 'card', 'card-foreground',
-  'muted', 'muted-foreground', 'accent', 'border', 'ring', 'radius',
-] as const;
+/** Redimensiona y comprime a JPEG (máx. ancho 1920px) para no inflar la BD. */
+function compressImageFileToJpegDataUrl(file: File, maxWidth = 1920, quality = 0.85): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let { width, height } = img;
+      if (width > maxWidth) {
+        height = (height * maxWidth) / width;
+        width = maxWidth;
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        reject(new Error('No se pudo crear el contexto del canvas'));
+        return;
+      }
+      ctx.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('No se pudo cargar la imagen'));
+    };
+    img.src = url;
+  });
+}
 
 function parseSavedTheme(raw: unknown): Record<string, string> {
   if (raw == null || typeof raw !== 'object' || Array.isArray(raw)) {
@@ -87,14 +152,13 @@ function parseSavedTheme(raw: unknown): Record<string, string> {
   return { ...(raw as Record<string, string>) };
 }
 
-/** Estado del formulario: siempre parte de DEFAULT_THEME y se superpone lo guardado en API. */
 function mergeWithDefaultTheme(saved: Record<string, string>): Record<string, string> {
   return { ...DEFAULT_THEME, ...saved };
 }
 
 function getEffectiveTheme(theme: Record<string, string>): Record<string, string> {
   const out: Record<string, string> = {};
-  ALL_THEME_KEYS.forEach((key) => {
+  THEME_COLOR_KEYS.forEach((key) => {
     const v = theme[key];
     out[key] = v != null && v !== '' ? v : (DEFAULT_THEME[key] ?? '');
   });
@@ -121,8 +185,11 @@ export function CompanyBrandingSettings() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [isCompressingBg, setIsCompressingBg] = useState(false);
+  const bgFileInputRef = useRef<HTMLInputElement>(null);
 
   const effectiveTheme = useMemo(() => getEffectiveTheme(theme), [theme]);
+  const appBackgroundImage = theme[APP_BACKGROUND_IMAGE_KEY] ?? '';
 
   useEffect(() => {
     let cancelled = false;
@@ -142,7 +209,9 @@ export function CompanyBrandingSettings() {
       .finally(() => {
         if (!cancelled) setIsLoading(false);
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const handleSave = async () => {
@@ -181,6 +250,34 @@ export function CompanyBrandingSettings() {
   const handleResetTheme = () => {
     setTheme({ ...DEFAULT_THEME });
     toast.success('Tema restablecido a valores por defecto');
+  };
+
+  const handleBackgroundFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !file.type.startsWith('image/')) {
+      toast.error('Selecciona un archivo de imagen');
+      return;
+    }
+    setIsCompressingBg(true);
+    try {
+      const dataUrl = await compressImageFileToJpegDataUrl(file);
+      setTheme((t) => ({ ...t, [APP_BACKGROUND_IMAGE_KEY]: dataUrl }));
+      toast.success('Imagen preparada; pulsa «Guardar tema» para persistirla');
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Error al procesar la imagen');
+    } finally {
+      setIsCompressingBg(false);
+    }
+  };
+
+  const clearBackgroundImage = () => {
+    setTheme((t) => {
+      const next = { ...t };
+      delete next[APP_BACKGROUND_IMAGE_KEY];
+      return next;
+    });
+    toast.success('Imagen eliminada del borrador; guarda para aplicar en el servidor');
   };
 
   if (isLoading) {
@@ -255,6 +352,52 @@ export function CompanyBrandingSettings() {
 
       <Card>
         <CardHeader>
+          <div className="flex items-center gap-2">
+            <Wallpaper className="w-5 h-5 text-primary" />
+            <CardTitle>Imagen de fondo (toda la aplicación)</CardTitle>
+          </div>
+          <CardDescription>
+            Se guarda en la base de datos como imagen JPEG comprimida (data URL con base64). Visible en todas las pantallas tras guardar.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <input
+            ref={bgFileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleBackgroundFile}
+          />
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={isCompressingBg}
+              onClick={() => bgFileInputRef.current?.click()}
+            >
+              <Upload className="w-4 h-4 mr-1" />
+              {isCompressingBg ? 'Procesando…' : 'Elegir imagen'}
+            </Button>
+            {appBackgroundImage ? (
+              <Button type="button" variant="ghost" size="sm" onClick={clearBackgroundImage}>
+                <X className="w-4 h-4 mr-1" />
+                Quitar imagen
+              </Button>
+            ) : null}
+          </div>
+          {appBackgroundImage ? (
+            <div className="rounded-lg border overflow-hidden max-h-48 bg-muted">
+              <img src={appBackgroundImage} alt="Vista previa del fondo" className="w-full h-40 object-cover" />
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">Sin imagen de fondo; se usa solo el color de «Fondo de página».</p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-2">
               <Palette className="w-5 h-5 text-primary" />
@@ -277,14 +420,13 @@ export function CompanyBrandingSettings() {
           </div>
         </CardHeader>
         <CardContent className="space-y-8">
-          {/* Vista previa en vivo */}
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-sm font-medium">
               <Eye className="w-4 h-4" />
               Vista previa
             </div>
             <div
-              className="rounded-xl border p-6 min-h-[180px]"
+              className="rounded-xl border p-4 min-h-[200px] flex gap-3"
               style={
                 {
                   '--background': effectiveTheme.background ? `hsl(${effectiveTheme.background})` : undefined,
@@ -305,49 +447,83 @@ export function CompanyBrandingSettings() {
                 } as React.CSSProperties
               }
             >
-              <div className="flex flex-wrap items-center gap-3 mb-4">
-                <button
-                  type="button"
-                  className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow hover:opacity-90"
+              <div
+                className="w-24 shrink-0 rounded-lg border p-2 flex flex-col gap-2 text-[10px] leading-tight"
+                style={{
+                  background: effectiveTheme['sidebar-background'] ? `hsl(${effectiveTheme['sidebar-background']})` : undefined,
+                  color: effectiveTheme['sidebar-foreground'] ? `hsl(${effectiveTheme['sidebar-foreground']})` : undefined,
+                  borderColor: effectiveTheme['sidebar-border'] ? `hsl(${effectiveTheme['sidebar-border']})` : undefined,
+                  borderRadius: effectiveTheme.radius ?? '0.75rem',
+                }}
+              >
+                <span className="font-semibold">Barra</span>
+                <span
+                  className="rounded px-1 py-0.5 text-center"
                   style={{
-                    background: effectiveTheme.primary ? `hsl(${effectiveTheme.primary})` : undefined,
-                    color: effectiveTheme['primary-foreground'] ? `hsl(${effectiveTheme['primary-foreground']})` : undefined,
-                    borderRadius: effectiveTheme.radius ?? '0.75rem',
+                    background: effectiveTheme['sidebar-primary'] ? `hsl(${effectiveTheme['sidebar-primary']})` : undefined,
+                    color: effectiveTheme['sidebar-primary-foreground']
+                      ? `hsl(${effectiveTheme['sidebar-primary-foreground']})`
+                      : undefined,
                   }}
                 >
-                  Botón primario
-                </button>
-                <button
-                  type="button"
-                  className="inline-flex items-center justify-center rounded-md border border-input bg-secondary px-4 py-2 text-sm font-medium text-secondary-foreground shadow-sm hover:bg-secondary/80"
+                  Activo
+                </span>
+                <span
+                  className="rounded px-1 py-0.5 text-center opacity-90"
                   style={{
-                    background: effectiveTheme.secondary ? `hsl(${effectiveTheme.secondary})` : undefined,
-                    color: effectiveTheme['secondary-foreground'] ? `hsl(${effectiveTheme['secondary-foreground']})` : undefined,
+                    background: effectiveTheme['sidebar-accent'] ? `hsl(${effectiveTheme['sidebar-accent']})` : undefined,
+                    color: effectiveTheme['sidebar-accent-foreground']
+                      ? `hsl(${effectiveTheme['sidebar-accent-foreground']})`
+                      : undefined,
+                  }}
+                >
+                  Acento
+                </span>
+              </div>
+              <div className="flex-1 min-w-0 space-y-3">
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow hover:opacity-90"
+                    style={{
+                      background: effectiveTheme.primary ? `hsl(${effectiveTheme.primary})` : undefined,
+                      color: effectiveTheme['primary-foreground'] ? `hsl(${effectiveTheme['primary-foreground']})` : undefined,
+                      borderRadius: effectiveTheme.radius ?? '0.75rem',
+                    }}
+                  >
+                    Botón primario
+                  </button>
+                  <button
+                    type="button"
+                    className="inline-flex items-center justify-center rounded-md border border-input bg-secondary px-4 py-2 text-sm font-medium text-secondary-foreground shadow-sm hover:bg-secondary/80"
+                    style={{
+                      background: effectiveTheme.secondary ? `hsl(${effectiveTheme.secondary})` : undefined,
+                      color: effectiveTheme['secondary-foreground'] ? `hsl(${effectiveTheme['secondary-foreground']})` : undefined,
+                      borderColor: effectiveTheme.border ? `hsl(${effectiveTheme.border})` : undefined,
+                      borderRadius: effectiveTheme.radius ?? '0.75rem',
+                    }}
+                  >
+                    Secundario
+                  </button>
+                </div>
+                <div
+                  className="rounded-lg border p-4 max-w-sm"
+                  style={{
+                    background: effectiveTheme.card ? `hsl(${effectiveTheme.card})` : undefined,
+                    color: effectiveTheme['card-foreground'] ? `hsl(${effectiveTheme['card-foreground']})` : undefined,
                     borderColor: effectiveTheme.border ? `hsl(${effectiveTheme.border})` : undefined,
                     borderRadius: effectiveTheme.radius ?? '0.75rem',
                   }}
                 >
-                  Secundario
-                </button>
-              </div>
-              <div
-                className="rounded-lg border p-4 max-w-sm"
-                style={{
-                  background: effectiveTheme.card ? `hsl(${effectiveTheme.card})` : undefined,
-                  color: effectiveTheme['card-foreground'] ? `hsl(${effectiveTheme['card-foreground']})` : undefined,
-                  borderColor: effectiveTheme.border ? `hsl(${effectiveTheme.border})` : undefined,
-                  borderRadius: effectiveTheme.radius ?? '0.75rem',
-                }}
-              >
-                <p className="font-medium">Tarjeta de ejemplo</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Texto secundario y borde redondeado según tu tema.
-                </p>
+                  <p className="font-medium">Tarjeta de ejemplo</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Texto secundario y borde redondeado según tu tema.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Controles de color por grupos */}
           <div className="space-y-6">
             {COLOR_GROUPS.map((group) => (
               <div key={group.title} className="space-y-3">
@@ -382,7 +558,6 @@ export function CompanyBrandingSettings() {
               </div>
             ))}
 
-            {/* Radio de bordes */}
             <div className="space-y-3">
               <h4 className="text-sm font-semibold text-foreground">Radio de bordes</h4>
               <div className="flex items-center gap-4 max-w-sm">
@@ -401,7 +576,6 @@ export function CompanyBrandingSettings() {
             </div>
           </div>
 
-          {/* Valores HSL avanzados (colapsable) */}
           <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
             <CollapsibleTrigger asChild>
               <Button variant="ghost" size="sm" className="w-full justify-between px-0">
@@ -413,7 +587,7 @@ export function CompanyBrandingSettings() {
             </CollapsibleTrigger>
             <CollapsibleContent>
               <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 pt-4">
-                {ALL_THEME_KEYS.map((key) => (
+                {THEME_COLOR_KEYS.map((key) => (
                   <div key={key} className="space-y-1">
                     <Label htmlFor={`theme-${key}`} className="text-xs">
                       {key}

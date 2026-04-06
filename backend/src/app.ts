@@ -15,8 +15,8 @@ app.use(cors({
   credentials: true,
 }));
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '15mb' }));
+app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 
 // Servir archivos subidos (productos, etc.) desde la carpeta configurada
 const uploadsPath = path.isAbsolute(config.uploadsDir)
