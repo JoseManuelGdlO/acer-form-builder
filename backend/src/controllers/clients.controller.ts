@@ -607,7 +607,12 @@ export const createClient = [
         }
       }
 
-      const client = await Client.create({ ...req.body, companyId, parentClientId: parentClientId ?? null });
+      const client = await Client.create({
+        ...req.body,
+        companyId,
+        parentClientId: parentClientId ?? null,
+        ...(req.user && !req.user.roles.includes('super_admin') ? { assignedUserId: req.user.id } : {}),
+      });
       await client.reload({
         include: [
           { model: Product, as: 'product', attributes: ['id', 'title'], required: false },

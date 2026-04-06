@@ -9,6 +9,7 @@ const router = Router();
 
 // Protected list (tenant-scoped)
 router.get('/', authenticate, formsController.getAllForms);
+router.post('/:id/duplicate', authenticate, formsController.duplicateForm);
 router.get('/sessions/client/:clientId', authenticate, formSessionsController.getClientFormSessions);
 // Form sessions (public get/update for respondents; create is protected)
 router.get('/:id/sessions/:sessionId', formSessionsController.getFormSessionProgress);

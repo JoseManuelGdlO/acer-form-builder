@@ -82,6 +82,8 @@ interface TripDetailViewProps {
   tripIncomes: TripIncome[];
   tripExpenses: TripExpense[];
   onInviteCompanies: (invitedCompanyIds: string[]) => Promise<void>;
+  /** Revisor: solo ver, participantes y asientos; sin finanzas, invitaciones, edición */
+  reviewerMode?: boolean;
 }
 
 export const TripDetailView = ({
@@ -106,6 +108,7 @@ export const TripDetailView = ({
   tripIncomes,
   tripExpenses,
   onInviteCompanies,
+  reviewerMode = false,
 }: TripDetailViewProps) => {
   const [memberSearch, setMemberSearch] = useState('');
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -136,20 +139,21 @@ export const TripDetailView = ({
   const sharedIds = (trip.sharedCompanies ?? []).map(c => c.id);
   const companiesAvailableToInvite = companiesForInvite.filter(c => !sharedIds.includes(c.id));
 
-  // Cargar historial al entrar al detalle del viaje (solo cuando cambia trip.id)
+  // Cargar historial y finanzas al entrar (solo administradores)
   useEffect(() => {
+    if (reviewerMode) return;
     onLoadChangeLog();
     onLoadTripFinance();
-  }, [trip.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [trip.id, reviewerMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Refrescar historial cada 30 minutos mientras se está en la pantalla
   useEffect(() => {
+    if (reviewerMode) return;
     const interval = setInterval(() => {
       onLoadChangeLog();
       onLoadTripFinance();
     }, 30 * 60 * 1000);
     return () => clearInterval(interval);
-  }, [trip.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [trip.id, reviewerMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const participants = trip.participants ?? [];
   const filteredParticipants = memberSearch.trim()
@@ -733,10 +737,12 @@ export const TripDetailView = ({
               </div>
             )}
             <div className="flex items-center gap-2 mt-4 flex-wrap">
-              <Button type="button" variant="outline" size="sm" onClick={() => onEdit(trip)} className="gap-2">
-                <Pencil className="w-4 h-4" />
-                Editar viaje
-              </Button>
+              {!reviewerMode && (
+                <Button type="button" variant="outline" size="sm" onClick={() => onEdit(trip)} className="gap-2">
+                  <Pencil className="w-4 h-4" />
+                  Editar viaje
+                </Button>
+              )}
               <Button
                 type="button"
                 variant="outline"
@@ -760,27 +766,31 @@ export const TripDetailView = ({
                 <Download className="w-4 h-4" />
                 Descargar detalles
               </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleResetSeats}
-                disabled={isResetting || (trip.seatAssignments?.length ?? 0) === 0}
-                className="gap-2"
-              >
-                <RotateCcw className="w-4 h-4" />
-                Reiniciar asignaciones
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setDeleteConfirmOpen(true)}
-                className="gap-2 text-destructive hover:text-destructive"
-              >
-                <Trash2 className="w-4 h-4" />
-                Eliminar viaje
-              </Button>
+              {!reviewerMode && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleResetSeats}
+                  disabled={isResetting || (trip.seatAssignments?.length ?? 0) === 0}
+                  className="gap-2"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  Reiniciar asignaciones
+                </Button>
+              )}
+              {!reviewerMode && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setDeleteConfirmOpen(true)}
+                  className="gap-2 text-destructive hover:text-destructive"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Eliminar viaje
+                </Button>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0 flex-wrap">
@@ -788,16 +798,18 @@ export const TripDetailView = ({
             <UserPlus className="w-4 h-4" />
             Agregar participantes
           </Button>
-          <Button
-            variant="outline"
-            onClick={openInviteModal}
-            className="gap-2"
-            disabled={companiesAvailableToInvite.length === 0}
-            title={companiesAvailableToInvite.length === 0 ? 'No hay más empresas disponibles para invitar' : 'Invitar a otra empresa a colaborar en el viaje'}
-          >
-            <Building2 className="w-4 h-4" />
-            Invitar empresa
-          </Button>
+          {!reviewerMode && (
+            <Button
+              variant="outline"
+              onClick={openInviteModal}
+              className="gap-2"
+              disabled={companiesAvailableToInvite.length === 0}
+              title={companiesAvailableToInvite.length === 0 ? 'No hay más empresas disponibles para invitar' : 'Invitar a otra empresa a colaborar en el viaje'}
+            >
+              <Building2 className="w-4 h-4" />
+              Invitar empresa
+            </Button>
+          )}
         </div>
         </div>
 
@@ -858,14 +870,16 @@ export const TripDetailView = ({
                             )}
                           </div>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-destructive hover:text-destructive shrink-0"
-                          onClick={() => onRemoveParticipant(c.id)}
-                        >
-                          Quitar
-                        </Button>
+                        {!reviewerMode && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:text-destructive shrink-0"
+                            onClick={() => onRemoveParticipant(c.id)}
+                          >
+                            Quitar
+                          </Button>
+                        )}
                       </li>
                     );
                   })}
@@ -875,48 +889,50 @@ export const TripDetailView = ({
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <h2 className="font-semibold text-lg mb-3 flex items-center gap-2">
-              <History className="w-5 h-5" />
-              Historial de cambios
-            </h2>
-            {changeLog.length === 0 ? (
-              <p className="text-muted-foreground py-4 text-center text-sm">Aún no hay cambios registrados.</p>
-            ) : (
-              <ScrollArea className="h-[200px]">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b text-left text-muted-foreground">
-                      <th className="pb-2 pr-2">Fecha</th>
-                      <th className="pb-2 pr-2">Usuario</th>
-                      <th className="pb-2 pr-2">Acción</th>
-                      <th className="pb-2">Detalle</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {changeLog.map(entry => (
-                      <tr key={entry.id} className="border-b border-border/50">
-                        <td className="py-2 pr-2 whitespace-nowrap text-muted-foreground">
-                          {format(new Date(entry.createdAt), 'dd/MM/yyyy HH:mm', { locale: es })}
-                        </td>
-                        <td className="py-2 pr-2">{entry.user?.name ?? '—'}</td>
-                        <td className="py-2 pr-2">{ACTION_LABELS[entry.action] ?? entry.action}</td>
-                        <td className="py-2 text-muted-foreground">
-                          {entry.fieldName && entry.oldValue != null && entry.newValue != null
-                            ? `${entry.fieldName}: ${entry.oldValue} → ${entry.newValue}`
-                            : entry.newValue ?? entry.oldValue ?? '—'}
-                        </td>
+        {!reviewerMode && (
+          <Card>
+            <CardContent className="p-4">
+              <h2 className="font-semibold text-lg mb-3 flex items-center gap-2">
+                <History className="w-5 h-5" />
+                Historial de cambios
+              </h2>
+              {changeLog.length === 0 ? (
+                <p className="text-muted-foreground py-4 text-center text-sm">Aún no hay cambios registrados.</p>
+              ) : (
+                <ScrollArea className="h-[200px]">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b text-left text-muted-foreground">
+                        <th className="pb-2 pr-2">Fecha</th>
+                        <th className="pb-2 pr-2">Usuario</th>
+                        <th className="pb-2 pr-2">Acción</th>
+                        <th className="pb-2">Detalle</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </ScrollArea>
-            )}
-          </CardContent>
-        </Card>
+                    </thead>
+                    <tbody>
+                      {changeLog.map(entry => (
+                        <tr key={entry.id} className="border-b border-border/50">
+                          <td className="py-2 pr-2 whitespace-nowrap text-muted-foreground">
+                            {format(new Date(entry.createdAt), 'dd/MM/yyyy HH:mm', { locale: es })}
+                          </td>
+                          <td className="py-2 pr-2">{entry.user?.name ?? '—'}</td>
+                          <td className="py-2 pr-2">{ACTION_LABELS[entry.action] ?? entry.action}</td>
+                          <td className="py-2 text-muted-foreground">
+                            {entry.fieldName && entry.oldValue != null && entry.newValue != null
+                              ? `${entry.fieldName}: ${entry.oldValue} → ${entry.newValue}`
+                              : entry.newValue ?? entry.oldValue ?? '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </ScrollArea>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
-        {financeCard}
+        {!reviewerMode && financeCard}
 
         <AddParticipantsToTripModal
           open={addModalOpen}

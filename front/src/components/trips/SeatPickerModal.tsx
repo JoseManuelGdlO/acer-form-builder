@@ -36,6 +36,8 @@ interface SeatPickerModalProps {
   onClear: (opts: { clientId?: string; seatId?: string }) => Promise<void>;
   onReset: () => Promise<void>;
   onUpdateTemplateSeatLabel?: (tripId: string, templateId: string, seatId: string, label: string) => Promise<void>;
+  /** Revisor: solo asignar asientos, sin quitar ni reiniciar */
+  reviewerSeatMode?: boolean;
 }
 
 export function SeatPickerModal({
@@ -46,6 +48,7 @@ export function SeatPickerModal({
   onClear,
   onReset,
   onUpdateTemplateSeatLabel,
+  reviewerSeatMode = false,
 }: SeatPickerModalProps) {
   const [pendingSeatNumber, setPendingSeatNumber] = useState<number | null>(null);
   const [pendingSeatId, setPendingSeatId] = useState<string | null>(null);
@@ -178,7 +181,9 @@ export function SeatPickerModal({
           <div className="grid grid-cols-1 md:grid-cols-[1.7fr_1fr_1fr] gap-4 flex-1 min-h-0">
             <div className="flex flex-col min-h-0">
               <p className="text-xs text-muted-foreground mb-2">
-                Haz clic en un asiento para asignar o quitar.
+                {reviewerSeatMode
+                  ? 'Haz clic en un asiento libre para asignar un participante.'
+                  : 'Haz clic en un asiento para asignar o quitar.'}
               </p>
               <Tabs defaultValue="0" className="flex-1 flex flex-col min-h-0">
                 <TabsList className="grid w-full shrink-0" style={{ gridTemplateColumns: `repeat(${layout!.floors.length}, 1fr)` }}>
@@ -198,10 +203,12 @@ export function SeatPickerModal({
                   </TabsContent>
                 ))}
               </Tabs>
-              <Button variant="outline" size="sm" className="mt-2 gap-2" onClick={handleReset} disabled={resetting}>
-                <RotateCcw className="w-4 h-4" />
-                Reiniciar asignaciones
-              </Button>
+              {!reviewerSeatMode && (
+                <Button variant="outline" size="sm" className="mt-2 gap-2" onClick={handleReset} disabled={resetting}>
+                  <RotateCcw className="w-4 h-4" />
+                  Reiniciar asignaciones
+                </Button>
+              )}
             </div>
 
             <div className="flex flex-col gap-2 min-h-0">
@@ -245,15 +252,17 @@ export function SeatPickerModal({
                     <div className="text-sm flex items-center gap-2 flex-wrap">
                       <span className="text-muted-foreground">Asignado a: </span>
                       <span>{(assignmentBySeatId[pendingSeatId] as any)?.client?.name ?? assignmentBySeatId[pendingSeatId].clientId}</span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-destructive hover:text-destructive"
-                        onClick={() => handleClear({ seatId: pendingSeatId })}
-                      >
-                        <UserMinus className="w-3.5 h-3.5" />
-                        Quitar
-                      </Button>
+                      {!reviewerSeatMode && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => handleClear({ seatId: pendingSeatId })}
+                        >
+                          <UserMinus className="w-3.5 h-3.5" />
+                          Quitar
+                        </Button>
+                      )}
                     </div>
                   )}
                   <Button variant="ghost" size="sm" onClick={() => { setPendingSeatId(null); setPendingSeatNumber(null); }}>
@@ -285,14 +294,16 @@ export function SeatPickerModal({
                             <span className="text-muted-foreground text-xs ml-1">({(a as any).client.company.name})</span>
                           )}
                         </span>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="shrink-0 text-destructive hover:text-destructive"
-                          onClick={() => handleClear(a.seatId ? { seatId: a.seatId! } : { clientId: a.clientId })}
-                        >
-                          <UserMinus className="w-3.5 h-3.5" />
-                        </Button>
+                        {!reviewerSeatMode && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="shrink-0 text-destructive hover:text-destructive"
+                            onClick={() => handleClear(a.seatId ? { seatId: a.seatId! } : { clientId: a.clientId })}
+                          >
+                            <UserMinus className="w-3.5 h-3.5" />
+                          </Button>
+                        )}
                       </li>
                     );
                   })}
@@ -364,10 +375,12 @@ export function SeatPickerModal({
                 ))}
               </div>
             </div>
-            <Button variant="outline" size="sm" className="mt-2 gap-2" onClick={handleReset} disabled={resetting}>
-              <RotateCcw className="w-4 h-4" />
-              Reiniciar asignaciones
-            </Button>
+            {!reviewerSeatMode && (
+              <Button variant="outline" size="sm" className="mt-2 gap-2" onClick={handleReset} disabled={resetting}>
+                <RotateCcw className="w-4 h-4" />
+                Reiniciar asignaciones
+              </Button>
+            )}
           </div>
 
           <div className="flex flex-col gap-2 min-h-0">
@@ -420,14 +433,16 @@ export function SeatPickerModal({
                           <span className="text-muted-foreground text-xs ml-1">({(a as any).client.company.name})</span>
                         )}
                       </span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="shrink-0 text-destructive hover:text-destructive"
-                        onClick={() => handleClear({ clientId: a.clientId })}
-                      >
-                        <UserMinus className="w-3.5 h-3.5" />
-                      </Button>
+                      {!reviewerSeatMode && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="shrink-0 text-destructive hover:text-destructive"
+                          onClick={() => handleClear({ clientId: a.clientId })}
+                        >
+                          <UserMinus className="w-3.5 h-3.5" />
+                        </Button>
+                      )}
                     </li>
                   ))}
                 {seatAssignments.length === 0 && (

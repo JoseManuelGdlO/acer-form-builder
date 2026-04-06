@@ -29,9 +29,20 @@ interface FormListProps {
   onSelectForm: (formId: string) => void | Promise<void>;
   onCreateForm: (name: string, description?: string) => void | Promise<void>;
   onDeleteForm: (formId: string) => void | Promise<void>;
+  /** Duplicar vía API (copia secciones); preferido frente a crear vacío */
+  onDuplicateForm?: (formId: string) => void | Promise<void>;
+  /** Revisor: sin crear/eliminar/editar; solo ver público y duplicar */
+  readOnly?: boolean;
 }
 
-export const FormList = ({ forms, onSelectForm, onCreateForm, onDeleteForm }: FormListProps) => {
+export const FormList = ({
+  forms,
+  onSelectForm,
+  onCreateForm,
+  onDeleteForm,
+  onDuplicateForm,
+  readOnly = false,
+}: FormListProps) => {
   const [search, setSearch] = useState('');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [newFormName, setNewFormName] = useState('');
@@ -60,10 +71,18 @@ export const FormList = ({ forms, onSelectForm, onCreateForm, onDeleteForm }: Fo
 
   const handleDuplicate = async (form: Form) => {
     try {
-      await onCreateForm(`${form.name} (copia)`, form.description);
+      if (onDuplicateForm) {
+        await onDuplicateForm(form.id);
+      } else {
+        await onCreateForm(`${form.name} (copia)`, form.description);
+      }
     } catch (error) {
       console.error('Failed to duplicate form:', error);
     }
+  };
+
+  const openPublicForm = (formId: string) => {
+    window.open(`${window.location.origin}/form/${formId}`, '_blank', 'noopener,noreferrer');
   };
 
   const handleDelete = (form: Form) => {
@@ -93,16 +112,20 @@ export const FormList = ({ forms, onSelectForm, onCreateForm, onDeleteForm }: Fo
           <div>
             <h2 className="text-2xl font-bold text-foreground">Mis Formularios</h2>
             <p className="text-muted-foreground mt-1">
-              Crea y gestiona formularios para tus clientes de visa
+              {readOnly
+                ? 'Consulta y duplica formularios existentes'
+                : 'Crea y gestiona formularios para tus clientes de visa'}
             </p>
           </div>
-          <Button
-            onClick={() => setIsCreateDialogOpen(true)}
-            className="gradient-primary text-primary-foreground gap-2"
-          >
-            <Plus className="w-4 h-4" />
-            Nuevo Formulario
-          </Button>
+          {!readOnly && (
+            <Button
+              onClick={() => setIsCreateDialogOpen(true)}
+              className="gradient-primary text-primary-foreground gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              Nuevo Formulario
+            </Button>
+          )}
         </div>
 
         {/* Search */}
@@ -123,6 +146,8 @@ export const FormList = ({ forms, onSelectForm, onCreateForm, onDeleteForm }: Fo
               <FormCard
                 key={form.id}
                 form={form}
+                readOnly={readOnly}
+                onViewPublic={() => openPublicForm(form.id)}
                 onEdit={() => onSelectForm(form.id)}
                 onDelete={() => handleDelete(form)}
                 onDuplicate={() => handleDuplicate(form)}
@@ -140,9 +165,11 @@ export const FormList = ({ forms, onSelectForm, onCreateForm, onDeleteForm }: Fo
             <p className="text-muted-foreground max-w-md mx-auto mb-6">
               {search
                 ? 'Intenta con otro término de búsqueda'
-                : 'Crea tu primer formulario para empezar a recopilar información de tus clientes'}
+                : readOnly
+                  ? 'No hay formularios disponibles'
+                  : 'Crea tu primer formulario para empezar a recopilar información de tus clientes'}
             </p>
-            {!search && (
+            {!search && !readOnly && (
               <Button
                 onClick={() => setIsCreateDialogOpen(true)}
                 className="gradient-primary text-primary-foreground gap-2"
@@ -155,8 +182,8 @@ export const FormList = ({ forms, onSelectForm, onCreateForm, onDeleteForm }: Fo
         )}
       </main>
 
-      {/* Create Form Dialog */}
-      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+      {/* Create Form Dialog (solo admin) */}
+      <Dialog open={!readOnly && isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Nuevo Formulario</DialogTitle>

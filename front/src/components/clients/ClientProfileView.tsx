@@ -889,7 +889,7 @@ export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpe
                       amountDueHistory={amountDueHistory}
                       paymentDeletedHistory={paymentDeletedHistory}
                       onAddPayment={handleAddPayment}
-                      onDeletePayment={handleDeletePayment}
+                      onDeletePayment={isAdmin ? handleDeletePayment : undefined}
                       familyMembers={displayClient.children ?? []}
                     />
                   </AccordionContent>

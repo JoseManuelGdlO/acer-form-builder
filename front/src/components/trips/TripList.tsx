@@ -64,6 +64,8 @@ interface TripListProps {
   onUpdateBusTemplate?: (id: string, data: { name?: string; layout?: import('@/types/form').BusLayout }) => Promise<void>;
   onDeleteBusTemplate?: (id: string) => Promise<void>;
   changeLog: { id: string; tripId: string; userId: string; user?: { id: string; name: string }; action: string; fieldName?: string | null; oldValue?: string | null; newValue?: string | null; createdAt: string }[];
+  /** Revisor: sin camiones, crear/editar viaje, invitaciones, finanzas */
+  reviewerMode?: boolean;
 }
 
 export const TripList = ({
@@ -97,6 +99,7 @@ export const TripList = ({
   onUpdateBusTemplate,
   onDeleteBusTemplate,
   changeLog,
+  reviewerMode = false,
 }: TripListProps) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -190,7 +193,7 @@ export const TripList = ({
     setViewingTripId(tripId);
   };
 
-  if (showBusTemplates && onCreateBusTemplate && onUpdateBusTemplate && onDeleteBusTemplate) {
+  if (!reviewerMode && showBusTemplates && onCreateBusTemplate && onUpdateBusTemplate && onDeleteBusTemplate) {
     return (
       <BusTemplateList
         templates={busTemplates}
@@ -210,6 +213,7 @@ export const TripList = ({
           availableClients={availableClients}
           companiesForInvite={companiesForInvite}
           changeLog={changeLog.filter(e => e.tripId === viewingTrip.id)}
+          reviewerMode={reviewerMode}
           onBack={() => {
             setViewingTripId(null);
             setSeatPickerTrip(null);
@@ -257,7 +261,8 @@ export const TripList = ({
             onReset={async () => {
               await onResetSeatAssignments(seatPickerTrip.id);
             }}
-            onUpdateTemplateSeatLabel={onUpdateTemplateSeatLabel ? (tripId, templateId, seatId, label) => onUpdateTemplateSeatLabel(tripId, templateId, seatId, label) : undefined}
+            reviewerSeatMode={reviewerMode}
+            onUpdateTemplateSeatLabel={onUpdateTemplateSeatLabel && !reviewerMode ? (tripId, templateId, seatId, label) => onUpdateTemplateSeatLabel(tripId, templateId, seatId, label) : undefined}
           />
         )}
       </>
@@ -271,22 +276,26 @@ export const TripList = ({
           <div>
             <h1 className="text-3xl font-bold text-foreground">Viajes</h1>
             <p className="text-muted-foreground mt-1">
-              Gestiona viajes, invitaciones y asientos
+              {reviewerMode
+                ? 'Consulta viajes, participantes y asientos'
+                : 'Gestiona viajes, invitaciones y asientos'}
             </p>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setShowBusTemplates(true)} className="gap-2">
-              <Bus className="w-4 h-4" />
-              Mis camiones
-            </Button>
-            <Button onClick={() => { setEditingTrip(null); setIsFormOpen(true); }} className="gap-2">
-              <Plus className="w-4 h-4" />
-              Nuevo viaje
-            </Button>
-          </div>
+          {!reviewerMode && (
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setShowBusTemplates(true)} className="gap-2">
+                <Bus className="w-4 h-4" />
+                Mis camiones
+              </Button>
+              <Button onClick={() => { setEditingTrip(null); setIsFormOpen(true); }} className="gap-2">
+                <Plus className="w-4 h-4" />
+                Nuevo viaje
+              </Button>
+            </div>
+          )}
         </div>
 
-        {invitations.length > 0 && (
+        {!reviewerMode && invitations.length > 0 && (
           <Card className="border-primary/30">
             <CardContent className="p-4">
               <h2 className="font-semibold text-lg mb-3">Invitaciones pendientes</h2>
@@ -422,9 +431,11 @@ export const TripList = ({
             <p className="text-muted-foreground mb-4">
               {searchQuery
                 ? 'No se encontraron viajes con ese criterio'
-                : 'Crea un viaje para gestionar fechas, participantes y asientos'}
+                : reviewerMode
+                  ? 'Aún no hay viajes registrados'
+                  : 'Crea un viaje para gestionar fechas, participantes y asientos'}
             </p>
-            {!searchQuery && (
+            {!searchQuery && !reviewerMode && (
               <Button onClick={() => { setEditingTrip(null); setIsFormOpen(true); }} className="gap-2">
                 <Plus className="w-4 h-4" />
                 Nuevo viaje
@@ -437,6 +448,7 @@ export const TripList = ({
               <TripCard
                 key={trip.id}
                 trip={trip}
+                readOnly={reviewerMode}
                 onView={() => handleViewTrip(trip.id)}
                 onEdit={() => {
                   setEditingTrip(trip);
@@ -448,17 +460,19 @@ export const TripList = ({
           </div>
         )}
 
-        <TripFormModal
-          trip={editingTrip}
-          open={isFormOpen}
-          onOpenChange={open => {
-            setIsFormOpen(open);
-            if (!open) setEditingTrip(null);
-          }}
-          onSave={handleSaveTrip}
-          companiesForInvite={companiesForInvite}
-          busTemplates={busTemplates}
-        />
+        {!reviewerMode && (
+          <TripFormModal
+            trip={editingTrip}
+            open={isFormOpen}
+            onOpenChange={open => {
+              setIsFormOpen(open);
+              if (!open) setEditingTrip(null);
+            }}
+            onSave={handleSaveTrip}
+            companiesForInvite={companiesForInvite}
+            busTemplates={busTemplates}
+          />
+        )}
 
         {seatPickerTrip && (
           <SeatPickerModal
@@ -474,7 +488,8 @@ export const TripList = ({
             onReset={async () => {
               await onResetSeatAssignments(seatPickerTrip.id);
             }}
-            onUpdateTemplateSeatLabel={onUpdateTemplateSeatLabel ? (tripId, templateId, seatId, label) => onUpdateTemplateSeatLabel(tripId, templateId, seatId, label) : undefined}
+            reviewerSeatMode={reviewerMode}
+            onUpdateTemplateSeatLabel={onUpdateTemplateSeatLabel && !reviewerMode ? (tripId, templateId, seatId, label) => onUpdateTemplateSeatLabel(tripId, templateId, seatId, label) : undefined}
           />
         )}
       </div>

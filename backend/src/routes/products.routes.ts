@@ -5,6 +5,7 @@ import fs from 'fs';
 import { config } from '../config/env';
 import * as productsController from '../controllers/products.controller';
 import { authenticate } from '../middleware/auth.middleware';
+import { requireAdmin } from '../middleware/role.middleware';
 
 const router = Router();
 
@@ -48,9 +49,9 @@ router.get('/', productsController.getAllProducts);
 router.get('/by-category', productsController.getProductsByCategories);
 router.get('/title/:title', productsController.getProductByTitle);
 router.get('/:id', productsController.getProductById);
-router.post('/', upload.single('image'), productsController.createProduct);
-router.put('/:id', upload.single('image'), productsController.updateProduct);
-router.delete('/:id', productsController.deleteProduct);
+router.post('/', requireAdmin, upload.single('image'), productsController.createProduct);
+router.put('/:id', requireAdmin, upload.single('image'), productsController.updateProduct);
+router.delete('/:id', requireAdmin, productsController.deleteProduct);
 
 export default router;
 

@@ -680,6 +680,14 @@ class ApiClient {
     });
   }
 
+  async duplicateForm(id: string, token?: string | null) {
+    return this.request<any>(`/forms/${id}/duplicate`, {
+      method: 'POST',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
   async updateForm(id: string, formData: any, token?: string | null) {
     return this.request<any>(`/forms/${id}`, {
       method: 'PUT',

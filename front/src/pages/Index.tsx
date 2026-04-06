@@ -96,6 +96,7 @@ const Index = () => {
     createForm,
     updateForm,
     deleteForm,
+    duplicateForm,
     addSection,
     updateSection,
     deleteSection,
@@ -202,6 +203,12 @@ const Index = () => {
     // When leaving the editor (or when it isn't mounted), reset the flag.
     if (!currentForm) setEditorHasUnsavedChanges(false);
   }, [currentForm]);
+
+  useEffect(() => {
+    if (currentForm && !hasRole('super_admin')) {
+      void selectForm(null);
+    }
+  }, [currentForm, hasRole, selectForm]);
 
   const normalizeCategoryKey = (input: string): string | null => {
     const v = String(input || '')
@@ -326,12 +333,15 @@ const Index = () => {
     }
   }, [activeView, token]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Load trips, invitations, companies, groups and bus templates when switching to trips view (super_admin only)
+  // Viajes: lista para admin y revisor; invitaciones y plantillas solo admin
   useEffect(() => {
-    if (token && activeView === 'trips' && hasRole('super_admin')) {
+    if (!token || activeView !== 'trips') return;
+    if (hasRole('super_admin') || hasRole('reviewer')) {
       fetchTrips(token).catch((error) => {
         console.error('Failed to fetch trips:', error);
       });
+    }
+    if (hasRole('super_admin')) {
       fetchInvitations(token).catch((error) => {
         console.error('Failed to fetch invitations:', error);
       });
@@ -472,7 +482,7 @@ const Index = () => {
           </span>
         )}
       </Button>
-      {hasRole('super_admin') && (
+      {(hasRole('super_admin') || hasRole('reviewer')) && (
         <Button
           variant={current === 'trips' ? 'default' : 'ghost'}
           size="sm"
@@ -542,16 +552,17 @@ const Index = () => {
   );
 
   // Floating View As selector - always visible
-  const FloatingViewAs = () => (
-    <ViewAsSelector
-      users={users}
-      viewingAs={viewingAs}
-      onSelectUser={setViewingAs}
-    />
-  );
+  const FloatingViewAs = () =>
+    hasRole('super_admin') ? (
+      <ViewAsSelector
+        users={users}
+        viewingAs={viewingAs}
+        onSelectUser={setViewingAs}
+      />
+    ) : null;
 
-  // Si estamos editando un formulario, mostramos el editor
-  if (currentForm) {
+  // Si estamos editando un formulario, mostramos el editor (solo administradores)
+  if (currentForm && hasRole('super_admin')) {
     return (
       <>
         <FloatingViewAs />
@@ -765,19 +776,22 @@ const Index = () => {
                     Quitar filtros
                   </Button>
                 </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCategoryManagerOpen(true)}
-                >
-                  Gestionar categorías
-                </Button>
+                {hasRole('super_admin') && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCategoryManagerOpen(true)}
+                  >
+                    Gestionar categorías
+                  </Button>
+                )}
               </div>
             </div>
           </div>
           <ProductsList
             products={products}
+            readOnly={!hasRole('super_admin')}
             onCreate={handleCreate}
             onEdit={handleEdit}
             onDelete={handleDelete}
@@ -790,55 +804,59 @@ const Index = () => {
               return acc;
             }, {})}
           />
-          <ProductFormModal
-            open={productModalOpen}
-            product={editingProduct}
-            onClose={() => setProductModalOpen(false)}
-            availableCategories={categories}
-            onSubmit={handleSubmit}
-          />
-          <CategoryManagerModal
-            open={categoryManagerOpen}
-            categories={categories}
-            onClose={() => setCategoryManagerOpen(false)}
-            onCreate={async (data) => {
-              if (!token) throw new Error('No token available');
-              await createCategory(token, data);
-            }}
-            onUpdate={async (id, data) => {
-              if (!token) throw new Error('No token available');
-              await updateCategory(token, id, data);
-            }}
-            onDelete={async (id) => {
-              if (!token) throw new Error('No token available');
-              const deleting = categories.find((c) => c.id === id);
-              const deletedKey = deleting?.key;
+          {hasRole('super_admin') && (
+            <>
+              <ProductFormModal
+                open={productModalOpen}
+                product={editingProduct}
+                onClose={() => setProductModalOpen(false)}
+                availableCategories={categories}
+                onSubmit={handleSubmit}
+              />
+              <CategoryManagerModal
+                open={categoryManagerOpen}
+                categories={categories}
+                onClose={() => setCategoryManagerOpen(false)}
+                onCreate={async (data) => {
+                  if (!token) throw new Error('No token available');
+                  await createCategory(token, data);
+                }}
+                onUpdate={async (id, data) => {
+                  if (!token) throw new Error('No token available');
+                  await updateCategory(token, id, data);
+                }}
+                onDelete={async (id) => {
+                  if (!token) throw new Error('No token available');
+                  const deleting = categories.find((c) => c.id === id);
+                  const deletedKey = deleting?.key;
 
-              const affectsActiveFilter = deletedKey
-                ? selectedFilterCategories.includes(deletedKey)
-                : false;
-              const nextSelectedFilterCategories = affectsActiveFilter && deletedKey
-                ? selectedFilterCategories.filter((k) => k !== deletedKey)
-                : selectedFilterCategories;
+                  const affectsActiveFilter = deletedKey
+                    ? selectedFilterCategories.includes(deletedKey)
+                    : false;
+                  const nextSelectedFilterCategories = affectsActiveFilter && deletedKey
+                    ? selectedFilterCategories.filter((k) => k !== deletedKey)
+                    : selectedFilterCategories;
 
-              try {
-                await deleteCategory(token, id);
-              } catch (err) {
-                toast.error(err instanceof Error ? err.message : 'Error al eliminar categoría');
-                return;
-              }
+                  try {
+                    await deleteCategory(token, id);
+                  } catch (err) {
+                    toast.error(err instanceof Error ? err.message : 'Error al eliminar categoría');
+                    return;
+                  }
 
-              if (affectsActiveFilter) {
-                setSelectedFilterCategories(nextSelectedFilterCategories);
-                if (nextSelectedFilterCategories.length === 0) {
-                  await fetchProducts(token);
-                } else {
-                  const filtered = await api.getProductsByCategories(nextSelectedFilterCategories, token);
-                  replaceProducts(mapApiProductsToUi(filtered));
-                }
-              }
-            }}
-          />
+                  if (affectsActiveFilter) {
+                    setSelectedFilterCategories(nextSelectedFilterCategories);
+                    if (nextSelectedFilterCategories.length === 0) {
+                      await fetchProducts(token);
+                    } else {
+                      const filtered = await api.getProductsByCategories(nextSelectedFilterCategories, token);
+                      replaceProducts(mapApiProductsToUi(filtered));
+                    }
+                  }
+                }}
+              />
+            </>
+          )}
         </div>
       </>
     );
@@ -903,15 +921,16 @@ const Index = () => {
     );
   }
 
-  // Vista de viajes (solo super_admin)
+  // Vista de viajes (admin y revisor)
   if (activeView === 'trips') {
-    if (!hasRole('super_admin')) {
+    if (!hasRole('super_admin') && !hasRole('reviewer')) {
       return (
         <div className="min-h-screen flex items-center justify-center">
           <p className="text-muted-foreground">No tienes permisos para acceder a esta sección.</p>
         </div>
       );
     }
+    const tripReviewerMode = !hasRole('super_admin');
     return (
       <>
         <FloatingViewAs />
@@ -920,6 +939,7 @@ const Index = () => {
             <NavigationButtons current="trips" />
           </AppHeader>
           <TripList
+            reviewerMode={tripReviewerMode}
             trips={trips}
             invitations={invitations}
             availableClients={filteredClients}
@@ -1084,19 +1104,22 @@ const Index = () => {
 
         <FormList
           forms={forms}
+          readOnly={!hasRole('super_admin')}
           onSelectForm={async (formId) => {
             await selectForm(formId);
           }}
+          onDuplicateForm={async (formId) => {
+            await duplicateForm(formId);
+            if (token) await fetchForms();
+          }}
           onCreateForm={async (name, description) => {
             await createForm(name, description);
-            // Reload forms after creation
             if (token) {
               await fetchForms();
             }
           }}
           onDeleteForm={async (formId) => {
             await deleteForm(formId);
-            // Reload forms after deletion
             if (token) {
               await fetchForms();
             }

@@ -16,9 +16,11 @@ interface TripCardProps {
   onView: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  /** Solo ver detalle (revisor) */
+  readOnly?: boolean;
 }
 
-export const TripCard = ({ trip, onView, onEdit, onDelete }: TripCardProps) => {
+export const TripCard = ({ trip, onView, onEdit, onDelete, readOnly = false }: TripCardProps) => {
   const count = trip.participantCount ?? trip.participants?.length ?? 0;
   const departure = trip.departureDate ? format(new Date(trip.departureDate), 'd MMM yyyy', { locale: es }) : '';
   const returnDate = trip.returnDate ? format(new Date(trip.returnDate), 'd MMM yyyy', { locale: es }) : '';
@@ -70,14 +72,18 @@ export const TripCard = ({ trip, onView, onEdit, onDelete }: TripCardProps) => {
                 <Eye className="w-4 h-4" />
                 Ver detalle
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={onEdit} className="gap-2">
-                <Pencil className="w-4 h-4" />
-                Editar
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={onDelete} className="gap-2 text-destructive focus:text-destructive">
-                <Trash2 className="w-4 h-4" />
-                Eliminar
-              </DropdownMenuItem>
+              {!readOnly && (
+                <>
+                  <DropdownMenuItem onClick={onEdit} className="gap-2">
+                    <Pencil className="w-4 h-4" />
+                    Editar
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={onDelete} className="gap-2 text-destructive focus:text-destructive">
+                    <Trash2 className="w-4 h-4" />
+                    Eliminar
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

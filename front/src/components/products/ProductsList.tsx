@@ -10,11 +10,12 @@ interface ProductsListProps {
   onEdit: (product: Product) => void;
   onDelete: (product: Product) => void;
   categoriesMap?: Record<string, Category>;
+  readOnly?: boolean;
 }
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
-export const ProductsList = ({ products, onCreate, onEdit, onDelete, categoriesMap }: ProductsListProps) => {
+export const ProductsList = ({ products, onCreate, onEdit, onDelete, categoriesMap, readOnly = false }: ProductsListProps) => {
   const sortedProducts = useMemo(
     () => [...products].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()),
     [products]
@@ -31,13 +32,13 @@ export const ProductsList = ({ products, onCreate, onEdit, onDelete, categoriesM
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-3xl font-bold text-primary">Productos</h1>
-          <Button onClick={onCreate}>Crear producto</Button>
+          {!readOnly && <Button onClick={onCreate}>Crear producto</Button>}
         </div>
 
         {sortedProducts.length === 0 ? (
           <div className="border rounded-lg p-8 text-center text-muted-foreground bg-card">
             <p className="mb-3">Aún no tienes productos creados.</p>
-            <Button onClick={onCreate}>Crear el primer producto</Button>
+            {!readOnly && <Button onClick={onCreate}>Crear el primer producto</Button>}
           </div>
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -80,18 +81,20 @@ export const ProductsList = ({ products, onCreate, onEdit, onDelete, categoriesM
                     <p className="text-sm text-muted-foreground line-clamp-3">
                       {product.description}
                     </p>
-                    <div className="mt-2 flex items-center justify-between gap-2">
-                      <Button variant="outline" size="sm" onClick={() => onEdit(product)}>
-                        Editar
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => onDelete(product)}
-                      >
-                        Eliminar
-                      </Button>
-                    </div>
+                    {!readOnly && (
+                      <div className="mt-2 flex items-center justify-between gap-2">
+                        <Button variant="outline" size="sm" onClick={() => onEdit(product)}>
+                          Editar
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => onDelete(product)}
+                        >
+                          Eliminar
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </div>
               );

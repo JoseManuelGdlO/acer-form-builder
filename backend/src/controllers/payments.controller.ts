@@ -183,8 +183,8 @@ export const deletePayment = async (req: AuthRequest, res: Response): Promise<vo
       res.status(400).json({ error: PAYMENTS_ONLY_PRIMARY_MESSAGE });
       return;
     }
-    if (!req.user?.roles.includes('super_admin') && client && client.assignedUserId !== req.user?.id) {
-      res.status(403).json({ error: 'Access denied' });
+    if (!req.user?.roles.includes('super_admin')) {
+      res.status(403).json({ error: 'Only administrators can delete payments' });
       return;
     }
 

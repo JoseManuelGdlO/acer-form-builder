@@ -26,6 +26,16 @@ function requireSuperAdmin(req: AuthRequest, res: Response): boolean {
   return true;
 }
 
+/** super_admin or reviewer — read trips, add participants, assign seats */
+function requireSuperAdminOrReviewer(req: AuthRequest, res: Response): boolean {
+  const roles = req.user?.roles || [];
+  if (!roles.includes('super_admin') && !roles.includes('reviewer')) {
+    res.status(403).json({ error: 'Forbidden' });
+    return false;
+  }
+  return true;
+}
+
 async function ensureUserCompanyInTrip(req: AuthRequest, tripId: string): Promise<boolean> {
   const companyId = req.user?.companyId;
   if (!companyId) return false;
@@ -53,7 +63,7 @@ async function logTripChange(
 
 export const getAllTrips = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    if (!requireSuperAdmin(req, res)) return;
+    if (!requireSuperAdminOrReviewer(req, res)) return;
     const companyId = req.user?.companyId;
     if (!companyId) {
       res.status(401).json({ error: 'Authentication required' });
@@ -89,7 +99,7 @@ export const getAllTrips = async (req: AuthRequest, res: Response): Promise<void
 
 export const getTripById = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    if (!requireSuperAdmin(req, res)) return;
+    if (!requireSuperAdminOrReviewer(req, res)) return;
     const { id } = req.params;
     const companyId = req.user?.companyId;
     if (!companyId) {
@@ -381,7 +391,7 @@ export const addParticipants = [
   body('groupIds.*').optional().isUUID(),
   async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-      if (!requireSuperAdmin(req, res)) return;
+      if (!requireSuperAdminOrReviewer(req, res)) return;
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         res.status(400).json({ errors: errors.array() });
@@ -583,7 +593,7 @@ export const setSeatAssignment = [
   body('seatId').optional().isString().trim().notEmpty(),
   async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-      if (!requireSuperAdmin(req, res)) return;
+      if (!requireSuperAdminOrReviewer(req, res)) return;
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         res.status(400).json({ errors: errors.array() });

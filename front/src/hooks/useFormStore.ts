@@ -163,6 +163,26 @@ export const useFormStore = () => {
     }
   }, [currentForm, token]);
 
+  const duplicateForm = useCallback(
+    async (formId: string) => {
+      if (!token) {
+        throw new Error('No token available');
+      }
+      try {
+        const response = await api.duplicateForm(formId, token);
+        const mappedForm = mapFormData(response);
+        setForms((prev) => [...prev, mappedForm]);
+        toast.success('Formulario duplicado correctamente');
+        return mappedForm;
+      } catch (error) {
+        console.error('Failed to duplicate form:', error);
+        toast.error('Error al duplicar el formulario');
+        throw error;
+      }
+    },
+    [token]
+  );
+
   // Section operations
   const addSection = useCallback(async (formId: string) => {
     const newSection: FormSection = {
@@ -316,6 +336,7 @@ export const useFormStore = () => {
     createForm,
     updateForm,
     deleteForm,
+    duplicateForm,
     addSection,
     updateSection,
     deleteSection,
