@@ -1,7 +1,8 @@
 import { Response } from 'express';
+import { body, validationResult } from 'express-validator';
 import { Op } from 'sequelize';
 import { AuthRequest } from '../middleware/auth.middleware';
-import { ClientPayment, TripExpense, Client, Product, Trip, User } from '../models';
+import { ClientPayment, FinanceExpense, Client, Product, Trip, User } from '../models';
 
 type Granularity = 'hourly' | 'daily' | 'weekly' | 'monthly' | 'bimonthly' | 'quarterly' | 'semiannual' | 'annual';
 
@@ -249,26 +250,11 @@ export const getFinanceOverview = async (req: AuthRequest, res: Response): Promi
       { model: Trip, as: 'trip', attributes: ['id', 'title'] },
     ];
 
-    const includeTripWithAdvisorBranch = [
-      {
-        model: Trip,
-        as: 'trip',
-        attributes: ['id', 'title'],
-        include: [
-          {
-            model: User,
-            as: 'assignedUser',
-            attributes: ['id', 'branchId'],
-          },
-        ],
-      },
-    ];
-
     const [paymentsRows, expenseRows, previousPaymentsRows, previousExpenseRows] = await Promise.all([
       ClientPayment.findAll({ where: paymentWhere, include: includeClientProduct }),
-      TripExpense.findAll({ where: expenseWhere, include: includeTripWithAdvisorBranch }),
+      FinanceExpense.findAll({ where: expenseWhere }),
       ClientPayment.findAll({ where: previousPaymentWhere, include: includeClientProduct }),
-      TripExpense.findAll({ where: previousExpenseWhere, include: includeTripWithAdvisorBranch }),
+      FinanceExpense.findAll({ where: previousExpenseWhere }),
     ]);
 
     const payments = paymentsRows as Array<
@@ -277,7 +263,7 @@ export const getFinanceOverview = async (req: AuthRequest, res: Response): Promi
         trip?: Trip | null;
       }
     >;
-    const expenses = expenseRows as Array<TripExpense & { trip?: (Trip & { assignedUser?: User | null }) | null }>;
+    const expenses = expenseRows as FinanceExpense[];
 
     const productIdFilter = query.productId || null;
     let filteredPayments = productIdFilter
@@ -299,18 +285,8 @@ export const getFinanceOverview = async (req: AuthRequest, res: Response): Promi
       );
     }
 
-    let filteredExpenses = expenses;
-    if (assignedUserIdFilter) {
-      filteredExpenses = filteredExpenses.filter(
-        (expense) => expense.trip?.assignedUser?.id === assignedUserIdFilter,
-      );
-    }
-
-    if (branchIdFilter) {
-      filteredExpenses = filteredExpenses.filter(
-        (expense) => expense.trip?.assignedUser?.branchId === branchIdFilter,
-      );
-    }
+    /** Egresos de finanzas (manuales): no se filtran por asesor/sucursal; son a nivel empresa. */
+    const filteredExpenses = expenses;
 
     const previousPayments = previousPaymentsRows as Array<
       ClientPayment & {
@@ -318,9 +294,7 @@ export const getFinanceOverview = async (req: AuthRequest, res: Response): Promi
         trip?: Trip | null;
       }
     >;
-    const previousExpenses = previousExpenseRows as Array<
-      TripExpense & { trip?: (Trip & { assignedUser?: User | null }) | null }
-    >;
+    const previousExpenses = previousExpenseRows as FinanceExpense[];
 
     let filteredPreviousPayments = productIdFilter
       ? previousPayments.filter(
@@ -341,18 +315,7 @@ export const getFinanceOverview = async (req: AuthRequest, res: Response): Promi
       );
     }
 
-    let filteredPreviousExpenses = previousExpenses;
-    if (assignedUserIdFilter) {
-      filteredPreviousExpenses = filteredPreviousExpenses.filter(
-        (expense) => expense.trip?.assignedUser?.id === assignedUserIdFilter,
-      );
-    }
-
-    if (branchIdFilter) {
-      filteredPreviousExpenses = filteredPreviousExpenses.filter(
-        (expense) => expense.trip?.assignedUser?.branchId === branchIdFilter,
-      );
-    }
+    const filteredPreviousExpenses = previousExpenses;
 
     const totalIncome = sumAmounts(filteredPayments);
     const totalExpense = sumAmounts(filteredExpenses);
@@ -444,15 +407,6 @@ export const getFinanceOverview = async (req: AuthRequest, res: Response): Promi
       }
       tripRankMap.get(tripId)!.income += Number(payment.amount || 0);
     });
-    filteredExpenses.forEach((expense) => {
-      const tripId = expense.tripId;
-      const title = expense.trip?.title || 'Viaje sin título';
-      if (!tripRankMap.has(tripId)) {
-        tripRankMap.set(tripId, { tripId, title, income: 0, expense: 0 });
-      }
-      tripRankMap.get(tripId)!.expense += Number(expense.amount || 0);
-    });
-
     res.json({
       meta: {
         from: toIsoDate(fromDate),
@@ -473,6 +427,13 @@ export const getFinanceOverview = async (req: AuthRequest, res: Response): Promi
         previousNetProfit: Number(previousNet.toFixed(2)),
       },
       timeseries,
+      manualExpenses: filteredExpenses.map((e) => ({
+        id: e.id,
+        concept: e.concept,
+        amount: Number(Number(e.amount || 0).toFixed(2)),
+        expenseDate: e.expenseDate,
+        note: e.note ?? null,
+      })),
       breakdowns: {
         paymentTypes: Array.from(paymentTypeMap.values())
           .sort((a, b) => b.amount - a.amount)
@@ -499,6 +460,80 @@ export const getFinanceOverview = async (req: AuthRequest, res: Response): Promi
     });
   } catch (error) {
     console.error('Get finance overview error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+export const createFinanceExpense = [
+  body('amount').isFloat({ min: 0.01 }).withMessage('Amount must be a positive number'),
+  body('expenseDate').notEmpty().withMessage('Expense date is required').isISO8601().withMessage('Invalid date format'),
+  body('concept').trim().notEmpty().withMessage('Concept is required').isLength({ max: 255 }).withMessage('Concept must be up to 255 chars'),
+  body('note').optional({ values: 'falsy' }).isString(),
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        res.status(400).json({ errors: errors.array() });
+        return;
+      }
+      const companyId = req.user?.companyId;
+      if (!companyId) {
+        res.status(401).json({ error: 'Authentication required' });
+        return;
+      }
+      if (!req.user?.roles.includes('super_admin')) {
+        res.status(403).json({ error: 'Forbidden' });
+        return;
+      }
+      const { amount, expenseDate, concept, note } = req.body as {
+        amount: number;
+        expenseDate: string;
+        concept: string;
+        note?: string;
+      };
+      const row = await FinanceExpense.create({
+        companyId,
+        amount,
+        expenseDate,
+        concept: String(concept).trim(),
+        note: note ? String(note) : null,
+        createdBy: req.user!.id,
+      });
+      res.status(201).json({
+        id: row.id,
+        concept: row.concept,
+        amount: Number(Number(row.amount).toFixed(2)),
+        expenseDate: row.expenseDate,
+        note: row.note ?? null,
+      });
+    } catch (error) {
+      console.error('Create finance expense error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  },
+];
+
+export const deleteFinanceExpense = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const companyId = req.user?.companyId;
+    if (!companyId) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+    if (!req.user?.roles.includes('super_admin')) {
+      res.status(403).json({ error: 'Forbidden' });
+      return;
+    }
+    const { id } = req.params;
+    const row = await FinanceExpense.findOne({ where: { id, companyId } });
+    if (!row) {
+      res.status(404).json({ error: 'Expense not found' });
+      return;
+    }
+    await row.destroy();
+    res.json({ message: 'Deleted' });
+  } catch (error) {
+    console.error('Delete finance expense error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };

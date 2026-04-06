@@ -15,6 +15,7 @@ import { ClientAcquiredPackage } from './ClientAcquiredPackage';
 import { ClientAmountDueLog } from './ClientAmountDueLog';
 import { ClientPaymentDeletedLog } from './ClientPaymentDeletedLog';
 import { TripExpense } from './TripExpense';
+import { FinanceExpense } from './FinanceExpense';
 import { ClientMessage } from './ClientMessage';
 import { ClientGroup } from './ClientGroup';
 import { ClientGroupMember } from './ClientGroupMember';
@@ -232,6 +233,10 @@ Trip.hasMany(TripExpense, { foreignKey: 'tripId', as: 'expenses' });
 TripExpense.belongsTo(Trip, { foreignKey: 'tripId', as: 'trip' });
 User.hasMany(TripExpense, { foreignKey: 'createdBy', as: 'createdTripExpenses' });
 TripExpense.belongsTo(User, { foreignKey: 'createdBy', as: 'createdByUser' });
+Company.hasMany(FinanceExpense, { foreignKey: 'companyId', as: 'financeExpenses' });
+FinanceExpense.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+User.hasMany(FinanceExpense, { foreignKey: 'createdBy', as: 'createdFinanceExpenses' });
+FinanceExpense.belongsTo(User, { foreignKey: 'createdBy', as: 'createdByUser' });
 
 // Form relationships
 Form.hasMany(FormSession, { foreignKey: 'formId', as: 'sessions' });
@@ -278,6 +283,7 @@ export {
   ClientAmountDueLog,
   ClientPaymentDeletedLog,
   TripExpense,
+  FinanceExpense,
   ClientMessage,
   FAQ,
   BotBehavior,

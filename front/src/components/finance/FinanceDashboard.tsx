@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import type { ReactNode } from 'react';
-import { Loader2, TrendingUp, Wallet, Landmark, Percent, Receipt, RotateCcw } from 'lucide-react';
+import { Loader2, TrendingUp, Wallet, Landmark, Percent, Receipt, RotateCcw, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { PAYMENT_TYPE_LABELS } from '@/types/form';
 import type { FinanceGranularity, FinanceOverviewResponse } from '@/types/finance';
 import { api } from '@/lib/api';
@@ -73,6 +75,11 @@ export const FinanceDashboard = () => {
   const [products, setProducts] = useState<Array<{ id: string; title: string }>>([]);
   const [advisors, setAdvisors] = useState<Array<{ id: string; name: string }>>([]);
   const [branches, setBranches] = useState<Array<{ id: string; name: string }>>([]);
+  const [expenseConcept, setExpenseConcept] = useState('');
+  const [expenseAmount, setExpenseAmount] = useState('');
+  const [expenseDate, setExpenseDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [expenseNote, setExpenseNote] = useState('');
+  const [isSavingExpense, setIsSavingExpense] = useState(false);
 
   // Load product list for the product filter dropdown
   useEffect(() => {
@@ -174,6 +181,50 @@ export const FinanceDashboard = () => {
   const productsBreakdown = data?.breakdowns.products ?? [];
   const topClients = data?.rankings.topClients ?? [];
   const topTrips = data?.rankings.topTrips ?? [];
+  const manualExpenses = data?.manualExpenses ?? [];
+
+  const handleCreateManualExpense = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!token) return;
+    const amount = parseFloat(expenseAmount.replace(',', '.'));
+    if (!expenseConcept.trim() || Number.isNaN(amount) || amount <= 0) {
+      toast.error('Indica concepto y un monto válido');
+      return;
+    }
+    setIsSavingExpense(true);
+    try {
+      await api.createFinanceExpense(
+        {
+          concept: expenseConcept.trim(),
+          amount,
+          expenseDate,
+          note: expenseNote.trim() || undefined,
+        },
+        token
+      );
+      toast.success('Egreso registrado');
+      setExpenseConcept('');
+      setExpenseAmount('');
+      setExpenseNote('');
+      await loadOverview();
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'No se pudo guardar');
+    } finally {
+      setIsSavingExpense(false);
+    }
+  };
+
+  const handleDeleteManualExpense = async (id: string) => {
+    if (!token) return;
+    if (!window.confirm('¿Eliminar este egreso de finanzas?')) return;
+    try {
+      await api.deleteFinanceExpense(id, token);
+      toast.success('Egreso eliminado');
+      await loadOverview();
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'No se pudo eliminar');
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -300,11 +351,122 @@ export const FinanceDashboard = () => {
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
             <StatCard title="Ganancia Neta" value={formatter.format(kpis.netProfit)} icon={<Wallet className="w-5 h-5" />} />
             <StatCard title="Ingresos" value={formatter.format(kpis.totalIncome)} icon={<TrendingUp className="w-5 h-5" />} />
-            <StatCard title="Egresos" value={formatter.format(kpis.totalExpense)} icon={<Landmark className="w-5 h-5" />} />
+            <StatCard
+              title="Egresos (manuales)"
+              value={formatter.format(kpis.totalExpense)}
+              icon={<Landmark className="w-5 h-5" />}
+            />
             <StatCard title="Margen Neto" value={`${kpis.netMarginPct}%`} icon={<Percent className="w-5 h-5" />} />
             <StatCard title="Ticket Promedio" value={formatter.format(kpis.averageTicket)} icon={<Receipt className="w-5 h-5" />} />
             <StatCard title="Crecimiento" value={`${kpis.growthVsPreviousPct}%`} icon={<TrendingUp className="w-5 h-5" />} />
           </div>
+
+          <Card className="border-border/50">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Egresos manuales</CardTitle>
+              <p className="text-sm text-muted-foreground font-normal">
+                Los gastos que registres en un viaje no se suman aquí. Usa este apartado para cargar egresos de la empresa con
+                concepto (operación, nómina, servicios, etc.).
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <form onSubmit={handleCreateManualExpense} className="grid sm:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+                <div className="space-y-2 sm:col-span-2">
+                  <Label htmlFor="fin-exp-concept">Concepto</Label>
+                  <Input
+                    id="fin-exp-concept"
+                    value={expenseConcept}
+                    onChange={(ev) => setExpenseConcept(ev.target.value)}
+                    placeholder="Ej. Nómina, renta oficina"
+                    maxLength={255}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="fin-exp-amount">Monto</Label>
+                  <Input
+                    id="fin-exp-amount"
+                    type="text"
+                    inputMode="decimal"
+                    value={expenseAmount}
+                    onChange={(ev) => setExpenseAmount(ev.target.value)}
+                    placeholder="0.00"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="fin-exp-date">Fecha</Label>
+                  <Input
+                    id="fin-exp-date"
+                    type="date"
+                    value={expenseDate}
+                    onChange={(ev) => setExpenseDate(ev.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="fin-exp-note">Nota (opcional)</Label>
+                  <Input
+                    id="fin-exp-note"
+                    value={expenseNote}
+                    onChange={(ev) => setExpenseNote(ev.target.value)}
+                    placeholder="Referencia"
+                  />
+                </div>
+                <div className="sm:col-span-2 lg:col-span-5 flex justify-end">
+                  <Button type="submit" disabled={isSavingExpense}>
+                    {isSavingExpense ? 'Guardando…' : 'Registrar egreso'}
+                  </Button>
+                </div>
+              </form>
+
+              {manualExpenses.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-2">
+                  No hay egresos manuales en el periodo seleccionado. Ajusta las fechas en filtros o registra uno arriba.
+                </p>
+              ) : (
+                <div className="border rounded-md overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/50">
+                      <tr className="text-left">
+                        <th className="p-3 font-medium">Fecha</th>
+                        <th className="p-3 font-medium">Concepto</th>
+                        <th className="p-3 font-medium text-right">Monto</th>
+                        <th className="p-3 font-medium hidden md:table-cell">Nota</th>
+                        <th className="p-3 w-12" />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[...manualExpenses]
+                        .sort((a, b) => b.expenseDate.localeCompare(a.expenseDate))
+                        .map((row) => (
+                          <tr key={row.id} className="border-t border-border/60">
+                            <td className="p-3 whitespace-nowrap">{row.expenseDate}</td>
+                            <td className="p-3">{row.concept}</td>
+                            <td className="p-3 text-right font-medium text-red-600">{formatter.format(row.amount)}</td>
+                            <td className="p-3 text-muted-foreground hidden md:table-cell max-w-[200px] truncate">
+                              {row.note || '—'}
+                            </td>
+                            <td className="p-3">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="text-destructive hover:text-destructive"
+                                title="Eliminar"
+                                onClick={() => handleDeleteManualExpense(row.id)}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Grafico de tendencia + metodos de pago */}
           <div className="grid lg:grid-cols-3 gap-6">
@@ -416,7 +578,10 @@ export const FinanceDashboard = () => {
 
             <Card className="border-border/50">
               <CardHeader className="pb-2">
-                <CardTitle className="text-base">Top viajes por utilidad</CardTitle>
+                <CardTitle className="text-base">Top viajes por ingresos</CardTitle>
+                <p className="text-xs text-muted-foreground font-normal">
+                  Solo pagos de clientes asociados al viaje. Los egresos del módulo Viajes no afectan Finanzas.
+                </p>
               </CardHeader>
               <CardContent className="space-y-3">
                 {topTrips.length === 0 ? (
@@ -426,13 +591,9 @@ export const FinanceDashboard = () => {
                     <div key={trip.tripId} className="flex items-center justify-between border-b border-border/40 pb-2">
                       <div>
                         <span className="text-sm font-medium">{trip.title}</span>
-                        <span className="ml-2 text-xs text-muted-foreground">
-                          Ing: {formatter.format(trip.income)} / Egr: {formatter.format(trip.expense)}
-                        </span>
+                        <span className="ml-2 text-xs text-muted-foreground">Ingresos</span>
                       </div>
-                      <span className={`text-sm font-semibold ${trip.net >= 0 ? 'text-green-600' : 'text-red-500'}`}>
-                        {formatter.format(trip.net)}
-                      </span>
+                      <span className="text-sm font-semibold text-green-600">{formatter.format(trip.income)}</span>
                     </div>
                   ))
                 )}

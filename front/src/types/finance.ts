@@ -26,6 +26,13 @@ export interface FinanceOverviewResponse {
     expense: number;
     net: number;
   }>;
+  manualExpenses: Array<{
+    id: string;
+    concept: string;
+    amount: number;
+    expenseDate: string;
+    note: string | null;
+  }>;
   breakdowns: {
     paymentTypes: Array<{ key: string; label: string; amount: number; count: number }>;
     products: Array<{ key: string; label: string; amount: number; count: number }>;

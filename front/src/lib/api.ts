@@ -1030,6 +1030,29 @@ class ApiClient {
     });
   }
 
+  async createFinanceExpense(
+    data: { amount: number; expenseDate: string; concept: string; note?: string },
+    token?: string | null
+  ) {
+    return this.request<{ id: string; concept: string; amount: number; expenseDate: string; note: string | null }>(
+      `/finance/expenses`,
+      {
+        method: 'POST',
+        token: token ?? this.getToken(),
+        requireAuth: true,
+        body: JSON.stringify(data),
+      }
+    );
+  }
+
+  async deleteFinanceExpense(id: string, token?: string | null) {
+    return this.request<{ message: string }>(`/finance/expenses/${id}`, {
+      method: 'DELETE',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
   async getClientPayments(clientId: string, token?: string | null) {
     return this.request<any[]>(`/payments/clients/${clientId}`, {
       method: 'GET',
