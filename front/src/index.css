@@ -125,9 +125,30 @@
     font-family: 'Montserrat', sans-serif;
   }
 
-  /* Imagen de fondo global (company.theme.appBackgroundImage): capa semitransparente para legibilidad */
+  /*
+   * Imagen de fondo global: sin velar el fondo (se ve la foto tal cual).
+   * Contenedores de página transparentes para que el body muestre la imagen en todas las vistas.
+   * Cards con ligera transparencia + blur para legibilidad.
+   */
   [data-app-bg-image="true"] .min-h-screen.bg-background {
-    background-color: hsl(var(--background) / 0.88) !important;
+    background-color: transparent !important;
+  }
+
+  [data-app-bg-image="true"] .min-h-screen.bg-gradient-to-br {
+    background-image: none !important;
+    background-color: transparent !important;
+  }
+
+  [data-app-bg-image="true"] .bg-card {
+    background-color: hsl(var(--card) / 0.78) !important;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+
+  [data-app-bg-image="true"] .bg-card\/80 {
+    background-color: hsl(var(--card) / 0.58) !important;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
   }
 }
 
