@@ -1,7 +1,10 @@
 import { Response } from 'express';
 import { body, validationResult } from 'express-validator';
-import { ClientPayment, Client, ClientPaymentDeletedLog } from '../models';
+import { ClientPayment, Client, ClientPaymentDeletedLog, ClientAcquiredPackage, Product } from '../models';
 import { AuthRequest } from '../middleware/auth.middleware';
+
+const PAYMENTS_ONLY_PRIMARY_MESSAGE =
+  'Las cuentas de pago solo se gestionan en el cliente titular. Abre el perfil del titular para ver o registrar pagos.';
 
 export const getCompanyPayments = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -17,7 +20,16 @@ export const getCompanyPayments = async (req: AuthRequest, res: Response): Promi
 
     const payments = await ClientPayment.findAll({
       where: { companyId },
-      include: [{ model: Client, as: 'client', attributes: ['id', 'name'] }],
+      include: [
+        { model: Client, as: 'client', attributes: ['id', 'name', 'parent_client_id'] },
+        {
+          model: ClientAcquiredPackage,
+          as: 'acquiredPackage',
+          required: false,
+          attributes: ['id', 'product_id', 'parent_client_id'],
+          include: [{ model: Product, as: 'product', attributes: ['id', 'title'], required: false }],
+        },
+      ],
       order: [['payment_date', 'DESC'], ['created_at', 'DESC']],
     });
 
@@ -41,6 +53,10 @@ export const getClientPayments = async (req: AuthRequest, res: Response): Promis
       res.status(404).json({ error: 'Client not found' });
       return;
     }
+    if (client.parentClientId) {
+      res.status(400).json({ error: PAYMENTS_ONLY_PRIMARY_MESSAGE });
+      return;
+    }
     if (!req.user?.roles.includes('super_admin') && client.assignedUserId !== req.user?.id) {
       res.status(403).json({ error: 'Access denied' });
       return;
@@ -48,6 +64,15 @@ export const getClientPayments = async (req: AuthRequest, res: Response): Promis
 
     const payments = await ClientPayment.findAll({
       where: { clientId },
+      include: [
+        {
+          model: ClientAcquiredPackage,
+          as: 'acquiredPackage',
+          required: false,
+          attributes: ['id', 'product_id', 'parent_client_id'],
+          include: [{ model: Product, as: 'product', attributes: ['id', 'title'], required: false }],
+        },
+      ],
       order: [['payment_date', 'DESC'], ['created_at', 'DESC']],
     });
 
@@ -66,6 +91,7 @@ export const createPayment = [
   body('paymentType').optional().isIn(PAYMENT_TYPES).withMessage('Payment type must be tarjeta, transferencia or efectivo'),
   body('referenceNumber').optional({ values: 'falsy' }).isString().isLength({ max: 100 }).withMessage('Reference number must be up to 100 chars'),
   body('note').optional().isString(),
+  body('acquiredPackageId').optional({ values: 'null' }).isUUID().withMessage('acquiredPackageId must be a UUID'),
   async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       const errors = validationResult(req);
@@ -75,7 +101,7 @@ export const createPayment = [
       }
 
       const { clientId } = req.params;
-      const { amount, paymentDate, paymentType, referenceNumber, note } = req.body;
+      const { amount, paymentDate, paymentType, referenceNumber, note, acquiredPackageId } = req.body;
       const companyId = req.user?.companyId;
       if (!companyId) {
         res.status(401).json({ error: 'Authentication required' });
@@ -86,14 +112,31 @@ export const createPayment = [
         res.status(404).json({ error: 'Client not found' });
         return;
       }
+      if (client.parentClientId) {
+        res.status(400).json({ error: PAYMENTS_ONLY_PRIMARY_MESSAGE });
+        return;
+      }
       if (!req.user?.roles.includes('super_admin') && client.assignedUserId !== req.user?.id) {
         res.status(403).json({ error: 'Access denied' });
         return;
       }
 
+      let resolvedAcquiredPackageId: string | undefined;
+      if (acquiredPackageId) {
+        const pkg = await ClientAcquiredPackage.findOne({
+          where: { id: acquiredPackageId, companyId, parentClientId: clientId },
+        });
+        if (!pkg) {
+          res.status(400).json({ error: 'Paquete no encontrado o no pertenece a este cliente titular' });
+          return;
+        }
+        resolvedAcquiredPackageId = pkg.id;
+      }
+
       const payment = await ClientPayment.create({
         companyId,
         clientId,
+        acquiredPackageId: resolvedAcquiredPackageId,
         amount,
         paymentDate,
         paymentType: paymentType && PAYMENT_TYPES.includes(paymentType) ? paymentType : 'efectivo',
@@ -101,7 +144,18 @@ export const createPayment = [
         note: note || undefined,
       });
 
-      res.status(201).json(payment);
+      const created = await ClientPayment.findByPk(payment.id, {
+        include: [
+          {
+            model: ClientAcquiredPackage,
+            as: 'acquiredPackage',
+            required: false,
+            include: [{ model: Product, as: 'product', attributes: ['id', 'title'], required: false }],
+          },
+        ],
+      });
+
+      res.status(201).json(created ?? payment);
     } catch (error) {
       console.error('Create payment error:', error);
       res.status(500).json({ error: 'Internal server error' });
@@ -125,6 +179,10 @@ export const deletePayment = async (req: AuthRequest, res: Response): Promise<vo
     }
 
     const client = await Client.findOne({ where: { id: payment.clientId, companyId } });
+    if (client?.parentClientId) {
+      res.status(400).json({ error: PAYMENTS_ONLY_PRIMARY_MESSAGE });
+      return;
+    }
     if (!req.user?.roles.includes('super_admin') && client && client.assignedUserId !== req.user?.id) {
       res.status(403).json({ error: 'Access denied' });
       return;
@@ -134,6 +192,8 @@ export const deletePayment = async (req: AuthRequest, res: Response): Promise<vo
       companyId,
       clientId: payment.clientId,
       paymentId: payment.id,
+      tripId: payment.tripId ?? null,
+      acquiredPackageId: payment.acquiredPackageId ?? null,
       amount: payment.amount,
       paymentDate: payment.paymentDate,
       paymentType: payment.paymentType || 'efectivo',

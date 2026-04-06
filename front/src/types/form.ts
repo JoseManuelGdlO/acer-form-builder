@@ -196,10 +196,25 @@ export const PAYMENT_TYPE_LABELS: Record<PaymentType, string> = {
   efectivo: 'Efectivo',
 };
 
+export interface ClientAcquiredPackage {
+  id: string;
+  productId: string;
+  product: { id: string; title: string } | null;
+  beneficiaryClientId?: string | null;
+  beneficiary?: { id: string; name: string } | null;
+  createdAt: Date;
+  updatedAt?: Date;
+}
+
 export interface ClientPayment {
   id: string;
   clientId?: string;
   tripId?: string | null;
+  acquiredPackageId?: string | null;
+  acquiredPackage?: {
+    id: string;
+    product?: { id: string; title: string };
+  } | null;
   client?: { id: string; name: string };
   amount: number;
   paymentDate: string;

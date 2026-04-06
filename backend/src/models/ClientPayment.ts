@@ -9,6 +9,7 @@ interface ClientPaymentAttributes {
   companyId: string;
   clientId: string;
   tripId?: string | null;
+  acquiredPackageId?: string | null;
   amount: number;
   paymentDate: string;
   paymentType: PaymentType;
@@ -18,13 +19,15 @@ interface ClientPaymentAttributes {
   updatedAt?: Date;
 }
 
-interface ClientPaymentCreationAttributes extends Optional<ClientPaymentAttributes, 'id' | 'note' | 'createdAt' | 'updatedAt'> {}
+interface ClientPaymentCreationAttributes
+  extends Optional<ClientPaymentAttributes, 'id' | 'note' | 'tripId' | 'acquiredPackageId' | 'createdAt' | 'updatedAt'> {}
 
 export class ClientPayment extends Model<ClientPaymentAttributes, ClientPaymentCreationAttributes> implements ClientPaymentAttributes {
   public id!: string;
   public companyId!: string;
   public clientId!: string;
   public tripId?: string | null;
+  public acquiredPackageId?: string | null;
   public amount!: number;
   public paymentDate!: string;
   public paymentType!: PaymentType;
@@ -64,6 +67,15 @@ ClientPayment.init(
       allowNull: true,
       references: {
         model: 'trips',
+        key: 'id',
+      },
+      onDelete: 'SET NULL',
+    },
+    acquiredPackageId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      references: {
+        model: 'client_acquired_packages',
         key: 'id',
       },
       onDelete: 'SET NULL',

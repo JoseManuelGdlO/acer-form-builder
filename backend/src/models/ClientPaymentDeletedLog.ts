@@ -9,6 +9,7 @@ interface ClientPaymentDeletedLogAttributes {
   clientId: string;
   paymentId: string;
   tripId?: string | null;
+  acquiredPackageId?: string | null;
   amount: number;
   paymentDate: string;
   paymentType: string;
@@ -18,7 +19,8 @@ interface ClientPaymentDeletedLogAttributes {
   createdAt?: Date;
 }
 
-interface ClientPaymentDeletedLogCreationAttributes extends Optional<ClientPaymentDeletedLogAttributes, 'id' | 'note' | 'createdAt'> {}
+interface ClientPaymentDeletedLogCreationAttributes
+  extends Optional<ClientPaymentDeletedLogAttributes, 'id' | 'note' | 'tripId' | 'acquiredPackageId' | 'createdAt'> {}
 
 export class ClientPaymentDeletedLog extends Model<ClientPaymentDeletedLogAttributes, ClientPaymentDeletedLogCreationAttributes> implements ClientPaymentDeletedLogAttributes {
   public id!: string;
@@ -26,6 +28,7 @@ export class ClientPaymentDeletedLog extends Model<ClientPaymentDeletedLogAttrib
   public clientId!: string;
   public paymentId!: string;
   public tripId?: string | null;
+  public acquiredPackageId?: string | null;
   public amount!: number;
   public paymentDate!: string;
   public paymentType!: string;
@@ -69,6 +72,15 @@ ClientPaymentDeletedLog.init(
       allowNull: true,
       references: {
         model: 'trips',
+        key: 'id',
+      },
+      onDelete: 'SET NULL',
+    },
+    acquiredPackageId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      references: {
+        model: 'client_acquired_packages',
         key: 'id',
       },
       onDelete: 'SET NULL',

@@ -26,6 +26,7 @@ interface PaymentRow {
   clientId: string;
   clientName: string;
   createdAt: string;
+  packageTitle?: string | null;
 }
 
 export const PaymentLogsPage = () => {
@@ -44,17 +45,22 @@ export const PaymentLogsPage = () => {
     setIsLoading(true);
     try {
       const data = await api.getCompanyPayments(token);
-      const rows: PaymentRow[] = (data || []).map((p: any) => ({
-        id: p.id,
-        amount: Number(p.amount),
-        paymentDate: p.payment_date || p.paymentDate,
-        paymentType: p.payment_type || p.paymentType || 'efectivo',
-        referenceNumber: p.reference_number || p.referenceNumber,
-        note: p.note,
-        clientId: p.clientId || p.client_id,
-        clientName: p.client?.name || '—',
-        createdAt: p.created_at || p.createdAt,
-      }));
+      const rows: PaymentRow[] = (data || []).map((p: any) => {
+        const ap = p.acquired_package ?? p.acquiredPackage;
+        const pkgTitle = ap?.product?.title ?? null;
+        return {
+          id: p.id,
+          amount: Number(p.amount),
+          paymentDate: p.payment_date || p.paymentDate,
+          paymentType: p.payment_type || p.paymentType || 'efectivo',
+          referenceNumber: p.reference_number || p.referenceNumber,
+          note: p.note,
+          clientId: p.clientId || p.client_id,
+          clientName: p.client?.name || '—',
+          createdAt: p.created_at || p.createdAt,
+          packageTitle: pkgTitle,
+        };
+      });
       setPayments(rows);
     } catch (error: unknown) {
       console.error('Error loading payment logs:', error);
@@ -100,6 +106,7 @@ export const PaymentLogsPage = () => {
                 <TableRow>
                   <TableHead>Fecha</TableHead>
                   <TableHead>Cliente</TableHead>
+                  <TableHead>Paquete</TableHead>
                   <TableHead className="text-right">Monto</TableHead>
                   <TableHead>Tipo</TableHead>
                   <TableHead>Ticket/Transferencia</TableHead>
@@ -113,6 +120,9 @@ export const PaymentLogsPage = () => {
                       {format(new Date(p.paymentDate), "d MMM yyyy", { locale: es })}
                     </TableCell>
                     <TableCell className="font-medium">{p.clientName}</TableCell>
+                    <TableCell className="text-muted-foreground max-w-[180px] truncate">
+                      {p.packageTitle || '—'}
+                    </TableCell>
                     <TableCell className="text-right font-medium">
                       {p.amount.toFixed(2)}
                     </TableCell>

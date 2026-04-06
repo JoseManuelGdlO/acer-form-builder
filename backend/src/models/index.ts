@@ -11,6 +11,7 @@ import { ChecklistTemplate } from './ChecklistTemplate';
 import { ClientChecklist } from './ClientChecklist';
 import { ClientNote } from './ClientNote';
 import { ClientPayment } from './ClientPayment';
+import { ClientAcquiredPackage } from './ClientAcquiredPackage';
 import { ClientAmountDueLog } from './ClientAmountDueLog';
 import { ClientPaymentDeletedLog } from './ClientPaymentDeletedLog';
 import { TripExpense } from './TripExpense';
@@ -59,6 +60,8 @@ Company.hasMany(ClientNote, { foreignKey: 'companyId', as: 'clientNotes' });
 ClientNote.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
 Company.hasMany(ClientPayment, { foreignKey: 'companyId', as: 'clientPayments' });
 ClientPayment.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+Company.hasMany(ClientAcquiredPackage, { foreignKey: 'companyId', as: 'clientAcquiredPackages' });
+ClientAcquiredPackage.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
 Company.hasMany(ClientAmountDueLog, { foreignKey: 'companyId', as: 'clientAmountDueLogs' });
 ClientAmountDueLog.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
 Company.hasMany(ClientPaymentDeletedLog, { foreignKey: 'companyId', as: 'clientPaymentDeletedLogs' });
@@ -151,6 +154,15 @@ Client.hasMany(ClientPayment, { foreignKey: 'clientId', as: 'clientPayments' });
 ClientPayment.belongsTo(Client, { foreignKey: 'clientId', as: 'client' });
 Trip.hasMany(ClientPayment, { foreignKey: 'tripId', as: 'payments' });
 ClientPayment.belongsTo(Trip, { foreignKey: 'tripId', as: 'trip' });
+
+Client.hasMany(ClientAcquiredPackage, { foreignKey: 'parentClientId', as: 'acquiredPackages' });
+ClientAcquiredPackage.belongsTo(Client, { foreignKey: 'parentClientId', as: 'parentClient' });
+Client.hasMany(ClientAcquiredPackage, { foreignKey: 'beneficiaryClientId', as: 'beneficiaryAcquiredPackages' });
+ClientAcquiredPackage.belongsTo(Client, { foreignKey: 'beneficiaryClientId', as: 'beneficiary' });
+Product.hasMany(ClientAcquiredPackage, { foreignKey: 'productId', as: 'acquiredPackages' });
+ClientAcquiredPackage.belongsTo(Product, { foreignKey: 'productId', as: 'product' });
+ClientPayment.belongsTo(ClientAcquiredPackage, { foreignKey: 'acquiredPackageId', as: 'acquiredPackage' });
+ClientAcquiredPackage.hasMany(ClientPayment, { foreignKey: 'acquiredPackageId', as: 'payments' });
 
 Client.hasMany(ClientAmountDueLog, { foreignKey: 'clientId', as: 'amountDueLogs' });
 ClientAmountDueLog.belongsTo(Client, { foreignKey: 'clientId', as: 'client' });
@@ -262,6 +274,7 @@ export {
   ClientChecklist,
   ClientNote,
   ClientPayment,
+  ClientAcquiredPackage,
   ClientAmountDueLog,
   ClientPaymentDeletedLog,
   TripExpense,

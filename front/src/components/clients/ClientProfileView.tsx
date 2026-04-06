@@ -15,7 +15,7 @@ import { useSettingsStore } from '@/hooks/useSettingsStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
 import { 
-  User, Mail, Phone, MapPin, Calendar, Clock, 
+  User, Mail, Phone, Calendar, Clock, 
   ArrowLeft, Edit2, FileText, UserCircle, ShoppingBag, Plus, ListChecks, NotebookPen, Wallet,
 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -54,6 +54,8 @@ export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpe
   const { getActiveChecklistItems, fetchChecklistTemplates } = useSettingsStore();
   const { token, hasRole } = useAuth();
   const isAdmin = hasRole('super_admin');
+  /** Solo el titular gestiona pagos; los hijos no tienen sección de pagos. */
+  const isChildClient = Boolean(client.parentClientId);
   const [isLoading, setIsLoading] = useState(true);
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -80,7 +82,7 @@ export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpe
     if (token) {
       loadClientData();
     }
-  }, [client.id, token]);
+  }, [client.id, client.parentClientId, token]);
 
   const loadClientData = async () => {
     if (!token) return;
@@ -95,9 +97,9 @@ export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpe
         api.getClientConversations(client.id, token).catch(() => []),
         api.getSubmissions({ clientId: client.id }, token).catch(() => []),
         api.getClientChecklist(client.id, token).catch(() => []),
-        api.getClientPayments(client.id, token).catch(() => []),
-        isAdmin ? api.getClientAmountDueHistory(client.id, token).catch(() => []) : Promise.resolve([]),
-        isAdmin ? api.getClientPaymentDeletedHistory(client.id, token).catch(() => []) : Promise.resolve([]),
+        isChildClient ? Promise.resolve([]) : api.getClientPayments(client.id, token).catch(() => []),
+        isChildClient || !isAdmin ? Promise.resolve([]) : api.getClientAmountDueHistory(client.id, token).catch(() => []),
+        isChildClient || !isAdmin ? Promise.resolve([]) : api.getClientPaymentDeletedHistory(client.id, token).catch(() => []),
         api.getForms().catch(() => []),
         api.getClientFormSessions(client.id, token).catch(() => []),
       ]);
@@ -193,15 +195,29 @@ export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpe
       }));
       setClientNotes(notes);
 
-      const paymentsList: ClientPayment[] = paymentsData.map((p: any) => ({
-        id: p.id,
-        amount: Number(p.amount),
-        paymentDate: p.payment_date || p.paymentDate,
-        paymentType: (p.payment_type || p.paymentType || 'efectivo') as ClientPayment['paymentType'],
-        referenceNumber: p.reference_number || p.referenceNumber,
-        note: p.note,
-        createdAt: new Date(p.created_at || p.createdAt),
-      }));
+      const paymentsList: ClientPayment[] = isChildClient
+        ? []
+        : (paymentsData as any[]).map((p: any) => {
+            const ap = p.acquired_package ?? p.acquiredPackage;
+            return {
+              id: p.id,
+              amount: Number(p.amount),
+              paymentDate: p.payment_date || p.paymentDate,
+              paymentType: (p.payment_type || p.paymentType || 'efectivo') as ClientPayment['paymentType'],
+              referenceNumber: p.reference_number || p.referenceNumber,
+              note: p.note,
+              acquiredPackageId: p.acquired_package_id ?? p.acquiredPackageId ?? undefined,
+              acquiredPackage: ap
+                ? {
+                    id: ap.id,
+                    product: ap.product
+                      ? { id: ap.product.id, title: ap.product.title }
+                      : undefined,
+                  }
+                : undefined,
+              createdAt: new Date(p.created_at || p.createdAt),
+            };
+          });
       setPayments(paymentsList);
 
       const historyEntries: AmountDueLogEntry[] = (amountDueHistoryData || []).map((h: any) => ({
@@ -438,10 +454,18 @@ export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpe
     }
   };
 
-  const handleAddPayment = async (data: { amount: number; paymentDate: string; paymentType: 'tarjeta' | 'transferencia' | 'efectivo'; referenceNumber?: string; note?: string }) => {
+  const handleAddPayment = async (data: {
+    amount: number;
+    paymentDate: string;
+    paymentType: 'tarjeta' | 'transferencia' | 'efectivo';
+    referenceNumber?: string;
+    note?: string;
+    acquiredPackageId?: string | null;
+  }) => {
     if (!token) return;
     try {
       const newPayment = await api.createPayment(client.id, data, token);
+      const ap = newPayment.acquired_package ?? newPayment.acquiredPackage;
       const payment: ClientPayment = {
         id: newPayment.id,
         amount: Number(newPayment.amount),
@@ -449,6 +473,13 @@ export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpe
         paymentType: (newPayment.payment_type || newPayment.paymentType || 'efectivo') as ClientPayment['paymentType'],
         referenceNumber: newPayment.reference_number || newPayment.referenceNumber,
         note: newPayment.note,
+        acquiredPackageId: newPayment.acquired_package_id ?? newPayment.acquiredPackageId ?? undefined,
+        acquiredPackage: ap
+          ? {
+              id: ap.id,
+              product: ap.product ? { id: ap.product.id, title: ap.product.title } : undefined,
+            }
+          : undefined,
         createdAt: new Date(newPayment.created_at || newPayment.createdAt),
       };
       setPayments(prev => [payment, ...prev]);
@@ -642,7 +673,6 @@ export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpe
     : [
         { icon: Mail, label: 'Correo', value: displayClient.email },
         { icon: Phone, label: 'Teléfono', value: formatPhoneOptional(displayClient.phone) },
-        { icon: MapPin, label: 'Dirección', value: displayClient.address || 'No registrada' },
       ];
   const infoItems = [
     ...contactInfoItems,
@@ -795,7 +825,7 @@ export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpe
                     <>
                       <Separator className="my-4" />
                       <div className="space-y-2">
-                        <p className="text-xs text-muted-foreground">Hijos de este cliente</p>
+                        <p className="text-xs text-muted-foreground">Familiares de este cliente</p>
                         <div className="flex flex-wrap gap-2">
                           {displayClient.children!.map((child) => (
                             <Button key={child.id} variant="outline" size="sm" onClick={() => onOpenClient?.(child.id)}>
@@ -842,26 +872,29 @@ export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpe
                 </AccordionContent>
               </AccordionItem>
 
-              <AccordionItem value="payments">
-                <AccordionTrigger className="text-base">
-                  <span className="flex items-center gap-2">
-                    <Wallet className="w-5 h-5 text-primary" />
-                    Pagos e historial
-                  </span>
-                </AccordionTrigger>
-                <AccordionContent>
-                  <ClientPaymentHistory
-                    clientId={client.id}
-                    totalAmountDue={clientSnapshot.totalAmountDue}
-                    onUpdateTotalAmountDue={handleUpdateTotalAmountDue}
-                    payments={payments}
-                    amountDueHistory={amountDueHistory}
-                    paymentDeletedHistory={paymentDeletedHistory}
-                    onAddPayment={handleAddPayment}
-                    onDeletePayment={handleDeletePayment}
-                  />
-                </AccordionContent>
-              </AccordionItem>
+              {!displayClient.parentClientId && (
+                <AccordionItem value="payments">
+                  <AccordionTrigger className="text-base">
+                    <span className="flex items-center gap-2">
+                      <Wallet className="w-5 h-5 text-primary" />
+                      Pagos e historial
+                    </span>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <ClientPaymentHistory
+                      clientId={client.id}
+                      totalAmountDue={clientSnapshot.totalAmountDue}
+                      onUpdateTotalAmountDue={handleUpdateTotalAmountDue}
+                      payments={payments}
+                      amountDueHistory={amountDueHistory}
+                      paymentDeletedHistory={paymentDeletedHistory}
+                      onAddPayment={handleAddPayment}
+                      onDeletePayment={handleDeletePayment}
+                      familyMembers={displayClient.children ?? []}
+                    />
+                  </AccordionContent>
+                </AccordionItem>
+              )}
 
               <AccordionItem value="forms">
                 <AccordionTrigger className="text-base">

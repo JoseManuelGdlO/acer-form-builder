@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +15,8 @@ import {
   History,
   ChevronDown,
   ChevronRight,
+  ShoppingBag,
+  Loader2,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -30,9 +32,23 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
-import type { ClientPayment, PaymentType, AmountDueLogEntry, PaymentDeletedLogEntry } from '@/types/form';
+import type {
+  ClientPayment,
+  PaymentType,
+  AmountDueLogEntry,
+  PaymentDeletedLogEntry,
+  ClientAcquiredPackage,
+} from '@/types/form';
 import { PAYMENT_TYPE_LABELS } from '@/types/form';
 import { useAuth } from '@/contexts/AuthContext';
+import { api } from '@/lib/api';
+import type { Product } from '@/types/product';
+import { toast } from 'sonner';
+
+interface FamilyMemberOption {
+  id: string;
+  name: string;
+}
 
 interface ClientPaymentHistoryProps {
   clientId: string;
@@ -41,8 +57,17 @@ interface ClientPaymentHistoryProps {
   payments: ClientPayment[];
   amountDueHistory?: AmountDueLogEntry[];
   paymentDeletedHistory?: PaymentDeletedLogEntry[];
-  onAddPayment: (data: { amount: number; paymentDate: string; paymentType: PaymentType; referenceNumber?: string; note?: string }) => void;
+  onAddPayment: (data: {
+    amount: number;
+    paymentDate: string;
+    paymentType: PaymentType;
+    referenceNumber?: string;
+    note?: string;
+    acquiredPackageId?: string | null;
+  }) => void;
   onDeletePayment?: (paymentId: string) => void;
+  /** Familiares del titular (opcional) para asignar paquete a un dependiente */
+  familyMembers?: FamilyMemberOption[];
 }
 
 export const ClientPaymentHistory = ({
@@ -54,9 +79,17 @@ export const ClientPaymentHistory = ({
   paymentDeletedHistory = [],
   onAddPayment,
   onDeletePayment,
+  familyMembers = [],
 }: ClientPaymentHistoryProps) => {
-  const { hasRole } = useAuth();
+  const { hasRole, token } = useAuth();
   const isAdmin = hasRole('super_admin');
+  const [acquiredPackages, setAcquiredPackages] = useState<ClientAcquiredPackage[]>([]);
+  const [productChoices, setProductChoices] = useState<Product[]>([]);
+  const [packagesLoading, setPackagesLoading] = useState(true);
+  const [isAddingPackage, setIsAddingPackage] = useState(false);
+  const [newPackageProductId, setNewPackageProductId] = useState<string>('');
+  const [newPackageBeneficiaryId, setNewPackageBeneficiaryId] = useState<string>('none');
+  const [paymentPackageId, setPaymentPackageId] = useState<string>('__none__');
   const [isAdding, setIsAdding] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [deletedHistoryOpen, setDeletedHistoryOpen] = useState(false);
@@ -69,6 +102,47 @@ export const ClientPaymentHistory = ({
   const [editTotalValue, setEditTotalValue] = useState(
     totalAmountDue != null ? String(totalAmountDue) : ''
   );
+
+  const loadPackagesAndProducts = useCallback(async () => {
+    if (!token) return;
+    setPackagesLoading(true);
+    try {
+      const [pkgs, byCat, all] = await Promise.all([
+        api.getClientAcquiredPackages(clientId, token).catch(() => []),
+        api.getProductsByCategories(['PAQUETE'], token).catch(() => []),
+        api.getProducts(token).catch(() => []),
+      ]);
+      const list: ClientAcquiredPackage[] = (pkgs || []).map((row: any) => ({
+        id: row.id,
+        productId: row.productId ?? row.product_id,
+        product: row.product ? { id: row.product.id, title: row.product.title } : null,
+        beneficiaryClientId: row.beneficiaryClientId ?? row.beneficiary_client_id ?? null,
+        beneficiary: row.beneficiary ? { id: row.beneficiary.id, name: row.beneficiary.name } : null,
+        createdAt: new Date(row.createdAt ?? row.created_at),
+        updatedAt: row.updatedAt ? new Date(row.updatedAt) : undefined,
+      }));
+      setAcquiredPackages(list);
+      const catalog = Array.isArray(byCat) && byCat.length > 0 ? byCat : all;
+      setProductChoices(
+        (Array.isArray(catalog) ? catalog : []).map((p: any) => ({
+          id: p.id,
+          title: p.title,
+          description: p.description,
+          includes: p.includes,
+          categories: p.categories,
+          price: Number(p.price),
+          createdAt: new Date(p.created_at || p.createdAt),
+          updatedAt: new Date(p.updated_at || p.updatedAt),
+        }))
+      );
+    } finally {
+      setPackagesLoading(false);
+    }
+  }, [clientId, token]);
+
+  useEffect(() => {
+    loadPackagesAndProducts();
+  }, [loadPackagesAndProducts]);
 
   const totalPaid = payments.reduce((sum, p) => sum + Number(p.amount), 0);
   const totalDue = totalAmountDue != null ? Number(totalAmountDue) : null;
@@ -83,13 +157,49 @@ export const ClientPaymentHistory = ({
       paymentType,
       referenceNumber: referenceNumber.trim() || undefined,
       note: note.trim() || undefined,
+      acquiredPackageId: paymentPackageId !== '__none__' ? paymentPackageId : undefined,
     });
     setAmount('');
     setPaymentDate(format(new Date(), 'yyyy-MM-dd'));
     setPaymentType('efectivo');
     setReferenceNumber('');
     setNote('');
+    setPaymentPackageId('__none__');
     setIsAdding(false);
+  };
+
+  const handleAddAcquiredPackage = async () => {
+    if (!token || !newPackageProductId) return;
+    try {
+      await api.createClientAcquiredPackage(
+        clientId,
+        {
+          productId: newPackageProductId,
+          beneficiaryClientId: newPackageBeneficiaryId === 'none' ? null : newPackageBeneficiaryId,
+        },
+        token
+      );
+      setNewPackageProductId('');
+      setNewPackageBeneficiaryId('none');
+      setIsAddingPackage(false);
+      await loadPackagesAndProducts();
+      toast.success('Paquete registrado');
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'No se pudo registrar el paquete';
+      toast.error(msg);
+    }
+  };
+
+  const handleDeleteAcquiredPackage = async (packageId: string) => {
+    if (!token) return;
+    try {
+      await api.deleteClientAcquiredPackage(clientId, packageId, token);
+      await loadPackagesAndProducts();
+      toast.success('Paquete eliminado de la lista');
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'No se pudo eliminar el paquete';
+      toast.error(msg);
+    }
   };
 
   const handleSaveTotal = () => {
@@ -186,6 +296,113 @@ export const ClientPaymentHistory = ({
               {pending != null ? pending.toFixed(2) : '—'}
             </p>
           </div>
+        </div>
+
+        {/* Paquetes adquiridos (cuenta del titular) */}
+        <div className="rounded-lg border border-border/60 bg-muted/10 p-3 space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+              <ShoppingBag className="w-4 h-4 text-primary shrink-0" />
+              Paquetes adquiridos
+            </div>
+            {!isAddingPackage && (
+              <Button type="button" variant="outline" size="sm" className="gap-1" onClick={() => setIsAddingPackage(true)}>
+                <Plus className="w-3.5 h-3.5" />
+                Añadir paquete
+              </Button>
+            )}
+          </div>
+          {packagesLoading ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Cargando paquetes…
+            </div>
+          ) : isAddingPackage ? (
+            <div className="space-y-2 border border-dashed border-border/70 rounded-md p-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div>
+                  <Label className="text-xs">Paquete (producto)</Label>
+                  <Select value={newPackageProductId || undefined} onValueChange={(v) => setNewPackageProductId(v)}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Selecciona un paquete" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {productChoices.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {familyMembers.length > 0 && (
+                  <div>
+                    <Label className="text-xs">Familiar (opcional)</Label>
+                    <Select value={newPackageBeneficiaryId} onValueChange={setNewPackageBeneficiaryId}>
+                      <SelectTrigger className="mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Sin asignar</SelectItem>
+                        {familyMembers.map((m) => (
+                          <SelectItem key={m.id} value={m.id}>
+                            {m.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setIsAddingPackage(false);
+                    setNewPackageProductId('');
+                    setNewPackageBeneficiaryId('none');
+                  }}
+                >
+                  Cancelar
+                </Button>
+                <Button type="button" size="sm" onClick={handleAddAcquiredPackage} disabled={!newPackageProductId}>
+                  Guardar paquete
+                </Button>
+              </div>
+            </div>
+          ) : null}
+          {!packagesLoading && !isAddingPackage && acquiredPackages.length === 0 && (
+            <p className="text-xs text-muted-foreground">Aún no hay paquetes registrados. Usa «Añadir paquete» para listar lo adquirido.</p>
+          )}
+          {!packagesLoading && acquiredPackages.length > 0 && (
+            <ul className="space-y-1.5 max-h-[160px] overflow-y-auto">
+              {acquiredPackages.map((pkg) => (
+                <li
+                  key={pkg.id}
+                  className="flex items-start justify-between gap-2 text-sm rounded-md border border-border/40 bg-background/80 px-2 py-1.5"
+                >
+                  <div className="min-w-0">
+                    <span className="font-medium text-foreground">{pkg.product?.title ?? 'Paquete'}</span>
+                    {pkg.beneficiary && (
+                      <span className="text-muted-foreground text-xs block">Para: {pkg.beneficiary.name}</span>
+                    )}
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 shrink-0 text-destructive hover:text-destructive"
+                    onClick={() => handleDeleteAcquiredPackage(pkg.id)}
+                    title="Quitar paquete de la lista"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         {/* Historial de cambios del total a pagar (solo administradores) */}
@@ -348,6 +565,23 @@ export const ClientPaymentHistory = ({
               </Select>
             </div>
             <div>
+              <Label className="text-xs">Asociar a paquete (opcional)</Label>
+              <Select value={paymentPackageId} onValueChange={setPaymentPackageId}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Sin asociar" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Sin asociar</SelectItem>
+                  {acquiredPackages.map((pkg) => (
+                    <SelectItem key={pkg.id} value={pkg.id}>
+                      {pkg.product?.title ?? 'Paquete'}
+                      {pkg.beneficiary ? ` · ${pkg.beneficiary.name}` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
               <Label htmlFor="payment-reference" className="text-xs">
                 Numero de ticket/transferencia (opcional)
               </Label>
@@ -382,6 +616,7 @@ export const ClientPaymentHistory = ({
                   setPaymentType('efectivo');
                   setReferenceNumber('');
                   setNote('');
+                  setPaymentPackageId('__none__');
                 }}
                 className="gap-1.5"
               >
@@ -427,6 +662,11 @@ export const ClientPaymentHistory = ({
                     <span className="text-xs text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded">
                       {PAYMENT_TYPE_LABELS[payment.paymentType || 'efectivo']}
                     </span>
+                    {payment.acquiredPackage?.product?.title && (
+                      <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded max-w-[200px] truncate">
+                        {payment.acquiredPackage.product.title}
+                      </span>
+                    )}
                   </div>
                   {payment.note && (
                     <p className="text-xs text-muted-foreground mt-0.5 truncate">

@@ -250,6 +250,35 @@ class ApiClient {
     });
   }
 
+  async getClientAcquiredPackages(clientId: string, token?: string | null) {
+    return this.request<any[]>(`/clients/${clientId}/acquired-packages`, {
+      method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async createClientAcquiredPackage(
+    clientId: string,
+    data: { productId: string; beneficiaryClientId?: string | null },
+    token?: string | null
+  ) {
+    return this.request<any>(`/clients/${clientId}/acquired-packages`, {
+      method: 'POST',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteClientAcquiredPackage(clientId: string, packageId: string, token?: string | null) {
+    return this.request<{ message: string }>(`/clients/${clientId}/acquired-packages/${packageId}`, {
+      method: 'DELETE',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
   async createClient(clientData: any, token?: string | null) {
     return this.request<any>('/clients', {
       method: 'POST',
@@ -1003,7 +1032,14 @@ class ApiClient {
 
   async createPayment(
     clientId: string,
-    data: { amount: number; paymentDate: string; paymentType?: 'tarjeta' | 'transferencia' | 'efectivo'; referenceNumber?: string; note?: string },
+    data: {
+      amount: number;
+      paymentDate: string;
+      paymentType?: 'tarjeta' | 'transferencia' | 'efectivo';
+      referenceNumber?: string;
+      note?: string;
+      acquiredPackageId?: string | null;
+    },
     token?: string | null
   ) {
     return this.request<any>(`/payments/clients/${clientId}`, {

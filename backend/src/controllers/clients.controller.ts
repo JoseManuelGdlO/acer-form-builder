@@ -1,7 +1,21 @@
 import { Response } from 'express';
 import { body, validationResult } from 'express-validator';
 import { fn, col, Op, where as sequelizeWhere } from 'sequelize';
-import { Client, ClientChecklist, ChecklistTemplate, ClientAmountDueLog, ClientPaymentDeletedLog, ClientPayment, User, TripParticipant, Trip, Product, VisaStatusTemplate, Conversations } from '../models';
+import {
+  Client,
+  ClientChecklist,
+  ChecklistTemplate,
+  ClientAmountDueLog,
+  ClientPaymentDeletedLog,
+  ClientPayment,
+  ClientAcquiredPackage,
+  User,
+  TripParticipant,
+  Trip,
+  Product,
+  VisaStatusTemplate,
+  Conversations,
+} from '../models';
 import { AuthRequest } from '../middleware/auth.middleware';
 
 const parseNullableParentClientId = (value: unknown): string | null | undefined => {
@@ -714,6 +728,11 @@ export const updateClient = [
         }
       }
 
+      if (client.parentClientId && req.body.totalAmountDue !== undefined) {
+        res.status(400).json({ error: 'El total a pagar solo se gestiona en el cliente titular.' });
+        return;
+      }
+
       const updates: Record<string, unknown> = {};
       if (req.body.name !== undefined) updates.name = req.body.name;
       if (req.body.email !== undefined) {
@@ -871,6 +890,181 @@ export const updateClient = [
     }
   },
 ];
+
+const ACQUIRED_PACKAGES_PRIMARY_ONLY =
+  'Los paquetes adquiridos solo se registran en el perfil del cliente titular.';
+
+function serializeAcquiredPackage(row: any) {
+  const j = row?.toJSON ? row.toJSON() : row;
+  const product = row?.product ?? j?.product;
+  const beneficiary = row?.beneficiary ?? j?.beneficiary;
+  return {
+    id: j.id,
+    productId: j.productId ?? j.product_id,
+    product: product ? { id: product.id, title: product.title } : null,
+    beneficiaryClientId: j.beneficiaryClientId ?? j.beneficiary_client_id ?? null,
+    beneficiary: beneficiary ? { id: beneficiary.id, name: beneficiary.name } : null,
+    createdAt: j.createdAt ?? j.created_at,
+    updatedAt: j.updatedAt ?? j.updated_at,
+  };
+}
+
+export const getClientAcquiredPackages = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const companyId = req.user?.companyId;
+    if (!companyId) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+    const client = await Client.findOne({ where: { id, companyId } });
+    if (!client) {
+      res.status(404).json({ error: 'Client not found' });
+      return;
+    }
+    if (req.user && !req.user.roles.includes('super_admin') && client.assignedUserId !== req.user.id) {
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
+    if (client.parentClientId) {
+      res.status(400).json({ error: ACQUIRED_PACKAGES_PRIMARY_ONLY });
+      return;
+    }
+
+    const rows = await ClientAcquiredPackage.findAll({
+      where: { companyId, parentClientId: id },
+      include: [
+        { model: Product, as: 'product', attributes: ['id', 'title'], required: true },
+        { model: Client, as: 'beneficiary', attributes: ['id', 'name'], required: false },
+      ],
+      order: [['created_at', 'ASC']],
+    });
+
+    res.json(rows.map((r) => serializeAcquiredPackage(r as any)));
+  } catch (error) {
+    console.error('Get client acquired packages error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+export const createClientAcquiredPackage = [
+  body('productId').isUUID().withMessage('productId must be a valid UUID'),
+  body('beneficiaryClientId').optional({ values: 'null' }).isUUID(),
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        res.status(400).json({ errors: errors.array() });
+        return;
+      }
+
+      const { id } = req.params;
+      const companyId = req.user?.companyId;
+      if (!companyId) {
+        res.status(401).json({ error: 'Authentication required' });
+        return;
+      }
+      const client = await Client.findOne({ where: { id, companyId } });
+      if (!client) {
+        res.status(404).json({ error: 'Client not found' });
+        return;
+      }
+      if (req.user && !req.user.roles.includes('super_admin') && client.assignedUserId !== req.user.id) {
+        res.status(403).json({ error: 'Access denied' });
+        return;
+      }
+      if (client.parentClientId) {
+        res.status(400).json({ error: ACQUIRED_PACKAGES_PRIMARY_ONLY });
+        return;
+      }
+
+      const { productId, beneficiaryClientId } = req.body;
+      const product = await Product.findOne({ where: { id: productId, companyId } });
+      if (!product) {
+        res.status(400).json({ error: 'Product not found' });
+        return;
+      }
+
+      let beneficiaryId: string | null = null;
+      if (beneficiaryClientId) {
+        const beneficiary = await Client.findOne({
+          where: { id: beneficiaryClientId, companyId, parentClientId: id },
+        });
+        if (!beneficiary) {
+          res.status(400).json({ error: 'El familiar no pertenece a este cliente titular' });
+          return;
+        }
+        beneficiaryId = beneficiary.id;
+      }
+
+      const row = await ClientAcquiredPackage.create({
+        companyId,
+        parentClientId: id,
+        productId,
+        beneficiaryClientId: beneficiaryId,
+      });
+
+      const withIncludes = await ClientAcquiredPackage.findByPk(row.id, {
+        include: [
+          { model: Product, as: 'product', attributes: ['id', 'title'], required: true },
+          { model: Client, as: 'beneficiary', attributes: ['id', 'name'], required: false },
+        ],
+      });
+
+      res.status(201).json(serializeAcquiredPackage(withIncludes as any));
+    } catch (error) {
+      console.error('Create client acquired package error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  },
+];
+
+export const deleteClientAcquiredPackage = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { id, packageId } = req.params;
+    const companyId = req.user?.companyId;
+    if (!companyId) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+    const client = await Client.findOne({ where: { id, companyId } });
+    if (!client) {
+      res.status(404).json({ error: 'Client not found' });
+      return;
+    }
+    if (req.user && !req.user.roles.includes('super_admin') && client.assignedUserId !== req.user.id) {
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
+    if (client.parentClientId) {
+      res.status(400).json({ error: ACQUIRED_PACKAGES_PRIMARY_ONLY });
+      return;
+    }
+
+    const row = await ClientAcquiredPackage.findOne({
+      where: { id: packageId, companyId, parentClientId: id },
+    });
+    if (!row) {
+      res.status(404).json({ error: 'Paquete no encontrado' });
+      return;
+    }
+
+    const paymentCount = await ClientPayment.count({ where: { acquiredPackageId: packageId, companyId } });
+    if (paymentCount > 0) {
+      res.status(400).json({
+        error:
+          'No se puede eliminar este paquete porque hay pagos asociados. Quita la asociación en los pagos o elimina esos pagos primero.',
+      });
+      return;
+    }
+
+    await row.destroy();
+    res.json({ message: 'Paquete eliminado' });
+  } catch (error) {
+    console.error('Delete client acquired package error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
 
 export const deleteClient = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
