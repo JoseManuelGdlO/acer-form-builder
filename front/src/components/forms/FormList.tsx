@@ -104,8 +104,8 @@ export const FormList = ({
   };
 
   return (
-    <div className="bg-background">
-      {/* Main Content */}
+    <div className="bg-transparent">
+      {/* Contenedor sin bg-background: si no, tapa la imagen de fondo global (solo min-h-screen era transparente). */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Page Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">

@@ -140,15 +140,29 @@
   }
 
   [data-app-bg-image="true"] .bg-card {
-    background-color: hsl(var(--card) / 0.42) !important;
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
+    background-color: hsl(var(--card) / 0.26) !important;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
   }
 
   [data-app-bg-image="true"] .bg-card\/80 {
-    background-color: hsl(var(--card) / 0.32) !important;
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
+    background-color: hsl(var(--card) / 0.2) !important;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+  }
+
+  /* Inputs / selects: mismo lenguaje visual que las cards (sin bloque blanco sólido) */
+  [data-app-bg-image="true"] input.border-input.bg-background,
+  [data-app-bg-image="true"] textarea.border-input.bg-background {
+    background-color: hsl(var(--background) / 0.35) !important;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  [data-app-bg-image="true"] button[class~="border-input"][class~="bg-background"] {
+    background-color: hsl(var(--background) / 0.35) !important;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
   }
 }
 
