@@ -140,15 +140,15 @@
   }
 
   [data-app-bg-image="true"] .bg-card {
-    background-color: hsl(var(--card) / 0.78) !important;
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+    background-color: hsl(var(--card) / 0.42) !important;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
   }
 
   [data-app-bg-image="true"] .bg-card\/80 {
-    background-color: hsl(var(--card) / 0.58) !important;
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    background-color: hsl(var(--card) / 0.32) !important;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
   }
 }
 
