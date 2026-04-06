@@ -611,7 +611,7 @@ export const createClient = [
         ...req.body,
         companyId,
         parentClientId: parentClientId ?? null,
-        ...(req.user && !req.user.roles.includes('super_admin') ? { assignedUserId: req.user.id } : {}),
+        ...(req.user ? { assignedUserId: req.user.id } : {}),
       });
       await client.reload({
         include: [
