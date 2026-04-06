@@ -27,7 +27,7 @@ import {
   ChevronDown,
   ChevronRight,
   RotateCcw,
-  Image,
+  Image as ImageIcon,
   Bookmark,
   Wallpaper,
   Upload,
@@ -117,7 +117,7 @@ const COLOR_GROUPS: { title: string; keys: { key: string; label: string }[] }[] 
 /** Redimensiona y comprime a JPEG (máx. ancho 1920px) para no inflar la BD. */
 function compressImageFileToJpegDataUrl(file: File, maxWidth = 1920, quality = 0.85): Promise<string> {
   return new Promise((resolve, reject) => {
-    const img = new Image();
+    const img = document.createElement('img');
     const url = URL.createObjectURL(file);
     img.onload = () => {
       URL.revokeObjectURL(url);
@@ -315,7 +315,7 @@ export function CompanyBrandingSettings() {
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
-            <Image className="w-5 h-5 text-primary" />
+            <ImageIcon className="w-5 h-5 text-primary" />
             <CardTitle>Logotipo y favicon</CardTitle>
           </div>
           <CardDescription>
@@ -325,7 +325,7 @@ export function CompanyBrandingSettings() {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="company-logo-url" className="flex items-center gap-2 text-sm font-medium">
-              <Image className="w-4 h-4" />
+              <ImageIcon className="w-4 h-4" />
               Logotipo (URL)
             </Label>
             <Input
