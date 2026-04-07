@@ -1,4 +1,4 @@
-import { useMemo, type CSSProperties } from 'react';
+import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { 
@@ -10,10 +10,7 @@ import { format, formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Form, FormSubmission, Client } from '@/types/form';
 import { useTenant } from '@/contexts/TenantContext';
-import {
-  DASHBOARD_CENTER_LOGO_IMAGE_KEY,
-  getDashboardCardOpacity,
-} from '@/lib/theme';
+import { DASHBOARD_CENTER_LOGO_IMAGE_KEY } from '@/lib/theme';
 
 interface DashboardProps {
   forms: Form[];
@@ -28,6 +25,8 @@ interface Activity {
   type: 'client_created' | 'form_submitted' | 'client_updated' | 'form_created';
   title: string;
   description: string;
+  /** Línea extra (p. ej. asesor asignado en altas de cliente) */
+  descriptionSecondary?: string;
   timestamp: Date;
   icon: typeof Users;
   color: string;
@@ -41,7 +40,6 @@ const StatCard = ({
   trend, 
   trendValue,
   color = 'primary',
-  cardOpacity = 100,
 }: { 
   title: string; 
   value: number | string; 
@@ -50,7 +48,6 @@ const StatCard = ({
   trend?: 'up' | 'down' | 'neutral';
   trendValue?: string;
   color?: 'primary' | 'secondary' | 'accent' | 'success' | 'warning';
-  cardOpacity?: number;
 }) => {
   const colorClasses = {
     primary: 'bg-primary/10 text-primary',
@@ -61,14 +58,7 @@ const StatCard = ({
   };
 
   return (
-    <Card
-      className="border-border/50 hover:shadow-md transition-shadow bg-transparent"
-      style={{
-        backgroundColor: `hsl(var(--card) / ${Math.max(0, Math.min(1, cardOpacity / 100))})`,
-        backdropFilter: 'blur(4px)',
-        WebkitBackdropFilter: 'blur(4px)',
-      }}
-    >
+    <Card className="border-border/50 hover:shadow-md transition-shadow">
       <CardContent className="p-6">
         <div className="flex items-start justify-between">
           <div className="space-y-2">
@@ -108,7 +98,6 @@ export const Dashboard = ({
   clientStats
 }: DashboardProps) => {
   const { tenant } = useTenant();
-  const dashboardCardOpacity = getDashboardCardOpacity(tenant?.theme);
   const dashboardCenterLogoImage = tenant?.theme?.[DASHBOARD_CENTER_LOGO_IMAGE_KEY]?.trim() ?? '';
   const hasCenterLogo = Boolean(dashboardCenterLogoImage);
 
@@ -123,6 +112,7 @@ export const Dashboard = ({
         type: 'client_created',
         title: 'Nuevo cliente registrado',
         description: client.name,
+        descriptionSecondary: `Asesor: ${client.assignedUser?.name ?? 'Sin asignar'}`,
         timestamp: client.createdAt,
         icon: UserPlus,
         color: 'bg-green-500',
@@ -185,13 +175,6 @@ export const Dashboard = ({
     return { approved, denied, rate };
   }, [clients]);
 
-  const cardAlpha = Math.max(0, Math.min(1, dashboardCardOpacity / 100));
-  const cardSurfaceStyle: CSSProperties = {
-    backgroundColor: `hsl(var(--card) / ${cardAlpha})`,
-    backdropFilter: 'blur(4px)',
-    WebkitBackdropFilter: 'blur(4px)',
-  };
-
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -202,89 +185,63 @@ export const Dashboard = ({
         </p>
       </div>
 
-      {/* Main Stats Grid */}
-      <div
-        className={
-          hasCenterLogo
-            ? 'relative min-h-[70vh] grid gap-4 xl:grid-cols-5 pt-28 md:pt-36 xl:pt-44'
-            : 'grid sm:grid-cols-2 lg:grid-cols-5 gap-4'
-        }
-      >
-        {hasCenterLogo ? (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none px-4 md:px-10 z-0">
-            <img
-              src={dashboardCenterLogoImage}
-              alt="Logotipo principal del inicio"
-              className="w-full max-w-[1100px] max-h-[78vh] object-contain opacity-95"
-            />
-          </div>
-        ) : null}
+      {/* Logotipo de inicio: solo esta franja; las estadísticas van debajo, sin superponer */}
+      {hasCenterLogo ? (
+        <div className="flex justify-center items-center px-4 py-4 md:py-8 min-h-[min(52vh,480px)]">
+          <img
+            src={dashboardCenterLogoImage}
+            alt="Logotipo principal del inicio"
+            className="w-full max-w-4xl max-h-[min(48vh,440px)] object-contain"
+          />
+        </div>
+      ) : null}
 
-        <div className={hasCenterLogo ? 'space-y-4 xl:col-span-2 relative z-10' : 'contents'}>
-          <StatCard
-            title="Total Clientes"
-            value={clientStats.total}
-            subtitle={`${clientStats.active} activos`}
-            icon={Users}
-            color="primary"
-            trend="up"
-            trendValue={`${activeClientRate}% activos`}
-            cardOpacity={dashboardCardOpacity}
-          />
-          <StatCard
-            title="Respuestas"
-            value={submissionStats.total}
-            subtitle={`${submissionStats.pending} pendientes`}
-            icon={ClipboardList}
-            color="secondary"
-            trend={submissionStats.pending > 0 ? 'neutral' : 'up'}
-            trendValue={submissionStats.pending > 0 ? 'Requieren revisión' : 'Al día'}
-            cardOpacity={dashboardCardOpacity}
-          />
-          {!hasCenterLogo ? (
-            <StatCard
-              title="Tasa de Completado"
-              value={`${completionRate}%`}
-              subtitle={`${submissionStats.completed} completados`}
-              icon={CheckCircle2}
-              color="success"
-              cardOpacity={dashboardCardOpacity}
-            />
-          ) : null}
-        </div>
-        <div className={hasCenterLogo ? 'space-y-4 xl:col-span-2 relative z-10' : 'contents'}>
-          {hasCenterLogo ? (
-            <StatCard
-              title="Tasa de Completado"
-              value={`${completionRate}%`}
-              subtitle={`${submissionStats.completed} completados`}
-              icon={CheckCircle2}
-              color="success"
-              cardOpacity={dashboardCardOpacity}
-            />
-          ) : null}
-          <StatCard
-            title="Visas Aprobadas vs Negadas"
-            value={`${visaApprovalStats.approved} / ${visaApprovalStats.denied}`}
-            subtitle="Aprobadas / Negadas"
-            icon={Scale}
-            color="accent"
-            cardOpacity={dashboardCardOpacity}
-          />
-          <StatCard
-            title="Tasa de Aprobación de Visas"
-            value={`${visaApprovalStats.rate}%`}
-            subtitle={`${visaApprovalStats.approved + visaApprovalStats.denied} casos evaluados`}
-            icon={Percent}
-            color="success"
-            cardOpacity={dashboardCardOpacity}
-          />
-        </div>
+      {/* Main Stats Grid — siempre debajo del logo (flujo normal) */}
+      <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <StatCard
+          title="Total Clientes"
+          value={clientStats.total}
+          subtitle={`${clientStats.active} activos`}
+          icon={Users}
+          color="primary"
+          trend="up"
+          trendValue={`${activeClientRate}% activos`}
+        />
+        <StatCard
+          title="Respuestas"
+          value={submissionStats.total}
+          subtitle={`${submissionStats.pending} pendientes`}
+          icon={ClipboardList}
+          color="secondary"
+          trend={submissionStats.pending > 0 ? 'neutral' : 'up'}
+          trendValue={submissionStats.pending > 0 ? 'Requieren revisión' : 'Al día'}
+        />
+        <StatCard
+          title="Tasa de Completado"
+          value={`${completionRate}%`}
+          subtitle={`${submissionStats.completed} completados`}
+          icon={CheckCircle2}
+          color="success"
+        />
+        <StatCard
+          title="Visas Aprobadas vs Negadas"
+          value={`${visaApprovalStats.approved} / ${visaApprovalStats.denied}`}
+          subtitle="Aprobadas / Negadas"
+          icon={Scale}
+          color="accent"
+        />
+        <StatCard
+          title="Tasa de Aprobación de Visas"
+          value={`${visaApprovalStats.rate}%`}
+          subtitle={`${visaApprovalStats.approved + visaApprovalStats.denied} casos evaluados`}
+          icon={Percent}
+          color="success"
+        />
       </div>
 
       {/* Secondary Stats */}
       <div className="grid sm:grid-cols-3 gap-4">
-        <Card className="border-border/50 bg-transparent" style={cardSurfaceStyle}>
+        <Card className="border-border/50">
           <CardContent className="p-6">
             <div className="flex items-center gap-4">
               <div className="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center">
@@ -297,7 +254,7 @@ export const Dashboard = ({
             </div>
           </CardContent>
         </Card>
-        <Card className="border-border/50 bg-transparent" style={cardSurfaceStyle}>
+        <Card className="border-border/50">
           <CardContent className="p-6">
             <div className="flex items-center gap-4">
               <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
@@ -310,7 +267,7 @@ export const Dashboard = ({
             </div>
           </CardContent>
         </Card>
-        <Card className="border-border/50 bg-transparent" style={cardSurfaceStyle}>
+        <Card className="border-border/50">
           <CardContent className="p-6">
             <div className="flex items-center gap-4">
               <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
@@ -328,7 +285,7 @@ export const Dashboard = ({
       {/* Activity Feed & Distribution */}
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Recent Activity */}
-        <Card className="lg:col-span-2 border-border/50 bg-transparent" style={cardSurfaceStyle}>
+        <Card className="lg:col-span-2 border-border/50">
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
               <Activity className="w-5 h-5 text-primary" />
@@ -356,6 +313,9 @@ export const Dashboard = ({
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-foreground">{activity.title}</p>
                       <p className="text-sm text-muted-foreground truncate">{activity.description}</p>
+                      {activity.descriptionSecondary ? (
+                        <p className="text-xs text-muted-foreground truncate mt-0.5">{activity.descriptionSecondary}</p>
+                      ) : null}
                     </div>
                     <span className="text-xs text-muted-foreground whitespace-nowrap">
                       {formatDistanceToNow(activity.timestamp, { addSuffix: true, locale: es })}
@@ -368,7 +328,7 @@ export const Dashboard = ({
         </Card>
 
         {/* Status Distribution */}
-        <Card className="border-border/50 bg-transparent" style={cardSurfaceStyle}>
+        <Card className="border-border/50">
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
               <Users className="w-5 h-5 text-primary" />

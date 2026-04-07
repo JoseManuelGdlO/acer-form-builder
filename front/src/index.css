@@ -73,6 +73,9 @@
     --sidebar-accent-foreground: 0 0% 100%;
     --sidebar-border: 234 50% 40%;
     --sidebar-ring: 0 67% 47%;
+
+    /* Opacidad de superficies tipo card (tema: dashboardCardOpacity); 0–1 */
+    --dashboard-card-opacity: 0.9;
   }
 
   .dark {
@@ -139,14 +142,9 @@
     background-color: transparent !important;
   }
 
-  [data-app-bg-image="true"] .bg-card {
-    background-color: hsl(var(--card) / 0.26) !important;
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
-  }
-
+  /* bg-card ya usa --dashboard-card-opacity vía Tailwind; solo refuerzo blur sobre foto */
+  [data-app-bg-image="true"] .bg-card,
   [data-app-bg-image="true"] .bg-card\/80 {
-    background-color: hsl(var(--card) / 0.2) !important;
     backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
   }

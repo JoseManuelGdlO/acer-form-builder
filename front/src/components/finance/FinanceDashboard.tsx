@@ -1,12 +1,12 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import type { ReactNode } from 'react';
-import { Loader2, TrendingUp, Wallet, Landmark, Percent, Receipt, RotateCcw, Trash2 } from 'lucide-react';
+import { Loader2, TrendingUp, Wallet, Landmark, Percent, Receipt, RotateCcw, Trash2, FileDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { PAYMENT_TYPE_LABELS } from '@/types/form';
+import { PAYMENT_TYPE_LABELS, type PaymentType } from '@/types/form';
 import type { FinanceGranularity, FinanceOverviewResponse } from '@/types/finance';
 import { api } from '@/lib/api';
 import {
@@ -29,6 +29,7 @@ import {
   YAxis,
 } from 'recharts';
 import { useAuth } from '@/contexts/AuthContext';
+import { exportFinanceOverviewPdf, formatDateRangeLabel, type FinancePdfFilterLabels } from '@/lib/financePdfExport';
 
 const GRANULARITIES: Array<{ key: FinanceGranularity; label: string }> = [
   { key: 'hourly', label: 'Por hora' },
@@ -226,6 +227,32 @@ export const FinanceDashboard = () => {
     }
   };
 
+  const handleExportPdf = () => {
+    if (!data?.kpis) {
+      toast.error('Aplica los filtros y espera a que carguen los datos para exportar.');
+      return;
+    }
+    const labels: FinancePdfFilterLabels = {
+      granularityLabel: GRANULARITIES.find((g) => g.key === data.meta.granularity)?.label ?? data.meta.granularity,
+      fromLabel: formatDateRangeLabel(data.meta.from),
+      toLabel: formatDateRangeLabel(data.meta.to),
+      paymentLabel: data.meta.paymentType
+        ? PAYMENT_TYPE_LABELS[data.meta.paymentType as PaymentType] ?? data.meta.paymentType
+        : 'Todos',
+      productLabel: data.meta.productId
+        ? products.find((p) => p.id === data.meta.productId)?.title ?? data.meta.productId
+        : 'Todos',
+      advisorLabel: data.meta.assignedUserId
+        ? advisors.find((a) => a.id === data.meta.assignedUserId)?.name ?? data.meta.assignedUserId
+        : 'Todos',
+      branchLabel: data.meta.branchId
+        ? branches.find((b) => b.id === data.meta.branchId)?.name ?? data.meta.branchId
+        : 'Todas',
+    };
+    exportFinanceOverviewPdf(data, labels, formatter);
+    toast.success('PDF descargado');
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -235,8 +262,19 @@ export const FinanceDashboard = () => {
 
       {/* Filtros */}
       <Card className="border-border/50">
-        <CardHeader className="pb-3">
+        <CardHeader className="pb-3 flex flex-row flex-wrap items-center justify-between gap-2 space-y-0">
           <CardTitle className="text-base">Filtros</CardTitle>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleExportPdf}
+            disabled={isLoading || !data?.kpis}
+            className="shrink-0"
+          >
+            <FileDown className="w-4 h-4 mr-2" />
+            Exportar PDF
+          </Button>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Periodicidad */}

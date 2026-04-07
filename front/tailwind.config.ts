@@ -48,8 +48,9 @@ export default {
           foreground: "hsl(var(--popover-foreground))",
         },
         card: {
-          DEFAULT: "hsl(var(--card))",
-          foreground: "hsl(var(--card-foreground))",
+          DEFAULT:
+            "hsl(var(--card) / calc(var(--dashboard-card-opacity, 0.9) * <alpha-value>))",
+          foreground: "hsl(var(--card-foreground) / <alpha-value>)",
         },
         success: {
           DEFAULT: "hsl(var(--success))",

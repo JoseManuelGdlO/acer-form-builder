@@ -547,10 +547,11 @@ export function CompanyBrandingSettings() {
               className="rounded-xl border p-4 min-h-[200px] flex gap-3"
               style={
                 {
-                  '--background': effectiveTheme.background ? `hsl(${effectiveTheme.background})` : undefined,
-                  '--foreground': effectiveTheme.foreground ? `hsl(${effectiveTheme.foreground})` : undefined,
-                  '--card': effectiveTheme.card ? `hsl(${effectiveTheme.card})` : undefined,
-                  '--card-foreground': effectiveTheme['card-foreground'] ? `hsl(${effectiveTheme['card-foreground']})` : undefined,
+                  '--background': effectiveTheme.background ?? undefined,
+                  '--foreground': effectiveTheme.foreground ?? undefined,
+                  '--card': effectiveTheme.card ?? undefined,
+                  '--card-foreground': effectiveTheme['card-foreground'] ?? undefined,
+                  '--dashboard-card-opacity': String(dashboardCardOpacity / 100),
                   '--primary': effectiveTheme.primary ? `hsl(${effectiveTheme.primary})` : undefined,
                   '--primary-foreground': effectiveTheme['primary-foreground'] ? `hsl(${effectiveTheme['primary-foreground']})` : undefined,
                   '--secondary': effectiveTheme.secondary ? `hsl(${effectiveTheme.secondary})` : undefined,
@@ -625,19 +626,12 @@ export function CompanyBrandingSettings() {
                   </button>
                 </div>
                 <div
-                  className="rounded-lg border p-4 max-w-sm"
-                  style={{
-                    background: effectiveTheme.card
-                      ? `hsl(${effectiveTheme.card} / ${Math.max(0, Math.min(1, dashboardCardOpacity / 100))})`
-                      : undefined,
-                    color: effectiveTheme['card-foreground'] ? `hsl(${effectiveTheme['card-foreground']})` : undefined,
-                    borderColor: effectiveTheme.border ? `hsl(${effectiveTheme.border})` : undefined,
-                    borderRadius: effectiveTheme.radius ?? '0.75rem',
-                  }}
+                  className="rounded-lg border border-border p-4 max-w-sm bg-card text-card-foreground"
+                  style={{ borderRadius: effectiveTheme.radius ?? '0.75rem' }}
                 >
                   <p className="font-medium">Tarjeta de ejemplo</p>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Vista en vivo de transparencia: {dashboardCardOpacity}%.
+                    Misma transparencia que en toda la app: {dashboardCardOpacity}%.
                   </p>
                 </div>
               </div>
@@ -679,7 +673,7 @@ export function CompanyBrandingSettings() {
             ))}
 
             <div className="space-y-3">
-              <h4 className="text-sm font-semibold text-foreground">Intensidad de cards del dashboard</h4>
+              <h4 className="text-sm font-semibold text-foreground">Intensidad de tarjetas (toda la aplicación)</h4>
               <div className="flex items-center gap-4 max-w-sm">
                 <Slider
                   value={[dashboardCardOpacity]}

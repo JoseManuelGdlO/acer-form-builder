@@ -7,6 +7,9 @@ export const DASHBOARD_CARD_OPACITY_KEY = 'dashboardCardOpacity' as const;
 export const DASHBOARD_CENTER_LOGO_IMAGE_KEY = 'dashboardCenterLogoImage' as const;
 export const DEFAULT_DASHBOARD_CARD_OPACITY = 90;
 
+/** Variable CSS en :root (0–1). Controla opacidad de `bg-card` en toda la app. */
+export const CARD_SURFACE_OPACITY_CSS_VAR = '--dashboard-card-opacity' as const;
+
 /** Only these keys are applied as :root CSS variables (not data URLs / metadata). */
 export const THEME_COLOR_KEYS = [
   'primary',
@@ -168,6 +171,7 @@ export function applyTheme(theme: Record<string, string> | null): void {
     THEME_COLOR_KEYS.forEach((key) => {
       root.style.removeProperty(cssVarName(key));
     });
+    root.style.removeProperty(CARD_SURFACE_OPACITY_CSS_VAR);
     applyAppBackground(null);
     return;
   }
@@ -181,6 +185,8 @@ export function applyTheme(theme: Record<string, string> | null): void {
       root.style.removeProperty(prop);
     }
   });
+  const cardOpacity = getDashboardCardOpacity(theme);
+  root.style.setProperty(CARD_SURFACE_OPACITY_CSS_VAR, String(cardOpacity / 100));
   applyAppBackground(theme);
 }
 
@@ -195,4 +201,5 @@ export function clearTheme(themeKeys?: string[]): void {
     if (THEME_META_KEYS.has(key)) return;
     root.style.removeProperty(cssVarName(key));
   });
+  root.style.removeProperty(CARD_SURFACE_OPACITY_CSS_VAR);
 }
