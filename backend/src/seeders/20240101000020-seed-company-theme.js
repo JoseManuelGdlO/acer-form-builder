@@ -4,16 +4,44 @@
  * Seeds theme for the default company (saru).
  * Theme keys match CSS variables in front/src/index.css (without --).
  * Values are HSL without hsl() wrapper, e.g. "234 66% 30%".
+ *
+ * Idempotente: si ya hay un theme guardado (colores, fondo, logos en JSON, etc.),
+ * no lo sobrescribe para no perder branding al re-ejecutar seeds en deploy.
  */
+function parseThemeRow(raw) {
+  if (raw == null || raw === '') return null;
+  if (typeof raw === 'object' && !Array.isArray(raw)) return raw;
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+function themeHasAnyKey(theme) {
+  return theme && typeof theme === 'object' && Object.keys(theme).length > 0;
+}
+
 module.exports = {
   async up(queryInterface, Sequelize) {
     const rows = await queryInterface.sequelize.query(
-      `SELECT id FROM companies WHERE slug = 'saru' LIMIT 1`,
+      `SELECT id, theme FROM companies WHERE slug = 'saru' LIMIT 1`,
       { type: Sequelize.QueryTypes.SELECT }
     );
-    const companyId = rows?.[0]?.id ?? null;
+    const row = rows?.[0];
+    const companyId = row?.id ?? null;
     if (!companyId) {
       console.log('Default company (saru) not found. Run migrations first.');
+      return;
+    }
+
+    const existing = parseThemeRow(row.theme);
+    if (themeHasAnyKey(existing)) {
+      console.log('Company theme already set; skipping seed to preserve branding.');
       return;
     }
 

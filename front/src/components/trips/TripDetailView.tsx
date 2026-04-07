@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Trip, Client, TripChangeLogEntry, TripIncome, TripExpense, TripFinanceSummary } from '@/types/form';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -46,6 +46,7 @@ import {
 } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { isParticipantChildInTrip, sortTripParticipantsByFamily } from '@/lib/tripParticipantsOrder';
 
 const ACTION_LABELS: Record<string, string> = {
   trip_created: 'Viaje creado',
@@ -155,7 +156,14 @@ export const TripDetailView = ({
     return () => clearInterval(interval);
   }, [trip.id, reviewerMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const participants = trip.participants ?? [];
+  const participants = useMemo(
+    () => sortTripParticipantsByFamily(trip.participants ?? []),
+    [trip.participants]
+  );
+  const participantIdSet = useMemo(
+    () => new Set(participants.map((p) => p.client?.id).filter(Boolean) as string[]),
+    [participants]
+  );
   const filteredParticipants = memberSearch.trim()
     ? participants.filter(p => {
         const c = p.client;
@@ -441,7 +449,6 @@ export const TripDetailView = ({
       y += 6;
 
       writeLine('Participantes', { bold: true, size: 12 });
-      const participants = trip.participants ?? [];
       if (!participants.length) {
         writeLine('Sin participantes registrados.');
       } else {
@@ -841,10 +848,13 @@ export const TripDetailView = ({
                     const c = p.client;
                     if (!c) return null;
                     const rowNumber = participants.indexOf(p) + 1;
+                    const childInGroup = isParticipantChildInTrip(c, participantIdSet);
                     return (
                       <li
                         key={p.id ?? c.id}
-                        className="flex items-center justify-between gap-4 px-3 py-2.5 hover:bg-muted/30"
+                        className={`flex items-center justify-between gap-4 py-2.5 hover:bg-muted/30 ${
+                          childInGroup ? 'pl-8 pr-3 border-l-2 border-l-primary/25 ml-3' : 'px-3'
+                        }`}
                       >
                         <span
                           className="shrink-0 w-8 text-right text-sm tabular-nums text-muted-foreground"
@@ -854,6 +864,11 @@ export const TripDetailView = ({
                         </span>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
+                            {childInGroup && (
+                              <span className="text-xs text-muted-foreground shrink-0" aria-hidden>
+                                └
+                              </span>
+                            )}
                             <p className="font-medium truncate">{c.name}</p>
                             {c.company && (
                               <Badge variant="outline" className="text-xs shrink-0">

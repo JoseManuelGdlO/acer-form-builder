@@ -123,7 +123,7 @@ export const getTripById = async (req: AuthRequest, res: Response): Promise<void
               model: Client,
               as: 'client',
               include: [{ model: Company, as: 'company', attributes: ['id', 'name'] }],
-              attributes: ['id', 'name', 'email', 'phone', 'companyId', 'totalAmountDue'],
+              attributes: ['id', 'name', 'email', 'phone', 'companyId', 'totalAmountDue', 'parentClientId'],
             },
           ],
         },
