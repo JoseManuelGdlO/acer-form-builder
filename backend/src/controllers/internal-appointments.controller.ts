@@ -224,7 +224,8 @@ export const deleteInternalAppointment = async (req: AuthRequest, res: Response)
       return;
     }
     const previous = serializeAppointment(appointment);
-    await appointment.destroy();
+    // Registrar historial antes de destroy: si no, el INSERT falla (FK a internal_appointments).
+    // Nota: ON DELETE CASCADE en history borra también esta fila al eliminar la cita; si hace falta auditoría persistente de borrados, habría que usar SET NULL o borrado lógico.
     await writeHistory({
       appointmentId,
       companyId,
@@ -232,6 +233,7 @@ export const deleteInternalAppointment = async (req: AuthRequest, res: Response)
       changedByUserId: req.user.id,
       before: previous,
     });
+    await appointment.destroy();
     res.json({ message: 'Appointment deleted' });
   } catch (error) {
     console.error('Delete internal appointment error:', error);
