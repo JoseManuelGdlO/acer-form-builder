@@ -84,6 +84,25 @@ const isWhatsappReplyEvent = (eventData: NotificationSyncEventData | null | unde
   return eventData.notificationData?.type === 'whatsapp_reply';
 };
 
+/** Respuesta de GET /clients/stats → mismas categorías que filteredClientStats (activo=aprobada, inactivo=negada, resto=pendiente) */
+function mapServerClientStatsPayload(data: {
+  total?: number;
+  visaStatusCounts?: Array<{ label?: string; count?: number }>;
+}): { total: number; active: number; inactive: number; pending: number } {
+  const total = typeof data.total === 'number' ? data.total : 0;
+  const normalize = (s?: string | null) => (s || '').trim().toLowerCase();
+  let active = 0;
+  let inactive = 0;
+  for (const row of data.visaStatusCounts || []) {
+    const label = normalize(row.label);
+    const c = typeof row.count === 'number' ? row.count : 0;
+    if (label.includes('aprob')) active += c;
+    else if (label.includes('negad')) inactive += c;
+  }
+  const pending = Math.max(0, total - active - inactive);
+  return { total, active, inactive, pending };
+}
+
 const Index = () => {
   const initialNavigation = useMemo(parseInitialClientNavigation, []);
   const [activeView, setActiveView] = useState<View>(initialNavigation.initialView);
@@ -188,6 +207,14 @@ const Index = () => {
     page: number;
     limit: number;
   }>({ page: 1, limit: 20 });
+  const [dashboardClientStats, setDashboardClientStats] = useState<{
+    total: number;
+    active: number;
+    inactive: number;
+    pending: number;
+  } | null>(null);
+  /** Total de clientes del asesor cuando un admin usa "Ver como" (la paginación del listado sigue siendo la de todos) */
+  const [viewAsClientsTotal, setViewAsClientsTotal] = useState<number | null>(null);
   const { categories, fetchCategories, createCategory, updateCategory, deleteCategory } = useCategoryStore();
 
   const areClientQueriesEqual = (
@@ -313,6 +340,44 @@ const Index = () => {
 
     return () => window.clearInterval(intervalId);
   }, [token, activeView, clientListQuery, fetchClients, fetchSubmissions]);
+
+  // Inicio: totales reales (la lista de clientes va paginada; no usar solo clients.length)
+  useEffect(() => {
+    if (!token || activeView !== 'dashboard') return;
+    let cancelled = false;
+    const assignedUserId =
+      viewingAs && !viewingAs.roles.includes('super_admin') ? viewingAs.id : undefined;
+    getClientStats(token, assignedUserId ? { assignedUserId } : undefined)
+      .then((raw) => {
+        if (cancelled) return;
+        setDashboardClientStats(mapServerClientStatsPayload(raw));
+      })
+      .catch(() => {
+        if (!cancelled) setDashboardClientStats(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, activeView, viewingAs, getClientStats]);
+
+  useEffect(() => {
+    if (!token || activeView !== 'clients' || !viewingAs || viewingAs.roles.includes('super_admin')) {
+      setViewAsClientsTotal(null);
+      return;
+    }
+    let cancelled = false;
+    getClientStats(token, { assignedUserId: viewingAs.id })
+      .then((raw) => {
+        if (cancelled) return;
+        setViewAsClientsTotal(typeof raw.total === 'number' ? raw.total : null);
+      })
+      .catch(() => {
+        if (!cancelled) setViewAsClientsTotal(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, activeView, viewingAs, getClientStats]);
 
   // Load products & categories when switching to products view
   useEffect(() => {
@@ -637,7 +702,7 @@ const Index = () => {
             clients={filteredClients}
             products={products}
             visaStatusTemplates={visaStatusTemplates}
-            stats={filteredClientStats}
+            stats={{ total: viewAsClientsTotal ?? clientPagination.total }}
             initialClientId={initialNavigation.initialClientId}
             onDelete={deleteClient}
             onCreate={async (data) => { await createClient(data); }}
@@ -1110,7 +1175,7 @@ const Index = () => {
                 reviewed: submissionStats.in_progress,
                 completed: submissionStats.completed,
               }}
-              clientStats={filteredClientStats}
+              clientStats={dashboardClientStats ?? filteredClientStats}
             />
           </div>
         </div>

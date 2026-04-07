@@ -160,20 +160,14 @@ export const Dashboard = ({
     ? Math.round((clientStats.active / clientStats.total) * 100)
     : 0;
 
+  // Mismas reglas que en Index (aprob / negad); totales vienen del API en clientStats, no de la página paginada
   const visaApprovalStats = useMemo(() => {
-    const normalize = (value?: string | null) => (value || '').trim().toLowerCase();
-    const approved = clients.filter((client) =>
-      normalize(client.visaStatusTemplate?.label).includes('aprob')
-    ).length;
-    const denied = clients.filter((client) =>
-      normalize(client.visaStatusTemplate?.label).includes('negad')
-    ).length;
-    const rate = approved + denied > 0
-      ? Math.round((approved / (approved + denied)) * 100)
-      : 0;
-
+    const approved = clientStats.active;
+    const denied = clientStats.inactive;
+    const rate =
+      approved + denied > 0 ? Math.round((approved / (approved + denied)) * 100) : 0;
     return { approved, denied, rate };
-  }, [clients]);
+  }, [clientStats.active, clientStats.inactive]);
 
   return (
     <div className="space-y-8">

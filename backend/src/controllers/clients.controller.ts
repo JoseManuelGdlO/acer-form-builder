@@ -1141,8 +1141,14 @@ export const getClientStats = async (req: AuthRequest, res: Response): Promise<v
     }
     const where: any = { companyId };
 
-    // If user is reviewer, only count assigned clients
-    if (req.user && !req.user.roles.includes('super_admin')) {
+    const assignedUserIdParam =
+      typeof req.query.assignedUserId === 'string' ? req.query.assignedUserId.trim() : '';
+
+    // Super admin puede acotar por asesor (p. ej. "Ver como" revisor)
+    if (assignedUserIdParam && req.user?.roles.includes('super_admin')) {
+      where.assignedUserId = assignedUserIdParam;
+    } else if (req.user && !req.user.roles.includes('super_admin')) {
+      // Revisor: solo clientes asignados
       where.assignedUserId = req.user.id;
     }
 

@@ -188,10 +188,12 @@ export const useClientStore = () => {
     await updateClient(token, clientId, { visaStatusTemplateId });
   }, [updateClient]);
 
-  const getClientStats = useCallback(async (token: string) => {
+  const getClientStats = useCallback(async (
+    token: string,
+    params?: { assignedUserId?: string }
+  ) => {
     try {
-      const stats = await api.getClientStats(token);
-      return stats;
+      return await api.getClientStats(token, params);
     } catch (error) {
       console.error('Failed to get client stats:', error);
       return {
@@ -199,7 +201,7 @@ export const useClientStore = () => {
         visaStatusCounts: [],
       };
     }
-  }, [clients]);
+  }, [clients.length]);
 
   return {
     clients,

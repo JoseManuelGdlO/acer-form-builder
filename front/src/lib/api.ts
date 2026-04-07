@@ -218,8 +218,14 @@ class ApiClient {
     });
   }
 
-  async getClientStats(token?: string | null) {
-    return this.request<any>('/clients/stats', {
+  async getClientStats(
+    token?: string | null,
+    params?: { assignedUserId?: string }
+  ) {
+    const q = new URLSearchParams();
+    if (params?.assignedUserId) q.set('assignedUserId', params.assignedUserId);
+    const suffix = q.toString() ? `?${q}` : '';
+    return this.request<any>(`/clients/stats${suffix}`, {
       method: 'GET',
       token: token ?? this.getToken(),
       requireAuth: true,
