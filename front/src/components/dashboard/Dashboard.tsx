@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, type CSSProperties } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { 
@@ -62,8 +62,12 @@ const StatCard = ({
 
   return (
     <Card
-      className="border-border/50 hover:shadow-md transition-shadow"
-      style={{ backgroundColor: `hsl(var(--card) / ${Math.max(0, Math.min(1, cardOpacity / 100))})` }}
+      className="border-border/50 hover:shadow-md transition-shadow bg-transparent"
+      style={{
+        backgroundColor: `hsl(var(--card) / ${Math.max(0, Math.min(1, cardOpacity / 100))})`,
+        backdropFilter: 'blur(4px)',
+        WebkitBackdropFilter: 'blur(4px)',
+      }}
     >
       <CardContent className="p-6">
         <div className="flex items-start justify-between">
@@ -181,6 +185,13 @@ export const Dashboard = ({
     return { approved, denied, rate };
   }, [clients]);
 
+  const cardAlpha = Math.max(0, Math.min(1, dashboardCardOpacity / 100));
+  const cardSurfaceStyle: CSSProperties = {
+    backgroundColor: `hsl(var(--card) / ${cardAlpha})`,
+    backdropFilter: 'blur(4px)',
+    WebkitBackdropFilter: 'blur(4px)',
+  };
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -193,7 +204,11 @@ export const Dashboard = ({
 
       {/* Main Stats Grid */}
       <div
-        className={hasCenterLogo ? 'relative min-h-[70vh] grid gap-4 xl:grid-cols-5' : 'grid sm:grid-cols-2 lg:grid-cols-5 gap-4'}
+        className={
+          hasCenterLogo
+            ? 'relative min-h-[70vh] grid gap-4 xl:grid-cols-5 pt-28 md:pt-36 xl:pt-44'
+            : 'grid sm:grid-cols-2 lg:grid-cols-5 gap-4'
+        }
       >
         {hasCenterLogo ? (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none px-4 md:px-10 z-0">
@@ -269,10 +284,7 @@ export const Dashboard = ({
 
       {/* Secondary Stats */}
       <div className="grid sm:grid-cols-3 gap-4">
-        <Card
-          className="border-border/50"
-          style={{ backgroundColor: `hsl(var(--card) / ${Math.max(0, Math.min(1, dashboardCardOpacity / 100))})` }}
-        >
+        <Card className="border-border/50 bg-transparent" style={cardSurfaceStyle}>
           <CardContent className="p-6">
             <div className="flex items-center gap-4">
               <div className="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center">
@@ -285,10 +297,7 @@ export const Dashboard = ({
             </div>
           </CardContent>
         </Card>
-        <Card
-          className="border-border/50"
-          style={{ backgroundColor: `hsl(var(--card) / ${Math.max(0, Math.min(1, dashboardCardOpacity / 100))})` }}
-        >
+        <Card className="border-border/50 bg-transparent" style={cardSurfaceStyle}>
           <CardContent className="p-6">
             <div className="flex items-center gap-4">
               <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
@@ -301,10 +310,7 @@ export const Dashboard = ({
             </div>
           </CardContent>
         </Card>
-        <Card
-          className="border-border/50"
-          style={{ backgroundColor: `hsl(var(--card) / ${Math.max(0, Math.min(1, dashboardCardOpacity / 100))})` }}
-        >
+        <Card className="border-border/50 bg-transparent" style={cardSurfaceStyle}>
           <CardContent className="p-6">
             <div className="flex items-center gap-4">
               <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
@@ -322,10 +328,7 @@ export const Dashboard = ({
       {/* Activity Feed & Distribution */}
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Recent Activity */}
-        <Card
-          className="lg:col-span-2 border-border/50"
-          style={{ backgroundColor: `hsl(var(--card) / ${Math.max(0, Math.min(1, dashboardCardOpacity / 100))})` }}
-        >
+        <Card className="lg:col-span-2 border-border/50 bg-transparent" style={cardSurfaceStyle}>
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
               <Activity className="w-5 h-5 text-primary" />
@@ -365,10 +368,7 @@ export const Dashboard = ({
         </Card>
 
         {/* Status Distribution */}
-        <Card
-          className="border-border/50"
-          style={{ backgroundColor: `hsl(var(--card) / ${Math.max(0, Math.min(1, dashboardCardOpacity / 100))})` }}
-        >
+        <Card className="border-border/50 bg-transparent" style={cardSurfaceStyle}>
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
               <Users className="w-5 h-5 text-primary" />
