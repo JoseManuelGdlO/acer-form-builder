@@ -3,6 +3,9 @@ export type HslString = string;
 
 /** Keys stored in company.theme that are not CSS color variables. */
 export const APP_BACKGROUND_IMAGE_KEY = 'appBackgroundImage' as const;
+export const DASHBOARD_CARD_OPACITY_KEY = 'dashboardCardOpacity' as const;
+export const DASHBOARD_CENTER_LOGO_IMAGE_KEY = 'dashboardCenterLogoImage' as const;
+export const DEFAULT_DASHBOARD_CARD_OPACITY = 90;
 
 /** Only these keys are applied as :root CSS variables (not data URLs / metadata). */
 export const THEME_COLOR_KEYS = [
@@ -32,7 +35,19 @@ export const THEME_COLOR_KEYS = [
 
 export type ThemeColorKey = (typeof THEME_COLOR_KEYS)[number];
 
-const THEME_META_KEYS = new Set<string>([APP_BACKGROUND_IMAGE_KEY]);
+const THEME_META_KEYS = new Set<string>([
+  APP_BACKGROUND_IMAGE_KEY,
+  DASHBOARD_CARD_OPACITY_KEY,
+  DASHBOARD_CENTER_LOGO_IMAGE_KEY,
+]);
+
+export function getDashboardCardOpacity(theme: Record<string, string> | null | undefined): number {
+  const raw = theme?.[DASHBOARD_CARD_OPACITY_KEY];
+  if (!raw) return DEFAULT_DASHBOARD_CARD_OPACITY;
+  const parsed = Number.parseFloat(raw);
+  if (Number.isNaN(parsed)) return DEFAULT_DASHBOARD_CARD_OPACITY;
+  return Math.min(100, Math.max(0, Math.round(parsed)));
+}
 
 /**
  * Parse "H S% L%" to HSL numbers [h, s, l]. S and L are 0-100.

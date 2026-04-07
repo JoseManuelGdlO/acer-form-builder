@@ -17,6 +17,10 @@ import {
   hexToHslString,
   THEME_COLOR_KEYS,
   APP_BACKGROUND_IMAGE_KEY,
+  DASHBOARD_CARD_OPACITY_KEY,
+  DASHBOARD_CENTER_LOGO_IMAGE_KEY,
+  DEFAULT_DASHBOARD_CARD_OPACITY,
+  getDashboardCardOpacity,
 } from '@/lib/theme';
 import { applyFavicon } from '@/lib/favicon';
 import { useTenant } from '@/contexts/TenantContext';
@@ -186,10 +190,14 @@ export function CompanyBrandingSettings() {
   const [isSaving, setIsSaving] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [isCompressingBg, setIsCompressingBg] = useState(false);
+  const [isCompressingCenterLogo, setIsCompressingCenterLogo] = useState(false);
   const bgFileInputRef = useRef<HTMLInputElement>(null);
+  const centerLogoInputRef = useRef<HTMLInputElement>(null);
 
   const effectiveTheme = useMemo(() => getEffectiveTheme(theme), [theme]);
   const appBackgroundImage = theme[APP_BACKGROUND_IMAGE_KEY] ?? '';
+  const dashboardCenterLogoImage = theme[DASHBOARD_CENTER_LOGO_IMAGE_KEY] ?? '';
+  const dashboardCardOpacity = getDashboardCardOpacity(theme);
 
   useEffect(() => {
     let cancelled = false;
@@ -278,6 +286,39 @@ export function CompanyBrandingSettings() {
       return next;
     });
     toast.success('Imagen eliminada del borrador; guarda para aplicar en el servidor');
+  };
+
+  const updateDashboardCardOpacity = (value: number) => {
+    const safeValue = Math.min(100, Math.max(0, Math.round(value)));
+    setTheme((t) => ({ ...t, [DASHBOARD_CARD_OPACITY_KEY]: String(safeValue) }));
+  };
+
+  const handleCenterLogoFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !file.type.startsWith('image/')) {
+      toast.error('Selecciona un archivo de imagen');
+      return;
+    }
+    setIsCompressingCenterLogo(true);
+    try {
+      const dataUrl = await compressImageFileToJpegDataUrl(file, 1200, 0.9);
+      setTheme((t) => ({ ...t, [DASHBOARD_CENTER_LOGO_IMAGE_KEY]: dataUrl }));
+      toast.success('Logotipo preparado; pulsa «Guardar tema» para persistirlo');
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Error al procesar la imagen');
+    } finally {
+      setIsCompressingCenterLogo(false);
+    }
+  };
+
+  const clearCenterLogoImage = () => {
+    setTheme((t) => {
+      const next = { ...t };
+      delete next[DASHBOARD_CENTER_LOGO_IMAGE_KEY];
+      return next;
+    });
+    toast.success('Logotipo eliminado del borrador; guarda para aplicar en el servidor');
   };
 
   if (isLoading) {
@@ -392,6 +433,58 @@ export function CompanyBrandingSettings() {
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">Sin imagen de fondo; se usa solo el color de «Fondo de página».</p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <ImageIcon className="w-5 h-5 text-primary" />
+            <CardTitle>Logotipo centrado en inicio</CardTitle>
+          </div>
+          <CardDescription>
+            Imagen independiente para la pantalla de inicio. Se muestra centrada y deja el contenido estadístico a los lados.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <input
+            ref={centerLogoInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleCenterLogoFile}
+          />
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={isCompressingCenterLogo}
+              onClick={() => centerLogoInputRef.current?.click()}
+            >
+              <Upload className="w-4 h-4 mr-1" />
+              {isCompressingCenterLogo ? 'Procesando…' : 'Elegir logotipo de inicio'}
+            </Button>
+            {dashboardCenterLogoImage ? (
+              <Button type="button" variant="ghost" size="sm" onClick={clearCenterLogoImage}>
+                <X className="w-4 h-4 mr-1" />
+                Quitar logotipo
+              </Button>
+            ) : null}
+          </div>
+          {dashboardCenterLogoImage ? (
+            <div className="rounded-lg border overflow-hidden max-h-52 bg-muted p-4 flex items-center justify-center">
+              <img
+                src={dashboardCenterLogoImage}
+                alt="Vista previa del logotipo centrado de inicio"
+                className="max-h-40 w-auto object-contain"
+              />
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Sin logotipo central; el dashboard mostrará todas las cards sin reservar el centro.
+            </p>
           )}
         </CardContent>
       </Card>
@@ -557,6 +650,21 @@ export function CompanyBrandingSettings() {
                 </div>
               </div>
             ))}
+
+            <div className="space-y-3">
+              <h4 className="text-sm font-semibold text-foreground">Intensidad de cards del dashboard</h4>
+              <div className="flex items-center gap-4 max-w-sm">
+                <Slider
+                  value={[dashboardCardOpacity]}
+                  onValueChange={([v]) => updateDashboardCardOpacity(v)}
+                  min={0}
+                  max={100}
+                  step={1}
+                  className="flex-1"
+                />
+                <span className="text-sm tabular-nums text-muted-foreground w-16">{dashboardCardOpacity}%</span>
+              </div>
+            </div>
 
             <div className="space-y-3">
               <h4 className="text-sm font-semibold text-foreground">Radio de bordes</h4>

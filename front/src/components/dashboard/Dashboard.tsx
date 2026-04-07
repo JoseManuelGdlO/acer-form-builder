@@ -9,6 +9,11 @@ import {
 import { format, formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Form, FormSubmission, Client } from '@/types/form';
+import { useTenant } from '@/contexts/TenantContext';
+import {
+  DASHBOARD_CENTER_LOGO_IMAGE_KEY,
+  getDashboardCardOpacity,
+} from '@/lib/theme';
 
 interface DashboardProps {
   forms: Form[];
@@ -35,7 +40,8 @@ const StatCard = ({
   icon: Icon, 
   trend, 
   trendValue,
-  color = 'primary'
+  color = 'primary',
+  cardOpacity = 100,
 }: { 
   title: string; 
   value: number | string; 
@@ -44,6 +50,7 @@ const StatCard = ({
   trend?: 'up' | 'down' | 'neutral';
   trendValue?: string;
   color?: 'primary' | 'secondary' | 'accent' | 'success' | 'warning';
+  cardOpacity?: number;
 }) => {
   const colorClasses = {
     primary: 'bg-primary/10 text-primary',
@@ -54,7 +61,10 @@ const StatCard = ({
   };
 
   return (
-    <Card className="border-border/50 hover:shadow-md transition-shadow">
+    <Card
+      className="border-border/50 hover:shadow-md transition-shadow"
+      style={{ backgroundColor: `hsl(var(--card) / ${Math.max(0, Math.min(1, cardOpacity / 100))})` }}
+    >
       <CardContent className="p-6">
         <div className="flex items-start justify-between">
           <div className="space-y-2">
@@ -93,6 +103,11 @@ export const Dashboard = ({
   submissionStats,
   clientStats
 }: DashboardProps) => {
+  const { tenant } = useTenant();
+  const dashboardCardOpacity = getDashboardCardOpacity(tenant?.theme);
+  const dashboardCenterLogoImage = tenant?.theme?.[DASHBOARD_CENTER_LOGO_IMAGE_KEY]?.trim() ?? '';
+  const hasCenterLogo = Boolean(dashboardCenterLogoImage);
+
   // Generate recent activities from data
   const recentActivities = useMemo<Activity[]>(() => {
     const activities: Activity[] = [];
@@ -177,51 +192,87 @@ export const Dashboard = ({
       </div>
 
       {/* Main Stats Grid */}
-      <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        <StatCard
-          title="Total Clientes"
-          value={clientStats.total}
-          subtitle={`${clientStats.active} activos`}
-          icon={Users}
-          color="primary"
-          trend="up"
-          trendValue={`${activeClientRate}% activos`}
-        />
-        <StatCard
-          title="Respuestas"
-          value={submissionStats.total}
-          subtitle={`${submissionStats.pending} pendientes`}
-          icon={ClipboardList}
-          color="secondary"
-          trend={submissionStats.pending > 0 ? 'neutral' : 'up'}
-          trendValue={submissionStats.pending > 0 ? 'Requieren revisión' : 'Al día'}
-        />
-        <StatCard
-          title="Tasa de Completado"
-          value={`${completionRate}%`}
-          subtitle={`${submissionStats.completed} completados`}
-          icon={CheckCircle2}
-          color="success"
-        />
-        <StatCard
-          title="Visas Aprobadas vs Negadas"
-          value={`${visaApprovalStats.approved} / ${visaApprovalStats.denied}`}
-          subtitle="Aprobadas / Negadas"
-          icon={Scale}
-          color="accent"
-        />
-        <StatCard
-          title="Tasa de Aprobación de Visas"
-          value={`${visaApprovalStats.rate}%`}
-          subtitle={`${visaApprovalStats.approved + visaApprovalStats.denied} casos evaluados`}
-          icon={Percent}
-          color="success"
-        />
+      <div className={hasCenterLogo ? 'grid gap-4 xl:grid-cols-5' : 'grid sm:grid-cols-2 lg:grid-cols-5 gap-4'}>
+        <div className={hasCenterLogo ? 'space-y-4 xl:col-span-2' : 'contents'}>
+          <StatCard
+            title="Total Clientes"
+            value={clientStats.total}
+            subtitle={`${clientStats.active} activos`}
+            icon={Users}
+            color="primary"
+            trend="up"
+            trendValue={`${activeClientRate}% activos`}
+            cardOpacity={dashboardCardOpacity}
+          />
+          <StatCard
+            title="Respuestas"
+            value={submissionStats.total}
+            subtitle={`${submissionStats.pending} pendientes`}
+            icon={ClipboardList}
+            color="secondary"
+            trend={submissionStats.pending > 0 ? 'neutral' : 'up'}
+            trendValue={submissionStats.pending > 0 ? 'Requieren revisión' : 'Al día'}
+            cardOpacity={dashboardCardOpacity}
+          />
+          {!hasCenterLogo ? (
+            <StatCard
+              title="Tasa de Completado"
+              value={`${completionRate}%`}
+              subtitle={`${submissionStats.completed} completados`}
+              icon={CheckCircle2}
+              color="success"
+              cardOpacity={dashboardCardOpacity}
+            />
+          ) : null}
+        </div>
+        {hasCenterLogo ? (
+          <Card
+            className="border-border/50 xl:col-span-1 flex items-center justify-center min-h-[240px] p-6"
+            style={{ backgroundColor: `hsl(var(--card) / ${Math.max(0, Math.min(1, dashboardCardOpacity / 100))})` }}
+          >
+            <img
+              src={dashboardCenterLogoImage}
+              alt="Logotipo principal del inicio"
+              className="max-h-44 w-auto object-contain"
+            />
+          </Card>
+        ) : null}
+        <div className={hasCenterLogo ? 'space-y-4 xl:col-span-2' : 'contents'}>
+          {hasCenterLogo ? (
+            <StatCard
+              title="Tasa de Completado"
+              value={`${completionRate}%`}
+              subtitle={`${submissionStats.completed} completados`}
+              icon={CheckCircle2}
+              color="success"
+              cardOpacity={dashboardCardOpacity}
+            />
+          ) : null}
+          <StatCard
+            title="Visas Aprobadas vs Negadas"
+            value={`${visaApprovalStats.approved} / ${visaApprovalStats.denied}`}
+            subtitle="Aprobadas / Negadas"
+            icon={Scale}
+            color="accent"
+            cardOpacity={dashboardCardOpacity}
+          />
+          <StatCard
+            title="Tasa de Aprobación de Visas"
+            value={`${visaApprovalStats.rate}%`}
+            subtitle={`${visaApprovalStats.approved + visaApprovalStats.denied} casos evaluados`}
+            icon={Percent}
+            color="success"
+            cardOpacity={dashboardCardOpacity}
+          />
+        </div>
       </div>
 
       {/* Secondary Stats */}
       <div className="grid sm:grid-cols-3 gap-4">
-        <Card className="border-border/50">
+        <Card
+          className="border-border/50"
+          style={{ backgroundColor: `hsl(var(--card) / ${Math.max(0, Math.min(1, dashboardCardOpacity / 100))})` }}
+        >
           <CardContent className="p-6">
             <div className="flex items-center gap-4">
               <div className="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center">
@@ -234,7 +285,10 @@ export const Dashboard = ({
             </div>
           </CardContent>
         </Card>
-        <Card className="border-border/50">
+        <Card
+          className="border-border/50"
+          style={{ backgroundColor: `hsl(var(--card) / ${Math.max(0, Math.min(1, dashboardCardOpacity / 100))})` }}
+        >
           <CardContent className="p-6">
             <div className="flex items-center gap-4">
               <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
@@ -247,7 +301,10 @@ export const Dashboard = ({
             </div>
           </CardContent>
         </Card>
-        <Card className="border-border/50">
+        <Card
+          className="border-border/50"
+          style={{ backgroundColor: `hsl(var(--card) / ${Math.max(0, Math.min(1, dashboardCardOpacity / 100))})` }}
+        >
           <CardContent className="p-6">
             <div className="flex items-center gap-4">
               <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
@@ -265,7 +322,10 @@ export const Dashboard = ({
       {/* Activity Feed & Distribution */}
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Recent Activity */}
-        <Card className="lg:col-span-2 border-border/50">
+        <Card
+          className="lg:col-span-2 border-border/50"
+          style={{ backgroundColor: `hsl(var(--card) / ${Math.max(0, Math.min(1, dashboardCardOpacity / 100))})` }}
+        >
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
               <Activity className="w-5 h-5 text-primary" />
@@ -305,7 +365,10 @@ export const Dashboard = ({
         </Card>
 
         {/* Status Distribution */}
-        <Card className="border-border/50">
+        <Card
+          className="border-border/50"
+          style={{ backgroundColor: `hsl(var(--card) / ${Math.max(0, Math.min(1, dashboardCardOpacity / 100))})` }}
+        >
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
               <Users className="w-5 h-5 text-primary" />
