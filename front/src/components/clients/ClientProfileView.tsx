@@ -22,6 +22,8 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { formatPhoneOptional } from '@/lib/phone';
+import { APPOINTMENT_BADGE_CLASSES } from '@/lib/appointmentColors';
+import { cn } from '@/lib/utils';
 
 interface AssignedFormSession {
   id: string;
@@ -849,13 +851,17 @@ export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpe
                   </p>
                 )}
                 <div className="flex flex-wrap gap-2 mt-2">
-                  <Badge variant="secondary" className="gap-1">
-                    <Calendar className="w-3.5 h-3.5" />
+                  <Badge className={cn('inline-flex items-center gap-1', APPOINTMENT_BADGE_CLASSES.cas)}>
+                    <Calendar className="w-3.5 h-3.5 shrink-0" />
                     CAS: {formatAppointmentLabel(displayClient.visaCasAppointmentDate, displayClient.visaCasAppointmentLocation)}
                   </Badge>
-                  <Badge variant="secondary" className="gap-1">
-                    <Calendar className="w-3.5 h-3.5" />
-                    Consulado: {formatAppointmentLabel(displayClient.visaConsularAppointmentDate, displayClient.visaConsularAppointmentLocation)}
+                  <Badge className={cn('inline-flex items-center gap-1', APPOINTMENT_BADGE_CLASSES.consular)}>
+                    <Calendar className="w-3.5 h-3.5 shrink-0" />
+                    Consulado:{' '}
+                    {formatAppointmentLabel(
+                      displayClient.visaConsularAppointmentDate,
+                      displayClient.visaConsularAppointmentLocation
+                    )}
                   </Badge>
                 </div>
               </div>
@@ -1022,10 +1028,17 @@ export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpe
                       ) : (
                         <div className="space-y-2">
                           {upcomingAppointments.map((appointment) => (
-                            <div key={appointment.id} className="rounded-md border border-border/50 bg-card p-3 space-y-2 shadow-sm">
-                              <p className="text-sm font-medium">
-                                {formatInternalAppointmentDate(appointment.appointmentDate)} - {appointment.officeRole === 'admin' ? 'Administrador' : 'Revisor'}
-                              </p>
+                            <div
+                              key={appointment.id}
+                              className="rounded-md border border-border/50 border-l-4 border-l-green-600 bg-card p-3 space-y-2 shadow-sm"
+                            >
+                              <div className="flex flex-wrap items-center gap-2">
+                                <Badge className={APPOINTMENT_BADGE_CLASSES.office}>Oficina</Badge>
+                                <p className="text-sm font-medium">
+                                  {formatInternalAppointmentDate(appointment.appointmentDate)} —{' '}
+                                  {appointment.officeRole === 'admin' ? 'Administrador' : 'Revisor'}
+                                </p>
+                              </div>
                               <p className="text-sm text-muted-foreground">{appointment.purposeNote}</p>
                               <div className="flex gap-2">
                                 <Button size="sm" variant="outline" onClick={() => handleUpdateInternalAppointmentStatus(appointment.id, 'completed')}>
@@ -1051,10 +1064,16 @@ export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpe
                       ) : (
                         <div className="space-y-2">
                           {appointmentHistory.map((appointment) => (
-                            <div key={appointment.id} className="rounded-md border border-border/50 bg-card p-3 shadow-sm">
-                              <p className="text-sm font-medium">
-                                {formatInternalAppointmentDate(appointment.appointmentDate)} - {appointment.status}
-                              </p>
+                            <div
+                              key={appointment.id}
+                              className="rounded-md border border-border/50 border-l-4 border-l-green-600 bg-card p-3 shadow-sm"
+                            >
+                              <div className="flex flex-wrap items-center gap-2 mb-1">
+                                <Badge className={APPOINTMENT_BADGE_CLASSES.office}>Oficina</Badge>
+                                <p className="text-sm font-medium">
+                                  {formatInternalAppointmentDate(appointment.appointmentDate)} — {appointment.status}
+                                </p>
+                              </div>
                               <p className="text-sm text-muted-foreground">{appointment.purposeNote}</p>
                             </div>
                           ))}

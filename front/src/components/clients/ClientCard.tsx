@@ -3,6 +3,8 @@ import { User as UserType } from '@/types/user';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ClientStatusBadge } from './ClientStatusBadge';
+import { Badge } from '@/components/ui/badge';
+import { APPOINTMENT_BADGE_CLASSES } from '@/lib/appointmentColors';
 import {
   Select,
   SelectContent,
@@ -17,7 +19,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Eye, Trash2, User, Mail, Phone, FileText, Edit2, DollarSign, UserCircle, MapPin } from 'lucide-react';
+import { MoreHorizontal, Eye, Trash2, User, Mail, Phone, FileText, Edit2, DollarSign, UserCircle, MapPin, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { formatPhoneNumberDisplay } from '@/lib/phone';
@@ -137,17 +139,44 @@ export const ClientCard = ({
             </div>
 
             {client.assignedTrips && client.assignedTrips.length > 0 && (
-              <div className="flex items-center gap-1.5 text-sm text-muted-foreground flex-wrap">
-                <MapPin className="w-3.5 h-3.5 shrink-0" />
-                <span>En viaje(s): {client.assignedTrips.map(t => t.title).join(', ')}</span>
+              <div className="flex items-start gap-2 text-sm text-muted-foreground flex-wrap">
+                <Badge className={APPOINTMENT_BADGE_CLASSES.trip}>Viaje</Badge>
+                <span className="flex items-center gap-1.5 min-w-0">
+                  <MapPin className="w-3.5 h-3.5 shrink-0" />
+                  <span>{client.assignedTrips.map(t => t.title).join(', ')}</span>
+                </span>
+              </div>
+            )}
+            {client.visaCasAppointmentDate && (
+              <div className="flex items-start gap-2 text-sm flex-wrap">
+                <Badge className={`inline-flex items-center gap-1 ${APPOINTMENT_BADGE_CLASSES.cas}`}>
+                  <Calendar className="w-3 h-3 shrink-0" />
+                  CAS
+                </Badge>
+                <span className="text-muted-foreground pt-0.5">
+                  {format(new Date(`${client.visaCasAppointmentDate.slice(0, 10)}T00:00:00`), "d MMM yyyy", { locale: es })}
+                  {client.visaCasAppointmentLocation ? ` · ${client.visaCasAppointmentLocation}` : ''}
+                </span>
+              </div>
+            )}
+            {client.visaConsularAppointmentDate && (
+              <div className="flex items-start gap-2 text-sm flex-wrap">
+                <Badge className={`inline-flex items-center gap-1 ${APPOINTMENT_BADGE_CLASSES.consular}`}>
+                  <Calendar className="w-3 h-3 shrink-0" />
+                  Consulado
+                </Badge>
+                <span className="text-muted-foreground pt-0.5">
+                  {format(new Date(`${client.visaConsularAppointmentDate.slice(0, 10)}T00:00:00`), "d MMM yyyy", { locale: es })}
+                  {client.visaConsularAppointmentLocation ? ` · ${client.visaConsularAppointmentLocation}` : ''}
+                </span>
               </div>
             )}
             {nextOfficeAppointmentDate && !Number.isNaN(nextOfficeAppointmentDate.getTime()) && (
-              <div className="flex items-center gap-1.5 text-sm text-muted-foreground flex-wrap">
-                <MapPin className="w-3.5 h-3.5 shrink-0" />
-                <span>
-                  Proxima cita oficina: {format(nextOfficeAppointmentDate, "d MMM yyyy", { locale: es })}
-                  {client.nextOfficeAppointment?.purposeNote ? ` - ${client.nextOfficeAppointment.purposeNote}` : ''}
+              <div className="flex items-start gap-2 text-sm flex-wrap">
+                <Badge className={APPOINTMENT_BADGE_CLASSES.office}>Oficina</Badge>
+                <span className="text-muted-foreground pt-0.5">
+                  Próxima cita: {format(nextOfficeAppointmentDate, "d MMM yyyy", { locale: es })}
+                  {client.nextOfficeAppointment?.purposeNote ? ` — ${client.nextOfficeAppointment.purposeNote}` : ''}
                 </span>
               </div>
             )}
