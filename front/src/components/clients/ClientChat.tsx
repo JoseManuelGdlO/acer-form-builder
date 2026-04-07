@@ -89,7 +89,7 @@ export const ClientChat = ({
         </Button>
       </CardHeader>
       <CardContent className="flex-1 flex flex-col p-0 min-h-0">
-        <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
+        <ScrollArea className="flex-1 p-4 bg-transparent" ref={scrollAreaRef}>
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full py-12 text-center">
               <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center mb-3">

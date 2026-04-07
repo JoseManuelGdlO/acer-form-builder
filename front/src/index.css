@@ -162,6 +162,17 @@
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
   }
+
+  [data-app-bg-image="true"] select.border-input.bg-background {
+    background-color: hsl(var(--background) / 0.35) !important;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  /* Radix ScrollArea: el viewport suele tapar el vidrio del Card con fondo opaco */
+  [data-app-bg-image="true"] [data-radix-scroll-area-viewport] {
+    background-color: transparent !important;
+  }
 }
 
 @layer utilities {

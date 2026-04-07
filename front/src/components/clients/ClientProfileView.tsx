@@ -879,7 +879,7 @@ export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpe
         <div className="grid lg:grid-cols-2 gap-6">
           {/* Left Column - Info, checklist, notes, payments, forms */}
           <div className="space-y-6">
-            <Accordion type="multiple" defaultValue={['info']} className="w-full rounded-lg border border-border/50 px-4">
+            <Accordion type="multiple" defaultValue={['info']} className="w-full rounded-lg border border-border/50 bg-card px-4 shadow-sm">
               <AccordionItem value="info">
                 <AccordionTrigger className="text-base">
                   <span className="flex items-center gap-2">
@@ -986,7 +986,7 @@ export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpe
                 </AccordionTrigger>
                 <AccordionContent>
                   <div className="space-y-4">
-                    <div className="rounded-lg border border-border/60 p-4 space-y-3">
+                    <div className="rounded-lg border border-border/60 bg-card p-4 space-y-3 shadow-sm">
                       <p className="text-sm font-medium text-foreground">Agendar cita a oficina</p>
                       <div className="grid sm:grid-cols-3 gap-2">
                         <input
@@ -1015,14 +1015,14 @@ export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpe
                       />
                     </div>
 
-                    <div className="rounded-lg border border-border/60 p-4 space-y-3">
+                    <div className="rounded-lg border border-border/60 bg-card p-4 space-y-3 shadow-sm">
                       <p className="text-sm font-medium text-foreground">Proximas citas</p>
                       {upcomingAppointments.length === 0 ? (
                         <p className="text-sm text-muted-foreground">No hay citas de oficina pendientes.</p>
                       ) : (
                         <div className="space-y-2">
                           {upcomingAppointments.map((appointment) => (
-                            <div key={appointment.id} className="rounded-md border border-border/50 p-3 space-y-2">
+                            <div key={appointment.id} className="rounded-md border border-border/50 bg-card p-3 space-y-2 shadow-sm">
                               <p className="text-sm font-medium">
                                 {formatInternalAppointmentDate(appointment.appointmentDate)} - {appointment.officeRole === 'admin' ? 'Administrador' : 'Revisor'}
                               </p>
@@ -1044,14 +1044,14 @@ export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpe
                       )}
                     </div>
 
-                    <div className="rounded-lg border border-border/60 p-4 space-y-3">
+                    <div className="rounded-lg border border-border/60 bg-card p-4 space-y-3 shadow-sm">
                       <p className="text-sm font-medium text-foreground">Historico de citas</p>
                       {appointmentHistory.length === 0 ? (
                         <p className="text-sm text-muted-foreground">Sin historial de citas de oficina.</p>
                       ) : (
                         <div className="space-y-2">
                           {appointmentHistory.map((appointment) => (
-                            <div key={appointment.id} className="rounded-md border border-border/50 p-3">
+                            <div key={appointment.id} className="rounded-md border border-border/50 bg-card p-3 shadow-sm">
                               <p className="text-sm font-medium">
                                 {formatInternalAppointmentDate(appointment.appointmentDate)} - {appointment.status}
                               </p>
@@ -1098,7 +1098,7 @@ export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpe
                 </AccordionTrigger>
                 <AccordionContent>
                   <div className="space-y-4">
-                    <div className="rounded-lg border border-border/60 p-4 space-y-3">
+                    <div className="rounded-lg border border-border/60 bg-card p-4 space-y-3 shadow-sm">
                       <p className="text-sm font-medium text-foreground">Asignar formulario al cliente</p>
                       <div className="flex flex-col sm:flex-row gap-2">
                         <select
@@ -1120,14 +1120,14 @@ export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpe
                       </div>
                     </div>
 
-                    <div className="rounded-lg border border-border/60 p-4 space-y-3">
+                    <div className="rounded-lg border border-border/60 bg-card p-4 space-y-3 shadow-sm">
                       <p className="text-sm font-medium text-foreground">Formularios asignados</p>
                       {assignedFormSessions.length === 0 ? (
                         <p className="text-sm text-muted-foreground">No hay formularios asignados todavía.</p>
                       ) : (
                         <div className="space-y-2">
                           {assignedFormSessions.map((session) => (
-                            <div key={session.id} className="flex items-center justify-between gap-3 rounded-md border border-border/50 p-3">
+                            <div key={session.id} className="flex items-center justify-between gap-3 rounded-md border border-border/50 bg-card p-3 shadow-sm">
                               <div className="min-w-0">
                                 <p className="text-sm font-medium truncate">{session.formName}</p>
                                 <p className="text-xs text-muted-foreground">
