@@ -192,8 +192,20 @@ export const Dashboard = ({
       </div>
 
       {/* Main Stats Grid */}
-      <div className={hasCenterLogo ? 'grid gap-4 xl:grid-cols-5' : 'grid sm:grid-cols-2 lg:grid-cols-5 gap-4'}>
-        <div className={hasCenterLogo ? 'space-y-4 xl:col-span-2' : 'contents'}>
+      <div
+        className={hasCenterLogo ? 'relative min-h-[70vh] grid gap-4 xl:grid-cols-5' : 'grid sm:grid-cols-2 lg:grid-cols-5 gap-4'}
+      >
+        {hasCenterLogo ? (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none px-4 md:px-10 z-0">
+            <img
+              src={dashboardCenterLogoImage}
+              alt="Logotipo principal del inicio"
+              className="w-full max-w-[1100px] max-h-[78vh] object-contain opacity-95"
+            />
+          </div>
+        ) : null}
+
+        <div className={hasCenterLogo ? 'space-y-4 xl:col-span-2 relative z-10' : 'contents'}>
           <StatCard
             title="Total Clientes"
             value={clientStats.total}
@@ -225,19 +237,7 @@ export const Dashboard = ({
             />
           ) : null}
         </div>
-        {hasCenterLogo ? (
-          <Card
-            className="border-border/50 xl:col-span-1 flex items-center justify-center min-h-[240px] p-6"
-            style={{ backgroundColor: `hsl(var(--card) / ${Math.max(0, Math.min(1, dashboardCardOpacity / 100))})` }}
-          >
-            <img
-              src={dashboardCenterLogoImage}
-              alt="Logotipo principal del inicio"
-              className="max-h-44 w-auto object-contain"
-            />
-          </Card>
-        ) : null}
-        <div className={hasCenterLogo ? 'space-y-4 xl:col-span-2' : 'contents'}>
+        <div className={hasCenterLogo ? 'space-y-4 xl:col-span-2 relative z-10' : 'contents'}>
           {hasCenterLogo ? (
             <StatCard
               title="Tasa de Completado"

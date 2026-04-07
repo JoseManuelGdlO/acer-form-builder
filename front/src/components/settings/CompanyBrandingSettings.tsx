@@ -118,8 +118,14 @@ const COLOR_GROUPS: { title: string; keys: { key: string; label: string }[] }[] 
   },
 ];
 
-/** Redimensiona y comprime a JPEG (máx. ancho 1920px) para no inflar la BD. */
-function compressImageFileToJpegDataUrl(file: File, maxWidth = 1920, quality = 0.85): Promise<string> {
+/** Redimensiona y exporta data URL; permite preservar transparencia con PNG/WebP. */
+function compressImageFileToDataUrl(
+  file: File,
+  options?: { maxWidth?: number; quality?: number; outputType?: 'image/jpeg' | 'image/png' | 'image/webp' }
+): Promise<string> {
+  const maxWidth = options?.maxWidth ?? 1920;
+  const quality = options?.quality ?? 0.85;
+  const outputType = options?.outputType ?? 'image/jpeg';
   return new Promise((resolve, reject) => {
     const img = document.createElement('img');
     const url = URL.createObjectURL(file);
@@ -139,7 +145,7 @@ function compressImageFileToJpegDataUrl(file: File, maxWidth = 1920, quality = 0
         return;
       }
       ctx.drawImage(img, 0, 0, width, height);
-      resolve(canvas.toDataURL('image/jpeg', quality));
+      resolve(canvas.toDataURL(outputType, quality));
     };
     img.onerror = () => {
       URL.revokeObjectURL(url);
@@ -150,6 +156,16 @@ function compressImageFileToJpegDataUrl(file: File, maxWidth = 1920, quality = 0
 }
 
 function parseSavedTheme(raw: unknown): Record<string, string> {
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return { ...(parsed as Record<string, string>) };
+      }
+    } catch {
+      return {};
+    }
+  }
   if (raw == null || typeof raw !== 'object' || Array.isArray(raw)) {
     return {};
   }
@@ -231,7 +247,10 @@ export function CompanyBrandingSettings() {
         faviconUrl: faviconUrl.trim() || null,
         theme,
       });
-      const mergedAfterSave = mergeWithDefaultTheme(parseSavedTheme(res.theme));
+      const mergedAfterSave = mergeWithDefaultTheme({
+        ...theme,
+        ...parseSavedTheme(res.theme),
+      });
       setTheme(mergedAfterSave);
       applyTheme(mergedAfterSave);
       applyFavicon(res.faviconUrl ?? res.logoUrl ?? null);
@@ -269,7 +288,7 @@ export function CompanyBrandingSettings() {
     }
     setIsCompressingBg(true);
     try {
-      const dataUrl = await compressImageFileToJpegDataUrl(file);
+      const dataUrl = await compressImageFileToDataUrl(file, { outputType: 'image/jpeg' });
       setTheme((t) => ({ ...t, [APP_BACKGROUND_IMAGE_KEY]: dataUrl }));
       toast.success('Imagen preparada; pulsa «Guardar tema» para persistirla');
     } catch (err: unknown) {
@@ -302,7 +321,13 @@ export function CompanyBrandingSettings() {
     }
     setIsCompressingCenterLogo(true);
     try {
-      const dataUrl = await compressImageFileToJpegDataUrl(file, 1200, 0.9);
+      const supportsAlpha =
+        file.type === 'image/png' || file.type === 'image/webp' || file.type === 'image/gif';
+      const dataUrl = await compressImageFileToDataUrl(file, {
+        maxWidth: 2200,
+        quality: 0.92,
+        outputType: supportsAlpha ? 'image/png' : 'image/jpeg',
+      });
       setTheme((t) => ({ ...t, [DASHBOARD_CENTER_LOGO_IMAGE_KEY]: dataUrl }));
       toast.success('Logotipo preparado; pulsa «Guardar tema» para persistirlo');
     } catch (err: unknown) {
@@ -474,11 +499,11 @@ export function CompanyBrandingSettings() {
             ) : null}
           </div>
           {dashboardCenterLogoImage ? (
-            <div className="rounded-lg border overflow-hidden max-h-52 bg-muted p-4 flex items-center justify-center">
+            <div className="rounded-lg border overflow-hidden max-h-72 p-4 flex items-center justify-center bg-transparent bg-[linear-gradient(45deg,hsl(var(--muted))_25%,transparent_25%,transparent_75%,hsl(var(--muted))_75%,hsl(var(--muted))),linear-gradient(45deg,hsl(var(--muted))_25%,transparent_25%,transparent_75%,hsl(var(--muted))_75%,hsl(var(--muted)))] bg-[length:20px_20px] bg-[position:0_0,10px_10px]">
               <img
                 src={dashboardCenterLogoImage}
                 alt="Vista previa del logotipo centrado de inicio"
-                className="max-h-40 w-auto object-contain"
+                className="max-h-64 w-auto object-contain"
               />
             </div>
           ) : (
@@ -602,7 +627,9 @@ export function CompanyBrandingSettings() {
                 <div
                   className="rounded-lg border p-4 max-w-sm"
                   style={{
-                    background: effectiveTheme.card ? `hsl(${effectiveTheme.card})` : undefined,
+                    background: effectiveTheme.card
+                      ? `hsl(${effectiveTheme.card} / ${Math.max(0, Math.min(1, dashboardCardOpacity / 100))})`
+                      : undefined,
                     color: effectiveTheme['card-foreground'] ? `hsl(${effectiveTheme['card-foreground']})` : undefined,
                     borderColor: effectiveTheme.border ? `hsl(${effectiveTheme.border})` : undefined,
                     borderRadius: effectiveTheme.radius ?? '0.75rem',
@@ -610,7 +637,7 @@ export function CompanyBrandingSettings() {
                 >
                   <p className="font-medium">Tarjeta de ejemplo</p>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Texto secundario y borde redondeado según tu tema.
+                    Vista en vivo de transparencia: {dashboardCardOpacity}%.
                   </p>
                 </div>
               </div>
