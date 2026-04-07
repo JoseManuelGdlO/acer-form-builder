@@ -107,7 +107,17 @@ export const ClientFormModal = ({
     setError('');
     setPhoneError('');
     setIsLoading(false);
-  }, [client, open, visaStatusTemplates, defaultParentClientId]);
+  }, [client, open, defaultParentClientId]);
+
+  useEffect(() => {
+    if (!open || client || formData.visaStatusTemplateId || visaStatusTemplates.length === 0) {
+      return;
+    }
+    setFormData((prev) => ({
+      ...prev,
+      visaStatusTemplateId: visaStatusTemplates[0].id,
+    }));
+  }, [open, client, formData.visaStatusTemplateId, visaStatusTemplates]);
 
   const validatePhone = (digits: string): boolean => {
     if (!digits) {
