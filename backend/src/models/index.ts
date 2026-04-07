@@ -37,6 +37,8 @@ import { ProductCategory } from './ProductCategory';
 import { Category } from './Category';
 import { VisaStatusTemplate } from './VisaStatusTemplate';
 import { PushSubscription } from './PushSubscription';
+import { InternalAppointment } from './InternalAppointment';
+import { InternalAppointmentHistory } from './InternalAppointmentHistory';
 
 // Company relationships (multi-tenant)
 Company.hasMany(User, { foreignKey: 'companyId', as: 'users' });
@@ -112,6 +114,10 @@ PushSubscription.belongsTo(Company, {
 });
 User.hasMany(PushSubscription, { foreignKey: 'userId', as: 'pushSubscriptionsByUser' });
 PushSubscription.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+Company.hasMany(InternalAppointment, { foreignKey: 'companyId', as: 'internalAppointments' });
+InternalAppointment.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+Company.hasMany(InternalAppointmentHistory, { foreignKey: 'companyId', as: 'internalAppointmentHistory' });
+InternalAppointmentHistory.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
 
 // Category relationships
 Company.hasMany(Category, { foreignKey: 'companyId', as: 'categories' });
@@ -179,6 +185,8 @@ ClientPaymentDeletedLog.belongsTo(User, { foreignKey: 'deletedBy', as: 'deletedB
 
 Client.hasMany(ClientMessage, { foreignKey: 'clientId', as: 'messages' });
 ClientMessage.belongsTo(Client, { foreignKey: 'clientId', as: 'client' });
+Client.hasMany(InternalAppointment, { foreignKey: 'clientId', as: 'internalAppointments' });
+InternalAppointment.belongsTo(Client, { foreignKey: 'clientId', as: 'client' });
 
 // ClientGroup relationships
 User.hasMany(ClientGroup, { foreignKey: 'assignedUserId', as: 'assignedGroups' });
@@ -237,6 +245,12 @@ Company.hasMany(FinanceExpense, { foreignKey: 'companyId', as: 'financeExpenses'
 FinanceExpense.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
 User.hasMany(FinanceExpense, { foreignKey: 'createdBy', as: 'createdFinanceExpenses' });
 FinanceExpense.belongsTo(User, { foreignKey: 'createdBy', as: 'createdByUser' });
+User.hasMany(InternalAppointment, { foreignKey: 'appointedByUserId', as: 'createdInternalAppointments' });
+InternalAppointment.belongsTo(User, { foreignKey: 'appointedByUserId', as: 'appointedByUser' });
+InternalAppointment.hasMany(InternalAppointmentHistory, { foreignKey: 'appointmentId', as: 'history' });
+InternalAppointmentHistory.belongsTo(InternalAppointment, { foreignKey: 'appointmentId', as: 'appointment' });
+User.hasMany(InternalAppointmentHistory, { foreignKey: 'changedByUserId', as: 'internalAppointmentChanges' });
+InternalAppointmentHistory.belongsTo(User, { foreignKey: 'changedByUserId', as: 'changedByUser' });
 
 // Form relationships
 Form.hasMany(FormSession, { foreignKey: 'formId', as: 'sessions' });
@@ -293,4 +307,6 @@ export {
   Category,
   VisaStatusTemplate,
   PushSubscription,
+  InternalAppointment,
+  InternalAppointmentHistory,
 };

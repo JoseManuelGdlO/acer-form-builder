@@ -23,6 +23,8 @@ import notificationsRoutes from './notifications.routes';
 import visaStatusTemplatesRoutes from './visa-status-templates.routes';
 import financeRoutes from './finance.routes';
 import branchesRoutes from './branches.routes';
+import internalAppointmentsRoutes from './internal-appointments.routes';
+import calendarRoutes from './calendar.routes';
 
 const router = Router();
 
@@ -50,5 +52,7 @@ router.use('/notifications', notificationsRoutes);
 router.use('/visa-status-templates', visaStatusTemplatesRoutes);
 router.use('/finance', financeRoutes);
 router.use('/branches', branchesRoutes);
+router.use('/internal-appointments', internalAppointmentsRoutes);
+router.use('/calendar', calendarRoutes);
 
 export default router;

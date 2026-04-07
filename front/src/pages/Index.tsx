@@ -19,6 +19,7 @@ import { SettingsPage } from '@/components/settings/SettingsPage';
 import { PaymentLogsPage } from '@/components/payments/PaymentLogsPage';
 import { ProductsList } from '@/components/products/ProductsList';
 import { FinanceDashboard } from '@/components/finance/FinanceDashboard';
+import { CalendarPage } from '@/components/calendar/CalendarPage';
 import { ProductFormModal } from '@/components/products/ProductFormModal';
 import { CategoryManagerModal } from '@/components/products/CategoryManagerModal';
 import { useCategoryStore } from '@/hooks/useCategoryStore';
@@ -34,7 +35,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { LayoutDashboard, FileText, Users, UserCog, Bot, Settings, Receipt, ChevronDown, ShoppingBag, MapPin, ChartNoAxesCombined } from 'lucide-react';
+import { LayoutDashboard, FileText, Users, UserCog, Bot, Settings, Receipt, ChevronDown, ShoppingBag, MapPin, ChartNoAxesCombined, Calendar } from 'lucide-react';
 import { User } from '@/types/user';
 import { Client } from '@/types/form';
 import { Product } from '@/types/product';
@@ -46,6 +47,7 @@ type View =
   | 'forms'
   | 'clients'
   | 'products'
+  | 'calendar'
   | 'finance'
   | 'paymentLogs'
   | 'groups'
@@ -494,6 +496,15 @@ const Index = () => {
         </Button>
       )}
       <Button
+        variant={current === 'calendar' ? 'default' : 'ghost'}
+        size="sm"
+        onClick={() => handleNavigate('calendar')}
+        className="h-8 gap-1.5 px-2 text-xs sm:text-sm"
+      >
+        <Calendar className="w-4 h-4 shrink-0" />
+        <span className="hidden sm:inline">Calendario</span>
+      </Button>
+      <Button
         variant={current === 'forms' ? 'default' : 'ghost'}
         size="sm"
         onClick={() => handleNavigate('forms')}
@@ -857,6 +868,20 @@ const Index = () => {
               />
             </>
           )}
+        </div>
+      </>
+    );
+  }
+
+  if (activeView === 'calendar') {
+    return (
+      <>
+        <FloatingViewAs />
+        <div className={`min-h-screen bg-background ${viewingAs ? 'pt-10' : ''}`}>
+          <AppHeader>
+            <NavigationButtons current="calendar" />
+          </AppHeader>
+          <CalendarPage />
         </div>
       </>
     );

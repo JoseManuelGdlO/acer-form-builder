@@ -299,6 +299,7 @@ export const ClientList = ({
         }))
       : [],
     assignedTrips: raw.assignedTrips || raw.assigned_trips || [],
+    nextOfficeAppointment: raw.nextOfficeAppointment || raw.next_office_appointment || null,
   });
 
   const visaStatusFilterButtons = useMemo(() => {

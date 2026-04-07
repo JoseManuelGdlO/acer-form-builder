@@ -184,8 +184,39 @@ export interface Client {
   checklistTotal?: number;
   checklistByTemplate?: Record<string, { completed: boolean; templateId: string }>;
   assignedTrips?: { id: string; title: string }[];
+  nextOfficeAppointment?: { appointmentDate: string; purposeNote?: string | null } | null;
   parent?: Pick<Client, 'id' | 'name' | 'email' | 'phone'> | null;
   children?: Pick<Client, 'id' | 'name' | 'email' | 'phone' | 'parentClientId' | 'createdAt' | 'updatedAt'>[];
+}
+
+export type InternalAppointmentStatus = 'scheduled' | 'completed' | 'cancelled';
+export type OfficeRole = 'reviewer' | 'admin';
+
+export interface InternalAppointment {
+  id: string;
+  companyId: string;
+  clientId: string;
+  appointmentDate: string;
+  appointedByUserId: string;
+  appointedByUser?: { id: string; name: string; email?: string } | null;
+  officeRole: OfficeRole;
+  purposeNote: string;
+  status: InternalAppointmentStatus;
+  completedAt?: string | null;
+  cancelledAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CalendarEvent {
+  type: 'office' | 'cas' | 'consular' | 'trip_departure' | 'trip_return';
+  date: string;
+  title: string;
+  clientId?: string;
+  clientName?: string;
+  tripId?: string;
+  note?: string;
+  status?: string;
 }
 
 export type PaymentType = 'tarjeta' | 'transferencia' | 'efectivo';

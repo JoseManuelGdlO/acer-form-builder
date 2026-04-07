@@ -305,6 +305,74 @@ class ApiClient {
     });
   }
 
+  async getClientInternalAppointments(clientId: string, token?: string | null) {
+    return this.request<{ upcoming: any[]; history: any[]; all: any[] }>(`/clients/${clientId}/internal-appointments`, {
+      method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async createClientInternalAppointment(
+    clientId: string,
+    data: { appointmentDate: string; officeRole: 'reviewer' | 'admin'; purposeNote: string },
+    token?: string | null
+  ) {
+    return this.request<any>(`/clients/${clientId}/internal-appointments`, {
+      method: 'POST',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateInternalAppointment(
+    appointmentId: string,
+    data: Partial<{ appointmentDate: string; officeRole: 'reviewer' | 'admin'; purposeNote: string; status: 'scheduled' | 'completed' | 'cancelled' }>,
+    token?: string | null
+  ) {
+    return this.request<any>(`/internal-appointments/${appointmentId}`, {
+      method: 'PUT',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteInternalAppointment(appointmentId: string, token?: string | null) {
+    return this.request<{ message: string }>(`/internal-appointments/${appointmentId}`, {
+      method: 'DELETE',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async getInternalAppointmentHistory(appointmentId: string, token?: string | null) {
+    return this.request<any[]>(`/internal-appointments/${appointmentId}/history`, {
+      method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async getCalendarEvents(from: string, to: string, token?: string | null) {
+    const queryParams = new URLSearchParams({ from, to }).toString();
+    return this.request<any[]>(`/calendar/events?${queryParams}`, {
+      method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async getCalendarEventsByDate(date: string, token?: string | null) {
+    const queryParams = new URLSearchParams({ date }).toString();
+    return this.request<any[]>(`/calendar/events/by-date?${queryParams}`, {
+      method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
   // Groups
   async getGroups(token?: string | null) {
     return this.request<any[]>('/groups', {

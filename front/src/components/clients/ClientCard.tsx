@@ -41,6 +41,9 @@ export const ClientCard = ({
   users = [],
   isAdmin = false,
 }: ClientCardProps) => {
+  const nextOfficeAppointmentDate = client.nextOfficeAppointment?.appointmentDate
+    ? new Date(`${client.nextOfficeAppointment.appointmentDate}T00:00:00`)
+    : null;
   const handleCardClick = (event: React.MouseEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement;
     if (target.closest('[data-no-view="true"]')) return;
@@ -137,6 +140,15 @@ export const ClientCard = ({
               <div className="flex items-center gap-1.5 text-sm text-muted-foreground flex-wrap">
                 <MapPin className="w-3.5 h-3.5 shrink-0" />
                 <span>En viaje(s): {client.assignedTrips.map(t => t.title).join(', ')}</span>
+              </div>
+            )}
+            {nextOfficeAppointmentDate && !Number.isNaN(nextOfficeAppointmentDate.getTime()) && (
+              <div className="flex items-center gap-1.5 text-sm text-muted-foreground flex-wrap">
+                <MapPin className="w-3.5 h-3.5 shrink-0" />
+                <span>
+                  Proxima cita oficina: {format(nextOfficeAppointmentDate, "d MMM yyyy", { locale: es })}
+                  {client.nextOfficeAppointment?.purposeNote ? ` - ${client.nextOfficeAppointment.purposeNote}` : ''}
+                </span>
               </div>
             )}
 

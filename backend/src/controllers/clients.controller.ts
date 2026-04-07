@@ -15,6 +15,7 @@ import {
   Product,
   VisaStatusTemplate,
   Conversations,
+  InternalAppointment,
 } from '../models';
 import { AuthRequest } from '../middleware/auth.middleware';
 
@@ -266,6 +267,7 @@ export const getAllClients = async (req: AuthRequest, res: Response): Promise<vo
     });
 
     const clientIds = clients.map(c => c.id);
+    const today = new Date().toISOString().slice(0, 10);
     const children = await Client.findAll({
       where: {
         companyId,
@@ -317,6 +319,26 @@ export const getAllClients = async (req: AuthRequest, res: Response): Promise<vo
       const id = row.clientId || row.client_id;
       if (id) totalPaidByClientId[id] = parseFloat(row.totalPaid || '0') || 0;
     });
+    const upcomingInternalAppointments = await InternalAppointment.findAll({
+      where: {
+        companyId,
+        clientId: clientIds,
+        status: 'scheduled',
+        appointmentDate: { [Op.gte]: today },
+      },
+      attributes: ['clientId', 'appointmentDate', 'purposeNote'],
+      order: [['appointment_date', 'ASC']],
+      raw: true,
+    });
+    const nextOfficeAppointmentByClientId: Record<string, { appointmentDate: string; purposeNote: string | null }> = {};
+    for (const row of upcomingInternalAppointments as any[]) {
+      const clientId = row.clientId || row.client_id;
+      if (!clientId || nextOfficeAppointmentByClientId[clientId]) continue;
+      nextOfficeAppointmentByClientId[clientId] = {
+        appointmentDate: row.appointmentDate || row.appointment_date,
+        purposeNote: row.purposeNote || row.purpose_note || null,
+      };
+    }
     const whatsappStatusByPhone = await getWhatsappReplyStatusByPhone(clients.map((client) => client.phone || ''));
 
     // Add checklist stats and payment totals to each client
@@ -361,6 +383,7 @@ export const getAllClients = async (req: AuthRequest, res: Response): Promise<vo
         checklistByTemplate,
         totalPaid,
         assignedTrips: assignedTripsByClientId[client.id] || [],
+        nextOfficeAppointment: nextOfficeAppointmentByClientId[client.id] || null,
         hasWhatsappReply: whatsappStatus?.hasWhatsappReply ?? false,
         lastWhatsappUserMessageAt: whatsappStatus?.lastUserMessageAt ?? null,
         lastWhatsappBotMessageAt: whatsappStatus?.lastBotMessageAt ?? null,
@@ -733,6 +756,11 @@ export const updateClient = [
         }
       }
 
+      if (req.body.totalAmountDue !== undefined && !req.user?.roles.includes('super_admin')) {
+        res.status(403).json({ error: 'Solo administradores pueden modificar el total a pagar' });
+        return;
+      }
+
       if (client.parentClientId && req.body.totalAmountDue !== undefined) {
         res.status(400).json({ error: 'El total a pagar solo se gestiona en el cliente titular.' });
         return;
@@ -829,17 +857,19 @@ export const updateClient = [
           { model: Client, as: 'children', attributes: ['id', 'name', 'email', 'phone', 'parentClientId', 'createdAt', 'updatedAt'], required: false },
         ],
       });
-      if (req.body.totalAmountDue !== undefined) {
+      if (req.body.totalAmountDue !== undefined && req.user?.roles.includes('super_admin')) {
         const newVal = req.body.totalAmountDue === null || req.body.totalAmountDue === undefined
           ? null
           : Number(req.body.totalAmountDue);
-        await ClientAmountDueLog.create({
-          companyId,
-          clientId: client.id,
-          previousValue: previousTotalAmountDue,
-          newValue: newVal,
-          changedBy: req.user?.id,
-        });
+        if (newVal !== previousTotalAmountDue) {
+          await ClientAmountDueLog.create({
+            companyId,
+            clientId: client.id,
+            previousValue: previousTotalAmountDue,
+            newValue: newVal,
+            changedBy: req.user?.id,
+          });
+        }
       }
 
       // Get checklist stats for the updated client

@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Client, ClientPayment, AmountDueLogEntry, PaymentDeletedLogEntry, Form } from '@/types/form';
+import { Client, ClientPayment, AmountDueLogEntry, PaymentDeletedLogEntry, Form, InternalAppointment } from '@/types/form';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -72,6 +72,12 @@ export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpe
   const [isConversationPaused, setIsConversationPaused] = useState(false);
   const [hasConversationHistory, setHasConversationHistory] = useState(false);
   const [isTogglingConversationPause, setIsTogglingConversationPause] = useState(false);
+  const [upcomingAppointments, setUpcomingAppointments] = useState<InternalAppointment[]>([]);
+  const [appointmentHistory, setAppointmentHistory] = useState<InternalAppointment[]>([]);
+  const [newAppointmentDate, setNewAppointmentDate] = useState('');
+  const [newAppointmentRole, setNewAppointmentRole] = useState<'reviewer' | 'admin'>('reviewer');
+  const [newAppointmentPurpose, setNewAppointmentPurpose] = useState('');
+  const [isSubmittingAppointment, setIsSubmittingAppointment] = useState(false);
 
   useEffect(() => {
     setClientSnapshot(client);
@@ -90,7 +96,7 @@ export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpe
     setIsLoading(true);
     try {
       // Refetch client to get latest data (e.g. totalAmountDue) from DB. Historial solo para admin.
-      const [freshClientData, notesData, messagesData, conversationsData, submissionsData, checklistData, paymentsData, amountDueHistoryData, paymentDeletedHistoryData, formsData, formSessionsData] = await Promise.all([
+      const [freshClientData, notesData, messagesData, conversationsData, submissionsData, checklistData, paymentsData, amountDueHistoryData, paymentDeletedHistoryData, formsData, formSessionsData, internalAppointmentsData] = await Promise.all([
         api.getClient(client.id, token).catch(() => null),
         api.getClientNotes(client.id, token).catch(() => []),
         api.getClientMessages(client.id, token).catch(() => []),
@@ -102,6 +108,7 @@ export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpe
         isChildClient || !isAdmin ? Promise.resolve([]) : api.getClientPaymentDeletedHistory(client.id, token).catch(() => []),
         api.getForms().catch(() => []),
         api.getClientFormSessions(client.id, token).catch(() => []),
+        api.getClientInternalAppointments(client.id, token).catch(() => ({ upcoming: [], history: [] })),
       ]);
 
       setAvailableForms(
@@ -123,6 +130,25 @@ export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpe
           createdAt: new Date(s.created_at || s.createdAt || Date.now()),
         }))
       );
+      const mapInternalAppointment = (a: any): InternalAppointment => ({
+        id: a.id,
+        companyId: a.company_id ?? a.companyId,
+        clientId: a.client_id ?? a.clientId,
+        appointmentDate: a.appointment_date ?? a.appointmentDate,
+        appointedByUserId: a.appointed_by_user_id ?? a.appointedByUserId,
+        appointedByUser: a.appointedByUser
+          ? { id: a.appointedByUser.id, name: a.appointedByUser.name, email: a.appointedByUser.email }
+          : null,
+        officeRole: a.office_role ?? a.officeRole,
+        purposeNote: a.purpose_note ?? a.purposeNote,
+        status: a.status,
+        completedAt: a.completed_at ?? a.completedAt ?? null,
+        cancelledAt: a.cancelled_at ?? a.cancelledAt ?? null,
+        createdAt: a.created_at ?? a.createdAt,
+        updatedAt: a.updated_at ?? a.updatedAt,
+      });
+      setUpcomingAppointments((internalAppointmentsData.upcoming || []).map(mapInternalAppointment));
+      setAppointmentHistory((internalAppointmentsData.history || []).map(mapInternalAppointment));
 
       if (freshClientData) {
         const totalDue = freshClientData.total_amount_due != null
@@ -629,6 +655,80 @@ export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpe
     }
   };
 
+  const reloadInternalAppointments = async () => {
+    if (!token) return;
+    const data = await api.getClientInternalAppointments(client.id, token);
+    const normalize = (a: any): InternalAppointment => ({
+      id: a.id,
+      companyId: a.company_id ?? a.companyId,
+      clientId: a.client_id ?? a.clientId,
+      appointmentDate: a.appointment_date ?? a.appointmentDate,
+      appointedByUserId: a.appointed_by_user_id ?? a.appointedByUserId,
+      appointedByUser: a.appointedByUser
+        ? { id: a.appointedByUser.id, name: a.appointedByUser.name, email: a.appointedByUser.email }
+        : null,
+      officeRole: a.office_role ?? a.officeRole,
+      purposeNote: a.purpose_note ?? a.purposeNote,
+      status: a.status,
+      completedAt: a.completed_at ?? a.completedAt ?? null,
+      cancelledAt: a.cancelled_at ?? a.cancelledAt ?? null,
+      createdAt: a.created_at ?? a.createdAt,
+      updatedAt: a.updated_at ?? a.updatedAt,
+    });
+    setUpcomingAppointments((data.upcoming || []).map(normalize));
+    setAppointmentHistory((data.history || []).map(normalize));
+  };
+
+  const handleCreateInternalAppointment = async () => {
+    if (!token) return;
+    if (!newAppointmentDate || !newAppointmentPurpose.trim()) {
+      toast.error('Completa fecha y motivo de la cita');
+      return;
+    }
+    setIsSubmittingAppointment(true);
+    try {
+      await api.createClientInternalAppointment(
+        client.id,
+        {
+          appointmentDate: newAppointmentDate,
+          officeRole: newAppointmentRole,
+          purposeNote: newAppointmentPurpose.trim(),
+        },
+        token
+      );
+      setNewAppointmentDate('');
+      setNewAppointmentPurpose('');
+      await reloadInternalAppointments();
+      toast.success('Cita interna creada');
+    } catch (error: any) {
+      toast.error(error.message || 'No se pudo crear la cita');
+    } finally {
+      setIsSubmittingAppointment(false);
+    }
+  };
+
+  const handleUpdateInternalAppointmentStatus = async (appointmentId: string, status: 'scheduled' | 'completed' | 'cancelled') => {
+    if (!token) return;
+    try {
+      await api.updateInternalAppointment(appointmentId, { status }, token);
+      await reloadInternalAppointments();
+      toast.success('Cita actualizada');
+    } catch (error: any) {
+      toast.error(error.message || 'No se pudo actualizar la cita');
+    }
+  };
+
+  const handleDeleteInternalAppointment = async (appointmentId: string) => {
+    if (!token) return;
+    try {
+      await api.deleteInternalAppointment(appointmentId, token);
+      await reloadInternalAppointments();
+      toast.success('Cita eliminada');
+    } catch (error: any) {
+      toast.error(error.message || 'No se pudo eliminar la cita');
+    }
+  };
+
   const handleCopyAssignedLink = async (session: AssignedFormSession) => {
     const publicUrl = `${window.location.origin}/form/${session.formId}?token=${session.id}`;
     try {
@@ -661,6 +761,11 @@ export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpe
   const formatBirthDate = (value?: string | null) => {
     if (!value) return 'No registrada';
     return formatVisaAppointmentDate(value);
+  };
+  const formatInternalAppointmentDate = (value: string) => {
+    const parsedDate = new Date(`${value.slice(0, 10)}T00:00:00`);
+    if (Number.isNaN(parsedDate.getTime())) return value;
+    return format(parsedDate, "d MMM yyyy", { locale: es });
   };
   const familyInfoItems = displayClient.parentClientId
     ? [
@@ -869,6 +974,94 @@ export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpe
                     onAddNote={handleAddNote}
                     onDeleteNote={handleDeleteNote}
                   />
+                </AccordionContent>
+              </AccordionItem>
+
+              <AccordionItem value="internal-appointments">
+                <AccordionTrigger className="text-base">
+                  <span className="flex items-center gap-2">
+                    <Calendar className="w-5 h-5 text-primary" />
+                    Proximas citas nuestras
+                  </span>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div className="space-y-4">
+                    <div className="rounded-lg border border-border/60 p-4 space-y-3">
+                      <p className="text-sm font-medium text-foreground">Agendar cita a oficina</p>
+                      <div className="grid sm:grid-cols-3 gap-2">
+                        <input
+                          type="date"
+                          value={newAppointmentDate}
+                          onChange={(e) => setNewAppointmentDate(e.target.value)}
+                          className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                        />
+                        <select
+                          value={newAppointmentRole}
+                          onChange={(e) => setNewAppointmentRole(e.target.value as 'reviewer' | 'admin')}
+                          className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                        >
+                          <option value="reviewer">Revisor</option>
+                          <option value="admin">Administrador</option>
+                        </select>
+                        <Button onClick={handleCreateInternalAppointment} disabled={isSubmittingAppointment}>
+                          {isSubmittingAppointment ? 'Guardando...' : 'Guardar cita'}
+                        </Button>
+                      </div>
+                      <textarea
+                        value={newAppointmentPurpose}
+                        onChange={(e) => setNewAppointmentPurpose(e.target.value)}
+                        placeholder="Motivo de la cita en oficina"
+                        className="w-full min-h-[80px] rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      />
+                    </div>
+
+                    <div className="rounded-lg border border-border/60 p-4 space-y-3">
+                      <p className="text-sm font-medium text-foreground">Proximas citas</p>
+                      {upcomingAppointments.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">No hay citas de oficina pendientes.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {upcomingAppointments.map((appointment) => (
+                            <div key={appointment.id} className="rounded-md border border-border/50 p-3 space-y-2">
+                              <p className="text-sm font-medium">
+                                {formatInternalAppointmentDate(appointment.appointmentDate)} - {appointment.officeRole === 'admin' ? 'Administrador' : 'Revisor'}
+                              </p>
+                              <p className="text-sm text-muted-foreground">{appointment.purposeNote}</p>
+                              <div className="flex gap-2">
+                                <Button size="sm" variant="outline" onClick={() => handleUpdateInternalAppointmentStatus(appointment.id, 'completed')}>
+                                  Completar
+                                </Button>
+                                <Button size="sm" variant="outline" onClick={() => handleUpdateInternalAppointmentStatus(appointment.id, 'cancelled')}>
+                                  Cancelar
+                                </Button>
+                                <Button size="sm" variant="destructive" onClick={() => handleDeleteInternalAppointment(appointment.id)}>
+                                  Eliminar
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="rounded-lg border border-border/60 p-4 space-y-3">
+                      <p className="text-sm font-medium text-foreground">Historico de citas</p>
+                      {appointmentHistory.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">Sin historial de citas de oficina.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {appointmentHistory.map((appointment) => (
+                            <div key={appointment.id} className="rounded-md border border-border/50 p-3">
+                              <p className="text-sm font-medium">
+                                {formatInternalAppointmentDate(appointment.appointmentDate)} - {appointment.status}
+                              </p>
+                              <p className="text-sm text-muted-foreground">{appointment.purposeNote}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </AccordionContent>
               </AccordionItem>
 

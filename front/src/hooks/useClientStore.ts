@@ -67,6 +67,7 @@ export const useClientStore = () => {
         }))
       : [],
     assignedTrips: c.assignedTrips || c.assigned_trips || [],
+    nextOfficeAppointment: c.nextOfficeAppointment || c.next_office_appointment || null,
   });
 
   const fetchClients = useCallback(async (token: string, params?: ClientQueryParams) => {
