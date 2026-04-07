@@ -9,6 +9,8 @@ interface InternalAppointmentAttributes {
   companyId: string;
   clientId: string;
   appointmentDate: string;
+  /** HH:mm opcional */
+  appointmentTime?: string | null;
   appointedByUserId: string;
   officeRole: InternalAppointmentOfficeRole;
   purposeNote: string;
@@ -22,7 +24,7 @@ interface InternalAppointmentAttributes {
 interface InternalAppointmentCreationAttributes
   extends Optional<
     InternalAppointmentAttributes,
-    'id' | 'status' | 'completedAt' | 'cancelledAt' | 'createdAt' | 'updatedAt'
+    'id' | 'appointmentTime' | 'status' | 'completedAt' | 'cancelledAt' | 'createdAt' | 'updatedAt'
   > {}
 
 export class InternalAppointment
@@ -33,6 +35,7 @@ export class InternalAppointment
   public companyId!: string;
   public clientId!: string;
   public appointmentDate!: string;
+  public appointmentTime!: string | null;
   public appointedByUserId!: string;
   public officeRole!: InternalAppointmentOfficeRole;
   public purposeNote!: string;
@@ -65,6 +68,10 @@ InternalAppointment.init(
     appointmentDate: {
       type: DataTypes.DATEONLY,
       allowNull: false,
+    },
+    appointmentTime: {
+      type: DataTypes.STRING(5),
+      allowNull: true,
     },
     appointedByUserId: {
       type: DataTypes.UUID,

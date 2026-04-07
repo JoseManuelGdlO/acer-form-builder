@@ -13,12 +13,37 @@ const makeEvent = (payload: {
   type: 'office' | 'cas' | 'consular' | 'trip_departure' | 'trip_return';
   date: string;
   title: string;
+  /** HH:mm — citas internas; el resto usa orden por defecto */
+  startTime?: string | null;
   clientId?: string;
   clientName?: string;
   tripId?: string;
   note?: string;
   status?: string;
 }) => payload;
+
+/** Minutos desde medianoche para ordenar eventos del mismo día */
+function sortMinutesForEvent(e: { type: string; startTime?: string | null }): number {
+  const t = e.startTime;
+  if (t && /^\d{2}:\d{2}$/.test(t)) {
+    const [h, m] = t.split(':').map(Number);
+    return h * 60 + m;
+  }
+  switch (e.type) {
+    case 'office':
+      return 24 * 60 + 59;
+    case 'trip_departure':
+      return 6 * 60;
+    case 'trip_return':
+      return 22 * 60;
+    case 'cas':
+      return 10 * 60;
+    case 'consular':
+      return 11 * 60;
+    default:
+      return 12 * 60;
+  }
+}
 
 export const getCalendarEvents = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -96,11 +121,15 @@ export const getCalendarEvents = async (req: AuthRequest, res: Response): Promis
 
     for (const appointment of officeAppointments as any[]) {
       const client = appointment.client;
+      const apptTime = appointment.appointmentTime ?? appointment.appointment_time ?? null;
+      const timeStr =
+        typeof apptTime === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(apptTime) ? apptTime : null;
       events.push(
         makeEvent({
           type: 'office',
           date: formatDateOnly(appointment.appointmentDate)!,
           title: `Oficina - ${client?.name || 'Cliente'}`,
+          startTime: timeStr,
           clientId: client?.id,
           clientName: client?.name,
           note: appointment.purposeNote,
@@ -134,7 +163,11 @@ export const getCalendarEvents = async (req: AuthRequest, res: Response): Promis
       }
     }
 
-    events.sort((a, b) => a.date.localeCompare(b.date));
+    events.sort((a, b) => {
+      const byDate = a.date.localeCompare(b.date);
+      if (byDate !== 0) return byDate;
+      return sortMinutesForEvent(a) - sortMinutesForEvent(b);
+    });
     res.json(events);
   } catch (error) {
     console.error('Get calendar events error:', error);

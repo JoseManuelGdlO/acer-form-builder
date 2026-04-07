@@ -315,7 +315,12 @@ class ApiClient {
 
   async createClientInternalAppointment(
     clientId: string,
-    data: { appointmentDate: string; officeRole: 'reviewer' | 'admin'; purposeNote: string },
+    data: {
+      appointmentDate: string;
+      appointmentTime?: string | null;
+      officeRole: 'reviewer' | 'admin';
+      purposeNote: string;
+    },
     token?: string | null
   ) {
     return this.request<any>(`/clients/${clientId}/internal-appointments`, {
@@ -328,7 +333,13 @@ class ApiClient {
 
   async updateInternalAppointment(
     appointmentId: string,
-    data: Partial<{ appointmentDate: string; officeRole: 'reviewer' | 'admin'; purposeNote: string; status: 'scheduled' | 'completed' | 'cancelled' }>,
+    data: Partial<{
+      appointmentDate: string;
+      appointmentTime: string | null;
+      officeRole: 'reviewer' | 'admin';
+      purposeNote: string;
+      status: 'scheduled' | 'completed' | 'cancelled';
+    }>,
     token?: string | null
   ) {
     return this.request<any>(`/internal-appointments/${appointmentId}`, {

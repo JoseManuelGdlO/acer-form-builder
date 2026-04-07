@@ -77,6 +77,7 @@ export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpe
   const [upcomingAppointments, setUpcomingAppointments] = useState<InternalAppointment[]>([]);
   const [appointmentHistory, setAppointmentHistory] = useState<InternalAppointment[]>([]);
   const [newAppointmentDate, setNewAppointmentDate] = useState('');
+  const [newAppointmentTime, setNewAppointmentTime] = useState('');
   const [newAppointmentRole, setNewAppointmentRole] = useState<'reviewer' | 'admin'>('reviewer');
   const [newAppointmentPurpose, setNewAppointmentPurpose] = useState('');
   const [isSubmittingAppointment, setIsSubmittingAppointment] = useState(false);
@@ -137,6 +138,7 @@ export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpe
         companyId: a.company_id ?? a.companyId,
         clientId: a.client_id ?? a.clientId,
         appointmentDate: a.appointment_date ?? a.appointmentDate,
+        appointmentTime: a.appointment_time ?? a.appointmentTime ?? null,
         appointedByUserId: a.appointed_by_user_id ?? a.appointedByUserId,
         appointedByUser: a.appointedByUser
           ? { id: a.appointedByUser.id, name: a.appointedByUser.name, email: a.appointedByUser.email }
@@ -665,6 +667,7 @@ export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpe
       companyId: a.company_id ?? a.companyId,
       clientId: a.client_id ?? a.clientId,
       appointmentDate: a.appointment_date ?? a.appointmentDate,
+      appointmentTime: a.appointment_time ?? a.appointmentTime ?? null,
       appointedByUserId: a.appointed_by_user_id ?? a.appointedByUserId,
       appointedByUser: a.appointedByUser
         ? { id: a.appointedByUser.id, name: a.appointedByUser.name, email: a.appointedByUser.email }
@@ -693,12 +696,14 @@ export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpe
         client.id,
         {
           appointmentDate: newAppointmentDate,
+          appointmentTime: newAppointmentTime.trim() || null,
           officeRole: newAppointmentRole,
           purposeNote: newAppointmentPurpose.trim(),
         },
         token
       );
       setNewAppointmentDate('');
+      setNewAppointmentTime('');
       setNewAppointmentPurpose('');
       await reloadInternalAppointments();
       toast.success('Cita interna creada');
@@ -768,6 +773,14 @@ export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpe
     const parsedDate = new Date(`${value.slice(0, 10)}T00:00:00`);
     if (Number.isNaN(parsedDate.getTime())) return value;
     return format(parsedDate, "d MMM yyyy", { locale: es });
+  };
+  const formatInternalAppointmentDateTime = (appointment: Pick<InternalAppointment, 'appointmentDate' | 'appointmentTime'>) => {
+    const datePart = formatInternalAppointmentDate(appointment.appointmentDate);
+    const t = appointment.appointmentTime?.trim();
+    if (t && /^\d{2}:\d{2}$/.test(t)) {
+      return `${datePart} · ${t}`;
+    }
+    return datePart;
   };
   const familyInfoItems = displayClient.parentClientId
     ? [
@@ -994,12 +1007,19 @@ export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpe
                   <div className="space-y-4">
                     <div className="rounded-lg border border-border/60 bg-card p-4 space-y-3 shadow-sm">
                       <p className="text-sm font-medium text-foreground">Agendar cita a oficina</p>
-                      <div className="grid sm:grid-cols-3 gap-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
                         <input
                           type="date"
                           value={newAppointmentDate}
                           onChange={(e) => setNewAppointmentDate(e.target.value)}
                           className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                        />
+                        <input
+                          type="time"
+                          value={newAppointmentTime}
+                          onChange={(e) => setNewAppointmentTime(e.target.value)}
+                          className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                          title="Hora (opcional)"
                         />
                         <select
                           value={newAppointmentRole}
@@ -1013,6 +1033,7 @@ export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpe
                           {isSubmittingAppointment ? 'Guardando...' : 'Guardar cita'}
                         </Button>
                       </div>
+                      <p className="text-xs text-muted-foreground">La hora es opcional; si la indicas, el calendario ordenará la cita por hora ese día.</p>
                       <textarea
                         value={newAppointmentPurpose}
                         onChange={(e) => setNewAppointmentPurpose(e.target.value)}
@@ -1027,7 +1048,19 @@ export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpe
                         <p className="text-sm text-muted-foreground">No hay citas de oficina pendientes.</p>
                       ) : (
                         <div className="space-y-2">
-                          {upcomingAppointments.map((appointment) => (
+                          {[...upcomingAppointments]
+                            .sort((a, b) => {
+                              const byDate = a.appointmentDate.localeCompare(b.appointmentDate);
+                              if (byDate !== 0) return byDate;
+                              const valid = (t?: string | null) => t && /^\d{2}:\d{2}$/.test(t);
+                              const ta = a.appointmentTime;
+                              const tb = b.appointmentTime;
+                              if (valid(ta) && valid(tb)) return ta!.localeCompare(tb!);
+                              if (valid(ta)) return -1;
+                              if (valid(tb)) return 1;
+                              return 0;
+                            })
+                            .map((appointment) => (
                             <div
                               key={appointment.id}
                               className="rounded-md border border-border/50 border-l-4 border-l-green-600 bg-card p-3 space-y-2 shadow-sm"
@@ -1035,7 +1068,7 @@ export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpe
                               <div className="flex flex-wrap items-center gap-2">
                                 <Badge className={APPOINTMENT_BADGE_CLASSES.office}>Oficina</Badge>
                                 <p className="text-sm font-medium">
-                                  {formatInternalAppointmentDate(appointment.appointmentDate)} —{' '}
+                                  {formatInternalAppointmentDateTime(appointment)} —{' '}
                                   {appointment.officeRole === 'admin' ? 'Administrador' : 'Revisor'}
                                 </p>
                               </div>
@@ -1071,7 +1104,7 @@ export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpe
                               <div className="flex flex-wrap items-center gap-2 mb-1">
                                 <Badge className={APPOINTMENT_BADGE_CLASSES.office}>Oficina</Badge>
                                 <p className="text-sm font-medium">
-                                  {formatInternalAppointmentDate(appointment.appointmentDate)} — {appointment.status}
+                                  {formatInternalAppointmentDateTime(appointment)} — {appointment.status}
                                 </p>
                               </div>
                               <p className="text-sm text-muted-foreground">{appointment.purposeNote}</p>

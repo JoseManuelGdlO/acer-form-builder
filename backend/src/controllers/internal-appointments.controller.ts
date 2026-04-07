@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { body, validationResult } from 'express-validator';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { Client, InternalAppointment, InternalAppointmentHistory, User } from '../models';
+import sequelize from '../config/database';
 
 const serializeAppointment = (appointment: any) => {
   const row = appointment?.toJSON ? appointment.toJSON() : appointment;
@@ -10,6 +11,7 @@ const serializeAppointment = (appointment: any) => {
     companyId: row.companyId ?? row.company_id,
     clientId: row.clientId ?? row.client_id,
     appointmentDate: row.appointmentDate ?? row.appointment_date,
+    appointmentTime: row.appointmentTime ?? row.appointment_time ?? null,
     appointedByUserId: row.appointedByUserId ?? row.appointed_by_user_id,
     officeRole: row.officeRole ?? row.office_role,
     purposeNote: row.purposeNote ?? row.purpose_note,
@@ -67,7 +69,12 @@ export const getClientInternalAppointments = async (req: AuthRequest, res: Respo
     const appointments = await InternalAppointment.findAll({
       where: { companyId, clientId },
       include: [{ model: User, as: 'appointedByUser', attributes: ['id', 'name', 'email'], required: false }],
-      order: [['appointment_date', 'ASC'], ['created_at', 'DESC']],
+      order: [
+        ['appointment_date', 'ASC'],
+        [sequelize.literal('CASE WHEN appointment_time IS NULL OR appointment_time = \'\' THEN 1 ELSE 0 END'), 'ASC'],
+        ['appointment_time', 'ASC'],
+        ['created_at', 'ASC'],
+      ],
     });
     const today = new Date().toISOString().slice(0, 10);
     const serialized = appointments.map(serializeAppointment);
@@ -83,8 +90,17 @@ export const getClientInternalAppointments = async (req: AuthRequest, res: Respo
   }
 };
 
+const optionalTimeValidator = body('appointmentTime')
+  .optional({ nullable: true })
+  .custom((value: unknown) => {
+    if (value === null || value === undefined || value === '') return true;
+    return typeof value === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+  })
+  .withMessage('appointmentTime must be HH:mm');
+
 export const createClientInternalAppointment = [
   body('appointmentDate').isISO8601().withMessage('Appointment date must be a valid date'),
+  optionalTimeValidator,
   body('officeRole').isIn(['reviewer', 'admin']).withMessage('Office role must be reviewer or admin'),
   body('purposeNote').isString().isLength({ min: 1, max: 1000 }).withMessage('Purpose note is required'),
   async (req: AuthRequest, res: Response): Promise<void> => {
@@ -110,10 +126,15 @@ export const createClientInternalAppointment = [
         return;
       }
 
+      const timeRaw = req.body.appointmentTime;
+      const appointmentTime =
+        typeof timeRaw === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(timeRaw) ? timeRaw : null;
+
       const appointment = await InternalAppointment.create({
         companyId,
         clientId,
         appointmentDate: req.body.appointmentDate,
+        appointmentTime,
         officeRole: req.body.officeRole,
         purposeNote: req.body.purposeNote,
         appointedByUserId: req.user.id,
@@ -137,6 +158,7 @@ export const createClientInternalAppointment = [
 
 export const updateInternalAppointment = [
   body('appointmentDate').optional().isISO8601().withMessage('Appointment date must be a valid date'),
+  optionalTimeValidator,
   body('officeRole').optional().isIn(['reviewer', 'admin']).withMessage('Office role must be reviewer or admin'),
   body('purposeNote').optional().isString().isLength({ min: 1, max: 1000 }).withMessage('Purpose note must be valid'),
   body('status').optional().isIn(['scheduled', 'completed', 'cancelled']).withMessage('Invalid status'),
@@ -170,6 +192,15 @@ export const updateInternalAppointment = [
       const previous = serializeAppointment(appointment);
       const updates: any = {};
       if (req.body.appointmentDate !== undefined) updates.appointmentDate = req.body.appointmentDate;
+      if (req.body.appointmentTime !== undefined) {
+        const t = req.body.appointmentTime;
+        updates.appointmentTime =
+          t === null || t === ''
+            ? null
+            : typeof t === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(t)
+              ? t
+              : null;
+      }
       if (req.body.officeRole !== undefined) updates.officeRole = req.body.officeRole;
       if (req.body.purposeNote !== undefined) updates.purposeNote = req.body.purposeNote;
       if (req.body.status !== undefined) updates.status = req.body.status;

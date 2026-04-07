@@ -12,6 +12,9 @@ import {
   appointmentEventRowBorderClass,
   appointmentTypeBadgeClass,
 } from '@/lib/appointmentColors';
+import { sortCalendarEvents } from '@/lib/calendarEventSort';
+import { CalendarDays, Clock } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 export const CalendarPage = () => {
   const { token } = useAuth();
@@ -33,46 +36,67 @@ export const CalendarPage = () => {
   }, [token, visibleMonth]);
 
   const selectedDateKey = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '';
-  const selectedDateEvents = useMemo(
-    () => events.filter((event) => event.date === selectedDateKey),
-    [events, selectedDateKey]
-  );
+  const selectedDateEvents = useMemo(() => {
+    const list = events.filter((event) => event.date === selectedDateKey);
+    return sortCalendarEvents(list);
+  }, [events, selectedDateKey]);
 
   const eventDates = useMemo(() => {
     const unique = Array.from(new Set(events.map((event) => event.date)));
     return unique.map((d) => new Date(`${d}T00:00:00`));
   }, [events]);
 
+  const formatEventTime = (event: CalendarEvent) => {
+    if (event.type === 'office' && event.startTime && /^\d{2}:\d{2}$/.test(event.startTime)) {
+      return event.startTime;
+    }
+    return null;
+  };
+
   return (
-    <div className="max-w-7xl mx-auto p-6 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-foreground">Calendario</h1>
-        <p className="text-muted-foreground mt-1">
-          Citas internas, CAS, Consulado y viajes en una sola vista.
-        </p>
-        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground mt-3">
-          <span className="inline-flex items-center gap-1.5">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+      <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-gradient-to-br from-primary/10 via-card to-accent/5 p-6 sm:p-8 shadow-sm">
+        <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-primary/5 blur-3xl pointer-events-none" aria-hidden />
+        <div className="absolute -left-12 bottom-0 h-32 w-32 rounded-full bg-violet-500/10 blur-2xl pointer-events-none" aria-hidden />
+        <div className="relative flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+          <div className="flex items-start gap-4">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary/15 text-primary shadow-inner">
+              <CalendarDays className="h-7 w-7" />
+            </div>
+            <div>
+              <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">Calendario</h1>
+              <p className="text-muted-foreground mt-1 max-w-xl">
+                Citas internas, CAS, Consulado y viajes en una sola vista. Las citas de oficina se ordenan por hora.
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="relative mt-5 flex flex-wrap gap-x-5 gap-y-2 text-xs font-medium">
+          <span className="inline-flex items-center gap-2 rounded-full bg-background/80 px-2.5 py-1 shadow-sm border border-border/40">
             <span className="h-2.5 w-2.5 rounded-full bg-green-600" aria-hidden />
             Oficina
           </span>
-          <span className="inline-flex items-center gap-1.5">
+          <span className="inline-flex items-center gap-2 rounded-full bg-background/80 px-2.5 py-1 shadow-sm border border-border/40">
             <span className="h-2.5 w-2.5 rounded-full bg-blue-600" aria-hidden />
             CAS
           </span>
-          <span className="inline-flex items-center gap-1.5">
+          <span className="inline-flex items-center gap-2 rounded-full bg-background/80 px-2.5 py-1 shadow-sm border border-border/40">
             <span className="h-2.5 w-2.5 rounded-full bg-red-600" aria-hidden />
             Consulado
           </span>
-          <span className="inline-flex items-center gap-1.5">
+          <span className="inline-flex items-center gap-2 rounded-full bg-background/80 px-2.5 py-1 shadow-sm border border-border/40">
             <span className="h-2.5 w-2.5 rounded-full bg-violet-600" aria-hidden />
             Viajes
           </span>
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-[420px_1fr] gap-6">
-        <Card>
-          <CardContent className="p-4">
+      <div className="grid lg:grid-cols-[minmax(0,400px)_1fr] gap-8 items-start">
+        <Card className="overflow-hidden border-border/60 shadow-md rounded-2xl bg-card/90 backdrop-blur-sm">
+          <CardHeader className="pb-2 border-b border-border/40 bg-muted/20">
+            <CardTitle className="text-base font-semibold">Mes</CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 sm:p-5">
             <Calendar
               mode="single"
               selected={selectedDate}
@@ -80,39 +104,92 @@ export const CalendarPage = () => {
               month={visibleMonth}
               onMonthChange={setVisibleMonth}
               modifiers={{ hasEvents: eventDates }}
-              modifiersClassNames={{ hasEvents: 'font-bold underline' }}
+              modifiersClassNames={{
+                hasEvents: cn(
+                  'font-semibold relative',
+                  'after:absolute after:bottom-1 after:left-1/2 after:-translate-x-1/2',
+                  'after:h-1 after:w-1 after:rounded-full after:bg-primary after:shadow-sm'
+                ),
+              }}
+              className="mx-auto w-full max-w-[340px]"
             />
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>
-              Eventos del {selectedDate ? format(selectedDate, "d 'de' MMMM yyyy", { locale: es }) : 'dia'}
+        <Card className="overflow-hidden border-border/60 shadow-md rounded-2xl min-h-[420px] flex flex-col bg-card/90 backdrop-blur-sm">
+          <CardHeader className="border-b border-border/40 bg-muted/15 pb-4">
+            <CardTitle className="text-lg sm:text-xl flex flex-wrap items-baseline gap-x-2 gap-y-1">
+              <span>Eventos</span>
+              <span className="text-muted-foreground font-normal text-base">
+                {selectedDate ? format(selectedDate, "d 'de' MMMM yyyy", { locale: es }) : 'Selecciona un día'}
+              </span>
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex-1 p-4 sm:p-6">
             {isLoading ? (
-              <p className="text-sm text-muted-foreground">Cargando eventos...</p>
-            ) : selectedDateEvents.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No hay eventos para esta fecha.</p>
-            ) : (
-              <div className="space-y-3">
-                {selectedDateEvents.map((event, idx) => (
-                  <div
-                    key={`${event.type}-${event.date}-${idx}`}
-                    className={`rounded-md border border-border/60 bg-card/50 p-3 pl-3 ${appointmentEventRowBorderClass(event.type)}`}
-                  >
-                    <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <Badge className={appointmentTypeBadgeClass(event.type)}>
-                        {APPOINTMENT_TYPE_LABELS[event.type]}
-                      </Badge>
-                      <span className="text-sm font-medium">{event.title}</span>
-                    </div>
-                    {event.note && <p className="text-sm text-muted-foreground">{event.note}</p>}
-                  </div>
-                ))}
+              <div className="flex items-center gap-3 text-sm text-muted-foreground py-8">
+                <div className="h-5 w-5 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+                Cargando eventos...
               </div>
+            ) : selectedDateEvents.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-border/80 bg-muted/20 px-6 py-12 text-center">
+                <p className="text-sm text-muted-foreground">No hay eventos para esta fecha.</p>
+              </div>
+            ) : (
+              <ul className="space-y-3">
+                {selectedDateEvents.map((event, idx) => {
+                  const timeLabel = formatEventTime(event);
+                  const sidebarLabel =
+                    timeLabel != null
+                      ? { variant: 'time' as const, text: timeLabel }
+                      : event.type === 'office'
+                        ? { variant: 'muted' as const, text: 'Sin hora' }
+                        : { variant: 'type' as const, text: APPOINTMENT_TYPE_LABELS[event.type] };
+                  return (
+                    <li
+                      key={`${event.type}-${event.date}-${idx}-${event.title}`}
+                      className={cn(
+                        'group rounded-xl border border-border/50 bg-gradient-to-r from-card to-card/80 p-4 shadow-sm transition-shadow hover:shadow-md',
+                        appointmentEventRowBorderClass(event.type)
+                      )}
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-start gap-3">
+                        {sidebarLabel.variant === 'time' ? (
+                          <div className="flex shrink-0 items-center gap-2 rounded-lg bg-muted/50 px-3 py-2 text-sm font-mono font-semibold tabular-nums text-foreground border border-border/40">
+                            <Clock className="h-4 w-4 text-muted-foreground" aria-hidden />
+                            {sidebarLabel.text}
+                          </div>
+                        ) : (
+                          <div
+                            className={cn(
+                              'flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 border border-border/30',
+                              sidebarLabel.variant === 'muted'
+                                ? 'bg-muted/30 text-xs text-muted-foreground'
+                                : 'bg-muted/20 text-xs font-medium text-foreground'
+                            )}
+                          >
+                            <Clock className="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden />
+                            {sidebarLabel.text}
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1 space-y-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge className={appointmentTypeBadgeClass(event.type)}>
+                              {APPOINTMENT_TYPE_LABELS[event.type]}
+                            </Badge>
+                            <span className="text-sm font-semibold text-foreground leading-snug">{event.title}</span>
+                          </div>
+                          {event.note && (
+                            <p className="text-sm text-muted-foreground leading-relaxed border-t border-border/30 pt-2">
+                              {event.note}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
             )}
           </CardContent>
         </Card>

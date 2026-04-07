@@ -197,6 +197,8 @@ export interface InternalAppointment {
   companyId: string;
   clientId: string;
   appointmentDate: string;
+  /** HH:mm opcional (citas internas) */
+  appointmentTime?: string | null;
   appointedByUserId: string;
   appointedByUser?: { id: string; name: string; email?: string } | null;
   officeRole: OfficeRole;
@@ -212,6 +214,8 @@ export interface CalendarEvent {
   type: 'office' | 'cas' | 'consular' | 'trip_departure' | 'trip_return';
   date: string;
   title: string;
+  /** HH:mm (principalmente citas internas) */
+  startTime?: string | null;
   clientId?: string;
   clientName?: string;
   tripId?: string;
