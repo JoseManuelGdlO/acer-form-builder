@@ -840,11 +840,18 @@ export const TripDetailView = ({
                   {filteredParticipants.map(p => {
                     const c = p.client;
                     if (!c) return null;
+                    const rowNumber = participants.indexOf(p) + 1;
                     return (
                       <li
                         key={p.id ?? c.id}
                         className="flex items-center justify-between gap-4 px-3 py-2.5 hover:bg-muted/30"
                       >
+                        <span
+                          className="shrink-0 w-8 text-right text-sm tabular-nums text-muted-foreground"
+                          title="Nº en el listado"
+                        >
+                          {rowNumber}
+                        </span>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
                             <p className="font-medium truncate">{c.name}</p>
