@@ -56,6 +56,7 @@ export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpe
   const { getActiveChecklistItems, fetchChecklistTemplates } = useSettingsStore();
   const { token, hasRole } = useAuth();
   const isAdmin = hasRole('super_admin');
+  const canEditTotalAmountDue = hasRole('super_admin') || hasRole('reviewer');
   /** Solo el titular gestiona pagos; los hijos no tienen sección de pagos. */
   const isChildClient = Boolean(client.parentClientId);
   const [isLoading, setIsLoading] = useState(true);
@@ -546,7 +547,7 @@ export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpe
   };
 
   const handleUpdateTotalAmountDue = async (value: number | null) => {
-    if (!token || !isAdmin) return;
+    if (!token || !canEditTotalAmountDue) return;
     try {
       await api.updateClient(client.id, { totalAmountDue: value }, token);
       setClientSnapshot(prev => ({ ...prev, totalAmountDue: value ?? undefined }));

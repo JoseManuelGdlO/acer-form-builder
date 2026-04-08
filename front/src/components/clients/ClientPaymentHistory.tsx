@@ -83,6 +83,7 @@ export const ClientPaymentHistory = ({
 }: ClientPaymentHistoryProps) => {
   const { hasRole, token } = useAuth();
   const isAdmin = hasRole('super_admin');
+  const canEditTotalAmountDue = hasRole('super_admin') || hasRole('reviewer');
   const [acquiredPackages, setAcquiredPackages] = useState<ClientAcquiredPackage[]>([]);
   const [productChoices, setProductChoices] = useState<Product[]>([]);
   const [packagesLoading, setPackagesLoading] = useState(true);
@@ -247,7 +248,7 @@ export const ClientPaymentHistory = ({
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div className="bg-muted/30 rounded-lg p-3">
             <p className="text-xs text-muted-foreground mb-1">Total a pagar</p>
-            {isAdmin && isEditingTotal ? (
+            {canEditTotalAmountDue && isEditingTotal ? (
               <div className="flex items-center gap-2">
                 <Input
                   type="number"
@@ -270,7 +271,7 @@ export const ClientPaymentHistory = ({
                 <span className="text-sm font-medium text-foreground">
                   {totalDue != null ? totalDue.toFixed(2) : '—'}
                 </span>
-                {isAdmin && (
+                {canEditTotalAmountDue && (
                   <Button
                     variant="ghost"
                     size="icon"

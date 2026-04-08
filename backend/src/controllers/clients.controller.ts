@@ -756,8 +756,8 @@ export const updateClient = [
         }
       }
 
-      if (req.body.totalAmountDue !== undefined && !req.user?.roles.includes('super_admin')) {
-        res.status(403).json({ error: 'Solo administradores pueden modificar el total a pagar' });
+      if (req.body.totalAmountDue !== undefined && !req.user?.roles.some((role) => role === 'super_admin' || role === 'reviewer')) {
+        res.status(403).json({ error: 'No tienes permisos para modificar el total a pagar' });
         return;
       }
 
@@ -791,7 +791,7 @@ export const updateClient = [
       if (req.body.assignedUserId !== undefined && req.user?.roles.includes('super_admin')) {
         updates.assignedUserId = req.body.assignedUserId || null;
       }
-      if (req.body.totalAmountDue !== undefined && req.user?.roles.includes('super_admin')) {
+      if (req.body.totalAmountDue !== undefined && req.user?.roles.some((role) => role === 'super_admin' || role === 'reviewer')) {
         updates.totalAmountDue = req.body.totalAmountDue;
       }
 
@@ -857,7 +857,7 @@ export const updateClient = [
           { model: Client, as: 'children', attributes: ['id', 'name', 'email', 'phone', 'parentClientId', 'createdAt', 'updatedAt'], required: false },
         ],
       });
-      if (req.body.totalAmountDue !== undefined && req.user?.roles.includes('super_admin')) {
+      if (req.body.totalAmountDue !== undefined && req.user?.roles.some((role) => role === 'super_admin' || role === 'reviewer')) {
         const newVal = req.body.totalAmountDue === null || req.body.totalAmountDue === undefined
           ? null
           : Number(req.body.totalAmountDue);
