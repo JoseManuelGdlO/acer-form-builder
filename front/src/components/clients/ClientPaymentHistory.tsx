@@ -152,11 +152,16 @@ export const ClientPaymentHistory = ({
   const handleSubmitPayment = () => {
     const numAmount = parseFloat(amount);
     if (Number.isNaN(numAmount) || numAmount <= 0 || !paymentDate.trim()) return;
+    const ref = referenceNumber.trim();
+    if (!ref) {
+      toast.error('Indica el número de ticket o transferencia');
+      return;
+    }
     onAddPayment({
       amount: numAmount,
       paymentDate: paymentDate.trim(),
       paymentType,
-      referenceNumber: referenceNumber.trim() || undefined,
+      referenceNumber: ref,
       note: note.trim() || undefined,
       acquiredPackageId: paymentPackageId !== '__none__' ? paymentPackageId : undefined,
     });
@@ -584,15 +589,17 @@ export const ClientPaymentHistory = ({
             </div>
             <div>
               <Label htmlFor="payment-reference" className="text-xs">
-                Numero de ticket/transferencia (opcional)
+                Número de ticket o transferencia <span className="text-destructive">*</span>
               </Label>
               <Input
                 id="payment-reference"
                 type="text"
+                required
                 placeholder="Ej: TKT-123456"
                 value={referenceNumber}
                 onChange={(e) => setReferenceNumber(e.target.value)}
                 className="mt-1"
+                aria-required={true}
               />
             </div>
             <div>
@@ -630,7 +637,8 @@ export const ClientPaymentHistory = ({
                 disabled={
                   !amount.trim() ||
                   parseFloat(amount) <= 0 ||
-                  !paymentDate.trim()
+                  !paymentDate.trim() ||
+                  !referenceNumber.trim()
                 }
                 className="gap-1.5"
               >
