@@ -1,6 +1,6 @@
 import { Response } from 'express';
 import { body, validationResult } from 'express-validator';
-import { Op } from 'sequelize';
+import { Op, fn, col } from 'sequelize';
 import {
   Trip,
   TripCompany,
@@ -187,7 +187,7 @@ export const getTripById = async (req: AuthRequest, res: Response): Promise<void
       return;
     }
     const j = trip.toJSON() as any;
-    // Strip totalAmountDue for participants from other companies
+    // Strip totalAmountDue for participants from other companies; saldo pendiente solo para titulares
     if (j.participants) {
       j.participants = j.participants.map((p: any) => {
         const client = p.client || {};
@@ -197,6 +197,45 @@ export const getTripById = async (req: AuthRequest, res: Response): Promise<void
           return out;
         }
         return p;
+      });
+      const ownIds = (j.participants as any[])
+        .map((p) => p.client)
+        .filter((c: any) => c?.companyId === companyId)
+        .map((c: any) => c.id)
+        .filter(Boolean);
+      const uniqueOwn = [...new Set(ownIds)] as string[];
+      let paidByClientId: Record<string, number> = {};
+      if (uniqueOwn.length > 0) {
+        const sums = await ClientPayment.findAll({
+          attributes: ['clientId', [fn('SUM', col('amount')), 'totalPaid']],
+          where: { companyId, clientId: { [Op.in]: uniqueOwn } },
+          group: ['clientId'],
+          raw: true,
+        });
+        paidByClientId = Object.fromEntries(
+          (sums as any[]).map((row) => {
+            const cid = row.clientId || row.client_id;
+            return [cid, parseFloat(String(row.totalPaid ?? '0')) || 0] as const;
+          }).filter((e) => e[0])
+        );
+      }
+      j.participants = (j.participants as any[]).map((p: any) => {
+        const c = p.client;
+        if (!c || c.companyId !== companyId) return p;
+        if (c.parentClientId) {
+          return {
+            ...p,
+            client: {
+              ...c,
+              totalAmountDue: null,
+              tripBalanceDue: null,
+            },
+          };
+        }
+        const totalPaid = paidByClientId[c.id] ?? 0;
+        const due = c.totalAmountDue != null ? Number(c.totalAmountDue) : null;
+        const tripBalanceDue = due != null ? Math.max(0, due - totalPaid) : null;
+        return { ...p, client: { ...c, tripBalanceDue } };
       });
     }
     j.sharedCompanies = (j.tripCompanies || [])

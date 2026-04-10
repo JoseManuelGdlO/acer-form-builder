@@ -1036,12 +1036,14 @@ export const TripDetailView = ({
                                 {c.email}
                               </span>
                             )}
-                            {c.totalAmountDue != null && c.totalAmountDue !== undefined && (
-                              <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
-                                <DollarSign className="w-3.5 h-3.5" />
-                                Debe: ${Number(c.totalAmountDue).toLocaleString()}
-                              </span>
-                            )}
+                            {c.tripBalanceDue != null &&
+                              c.tripBalanceDue !== undefined &&
+                              Number(c.tripBalanceDue) > 0 && (
+                                <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
+                                  <DollarSign className="w-3.5 h-3.5" />
+                                  Pendiente: ${Number(c.tripBalanceDue).toLocaleString()}
+                                </span>
+                              )}
                           </div>
                         </div>
                         {!reviewerMode && (

@@ -42,6 +42,12 @@ function mapParticipant(p: any) {
     assignedUserId: client.assigned_user_id ?? client.assignedUserId,
     parentClientId: client.parent_client_id ?? client.parentClientId ?? null,
     totalAmountDue: client.total_amount_due ?? client.totalAmountDue,
+    tripBalanceDue:
+      client.trip_balance_due !== undefined
+        ? client.trip_balance_due
+        : client.tripBalanceDue !== undefined
+          ? client.tripBalanceDue
+          : undefined,
     createdAt: new Date(client.created_at ?? client.createdAt ?? 0),
     updatedAt: new Date(client.updated_at ?? client.updatedAt ?? 0),
   };

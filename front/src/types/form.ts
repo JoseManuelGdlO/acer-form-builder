@@ -315,6 +315,8 @@ export interface TripParticipantAdvisor extends ClientAssignedUser {
 export interface TripParticipantClient extends Omit<Client, 'assignedUser'> {
   company?: { id: string; name: string };
   totalAmountDue?: number | null;
+  /** Saldo pendiente (total a pagar − suma de pagos), solo titulares; lo envía el API del viaje */
+  tripBalanceDue?: number | null;
   assignedUser?: TripParticipantAdvisor | null;
 }
 
