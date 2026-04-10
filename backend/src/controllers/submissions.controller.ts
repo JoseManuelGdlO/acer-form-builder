@@ -16,8 +16,12 @@ const getDefaultVisaStatusTemplateId = async (companyId: string): Promise<string
 
 const normalizePhoneDigits = (phone: unknown): string | undefined => {
   if (typeof phone !== 'string') return undefined;
-  const normalized = phone.replace(/\D/g, '').slice(0, 10);
-  return normalized || undefined;
+  const trimmed = phone.trim();
+  if (!trimmed) return undefined;
+  const leadPlus = trimmed.startsWith('+');
+  const digits = trimmed.replace(/\D/g, '').slice(0, 11);
+  if (!digits) return undefined;
+  return leadPlus ? `+${digits}` : digits;
 };
 
 export const getAllSubmissions = async (req: AuthRequest, res: Response): Promise<void> => {

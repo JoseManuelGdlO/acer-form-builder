@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/select';
 import { User, Mail, Phone, MapPin, FileText, ShoppingBag } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { formatPhoneNumberDisplay, normalizePhoneDigits } from '@/lib/phone';
+import { formatPhoneNumberDisplay, isValidClientPhoneLength, normalizePhoneDigits } from '@/lib/phone';
 
 interface ClientFormModalProps {
   client?: Client | null;
@@ -119,13 +119,13 @@ export const ClientFormModal = ({
     }));
   }, [open, client, formData.visaStatusTemplateId, visaStatusTemplates]);
 
-  const validatePhone = (digits: string): boolean => {
-    if (!digits) {
+  const validatePhone = (value: string): boolean => {
+    if (!value || value.trim() === '+') {
       setPhoneError('');
       return true;
     }
-    if (digits.length !== 10) {
-      setPhoneError('El teléfono debe tener exactamente 10 dígitos (máximo 10).');
+    if (!isValidClientPhoneLength(value)) {
+      setPhoneError('El teléfono debe tener 10 u 11 dígitos. Puedes usar + para prefijo (p. ej. +1 EE. UU.).');
       return false;
     }
     setPhoneError('');
@@ -220,26 +220,28 @@ export const ClientFormModal = ({
                 type="tel"
                 value={formatPhoneNumberDisplay(formData.phone)}
                 onChange={e => {
-                  const digits = normalizePhoneDigits(e.target.value);
-                  setFormData(prev => ({ ...prev, phone: digits }));
-                  if (!digits) {
+                  const normalized = normalizePhoneDigits(e.target.value);
+                  setFormData(prev => ({ ...prev, phone: normalized }));
+                  if (!normalized || normalized === '+') {
                     setPhoneError('');
-                  } else if (digits.length !== 10) {
-                    setPhoneError('El teléfono debe tener exactamente 10 dígitos (máximo 10).');
+                  } else if (!isValidClientPhoneLength(normalized)) {
+                    setPhoneError('El teléfono debe tener 10 u 11 dígitos. Puedes usar + para prefijo (p. ej. +1 EE. UU.).');
                   } else {
                     setPhoneError('');
                   }
                 }}
                 onBlur={() => validatePhone(formData.phone)}
-                placeholder="(618)-290-1223"
-                maxLength={14}
+                placeholder="(618)-290-1223 o +1 (555) 123-4567"
+                maxLength={22}
                 className={cn(phoneError && 'border-destructive')}
                 aria-invalid={!!phoneError}
               />
               {phoneError ? (
                 <p className="text-sm text-destructive">{phoneError}</p>
               ) : (
-                <p className="text-xs text-muted-foreground">10 dígitos; se guarda sin formato en el sistema.</p>
+                <p className="text-xs text-muted-foreground">
+                  10 u 11 dígitos; opcional + al inicio. Se guarda tal como lo capturas (sin espacios de la máscara).
+                </p>
               )}
             </div>
           )}

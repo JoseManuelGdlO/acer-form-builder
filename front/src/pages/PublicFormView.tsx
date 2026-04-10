@@ -21,6 +21,11 @@ import { User, Mail, Phone, CheckCircle2, ArrowRight, ArrowLeft, Send, Loader2, 
 import { format, getYear, getMonth } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import {
+  formatPhoneNumberDisplay,
+  isValidClientPhoneLength,
+  normalizePhoneDigits,
+} from '@/lib/phone';
 import { api } from '@/lib/api';
 import DatePicker, { registerLocale, ReactDatePickerCustomHeaderProps } from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
@@ -125,10 +130,6 @@ const defaultClientInfo = {
   name: '',
   phone: '',
   email: '',
-};
-
-const normalizePhoneDigits = (value: string): string => {
-  return value.replace(/\D/g, '').slice(0, 10);
 };
 
 const normalizeFormSections = (rawSections: unknown): FormSection[] => {
@@ -404,22 +405,6 @@ export default function PublicFormView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, currentSectionIndex, submissionId]);
 
-  // Format phone number with mask (XXX)-XXXX-XXXX
-  const formatPhoneNumber = (value: string): string => {
-    // Remove all non-digit characters
-    const digits = value.replace(/\D/g, '');
-    
-    // Limit to 10 digits
-    const limitedDigits = digits.slice(0, 10);
-    
-    // Apply mask: (XXX)-XXXX-XXXX
-    if (limitedDigits.length === 0) return '';
-    if (limitedDigits.length <= 3) return `(${limitedDigits}`;
-    if (limitedDigits.length <= 6) return `(${limitedDigits.slice(0, 3)})-${limitedDigits.slice(3)}`;
-    return `(${limitedDigits.slice(0, 3)})-${limitedDigits.slice(3, 6)}-${limitedDigits.slice(6)}`;
-  };
-
-  // Get clean phone number (only digits)
   const getCleanPhone = (phone: string): string => {
     return normalizePhoneDigits(phone);
   };
@@ -431,14 +416,12 @@ export default function PublicFormView() {
       newErrors.name = 'El nombre es obligatorio';
     }
     
-    // Phone validation - exactly 10 digits
     const cleanPhone = getCleanPhone(clientInfo.phone);
-    if (!cleanPhone) {
+    if (!cleanPhone || cleanPhone === '+') {
       newErrors.phone = 'El teléfono es obligatorio';
-    } else if (cleanPhone.length !== 10) {
-      newErrors.phone = 'El teléfono debe tener exactamente 10 dígitos';
-    } else if (!/^\d{10}$/.test(cleanPhone)) {
-      newErrors.phone = 'El teléfono debe contener solo números';
+    } else if (!isValidClientPhoneLength(cleanPhone)) {
+      newErrors.phone =
+        'El teléfono debe tener 10 u 11 dígitos (puede incluir + para prefijo internacional).';
     }
     
     // Email optional - only validate format if provided
@@ -1198,28 +1181,37 @@ export default function PublicFormView() {
                   <Input
                     id="phone"
                     type="tel"
-                    placeholder="(XXX)-XXXX-XXXX"
-                    value={formatPhoneNumber(clientInfo.phone)}
+                    placeholder="(XXX)-XXX-XXXX o +1 (555) 123-4567"
+                    value={formatPhoneNumberDisplay(clientInfo.phone)}
                     onChange={e => {
-                      const cleanPhone = normalizePhoneDigits(e.target.value);
-                      setClientInfo(prev => ({ ...prev, phone: cleanPhone }));
-                      if (cleanPhone.length === 0) {
+                      const normalized = normalizePhoneDigits(e.target.value);
+                      setClientInfo(prev => ({ ...prev, phone: normalized }));
+                      if (!normalized || normalized === '+') {
                         setErrors(prev => ({ ...prev, phone: '' }));
-                      } else if (cleanPhone.length !== 10) {
-                        setErrors(prev => ({ ...prev, phone: 'El teléfono debe tener exactamente 10 dígitos' }));
+                      } else if (!isValidClientPhoneLength(normalized)) {
+                        setErrors(prev => ({
+                          ...prev,
+                          phone:
+                            'El teléfono debe tener 10 u 11 dígitos (puede incluir + para prefijo internacional).',
+                        }));
                       } else {
                         setErrors(prev => ({ ...prev, phone: '' }));
                       }
                     }}
                     onBlur={() => {
                       saveProgress();
-                      if (clientInfo.phone.length === 0) {
+                      const p = clientInfo.phone;
+                      if (!p || p === '+') {
                         setErrors(prev => ({ ...prev, phone: 'El teléfono es obligatorio' }));
-                      } else if (clientInfo.phone.length !== 10) {
-                        setErrors(prev => ({ ...prev, phone: 'El teléfono debe tener exactamente 10 dígitos' }));
+                      } else if (!isValidClientPhoneLength(p)) {
+                        setErrors(prev => ({
+                          ...prev,
+                          phone:
+                            'El teléfono debe tener 10 u 11 dígitos (puede incluir + para prefijo internacional).',
+                        }));
                       }
                     }}
-                    maxLength={14}
+                    maxLength={22}
                     className={cn('h-12', errors.phone && 'border-destructive')}
                   />
                   {errors.phone && (
