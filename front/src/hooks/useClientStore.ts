@@ -14,18 +14,12 @@ type ClientQueryParams = {
   limit?: number;
 };
 
-export const useClientStore = () => {
-  const [clients, setClients] = useState<Client[]>([]);
-  const [checklistTemplates, setChecklistTemplates] = useState<ChecklistTemplate[]>([]);
-  const [visaStatusTemplates, setVisaStatusTemplates] = useState<VisaStatusTemplate[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [query, setQuery] = useState<ClientQueryParams>({ page: 1, limit: 20 });
-  const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 0 });
-  const mapAssignedUser = (u: any) =>
-    u ? { id: u.id, name: u.name, email: u.email } : null;
-  const mapProduct = (p: any) =>
-    p ? { id: p.id, title: p.title } : null;
-  const mapClient = (c: any): Client => ({
+const mapAssignedUser = (u: any) =>
+  u ? { id: u.id, name: u.name, email: u.email } : null;
+const mapProduct = (p: any) =>
+  p ? { id: p.id, title: p.title } : null;
+
+const mapClient = (c: any): Client => ({
     id: c.id,
     parentClientId: c.parent_client_id ?? c.parentClientId ?? null,
     name: c.name,
@@ -69,7 +63,16 @@ export const useClientStore = () => {
       : [],
     assignedTrips: c.assignedTrips || c.assigned_trips || [],
     nextOfficeAppointment: c.nextOfficeAppointment || c.next_office_appointment || null,
-  });
+});
+
+export const useClientStore = () => {
+  const [clients, setClients] = useState<Client[]>([]);
+  const [pickerClients, setPickerClients] = useState<Client[]>([]);
+  const [checklistTemplates, setChecklistTemplates] = useState<ChecklistTemplate[]>([]);
+  const [visaStatusTemplates, setVisaStatusTemplates] = useState<VisaStatusTemplate[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [query, setQuery] = useState<ClientQueryParams>({ page: 1, limit: 20 });
+  const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 0 });
 
   const fetchClients = useCallback(async (token: string, params?: ClientQueryParams) => {
     setIsLoading(true);
@@ -126,6 +129,48 @@ export const useClientStore = () => {
     }
   }, [query]);
 
+  /** Todos los clientes del alcance actual (sin filtros de búsqueda/listado) para modales de viajes y grupos. */
+  const fetchClientsForPickers = useCallback(async (
+    token: string,
+    opts?: { assignedUserId?: string }
+  ) => {
+    try {
+      const merged: Client[] = [];
+      const seen = new Set<string>();
+      let page = 1;
+      let totalPages = 1;
+      do {
+        const response = await api.getClients(
+          {
+            page,
+            limit: 100,
+            ...(opts?.assignedUserId ? { assignedUserId: opts.assignedUserId } : {}),
+          },
+          token
+        );
+        const normalizedResponse = Array.isArray(response)
+          ? { data: response, meta: undefined }
+          : (response || {});
+        const clientsData = Array.isArray(normalizedResponse.data) ? normalizedResponse.data : [];
+        for (const c of clientsData) {
+          const cl = mapClient(c);
+          if (!seen.has(cl.id)) {
+            seen.add(cl.id);
+            merged.push(cl);
+          }
+        }
+        const meta = normalizedResponse.meta;
+        totalPages = meta?.totalPages ?? 1;
+        if (!meta || clientsData.length === 0) break;
+        page += 1;
+      } while (page <= totalPages);
+      setPickerClients(merged);
+    } catch (error) {
+      console.error('Failed to fetch clients for pickers:', error);
+      throw error;
+    }
+  }, []);
+
   const createClient = useCallback(async (token: string, clientData: Omit<Client, 'id' | 'createdAt' | 'updatedAt' | 'formsCompleted'>) => {
     try {
       const newClient = await api.createClient(clientData, token);
@@ -155,6 +200,13 @@ export const useClientStore = () => {
           };
         });
       });
+      setPickerClients(prev => {
+        const idx = prev.findIndex(p => p.id === client.id);
+        if (idx === -1) return [client, ...prev];
+        const next = [...prev];
+        next[idx] = client;
+        return next;
+      });
       return client;
     } catch (error) {
       console.error('Failed to create client:', error);
@@ -169,6 +221,9 @@ export const useClientStore = () => {
       setClients(prev =>
         prev.map(c => c.id === clientId ? client : c)
       );
+      setPickerClients(prev =>
+        prev.map(c => c.id === clientId ? client : c)
+      );
     } catch (error) {
       console.error('Failed to update client:', error);
       throw error;
@@ -179,6 +234,7 @@ export const useClientStore = () => {
     try {
       await api.deleteClient(clientId, token);
       setClients(prev => prev.filter(client => client.id !== clientId));
+      setPickerClients(prev => prev.filter(client => client.id !== clientId));
     } catch (error) {
       console.error('Failed to delete client:', error);
       throw error;
@@ -206,6 +262,7 @@ export const useClientStore = () => {
 
   return {
     clients,
+    pickerClients,
     checklistTemplates,
     visaStatusTemplates,
     query,
@@ -213,6 +270,7 @@ export const useClientStore = () => {
     isLoading,
     setQuery,
     fetchClients,
+    fetchClientsForPickers,
     createClient,
     updateClient,
     deleteClient,

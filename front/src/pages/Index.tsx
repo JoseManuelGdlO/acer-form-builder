@@ -133,10 +133,12 @@ const Index = () => {
 
   const {
     clients,
+    pickerClients,
     checklistTemplates,
     visaStatusTemplates,
     pagination: clientPagination,
     fetchClients,
+    fetchClientsForPickers,
     createClient: createClientStore,
     updateClient: updateClientStore,
     deleteClient: deleteClientStore,
@@ -215,8 +217,8 @@ const Index = () => {
     inactive: number;
     pending: number;
   } | null>(null);
-  /** Total de clientes del asesor cuando un admin usa "Ver como" (la paginación del listado sigue siendo la de todos) */
-  const [viewAsClientsTotal, setViewAsClientsTotal] = useState<number | null>(null);
+  /** Total de clientes del alcance actual (empresa o asesor en "Ver como"), sin filtros del listado — nav y resumen de clientes */
+  const [clientsScopeTotal, setClientsScopeTotal] = useState<number | null>(null);
   const { categories, fetchCategories, createCategory, updateCategory, deleteCategory } = useCategoryStore();
 
   const areClientQueriesEqual = (
@@ -383,23 +385,34 @@ const Index = () => {
   }, [token, activeView, viewingAs, getClientStats]);
 
   useEffect(() => {
-    if (!token || activeView !== 'clients' || !viewingAs || viewingAs.roles.includes('super_admin')) {
-      setViewAsClientsTotal(null);
-      return;
-    }
+    if (!token) return;
     let cancelled = false;
-    getClientStats(token, { assignedUserId: viewingAs.id })
+    const assignedUserId =
+      viewingAs && !viewingAs.roles.includes('super_admin') ? viewingAs.id : undefined;
+    getClientStats(token, assignedUserId ? { assignedUserId } : undefined)
       .then((raw) => {
         if (cancelled) return;
-        setViewAsClientsTotal(typeof raw.total === 'number' ? raw.total : null);
+        setClientsScopeTotal(typeof raw.total === 'number' ? raw.total : null);
       })
       .catch(() => {
-        if (!cancelled) setViewAsClientsTotal(null);
+        if (!cancelled) setClientsScopeTotal(null);
       });
     return () => {
       cancelled = true;
     };
-  }, [token, activeView, viewingAs, getClientStats]);
+  }, [token, viewingAs, getClientStats]);
+
+  useEffect(() => {
+    if (!token) return;
+    if (activeView !== 'trips' && activeView !== 'groups') return;
+    const opts =
+      viewingAs && !viewingAs.roles.includes('super_admin')
+        ? { assignedUserId: viewingAs.id }
+        : undefined;
+    fetchClientsForPickers(token, opts).catch((error) => {
+      console.error('Failed to load clients for trip/group pickers:', error);
+    });
+  }, [token, activeView, viewingAs, fetchClientsForPickers]);
 
   // Load products & categories when switching to products view
   useEffect(() => {
@@ -451,7 +464,15 @@ const Index = () => {
     if (!token) {
       throw new Error('No token available');
     }
-    return createClientStore(token, clientData);
+    const created = await createClientStore(token, clientData);
+    const assignedUserId =
+      viewingAs && !viewingAs.roles.includes('super_admin') ? viewingAs.id : undefined;
+    getClientStats(token, assignedUserId ? { assignedUserId } : undefined)
+      .then((raw) => {
+        if (typeof raw.total === 'number') setClientsScopeTotal(raw.total);
+      })
+      .catch(() => {});
+    return created;
   };
 
   const updateClient = async (clientId: string, updates: Partial<Client>) => {
@@ -465,7 +486,14 @@ const Index = () => {
     if (!token) {
       throw new Error('No token available');
     }
-    return deleteClientStore(token, clientId);
+    await deleteClientStore(token, clientId);
+    const assignedUserId =
+      viewingAs && !viewingAs.roles.includes('super_admin') ? viewingAs.id : undefined;
+    getClientStats(token, assignedUserId ? { assignedUserId } : undefined)
+      .then((raw) => {
+        if (typeof raw.total === 'number') setClientsScopeTotal(raw.total);
+      })
+      .catch(() => {});
   };
 
   const createGroup = async (data: { title: string; clientIds?: string[] }) => {
@@ -488,6 +516,12 @@ const Index = () => {
     if (viewingAs.roles.includes('super_admin')) return clients;
     return clients.filter(client => client.assignedUserId === viewingAs.id);
   }, [clients, viewingAs]);
+
+  const clientsForTripAndGroupPickers = useMemo(() => {
+    if (!viewingAs) return pickerClients;
+    if (viewingAs.roles.includes('super_admin')) return pickerClients;
+    return pickerClients.filter((c) => c.assignedUserId === viewingAs.id);
+  }, [pickerClients, viewingAs]);
 
   const filteredClientStats = useMemo(() => {
     const normalize = (s?: string | null) => (s || '').trim().toLowerCase();
@@ -567,9 +601,9 @@ const Index = () => {
       >
         <Users className="w-4 h-4 shrink-0" />
         <span className="hidden sm:inline">Clientes</span>
-        {filteredClients.length > 0 && (
+        {clientsScopeTotal !== null && clientsScopeTotal > 0 && (
           <span className="px-1.5 py-0.5 text-xs rounded-full bg-secondary/20 text-secondary">
-            {filteredClients.length}
+            {clientsScopeTotal}
           </span>
         )}
       </Button>
@@ -726,7 +760,7 @@ const Index = () => {
             clients={filteredClients}
             products={products}
             visaStatusTemplates={visaStatusTemplates}
-            stats={{ total: viewAsClientsTotal ?? clientPagination.total }}
+            stats={{ total: clientsScopeTotal ?? clientPagination.total }}
             initialClientId={initialNavigation.initialClientId}
             onDelete={deleteClient}
             onCreate={async (data) => { await createClient(data); }}
@@ -1025,7 +1059,7 @@ const Index = () => {
           </AppHeader>
           <GroupList
             groups={groups}
-            availableClients={filteredClients}
+            availableClients={clientsForTripAndGroupPickers}
             onCreate={async (data) => { await createGroup(data); }}
             onUpdate={async (id, data) => { await updateGroup(id, data); }}
             onDelete={deleteGroup}
@@ -1056,7 +1090,7 @@ const Index = () => {
             reviewerMode={tripReviewerMode}
             trips={trips}
             invitations={invitations}
-            availableClients={filteredClients}
+            availableClients={clientsForTripAndGroupPickers}
             companiesForInvite={companiesForTripShare}
             onCreate={async (data) => {
               await createTrip(token!, data);
