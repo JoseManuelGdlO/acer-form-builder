@@ -27,6 +27,8 @@ function parseJsonIfString<T>(value: unknown): T | null {
 function mapParticipant(p: any) {
   const client = p.client || {};
   const company = client.company || {};
+  const au = client.assigned_user ?? client.assignedUser;
+  const br = au?.branch;
   const tripClient: TripParticipantClient = {
     id: client.id,
     name: client.name,
@@ -38,11 +40,20 @@ function mapParticipant(p: any) {
     visaStatusTemplate: client.visa_status_template ?? client.visaStatusTemplate ?? null,
     formsCompleted: client.forms_completed ?? client.formsCompleted ?? 0,
     assignedUserId: client.assigned_user_id ?? client.assignedUserId,
+    parentClientId: client.parent_client_id ?? client.parentClientId ?? null,
     totalAmountDue: client.total_amount_due ?? client.totalAmountDue,
     createdAt: new Date(client.created_at ?? client.createdAt ?? 0),
     updatedAt: new Date(client.updated_at ?? client.updatedAt ?? 0),
   };
   if (company.id) tripClient.company = { id: company.id, name: company.name };
+  if (au?.id) {
+    tripClient.assignedUser = {
+      id: au.id,
+      name: au.name,
+      email: au.email,
+      ...(br?.id ? { branch: { id: br.id, name: br.name } } : {}),
+    };
+  }
   return {
     id: p.id,
     clientId: p.client_id ?? p.clientId,

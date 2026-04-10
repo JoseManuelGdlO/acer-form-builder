@@ -15,6 +15,7 @@ import {
   ClientGroupMember,
   Company,
   User,
+  Branch,
 } from '../models';
 import { AuthRequest } from '../middleware/auth.middleware';
 
@@ -148,8 +149,17 @@ export const getTripById = async (req: AuthRequest, res: Response): Promise<void
             {
               model: Client,
               as: 'client',
-              include: [{ model: Company, as: 'company', attributes: ['id', 'name'] }],
-              attributes: ['id', 'name', 'email', 'phone', 'companyId', 'totalAmountDue', 'parentClientId'],
+              include: [
+                { model: Company, as: 'company', attributes: ['id', 'name'] },
+                {
+                  model: User,
+                  as: 'assignedUser',
+                  attributes: ['id', 'name', 'email'],
+                  required: false,
+                  include: [{ model: Branch, as: 'branch', attributes: ['id', 'name'], required: false }],
+                },
+              ],
+              attributes: ['id', 'name', 'email', 'phone', 'companyId', 'totalAmountDue', 'parentClientId', 'assignedUserId'],
             },
           ],
         },
@@ -683,7 +693,17 @@ export const addParticipants = [
               {
                 model: Client,
                 as: 'client',
-                include: [{ model: Company, as: 'company', attributes: ['id', 'name'] }],
+                include: [
+                  { model: Company, as: 'company', attributes: ['id', 'name'] },
+                  {
+                    model: User,
+                    as: 'assignedUser',
+                    attributes: ['id', 'name', 'email'],
+                    required: false,
+                    include: [{ model: Branch, as: 'branch', attributes: ['id', 'name'], required: false }],
+                  },
+                ],
+                attributes: ['id', 'name', 'email', 'phone', 'companyId', 'totalAmountDue', 'parentClientId', 'assignedUserId'],
               },
             ],
           },

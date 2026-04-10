@@ -307,9 +307,15 @@ export interface Group {
 
 // ============= Trips =============
 
-export interface TripParticipantClient extends Client {
+/** Asesor del cliente en contexto de viaje, con sucursal (oficina) si aplica */
+export interface TripParticipantAdvisor extends ClientAssignedUser {
+  branch?: { id: string; name: string } | null;
+}
+
+export interface TripParticipantClient extends Omit<Client, 'assignedUser'> {
   company?: { id: string; name: string };
   totalAmountDue?: number | null;
+  assignedUser?: TripParticipantAdvisor | null;
 }
 
 export interface TripSeatAssignmentEntry {

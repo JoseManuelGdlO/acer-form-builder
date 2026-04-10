@@ -20,6 +20,8 @@ import {
   Building2,
   DollarSign,
   Download,
+  UserCircle,
+  MapPinned,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -47,6 +49,7 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { isParticipantChildInTrip, sortTripParticipantsByFamily } from '@/lib/tripParticipantsOrder';
+import { buildTripCompanyColorMap } from '@/lib/tripCompanyColors';
 
 const ACTION_LABELS: Record<string, string> = {
   trip_created: 'Viaje creado',
@@ -164,16 +167,38 @@ export const TripDetailView = ({
     () => new Set(participants.map((p) => p.client?.id).filter(Boolean) as string[]),
     [participants]
   );
+  const participantCompanyIds = useMemo(
+    () => participants.map((p) => p.client?.company?.id).filter(Boolean) as string[],
+    [participants]
+  );
+  const companyColorById = useMemo(
+    () => buildTripCompanyColorMap(participantCompanyIds),
+    [participantCompanyIds]
+  );
+  const companiesFromParticipants = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const p of participants) {
+      const co = p.client?.company;
+      if (co?.id) m.set(co.id, co.name);
+    }
+    return [...m.entries()]
+      .sort((a, b) => a[1].localeCompare(b[1], 'es'))
+      .map(([id, name]) => ({ id, name }));
+  }, [participants]);
   const filteredParticipants = memberSearch.trim()
     ? participants.filter(p => {
         const c = p.client;
         if (!c) return false;
         const q = memberSearch.toLowerCase();
+        const branchName = c.assignedUser?.branch?.name ?? '';
+        const advisorName = c.assignedUser?.name ?? '';
         return (
           c.name.toLowerCase().includes(q) ||
           (c.email && c.email.toLowerCase().includes(q)) ||
           (c.phone && c.phone.includes(memberSearch)) ||
-          (c.company?.name && c.company.name.toLowerCase().includes(q))
+          (c.company?.name && c.company.name.toLowerCase().includes(q)) ||
+          branchName.toLowerCase().includes(q) ||
+          advisorName.toLowerCase().includes(q)
         );
       })
     : participants;
@@ -474,8 +499,12 @@ export const TripDetailView = ({
       } else {
         participants.forEach((p, index) => {
           const name = p.client?.name ?? p.clientId;
-          const company = p.client?.company?.name ? ` (${p.client?.company?.name})` : '';
-          writeLine(`${index + 1}. ${name}${company}`, { indent: 18 });
+          const company = p.client?.company?.name ? ` · ${p.client?.company?.name}` : '';
+          const office = p.client?.assignedUser?.branch?.name
+            ? ` · Oficina: ${p.client.assignedUser.branch.name}`
+            : '';
+          const advisor = p.client?.assignedUser?.name ? ` · Asesor: ${p.client.assignedUser.name}` : '';
+          writeLine(`${index + 1}. ${name}${company}${office}${advisor}`, { indent: 18 });
         });
       }
 
@@ -773,14 +802,55 @@ export const TripDetailView = ({
             {trip.notes && (
               <p className="text-sm text-muted-foreground mt-2 max-w-xl">{trip.notes}</p>
             )}
+            {companiesFromParticipants.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                <span className="text-sm text-muted-foreground shrink-0">Compañías (participantes):</span>
+                {companiesFromParticipants.map(({ id, name }) => {
+                  const col = companyColorById.get(id);
+                  return (
+                    <Badge
+                      key={id}
+                      variant="outline"
+                      className="text-xs border font-medium"
+                      style={
+                        col
+                          ? {
+                              borderColor: col.main,
+                              backgroundColor: col.soft,
+                              color: 'inherit',
+                            }
+                          : undefined
+                      }
+                    >
+                      {name}
+                    </Badge>
+                  );
+                })}
+              </div>
+            )}
             {(trip.sharedCompanies ?? []).length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-2">
-                <span className="text-sm text-muted-foreground">Compañías:</span>
-                {(trip.sharedCompanies ?? []).map(c => (
-                  <Badge key={c.id} variant="secondary" className="text-xs">
-                    {c.name}
-                  </Badge>
-                ))}
+              <div className="flex flex-wrap gap-1 mt-1.5">
+                <span className="text-sm text-muted-foreground">También colaboran:</span>
+                {(trip.sharedCompanies ?? []).map(c => {
+                  const col = companyColorById.get(c.id);
+                  return (
+                    <Badge
+                      key={c.id}
+                      variant="secondary"
+                      className="text-xs"
+                      style={
+                        col
+                          ? {
+                              borderColor: col.main,
+                              backgroundColor: col.soft,
+                            }
+                          : undefined
+                      }
+                    >
+                      {c.name}
+                    </Badge>
+                  );
+                })}
               </div>
             )}
             <div className="flex items-center gap-2 mt-4 flex-wrap">
@@ -869,7 +939,7 @@ export const TripDetailView = ({
             <div className="relative mb-3">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
-                placeholder="Buscar por nombre, email, compañía..."
+                placeholder="Buscar por nombre, email, compañía, oficina o asesor..."
                 value={memberSearch}
                 onChange={e => setMemberSearch(e.target.value)}
                 className="pl-9"
@@ -889,12 +959,26 @@ export const TripDetailView = ({
                     if (!c) return null;
                     const rowNumber = participants.indexOf(p) + 1;
                     const childInGroup = isParticipantChildInTrip(c, participantIdSet);
+                    const coId = c.company?.id;
+                    const coColors = coId ? companyColorById.get(coId) : undefined;
                     return (
                       <li
                         key={p.id ?? c.id}
                         className={`flex items-center justify-between gap-4 py-2.5 hover:bg-muted/30 ${
-                          childInGroup ? 'pl-8 pr-3 border-l-2 border-l-primary/25 ml-3' : 'px-3'
+                          childInGroup ? 'pl-8 pr-3 ml-3' : 'px-3'
                         }`}
+                        style={
+                          coColors
+                            ? {
+                                borderLeftWidth: childInGroup ? 2 : 4,
+                                borderLeftStyle: 'solid',
+                                borderLeftColor: coColors.main,
+                                backgroundColor: coColors.soft,
+                              }
+                            : childInGroup
+                              ? { borderLeftWidth: 2, borderLeftStyle: 'solid', borderLeftColor: 'hsl(var(--primary) / 0.25)' }
+                              : undefined
+                        }
                       >
                         <span
                           className="shrink-0 w-8 text-right text-sm tabular-nums text-muted-foreground"
@@ -911,10 +995,35 @@ export const TripDetailView = ({
                             )}
                             <p className="font-medium truncate">{c.name}</p>
                             {c.company && (
-                              <Badge variant="outline" className="text-xs shrink-0">
+                              <Badge
+                                variant="outline"
+                                className="text-xs shrink-0 font-medium"
+                                style={
+                                  coColors
+                                    ? {
+                                        borderColor: coColors.main,
+                                        backgroundColor: coColors.soft,
+                                      }
+                                    : undefined
+                                }
+                              >
                                 <Building2 className="w-3 h-3 mr-0.5" />
                                 {c.company.name}
                               </Badge>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-x-3 gap-y-1 text-sm text-muted-foreground flex-wrap mt-0.5">
+                            {c.assignedUser?.branch?.name && (
+                              <span className="flex items-center gap-1 min-w-0">
+                                <MapPinned className="w-3.5 h-3.5 shrink-0" />
+                                <span className="truncate">Oficina: {c.assignedUser.branch.name}</span>
+                              </span>
+                            )}
+                            {c.assignedUser?.name && (
+                              <span className="flex items-center gap-1 min-w-0">
+                                <UserCircle className="w-3.5 h-3.5 shrink-0" />
+                                <span className="truncate">Asesor: {c.assignedUser.name}</span>
+                              </span>
                             )}
                           </div>
                           <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
