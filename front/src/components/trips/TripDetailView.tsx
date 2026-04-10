@@ -755,7 +755,7 @@ export const TripDetailView = ({
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-6xl mx-auto p-6 space-y-6">
+      <div className="max-w-[min(100%,88rem)] mx-auto px-4 sm:px-6 py-6 space-y-6 w-full">
         <div className="flex items-start justify-between flex-wrap gap-4">
           <div>
             <Button variant="ghost" onClick={onBack} className="mb-2 -ml-2 gap-2">
@@ -930,8 +930,8 @@ export const TripDetailView = ({
         </div>
         </div>
 
-        <Card>
-          <CardContent className="p-4">
+        <Card className="w-full">
+          <CardContent className="p-4 w-full">
             <h2 className="font-semibold text-lg mb-3 flex items-center gap-2">
               <UserPlus className="w-5 h-5" />
               Participantes
@@ -952,7 +952,7 @@ export const TripDetailView = ({
                   : 'No hay resultados para la búsqueda.'}
               </p>
             ) : (
-              <ScrollArea className="h-[280px]">
+              <ScrollArea className="h-[min(520px,60vh)] w-full">
                 <ul className="divide-y">
                   {filteredParticipants.map(p => {
                     const c = p.client;
@@ -989,8 +989,11 @@ export const TripDetailView = ({
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
                             {childInGroup && (
-                              <span className="text-xs text-muted-foreground shrink-0" aria-hidden>
-                                └
+                              <span
+                                className="text-xs font-semibold text-muted-foreground shrink-0 tabular-nums w-4 text-center"
+                                title="Integrante del grupo familiar"
+                              >
+                                F
                               </span>
                             )}
                             <p className="font-medium truncate">{c.name}</p>
