@@ -689,6 +689,232 @@
         }
       }
     },
+    "/api/clients/{id}/internal-appointments": {
+      "get": {
+        "tags": [
+          "clients"
+        ],
+        "operationId": "get__api_clients__id__internal_appointments",
+        "summary": "GET /api/clients/{id}/internal-appointments",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID: id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "clients"
+        ],
+        "operationId": "post__api_clients__id__internal_appointments",
+        "summary": "POST /api/clients/{id}/internal-appointments",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID: id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "appointmentDate": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "officeRole": {
+                    "type": "string"
+                  },
+                  "purposeNote": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "appointmentDate",
+                  "officeRole",
+                  "purposeNote"
+                ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request (validation errors)"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/clients/{id}/acquired-packages": {
+      "get": {
+        "tags": [
+          "clients"
+        ],
+        "operationId": "get__api_clients__id__acquired_packages",
+        "summary": "GET /api/clients/{id}/acquired-packages",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID: id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "clients"
+        ],
+        "operationId": "post__api_clients__id__acquired_packages",
+        "summary": "POST /api/clients/{id}/acquired-packages",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID: id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "productId": {
+                    "type": "string"
+                  },
+                  "beneficiaryClientId": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request (validation errors)"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/clients/{id}/acquired-packages/{packageId}": {
+      "delete": {
+        "tags": [
+          "clients"
+        ],
+        "operationId": "delete__api_clients__id__acquired_packages__packageId_",
+        "summary": "DELETE /api/clients/{id}/acquired-packages/{packageId}",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID: id",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "packageId",
+            "in": "path",
+            "required": true,
+            "description": "ID: packageId",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
     "/api/clients/{id}": {
       "get": {
         "tags": [
@@ -2176,6 +2402,40 @@
         }
       }
     },
+    "/api/forms/{id}/duplicate": {
+      "post": {
+        "tags": [
+          "forms"
+        ],
+        "operationId": "post__api_forms__id__duplicate",
+        "summary": "POST /api/forms/{id}/duplicate",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID: id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
     "/api/forms/sessions/client/{clientId}": {
       "get": {
         "tags": [
@@ -3388,6 +3648,9 @@
                   },
                   "note": {
                     "type": "string"
+                  },
+                  "acquiredPackageId": {
+                    "type": "string"
                   }
                 }
               }
@@ -3863,10 +4126,18 @@
         ],
         "operationId": "post__api_addChat",
         "summary": "POST /api/addChat",
-        "description": "Endpoint generado automaticamente desde rutas de Express. Acceso publico.",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         }
       }
@@ -3878,7 +4149,7 @@
         ],
         "operationId": "patch__api_addChat__id_",
         "summary": "PATCH /api/addChat/{id}",
-        "description": "Endpoint generado automaticamente desde rutas de Express. Acceso publico.",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
         "parameters": [
           {
             "name": "id",
@@ -3890,9 +4161,17 @@
             }
           }
         ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         }
       }
@@ -3904,7 +4183,7 @@
         ],
         "operationId": "patch__api_addChat__phone__baja",
         "summary": "PATCH /api/addChat/{phone}/baja",
-        "description": "Endpoint generado automaticamente desde rutas de Express. Acceso publico.",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
         "parameters": [
           {
             "name": "phone",
@@ -3916,9 +4195,17 @@
             }
           }
         ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         }
       }
@@ -3985,7 +4272,7 @@
         ],
         "operationId": "post__api_products",
         "summary": "POST /api/products",
-        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion y rol admin.",
         "requestBody": {
           "required": true,
           "content": {
@@ -4030,6 +4317,9 @@
           },
           "401": {
             "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
           }
         }
       }
@@ -4130,7 +4420,7 @@
         ],
         "operationId": "put__api_products__id_",
         "summary": "PUT /api/products/{id}",
-        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion y rol admin.",
         "parameters": [
           {
             "name": "id",
@@ -4186,6 +4476,9 @@
           },
           "401": {
             "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
           }
         }
       },
@@ -4195,7 +4488,7 @@
         ],
         "operationId": "delete__api_products__id_",
         "summary": "DELETE /api/products/{id}",
-        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion y rol admin.",
         "parameters": [
           {
             "name": "id",
@@ -4218,6 +4511,9 @@
           },
           "401": {
             "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
           }
         }
       }
@@ -4250,7 +4546,7 @@
         ],
         "operationId": "post__api_categories",
         "summary": "POST /api/categories",
-        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion y rol admin.",
         "requestBody": {
           "required": true,
           "content": {
@@ -4286,6 +4582,9 @@
           },
           "401": {
             "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
           }
         }
       }
@@ -4297,7 +4596,7 @@
         ],
         "operationId": "put__api_categories__id_",
         "summary": "PUT /api/categories/{id}",
-        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion y rol admin.",
         "parameters": [
           {
             "name": "id",
@@ -4341,6 +4640,9 @@
           },
           "401": {
             "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
           }
         }
       },
@@ -4350,7 +4652,7 @@
         ],
         "operationId": "delete__api_categories__id_",
         "summary": "DELETE /api/categories/{id}",
-        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion y rol admin.",
         "parameters": [
           {
             "name": "id",
@@ -4373,6 +4675,9 @@
           },
           "401": {
             "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
           }
         }
       }
@@ -4818,6 +5123,94 @@
         }
       }
     },
+    "/api/finance/expenses": {
+      "post": {
+        "tags": [
+          "finance"
+        ],
+        "operationId": "post__api_finance_expenses",
+        "summary": "POST /api/finance/expenses",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "amount": {
+                    "type": "number"
+                  },
+                  "expenseDate": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "concept": {
+                    "type": "string"
+                  },
+                  "note": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "amount"
+                ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request (validation errors)"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/finance/expenses/{id}": {
+      "delete": {
+        "tags": [
+          "finance"
+        ],
+        "operationId": "delete__api_finance_expenses__id_",
+        "summary": "DELETE /api/finance/expenses/{id}",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID: id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
     "/api/branches": {
       "get": {
         "tags": [
@@ -4978,6 +5371,180 @@
           },
           "403": {
             "description": "Forbidden"
+          }
+        }
+      }
+    },
+    "/api/internal-appointments/{appointmentId}": {
+      "put": {
+        "tags": [
+          "internal-appointments"
+        ],
+        "operationId": "put__api_internal_appointments__appointmentId_",
+        "summary": "PUT /api/internal-appointments/{appointmentId}",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "parameters": [
+          {
+            "name": "appointmentId",
+            "in": "path",
+            "required": true,
+            "description": "ID: appointmentId",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "appointmentDate": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "officeRole": {
+                    "type": "string"
+                  },
+                  "purposeNote": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request (validation errors)"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "internal-appointments"
+        ],
+        "operationId": "delete__api_internal_appointments__appointmentId_",
+        "summary": "DELETE /api/internal-appointments/{appointmentId}",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "parameters": [
+          {
+            "name": "appointmentId",
+            "in": "path",
+            "required": true,
+            "description": "ID: appointmentId",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/internal-appointments/{appointmentId}/history": {
+      "get": {
+        "tags": [
+          "internal-appointments"
+        ],
+        "operationId": "get__api_internal_appointments__appointmentId__history",
+        "summary": "GET /api/internal-appointments/{appointmentId}/history",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "parameters": [
+          {
+            "name": "appointmentId",
+            "in": "path",
+            "required": true,
+            "description": "ID: appointmentId",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/calendar/events": {
+      "get": {
+        "tags": [
+          "calendar"
+        ],
+        "operationId": "get__api_calendar_events",
+        "summary": "GET /api/calendar/events",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/calendar/events/by-date": {
+      "get": {
+        "tags": [
+          "calendar"
+        ],
+        "operationId": "get__api_calendar_events_by_date",
+        "summary": "GET /api/calendar/events/by-date",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         }
       }

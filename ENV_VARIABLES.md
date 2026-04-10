@@ -17,6 +17,10 @@ Este archivo documenta todas las variables de entorno necesarias para ejecutar l
 - `NODE_ENV`: Entorno de ejecución (production, development)
 - `CORS_ORIGIN`: Origen permitido para CORS (por defecto: http://localhost:80)
 
+### Integración de chat (`/api/addChat`) con n8n u otros clientes
+- Las rutas `POST /api/addChat`, `PATCH /api/addChat/:id` y `PATCH /api/addChat/:phone/baja` requieren **`Authorization: Bearer <JWT>`** igual que el resto de la API autenticada.
+- El `company_id` de las conversaciones sale del usuario del token (`req.user.companyId` tras `authenticate`). Conviene usar un **JWT permanente** por empresa (p. ej. endpoint de token permanente del backend) y que n8n elija el Bearer según la compañía detectada (p. ej. por `phone_number_id` del webhook).
+
 ### Frontend
 - `VITE_API_URL`: URL del API backend (por defecto: http://localhost:3000/api)
 

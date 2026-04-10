@@ -144,8 +144,9 @@ function scanEndpointsForFile(moduleBase, moduleFilePath) {
     const authUses = [...content.matchAll(/router\.use\(\s*authenticate\s*\)/g)].map((x) => x.index);
     const adminUses = [...content.matchAll(/router\.use\(\s*requireAdmin\s*\)/g)].map((x) => x.index);
 
-    let authRequired =
-      statementChunk.includes('authenticate') || authUses.some((idx) => idx !== undefined && idx < m.index);
+    const jwtAuthInRoute = /\bauthenticate\b/.test(statementChunk);
+
+    let authRequired = jwtAuthInRoute || authUses.some((idx) => idx !== undefined && idx < m.index);
     const adminRequired =
       statementChunk.includes('requireAdmin') || adminUses.some((idx) => idx !== undefined && idx < m.index);
 
@@ -380,6 +381,8 @@ function buildOpenApiSpec(allEndpoints) {
       }
     }
 
+    const securityBlock = ep.authRequired ? { security: [{ bearerAuth: [] }] } : {};
+
     spec.paths[ep.openApiPath][methodLower] = {
       tags: [ep.tag],
       operationId: operationIdBase,
@@ -387,7 +390,7 @@ function buildOpenApiSpec(allEndpoints) {
       description,
       ...(parameters ? { parameters } : {}),
       ...(requestBody ? { requestBody } : {}),
-      ...(ep.authRequired ? { security: [{ bearerAuth: [] }] } : {}),
+      ...securityBlock,
       responses: {
         '200': { description: 'OK' },
         ...(requestBody ? { '400': { description: 'Bad Request (validation errors)' } } : {}),

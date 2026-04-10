@@ -3,6 +3,7 @@ import sequelize from '../config/database';
 
 interface ConversationsAttributes {
   id: number;
+  companyId?: string | null;
   phone: string;
   fecha: Date;
   hora: Date;
@@ -16,7 +17,7 @@ interface ConversationsAttributes {
 interface ConversationsCreationAttributes
   extends Optional<
     ConversationsAttributes,
-    'id' | 'baja_logica' | 'createdAt' | 'updatedAt'
+    'id' | 'companyId' | 'baja_logica' | 'createdAt' | 'updatedAt'
   > {}
 
 export class Conversations
@@ -24,6 +25,7 @@ export class Conversations
   implements ConversationsAttributes
 {
   public id!: number;
+  public companyId!: string | null;
   public phone!: string;
   public fecha!: Date;
   public hora!: Date;
@@ -40,6 +42,17 @@ Conversations.init(
       type: DataTypes.INTEGER,
       autoIncrement: true,
       primaryKey: true,
+    },
+    companyId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      field: 'company_id',
+      references: {
+        model: 'companies',
+        key: 'id',
+      },
+      onDelete: 'CASCADE',
+      onUpdate: 'CASCADE',
     },
     phone: {
       type: DataTypes.STRING(50),

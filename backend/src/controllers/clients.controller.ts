@@ -37,7 +37,8 @@ const getDefaultVisaStatusTemplateId = async (companyId: string): Promise<string
 };
 
 const getWhatsappReplyStatusByPhone = async (
-  phones: string[]
+  phones: string[],
+  companyId: string
 ): Promise<Record<string, { hasWhatsappReply: boolean; lastUserMessageAt: Date | null; lastBotMessageAt: Date | null }>> => {
   const uniquePhones = Array.from(new Set(phones.map((phone) => String(phone || '').trim()).filter(Boolean)));
   if (uniquePhones.length === 0) return {};
@@ -46,6 +47,7 @@ const getWhatsappReplyStatusByPhone = async (
     where: {
       phone: { [Op.in]: uniquePhones },
       from: { [Op.in]: ['usuario', 'bot'] },
+      companyId,
     },
     attributes: ['phone', 'from', 'createdAt'],
     order: [['created_at', 'DESC']],
@@ -369,7 +371,10 @@ export const getAllClients = async (req: AuthRequest, res: Response): Promise<vo
         purposeNote: row.purposeNote || row.purpose_note || null,
       };
     }
-    const whatsappStatusByPhone = await getWhatsappReplyStatusByPhone(clients.map((client) => client.phone || ''));
+    const whatsappStatusByPhone = await getWhatsappReplyStatusByPhone(
+      clients.map((client) => client.phone || ''),
+      companyId
+    );
 
     // Add checklist stats and payment totals to each client
     const clientsWithStats = clients.map(client => {
@@ -509,7 +514,7 @@ export const getClientById = async (req: AuthRequest, res: Response): Promise<vo
       updatedAt: child.updated_at || child.updatedAt,
     }));
     (clientJson as any).assignedTrips = assignedTrips;
-    const clientWhatsappStatusByPhone = await getWhatsappReplyStatusByPhone([client.phone || '']);
+    const clientWhatsappStatusByPhone = await getWhatsappReplyStatusByPhone([client.phone || ''], companyId);
     const clientWhatsappStatus = client.phone ? clientWhatsappStatusByPhone[String(client.phone).trim()] : undefined;
     (clientJson as any).hasWhatsappReply = clientWhatsappStatus?.hasWhatsappReply ?? false;
     (clientJson as any).lastWhatsappUserMessageAt = clientWhatsappStatus?.lastUserMessageAt ?? null;

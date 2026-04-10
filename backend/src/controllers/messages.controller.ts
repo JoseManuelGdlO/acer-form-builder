@@ -235,7 +235,7 @@ export const createMessage = [
       }
 
       const lastUserConversation = await Conversations.findOne({
-        where: { phone: clientPhone, from: 'usuario' },
+        where: { phone: clientPhone, from: 'usuario', companyId },
         order: [['created_at', 'DESC']],
       });
 
@@ -250,6 +250,7 @@ export const createMessage = [
       if (shouldUseTemplateFallback) {
         await sendTemplateMessage(normalizedPhone);
         await Conversations.create({
+          companyId,
           phone: clientPhone,
           mensaje: '[Plantilla mensaje_inicial enviada]',
           from: 'bot',
@@ -262,6 +263,7 @@ export const createMessage = [
       await sendTextMessage(normalizedPhone, content);
 
       await Conversations.create({
+        companyId,
         phone: clientPhone,
         mensaje: content,
         from: 'bot',
