@@ -1,6 +1,7 @@
 import { Trip } from '@/types/form';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,8 +23,16 @@ interface TripCardProps {
 
 export const TripCard = ({ trip, onView, onEdit, onDelete, readOnly = false }: TripCardProps) => {
   const count = trip.participantCount ?? trip.participants?.length ?? 0;
-  const departure = trip.departureDate ? format(new Date(trip.departureDate), 'd MMM yyyy', { locale: es }) : '';
-  const returnDate = trip.returnDate ? format(new Date(trip.returnDate), 'd MMM yyyy', { locale: es }) : '';
+  const fmtShort = (d: string | null | undefined) =>
+    d ? format(new Date(d), 'd MMM yyyy', { locale: es }) : '';
+  const departure = fmtShort(trip.departureDate);
+  const returnDate = fmtShort(trip.returnDate);
+  const visa =
+    trip.isVisaTrip &&
+    trip.casDepartureDate &&
+    trip.casReturnDate &&
+    trip.consulateDepartureDate &&
+    trip.consulateReturnDate;
 
   return (
     <Card
@@ -38,17 +47,37 @@ export const TripCard = ({ trip, onView, onEdit, onDelete, readOnly = false }: T
                 <MapPin className="w-6 h-6 text-primary" />
               </div>
               <div>
-                <h3 className="font-semibold text-foreground text-lg">{trip.title}</h3>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="font-semibold text-foreground text-lg">{trip.title}</h3>
+                  {visa && (
+                    <Badge variant="secondary" className="text-xs font-normal">
+                      Visas
+                    </Badge>
+                  )}
+                </div>
                 {trip.destination && (
                   <p className="text-sm text-muted-foreground flex items-center gap-1">
                     <MapPin className="w-3.5 h-3.5" />
                     {trip.destination}
                   </p>
                 )}
-                <p className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5">
-                  <Calendar className="w-3.5 h-3.5" />
-                  {departure} – {returnDate}
-                </p>
+                {visa ? (
+                  <div className="text-sm text-muted-foreground space-y-0.5 mt-0.5">
+                    <p className="flex items-center gap-1">
+                      <Calendar className="w-3.5 h-3.5 shrink-0" />
+                      CAS: {fmtShort(trip.casDepartureDate)} – {fmtShort(trip.casReturnDate)}
+                    </p>
+                    <p className="flex items-center gap-1 pl-5">
+                      Consulado: {fmtShort(trip.consulateDepartureDate)} –{' '}
+                      {fmtShort(trip.consulateReturnDate)}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5">
+                    <Calendar className="w-3.5 h-3.5" />
+                    {departure} – {returnDate}
+                  </p>
+                )}
                 <p className="text-sm text-muted-foreground mt-0.5">
                   {count}/{trip.totalSeats} plazas
                 </p>

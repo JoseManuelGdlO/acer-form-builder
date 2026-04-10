@@ -13,6 +13,14 @@ function sortMinutes(e: CalendarEvent): number {
       return 6 * 60;
     case 'trip_return':
       return 22 * 60;
+    case 'trip_visa_cas_dep':
+      return 6 * 60;
+    case 'trip_visa_cas_ret':
+      return 6 * 60 + 15;
+    case 'trip_visa_con_dep':
+      return 6 * 60 + 30;
+    case 'trip_visa_con_ret':
+      return 6 * 60 + 45;
     case 'cas':
       return 10 * 60;
     case 'consular':

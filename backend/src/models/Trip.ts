@@ -6,8 +6,13 @@ interface TripAttributes {
   companyId: string;
   title: string;
   destination?: string | null;
-  departureDate: Date;
-  returnDate: Date;
+  departureDate: Date | string;
+  returnDate: Date | string;
+  isVisaTrip: boolean;
+  casDepartureDate?: string | null;
+  casReturnDate?: string | null;
+  consulateDepartureDate?: string | null;
+  consulateReturnDate?: string | null;
   notes?: string | null;
   totalSeats: number;
   busTemplateId?: string | null;
@@ -16,15 +21,34 @@ interface TripAttributes {
   updatedAt?: Date;
 }
 
-interface TripCreationAttributes extends Optional<TripAttributes, 'id' | 'destination' | 'notes' | 'busTemplateId' | 'assignedUserId' | 'createdAt' | 'updatedAt'> {}
+interface TripCreationAttributes extends Optional<
+  TripAttributes,
+  | 'id'
+  | 'destination'
+  | 'notes'
+  | 'busTemplateId'
+  | 'assignedUserId'
+  | 'isVisaTrip'
+  | 'casDepartureDate'
+  | 'casReturnDate'
+  | 'consulateDepartureDate'
+  | 'consulateReturnDate'
+  | 'createdAt'
+  | 'updatedAt'
+> {}
 
 export class Trip extends Model<TripAttributes, TripCreationAttributes> implements TripAttributes {
   public id!: string;
   public companyId!: string;
   public title!: string;
   public destination!: string | null;
-  public departureDate!: Date;
-  public returnDate!: Date;
+  public departureDate!: Date | string;
+  public returnDate!: Date | string;
+  public isVisaTrip!: boolean;
+  public casDepartureDate!: string | null;
+  public casReturnDate!: string | null;
+  public consulateDepartureDate!: string | null;
+  public consulateReturnDate!: string | null;
   public notes!: string | null;
   public totalSeats!: number;
   public busTemplateId!: string | null;
@@ -64,6 +88,32 @@ Trip.init(
     returnDate: {
       type: DataTypes.DATEONLY,
       allowNull: false,
+    },
+    isVisaTrip: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+      field: 'is_visa_trip',
+    },
+    casDepartureDate: {
+      type: DataTypes.DATEONLY,
+      allowNull: true,
+      field: 'cas_departure_date',
+    },
+    casReturnDate: {
+      type: DataTypes.DATEONLY,
+      allowNull: true,
+      field: 'cas_return_date',
+    },
+    consulateDepartureDate: {
+      type: DataTypes.DATEONLY,
+      allowNull: true,
+      field: 'consulate_departure_date',
+    },
+    consulateReturnDate: {
+      type: DataTypes.DATEONLY,
+      allowNull: true,
+      field: 'consulate_return_date',
     },
     notes: {
       type: DataTypes.TEXT,

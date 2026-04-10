@@ -561,13 +561,18 @@ class ApiClient {
 
   async createTrip(data: {
     title: string;
-    departureDate: string;
-    returnDate: string;
+    departureDate?: string;
+    returnDate?: string;
     totalSeats: number;
     destination?: string;
     notes?: string;
     busTemplateId?: string | null;
     invitedCompanyIds?: string[];
+    isVisaTrip?: boolean;
+    casDepartureDate?: string;
+    casReturnDate?: string;
+    consulateDepartureDate?: string;
+    consulateReturnDate?: string;
   }, token?: string | null) {
     return this.request<any>('/trips', {
       method: 'POST',
@@ -588,6 +593,11 @@ class ApiClient {
       notes?: string;
       busTemplateId?: string | null;
       invitedCompanyIds?: string[];
+      isVisaTrip?: boolean;
+      casDepartureDate?: string | null;
+      casReturnDate?: string | null;
+      consulateDepartureDate?: string | null;
+      consulateReturnDate?: string | null;
     },
     token?: string | null
   ) {

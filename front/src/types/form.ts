@@ -211,7 +211,16 @@ export interface InternalAppointment {
 }
 
 export interface CalendarEvent {
-  type: 'office' | 'cas' | 'consular' | 'trip_departure' | 'trip_return';
+  type:
+    | 'office'
+    | 'cas'
+    | 'consular'
+    | 'trip_departure'
+    | 'trip_return'
+    | 'trip_visa_cas_dep'
+    | 'trip_visa_cas_ret'
+    | 'trip_visa_con_dep'
+    | 'trip_visa_con_ret';
   date: string;
   title: string;
   /** HH:mm (principalmente citas internas) */
@@ -366,6 +375,11 @@ export interface Trip {
   destination?: string | null;
   departureDate: string;
   returnDate: string;
+  isVisaTrip?: boolean;
+  casDepartureDate?: string | null;
+  casReturnDate?: string | null;
+  consulateDepartureDate?: string | null;
+  consulateReturnDate?: string | null;
   notes?: string | null;
   totalSeats: number;
   companyId?: string;
@@ -383,7 +397,19 @@ export interface Trip {
 export interface TripInvitation {
   id: string;
   tripId: string;
-  trip?: { id: string; title: string; destination?: string; departureDate: string; returnDate: string; totalSeats: number };
+  trip?: {
+    id: string;
+    title: string;
+    destination?: string;
+    departureDate: string;
+    returnDate: string;
+    totalSeats: number;
+    isVisaTrip?: boolean;
+    casDepartureDate?: string | null;
+    casReturnDate?: string | null;
+    consulateDepartureDate?: string | null;
+    consulateReturnDate?: string | null;
+  };
   invitedCompanyId: string;
   invitedBy?: { id: string; name: string; email?: string };
   status: 'pending' | 'accepted' | 'rejected';

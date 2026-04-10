@@ -7,6 +7,10 @@ export const APPOINTMENT_TYPE_LABELS: Record<CalendarEvent['type'], string> = {
   consular: 'Consulado',
   trip_departure: 'Viaje · Salida',
   trip_return: 'Viaje · Regreso',
+  trip_visa_cas_dep: 'Viaje visas · CAS salida',
+  trip_visa_cas_ret: 'Viaje visas · CAS regreso',
+  trip_visa_con_dep: 'Viaje visas · Consulado salida',
+  trip_visa_con_ret: 'Viaje visas · Consulado regreso',
 };
 
 /**
@@ -23,6 +27,10 @@ export function appointmentTypeBadgeClass(type: CalendarEvent['type']): string {
       return 'border-0 bg-red-600 text-white shadow-none hover:bg-red-600';
     case 'trip_departure':
     case 'trip_return':
+    case 'trip_visa_cas_dep':
+    case 'trip_visa_cas_ret':
+    case 'trip_visa_con_dep':
+    case 'trip_visa_con_ret':
       return 'border-0 bg-violet-600 text-white shadow-none hover:bg-violet-600';
     default:
       return 'border-0 bg-secondary text-secondary-foreground';
@@ -39,6 +47,10 @@ export function appointmentEventRowBorderClass(type: CalendarEvent['type']): str
       return 'border-l-4 border-l-red-600';
     case 'trip_departure':
     case 'trip_return':
+    case 'trip_visa_cas_dep':
+    case 'trip_visa_cas_ret':
+    case 'trip_visa_con_dep':
+    case 'trip_visa_con_ret':
       return 'border-l-4 border-l-violet-600';
     default:
       return '';

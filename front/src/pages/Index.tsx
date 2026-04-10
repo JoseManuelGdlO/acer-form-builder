@@ -1038,15 +1038,27 @@ const Index = () => {
               await createTrip(token!, data);
             }}
             onUpdate={async (tripId, data) => {
+              const visa = data.isVisaTrip === true;
               await updateTrip(token!, tripId, {
                 title: data.title,
                 destination: data.destination,
-                departureDate: data.departureDate,
-                returnDate: data.returnDate,
                 notes: data.notes,
                 totalSeats: data.totalSeats,
-                busTemplateId: (data as { busTemplateId?: string | null }).busTemplateId,
-                invitedCompanyIds: (data as { invitedCompanyIds?: string[] }).invitedCompanyIds,
+                busTemplateId: data.busTemplateId,
+                invitedCompanyIds: data.invitedCompanyIds,
+                ...(visa
+                  ? {
+                      isVisaTrip: true,
+                      casDepartureDate: data.casDepartureDate ?? null,
+                      casReturnDate: data.casReturnDate ?? null,
+                      consulateDepartureDate: data.consulateDepartureDate ?? null,
+                      consulateReturnDate: data.consulateReturnDate ?? null,
+                    }
+                  : {
+                      isVisaTrip: false,
+                      departureDate: data.departureDate,
+                      returnDate: data.returnDate,
+                    }),
               });
               await fetchTrip(tripId, token!);
             }}

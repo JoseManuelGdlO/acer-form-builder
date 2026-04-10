@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { Trip, TripInvitation, Client, BusTemplate, TripIncome, TripExpense, TripFinanceSummary } from '@/types/form';
 import { TripCard } from './TripCard';
 import { TripDetailView } from './TripDetailView';
-import { TripFormModal } from './TripFormModal';
+import { TripFormModal, type TripFormSaveData } from './TripFormModal';
 import { BusTemplateList } from './BusTemplateList';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -23,16 +23,7 @@ interface TripListProps {
   invitations: TripInvitation[];
   availableClients: Client[];
   companiesForInvite: { id: string; name: string }[];
-  onCreate: (data: {
-    title: string;
-    destination?: string;
-    departureDate: string;
-    returnDate: string;
-    notes?: string;
-    totalSeats: number;
-    invitedCompanyIds?: string[];
-    busTemplateId?: string | null;
-  }) => Promise<void>;
+  onCreate: (data: TripFormSaveData) => Promise<void>;
   onUpdate: (tripId: string, data: Partial<Trip> & { invitedCompanyIds?: string[] }) => Promise<void>;
   onDelete: (tripId: string) => Promise<void>;
   onAddParticipants: (tripId: string, data: { clientIds?: string[] }) => Promise<void>;
@@ -125,39 +116,64 @@ export const TripList = ({
   );
 
   const calendarEvents = useMemo((): Event<Trip>[] => {
-    return filteredTrips.map((trip) => {
-      const start = new Date(trip.departureDate);
-      const end = endOfDay(new Date(trip.returnDate));
-      return {
-        id: trip.id,
-        title: trip.destination ? `${trip.title} — ${trip.destination}` : trip.title,
-        start,
-        end,
-        resource: trip,
-      };
-    });
+    const out: Event<Trip>[] = [];
+    for (const trip of filteredTrips) {
+      const titleBase = trip.destination ? `${trip.title} — ${trip.destination}` : trip.title;
+      if (
+        trip.isVisaTrip &&
+        trip.casDepartureDate &&
+        trip.casReturnDate &&
+        trip.consulateDepartureDate &&
+        trip.consulateReturnDate
+      ) {
+        out.push({
+          id: `${trip.id}-cas`,
+          title: `${titleBase} (CAS)`,
+          start: new Date(trip.casDepartureDate),
+          end: endOfDay(new Date(trip.casReturnDate)),
+          resource: trip,
+        });
+        out.push({
+          id: `${trip.id}-cons`,
+          title: `${titleBase} (Consulado)`,
+          start: new Date(trip.consulateDepartureDate),
+          end: endOfDay(new Date(trip.consulateReturnDate)),
+          resource: trip,
+        });
+      } else {
+        out.push({
+          id: trip.id,
+          title: titleBase,
+          start: new Date(trip.departureDate),
+          end: endOfDay(new Date(trip.returnDate)),
+          resource: trip,
+        });
+      }
+    }
+    return out;
   }, [filteredTrips]);
 
-  const handleSaveTrip = async (data: {
-    title: string;
-    destination?: string;
-    departureDate: string;
-    returnDate: string;
-    notes?: string;
-    totalSeats: number;
-    invitedCompanyIds?: string[];
-    busTemplateId?: string | null;
-  }) => {
+  const handleSaveTrip = async (data: TripFormSaveData) => {
     try {
       if (editingTrip) {
         await onUpdate(editingTrip.id, {
           title: data.title,
           destination: data.destination,
-          departureDate: data.departureDate,
-          returnDate: data.returnDate,
           notes: data.notes,
           totalSeats: data.totalSeats,
           busTemplateId: data.busTemplateId ?? undefined,
+          isVisaTrip: data.isVisaTrip,
+          ...(data.isVisaTrip
+            ? {
+                casDepartureDate: data.casDepartureDate,
+                casReturnDate: data.casReturnDate,
+                consulateDepartureDate: data.consulateDepartureDate,
+                consulateReturnDate: data.consulateReturnDate,
+              }
+            : {
+                departureDate: data.departureDate,
+                returnDate: data.returnDate,
+              }),
           sharedCompanies: data.invitedCompanyIds?.map(id => {
             const c = companiesForInvite.find(x => x.id === id);
             return c ? { id: c.id, name: c.name } : { id, name: '' };
@@ -313,12 +329,33 @@ export const TripList = ({
                           {inv.trip.destination}
                         </p>
                       )}
-                      {inv.trip?.departureDate && inv.trip?.returnDate && (
-                        <p className="text-sm text-muted-foreground flex items-center gap-1">
-                          <CalendarIcon className="w-3.5 h-3.5" />
-                          {format(new Date(inv.trip.departureDate), 'd MMM yyyy', { locale: es })} –{' '}
-                          {format(new Date(inv.trip.returnDate), 'd MMM yyyy', { locale: es })}
-                        </p>
+                      {inv.trip?.isVisaTrip &&
+                      inv.trip.casDepartureDate &&
+                      inv.trip.casReturnDate &&
+                      inv.trip.consulateDepartureDate &&
+                      inv.trip.consulateReturnDate ? (
+                        <div className="text-sm text-muted-foreground space-y-0.5 mt-1">
+                          <p className="flex items-center gap-1">
+                            <CalendarIcon className="w-3.5 h-3.5 shrink-0" />
+                            CAS:{' '}
+                            {format(new Date(inv.trip.casDepartureDate), 'd MMM yyyy', { locale: es })} –{' '}
+                            {format(new Date(inv.trip.casReturnDate), 'd MMM yyyy', { locale: es })}
+                          </p>
+                          <p className="flex items-center gap-1 pl-5">
+                            Consulado:{' '}
+                            {format(new Date(inv.trip.consulateDepartureDate), 'd MMM yyyy', { locale: es })} –{' '}
+                            {format(new Date(inv.trip.consulateReturnDate), 'd MMM yyyy', { locale: es })}
+                          </p>
+                        </div>
+                      ) : (
+                        inv.trip?.departureDate &&
+                        inv.trip?.returnDate && (
+                          <p className="text-sm text-muted-foreground flex items-center gap-1">
+                            <CalendarIcon className="w-3.5 h-3.5" />
+                            {format(new Date(inv.trip.departureDate), 'd MMM yyyy', { locale: es })} –{' '}
+                            {format(new Date(inv.trip.returnDate), 'd MMM yyyy', { locale: es })}
+                          </p>
+                        )
                       )}
                       {inv.invitedBy && (
                         <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
