@@ -194,6 +194,7 @@ class ApiClient {
     params?: {
       q?: string;
       assignedUserId?: string;
+      branchId?: string;
       productId?: string;
       visaStatusTemplateId?: string;
       checklistTemplateId?: string;

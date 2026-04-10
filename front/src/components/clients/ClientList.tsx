@@ -8,6 +8,14 @@ import { ClientFormModal } from './ClientFormModal';
 import { ClientProfileView } from './ClientProfileView';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
@@ -46,12 +54,16 @@ interface ClientListProps {
     visaStatusTemplateId?: string;
     checklistTemplateId?: string;
     productId?: string;
+    branchId?: string;
+    assignedUserId?: string;
   };
   onFiltersChange: (filters: {
     q?: string;
     visaStatusTemplateId?: string;
     checklistTemplateId?: string;
     productId?: string;
+    branchId?: string;
+    assignedUserId?: string;
   }) => void;
   onPageChange: (page: number) => void;
 }
@@ -59,6 +71,8 @@ interface ClientListProps {
 type ChecklistFilterType = 'all' | string; // 'all' or templateId
 type ProductFilterType = 'all' | string;
 type VisaStatusFilterType = 'all' | string;
+type BranchFilterType = 'all' | string;
+type AdvisorFilterType = 'all' | string;
 
 export const ClientList = ({
   clients,
@@ -80,6 +94,9 @@ export const ClientList = ({
   const [visaStatusFilter, setVisaStatusFilter] = useState<VisaStatusFilterType>(initialQuery?.visaStatusTemplateId || 'all');
   const [checklistFilter, setChecklistFilter] = useState<ChecklistFilterType>(initialQuery?.checklistTemplateId || 'all');
   const [productFilter, setProductFilter] = useState<ProductFilterType>(initialQuery?.productId || 'all');
+  const [branchFilter, setBranchFilter] = useState<BranchFilterType>(initialQuery?.branchId || 'all');
+  const [advisorFilter, setAdvisorFilter] = useState<AdvisorFilterType>(initialQuery?.assignedUserId || 'all');
+  const [branches, setBranches] = useState<{ id: string; name: string; isActive?: boolean }[]>([]);
   const [viewingClient, setViewingClient] = useState<Client | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isFiltersModalOpen, setIsFiltersModalOpen] = useState(false);
@@ -114,6 +131,42 @@ export const ClientList = ({
       });
     }
   }, [token, checklistTemplates.length, settingsTemplates.length, fetchChecklistTemplates]);
+
+  useEffect(() => {
+    if (!token || !isAdmin) {
+      setBranches([]);
+      return;
+    }
+    api
+      .getBranches(token)
+      .then((list) => {
+        const raw = Array.isArray(list) ? list : [];
+        setBranches(
+          raw
+            .filter((b: { is_active?: boolean; isActive?: boolean }) => b.is_active !== false && b.isActive !== false)
+            .map((b: { id: string; name: string; is_active?: boolean; isActive?: boolean }) => ({
+              id: b.id,
+              name: b.name,
+              isActive: b.is_active ?? b.isActive ?? true,
+            }))
+        );
+      })
+      .catch(() => setBranches([]));
+  }, [token, isAdmin]);
+
+  const advisorOptions = useMemo(() => {
+    const sorted = [...users].sort((a, b) => a.name.localeCompare(b.name, 'es'));
+    if (branchFilter === 'all') return sorted;
+    return sorted.filter((u) => u.branchId === branchFilter);
+  }, [users, branchFilter]);
+
+  useEffect(() => {
+    if (advisorFilter === 'all') return;
+    const selected = users.find((u) => u.id === advisorFilter);
+    if (branchFilter !== 'all' && selected && selected.branchId !== branchFilter) {
+      setAdvisorFilter('all');
+    }
+  }, [branchFilter, advisorFilter, users]);
 
   useEffect(() => {
     if (hasAutoOpenedInitialClient.current) return;
@@ -184,10 +237,25 @@ export const ClientList = ({
         visaStatusTemplateId: visaStatusFilter === 'all' ? undefined : visaStatusFilter,
         checklistTemplateId: checklistFilter === 'all' ? undefined : checklistFilter,
         productId: productFilter === 'all' ? undefined : productFilter,
+        ...(isAdmin
+          ? {
+              branchId: branchFilter === 'all' ? undefined : branchFilter,
+              assignedUserId: advisorFilter === 'all' ? undefined : advisorFilter,
+            }
+          : { branchId: undefined, assignedUserId: undefined }),
       });
     }, 350);
     return () => window.clearTimeout(timeout);
-  }, [searchQuery, visaStatusFilter, checklistFilter, productFilter, onFiltersChange]);
+  }, [
+    searchQuery,
+    visaStatusFilter,
+    checklistFilter,
+    productFilter,
+    branchFilter,
+    advisorFilter,
+    isAdmin,
+    onFiltersChange,
+  ]);
 
   const handleDelete = async (clientId: string) => {
     try {
@@ -371,14 +439,18 @@ export const ClientList = ({
     return (
       visaStatusFilter !== 'all' ||
       checklistFilter !== 'all' ||
-      productFilter !== 'all'
+      productFilter !== 'all' ||
+      (isAdmin && branchFilter !== 'all') ||
+      (isAdmin && advisorFilter !== 'all')
     );
-  }, [visaStatusFilter, checklistFilter, productFilter]);
+  }, [visaStatusFilter, checklistFilter, productFilter, isAdmin, branchFilter, advisorFilter]);
 
   const clearFilters = () => {
     setVisaStatusFilter('all');
     setChecklistFilter('all');
     setProductFilter('all');
+    setBranchFilter('all');
+    setAdvisorFilter('all');
   };
 
   // Show profile view if a client is selected
@@ -506,11 +578,20 @@ export const ClientList = ({
               No hay clientes
             </h3>
             <p className="text-muted-foreground mb-4">
-              {searchQuery || visaStatusFilter !== 'all' || checklistFilter !== 'all' || productFilter !== 'all'
+              {searchQuery ||
+              visaStatusFilter !== 'all' ||
+              checklistFilter !== 'all' ||
+              productFilter !== 'all' ||
+              (isAdmin && branchFilter !== 'all') ||
+              (isAdmin && advisorFilter !== 'all')
                 ? 'No se encontraron clientes con los filtros aplicados'
                 : 'Comienza agregando tu primer cliente'}
             </p>
-            {!searchQuery && visaStatusFilter === 'all' && checklistFilter === 'all' && productFilter === 'all' && (
+            {!searchQuery &&
+              visaStatusFilter === 'all' &&
+              checklistFilter === 'all' &&
+              productFilter === 'all' &&
+              (!isAdmin || (branchFilter === 'all' && advisorFilter === 'all')) && (
               <Button onClick={handleOpenNewClient} className="gap-2">
                 <Plus className="w-4 h-4" />
                 Agregar Cliente
@@ -649,6 +730,57 @@ export const ClientList = ({
                   ))}
                 </div>
               </div>
+
+              {isAdmin && (
+                <div className="space-y-4 rounded-lg border border-border/60 bg-muted/20 p-4">
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Solo administrador: puedes combinar sucursal y asesor (se aplican a la vez).
+                  </p>
+                  <div className="space-y-2">
+                    <Label htmlFor="client-filter-branch">Sucursal del asesor</Label>
+                    <Select
+                      value={branchFilter}
+                      onValueChange={(v) => setBranchFilter(v as BranchFilterType)}
+                    >
+                      <SelectTrigger id="client-filter-branch" className="w-full max-w-md">
+                        <SelectValue placeholder="Todas las sucursales" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todas las sucursales</SelectItem>
+                        {branches.map((b) => (
+                          <SelectItem key={b.id} value={b.id}>
+                            {b.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="client-filter-advisor">Asesor asignado</Label>
+                    <Select
+                      value={advisorFilter}
+                      onValueChange={(v) => setAdvisorFilter(v as AdvisorFilterType)}
+                    >
+                      <SelectTrigger id="client-filter-advisor" className="w-full max-w-md">
+                        <SelectValue placeholder="Todos los asesores" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos los asesores</SelectItem>
+                        {advisorOptions.map((u) => (
+                          <SelectItem key={u.id} value={u.id}>
+                            {u.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {branchFilter !== 'all' && advisorOptions.length === 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        No hay asesores en esta sucursal.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="flex justify-end gap-2 pt-2">

@@ -10,6 +10,7 @@ import {
   ClientPayment,
   ClientAcquiredPackage,
   User,
+  Branch,
   TripParticipant,
   Trip,
   Product,
@@ -98,6 +99,7 @@ export const getAllClients = async (req: AuthRequest, res: Response): Promise<vo
     }
     const {
       assignedUserId,
+      branchId,
       productId,
       visaStatusTemplateId,
       checklistTemplateId,
@@ -210,10 +212,70 @@ export const getAllClients = async (req: AuthRequest, res: Response): Promise<vo
       where.id = { [Op.in]: filteredByChecklist };
     }
 
+    let filterBranchId: string | undefined;
+    if (req.user?.roles.includes('super_admin') && branchId) {
+      const rawBranch = String(branchId).trim();
+      if (rawBranch) {
+        const branchRow = await Branch.findOne({
+          where: { id: rawBranch, companyId, isActive: true },
+          attributes: ['id'],
+        });
+        if (branchRow) {
+          filterBranchId = rawBranch;
+        }
+      }
+    }
+
+    const assignedUserInclude: {
+      model: typeof User;
+      as: 'assignedUser';
+      attributes: string[];
+      required: boolean;
+      where?: Record<string, unknown>;
+    } = {
+      model: User,
+      as: 'assignedUser',
+      attributes: ['id', 'name', 'email'],
+      required: Boolean(filterBranchId),
+      ...(filterBranchId
+        ? { where: { branchId: filterBranchId, companyId } }
+        : {}),
+    };
+
+    const clientListIncludes = [
+      assignedUserInclude,
+      {
+        model: Product,
+        as: 'product',
+        attributes: ['id', 'title'],
+        required: false,
+      },
+      {
+        model: VisaStatusTemplate,
+        as: 'visaStatusTemplate',
+        attributes: ['id', 'label', 'order', 'isActive', 'color'],
+        required: false,
+      },
+      {
+        model: ClientChecklist,
+        as: 'checklistItems',
+        include: [
+          {
+            model: ChecklistTemplate,
+            as: 'template',
+            where: { isActive: true },
+            required: false,
+          },
+        ],
+        required: false,
+      },
+    ];
+
     const total = await Client.count({
       where,
       distinct: true,
       col: 'id',
+      include: clientListIncludes,
     });
 
     const clients = await Client.findAll({
@@ -221,39 +283,7 @@ export const getAllClients = async (req: AuthRequest, res: Response): Promise<vo
       order: [['created_at', 'DESC']],
       limit: parsedLimit,
       offset,
-      include: [
-        {
-          model: User,
-          as: 'assignedUser',
-          attributes: ['id', 'name', 'email'],
-          required: false,
-        },
-        {
-          model: Product,
-          as: 'product',
-          attributes: ['id', 'title'],
-          required: false,
-        },
-        {
-          model: VisaStatusTemplate,
-          as: 'visaStatusTemplate',
-          attributes: ['id', 'label', 'order', 'isActive', 'color'],
-          required: false,
-        },
-        {
-          model: ClientChecklist,
-          as: 'checklistItems',
-          include: [
-            {
-              model: ChecklistTemplate,
-              as: 'template',
-              where: { isActive: true },
-              required: false,
-            },
-          ],
-          required: false,
-        },
-      ],
+      include: clientListIncludes,
     });
 
     // Get all active checklist templates for this company

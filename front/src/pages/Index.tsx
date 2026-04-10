@@ -204,6 +204,8 @@ const Index = () => {
     visaStatusTemplateId?: string;
     checklistTemplateId?: string;
     productId?: string;
+    branchId?: string;
+    assignedUserId?: string;
     page: number;
     limit: number;
   }>({ page: 1, limit: 20 });
@@ -218,13 +220,33 @@ const Index = () => {
   const { categories, fetchCategories, createCategory, updateCategory, deleteCategory } = useCategoryStore();
 
   const areClientQueriesEqual = (
-    a: { q?: string; visaStatusTemplateId?: string; checklistTemplateId?: string; productId?: string; page: number; limit: number },
-    b: { q?: string; visaStatusTemplateId?: string; checklistTemplateId?: string; productId?: string; page: number; limit: number }
+    a: {
+      q?: string;
+      visaStatusTemplateId?: string;
+      checklistTemplateId?: string;
+      productId?: string;
+      branchId?: string;
+      assignedUserId?: string;
+      page: number;
+      limit: number;
+    },
+    b: {
+      q?: string;
+      visaStatusTemplateId?: string;
+      checklistTemplateId?: string;
+      productId?: string;
+      branchId?: string;
+      assignedUserId?: string;
+      page: number;
+      limit: number;
+    }
   ) =>
     a.q === b.q &&
     a.visaStatusTemplateId === b.visaStatusTemplateId &&
     a.checklistTemplateId === b.checklistTemplateId &&
     a.productId === b.productId &&
+    a.branchId === b.branchId &&
+    a.assignedUserId === b.assignedUserId &&
     a.page === b.page &&
     a.limit === b.limit;
 
@@ -488,6 +510,8 @@ const Index = () => {
     visaStatusTemplateId?: string;
     checklistTemplateId?: string;
     productId?: string;
+    branchId?: string;
+    assignedUserId?: string;
   }) => {
     setClientListQuery((prev) => {
       const next = { ...prev, ...filters, page: 1 };
