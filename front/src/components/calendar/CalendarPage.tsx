@@ -13,8 +13,26 @@ import {
   appointmentTypeBadgeClass,
 } from '@/lib/appointmentColors';
 import { sortCalendarEvents } from '@/lib/calendarEventSort';
-import { CalendarDays, Clock } from 'lucide-react';
+import { CalendarDays, Clock, MapPin, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+
+type CalendarCategory = 'office' | 'cas' | 'consular' | 'trip';
+
+function calendarEventCategory(type: CalendarEvent['type']): CalendarCategory {
+  if (type === 'office') return 'office';
+  if (type === 'cas') return 'cas';
+  if (type === 'consular') return 'consular';
+  return 'trip';
+}
+
+const FILTER_DEFAULTS: Record<CalendarCategory, boolean> = {
+  office: true,
+  cas: true,
+  consular: true,
+  trip: true,
+};
 
 export const CalendarPage = () => {
   const { token } = useAuth();
@@ -22,6 +40,9 @@ export const CalendarPage = () => {
   const [visibleMonth, setVisibleMonth] = useState<Date>(new Date());
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [showCategory, setShowCategory] = useState<Record<CalendarCategory, boolean>>(() => ({
+    ...FILTER_DEFAULTS,
+  }));
 
   useEffect(() => {
     if (!token) return;
@@ -35,16 +56,29 @@ export const CalendarPage = () => {
       .finally(() => setIsLoading(false));
   }, [token, visibleMonth]);
 
+  const visibleEvents = useMemo(
+    () =>
+      events.filter((event) => {
+        const cat = calendarEventCategory(event.type);
+        return showCategory[cat];
+      }),
+    [events, showCategory]
+  );
+
   const selectedDateKey = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '';
+  const eventsOnSelectedDateRaw = useMemo(
+    () => events.filter((event) => event.date === selectedDateKey),
+    [events, selectedDateKey]
+  );
   const selectedDateEvents = useMemo(() => {
-    const list = events.filter((event) => event.date === selectedDateKey);
+    const list = visibleEvents.filter((event) => event.date === selectedDateKey);
     return sortCalendarEvents(list);
-  }, [events, selectedDateKey]);
+  }, [visibleEvents, selectedDateKey]);
 
   const eventDates = useMemo(() => {
-    const unique = Array.from(new Set(events.map((event) => event.date)));
+    const unique = Array.from(new Set(visibleEvents.map((event) => event.date)));
     return unique.map((d) => new Date(`${d}T00:00:00`));
-  }, [events]);
+  }, [visibleEvents]);
 
   const formatEventTime = (event: CalendarEvent) => {
     if (event.type === 'office' && event.startTime && /^\d{2}:\d{2}$/.test(event.startTime)) {
@@ -71,23 +105,33 @@ export const CalendarPage = () => {
             </div>
           </div>
         </div>
-        <div className="relative mt-5 flex flex-wrap gap-x-5 gap-y-2 text-xs font-medium">
-          <span className="inline-flex items-center gap-2 rounded-full bg-background/80 px-2.5 py-1 shadow-sm border border-border/40">
-            <span className="h-2.5 w-2.5 rounded-full bg-green-600" aria-hidden />
-            Oficina
-          </span>
-          <span className="inline-flex items-center gap-2 rounded-full bg-background/80 px-2.5 py-1 shadow-sm border border-border/40">
-            <span className="h-2.5 w-2.5 rounded-full bg-blue-600" aria-hidden />
-            CAS
-          </span>
-          <span className="inline-flex items-center gap-2 rounded-full bg-background/80 px-2.5 py-1 shadow-sm border border-border/40">
-            <span className="h-2.5 w-2.5 rounded-full bg-red-600" aria-hidden />
-            Consulado
-          </span>
-          <span className="inline-flex items-center gap-2 rounded-full bg-background/80 px-2.5 py-1 shadow-sm border border-border/40">
-            <span className="h-2.5 w-2.5 rounded-full bg-violet-600" aria-hidden />
-            Viajes
-          </span>
+        <div className="relative mt-5 space-y-2">
+          <p className="text-xs font-medium text-muted-foreground">Mostrar en el calendario (solo esta vista)</p>
+          <div className="flex flex-wrap gap-x-4 gap-y-2.5">
+            {(
+              [
+                { key: 'office' as const, dot: 'bg-green-600', label: 'Oficina' },
+                { key: 'cas' as const, dot: 'bg-blue-600', label: 'CAS' },
+                { key: 'consular' as const, dot: 'bg-red-600', label: 'Consulado' },
+                { key: 'trip' as const, dot: 'bg-violet-600', label: 'Viajes' },
+              ] as const
+            ).map(({ key, dot, label }) => (
+              <div key={key} className="flex items-center gap-2 rounded-full bg-background/80 px-2.5 py-1 shadow-sm border border-border/40">
+                <Checkbox
+                  id={`cal-filter-${key}`}
+                  checked={showCategory[key]}
+                  onCheckedChange={(checked) =>
+                    setShowCategory((prev) => ({ ...prev, [key]: checked === true }))
+                  }
+                  className="border-border/80"
+                />
+                <Label htmlFor={`cal-filter-${key}`} className="text-xs font-medium cursor-pointer flex items-center gap-2">
+                  <span className={cn('h-2.5 w-2.5 rounded-full shrink-0', dot)} aria-hidden />
+                  {label}
+                </Label>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -133,7 +177,11 @@ export const CalendarPage = () => {
               </div>
             ) : selectedDateEvents.length === 0 ? (
               <div className="rounded-xl border border-dashed border-border/80 bg-muted/20 px-6 py-12 text-center">
-                <p className="text-sm text-muted-foreground">No hay eventos para esta fecha.</p>
+                <p className="text-sm text-muted-foreground">
+                  {eventsOnSelectedDateRaw.length > 0
+                    ? 'Hay eventos este día, pero ninguno coincide con los filtros activos. Activa otro tipo arriba.'
+                    : 'No hay eventos para esta fecha.'}
+                </p>
               </div>
             ) : (
               <ul className="space-y-3">
@@ -179,6 +227,26 @@ export const CalendarPage = () => {
                             </Badge>
                             <span className="text-sm font-semibold text-foreground leading-snug">{event.title}</span>
                           </div>
+                          {event.type === 'office' && (event.branchName || event.advisorName) && (
+                            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                              {event.branchName && (
+                                <span className="inline-flex items-center gap-1.5">
+                                  <MapPin className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
+                                  <span>
+                                    Sucursal: <span className="text-foreground font-medium">{event.branchName}</span>
+                                  </span>
+                                </span>
+                              )}
+                              {event.advisorName && (
+                                <span className="inline-flex items-center gap-1.5">
+                                  <User className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
+                                  <span>
+                                    Asesor: <span className="text-foreground font-medium">{event.advisorName}</span>
+                                  </span>
+                                </span>
+                              )}
+                            </div>
+                          )}
                           {event.note && (
                             <p className="text-sm text-muted-foreground leading-relaxed border-t border-border/30 pt-2">
                               {event.note}

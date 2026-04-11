@@ -230,6 +230,10 @@ export interface CalendarEvent {
   tripId?: string;
   note?: string;
   status?: string;
+  /** Cita oficina: sucursal (asesor del cliente) */
+  branchName?: string;
+  /** Cita oficina: asesor asignado al cliente */
+  advisorName?: string;
 }
 
 export type PaymentType = 'tarjeta' | 'transferencia' | 'efectivo';

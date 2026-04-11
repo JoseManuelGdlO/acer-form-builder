@@ -1,7 +1,7 @@
 import { Response } from 'express';
 import { Op } from 'sequelize';
 import { AuthRequest } from '../middleware/auth.middleware';
-import { Client, InternalAppointment, Trip } from '../models';
+import { Branch, Client, InternalAppointment, Trip, User } from '../models';
 
 const formatDateOnly = (value: string | Date | null | undefined): string | null => {
   if (!value) return null;
@@ -29,6 +29,10 @@ const makeEvent = (payload: {
   tripId?: string;
   note?: string;
   status?: string;
+  /** Citas de oficina: sucursal del asesor asignado al cliente */
+  branchName?: string;
+  /** Citas de oficina: asesor asignado al cliente (o quien agendó si no hay asignado) */
+  advisorName?: string;
 }) => payload;
 
 /** Minutos desde medianoche para ordenar eventos del mismo día */
@@ -93,7 +97,22 @@ export const getCalendarEvents = async (req: AuthRequest, res: Response): Promis
         companyId,
         appointmentDate: { [Op.between]: [from, to] },
       },
-      include: [{ model: Client, as: 'client', attributes: ['id', 'name'] }],
+      include: [
+        {
+          model: Client,
+          as: 'client',
+          attributes: ['id', 'name'],
+          include: [
+            {
+              model: User,
+              as: 'assignedUser',
+              attributes: ['id', 'name'],
+              include: [{ model: Branch, as: 'branch', attributes: ['id', 'name'] }],
+            },
+          ],
+        },
+        { model: User, as: 'appointedByUser', attributes: ['id', 'name'] },
+      ],
       order: [['appointment_date', 'ASC']],
     });
 
@@ -155,6 +174,18 @@ export const getCalendarEvents = async (req: AuthRequest, res: Response): Promis
 
     for (const appointment of officeAppointments as any[]) {
       const client = appointment.client;
+      const assigned = client?.assignedUser;
+      const appointedBy = appointment.appointedByUser;
+      const branchName =
+        typeof assigned?.branch?.name === 'string' && assigned.branch.name.trim()
+          ? assigned.branch.name.trim()
+          : undefined;
+      const advisorName =
+        typeof assigned?.name === 'string' && assigned.name.trim()
+          ? assigned.name.trim()
+          : typeof appointedBy?.name === 'string' && appointedBy.name.trim()
+            ? appointedBy.name.trim()
+            : undefined;
       const apptTime = appointment.appointmentTime ?? appointment.appointment_time ?? null;
       const timeStr =
         typeof apptTime === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(apptTime) ? apptTime : null;
@@ -162,12 +193,14 @@ export const getCalendarEvents = async (req: AuthRequest, res: Response): Promis
         makeEvent({
           type: 'office',
           date: formatDateOnly(appointment.appointmentDate)!,
-          title: `Oficina - ${client?.name || 'Cliente'}`,
+          title: `Oficina — ${client?.name || 'Cliente'}`,
           startTime: timeStr,
           clientId: client?.id,
           clientName: client?.name,
           note: appointment.purposeNote,
           status: appointment.status,
+          branchName,
+          advisorName,
         })
       );
     }
