@@ -13,26 +13,22 @@ import {
   appointmentTypeBadgeClass,
 } from '@/lib/appointmentColors';
 import { sortCalendarEvents } from '@/lib/calendarEventSort';
-import { CalendarDays, Clock, MapPin, User } from 'lucide-react';
+import { CalendarDays, Clock, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 
-type CalendarCategory = 'office' | 'cas' | 'consular' | 'trip';
+/** Clave interna para eventos sin sucursal en filtros */
+const BRANCH_FILTER_NONE = '__sin_sucursal__';
 
-function calendarEventCategory(type: CalendarEvent['type']): CalendarCategory {
-  if (type === 'office') return 'office';
-  if (type === 'cas') return 'cas';
-  if (type === 'consular') return 'consular';
-  return 'trip';
+function branchFilterKey(event: CalendarEvent): string {
+  const n = event.branchName?.trim();
+  return n || BRANCH_FILTER_NONE;
 }
 
-const FILTER_DEFAULTS: Record<CalendarCategory, boolean> = {
-  office: true,
-  cas: true,
-  consular: true,
-  trip: true,
-};
+function branchFilterLabel(key: string): string {
+  return key === BRANCH_FILTER_NONE ? 'Sin sucursal' : key;
+}
 
 export const CalendarPage = () => {
   const { token } = useAuth();
@@ -40,9 +36,7 @@ export const CalendarPage = () => {
   const [visibleMonth, setVisibleMonth] = useState<Date>(new Date());
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [showCategory, setShowCategory] = useState<Record<CalendarCategory, boolean>>(() => ({
-    ...FILTER_DEFAULTS,
-  }));
+  const [showBranch, setShowBranch] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (!token) return;
@@ -56,13 +50,27 @@ export const CalendarPage = () => {
       .finally(() => setIsLoading(false));
   }, [token, visibleMonth]);
 
+  const branchFilterKeys = useMemo(() => {
+    const set = new Set<string>();
+    for (const e of events) {
+      set.add(branchFilterKey(e));
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+  }, [events]);
+
+  useEffect(() => {
+    setShowBranch((prev) => {
+      const next: Record<string, boolean> = {};
+      for (const k of branchFilterKeys) {
+        next[k] = prev[k] ?? true;
+      }
+      return next;
+    });
+  }, [branchFilterKeys]);
+
   const visibleEvents = useMemo(
-    () =>
-      events.filter((event) => {
-        const cat = calendarEventCategory(event.type);
-        return showCategory[cat];
-      }),
-    [events, showCategory]
+    () => events.filter((e) => showBranch[branchFilterKey(e)] !== false),
+    [events, showBranch]
   );
 
   const selectedDateKey = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '';
@@ -87,6 +95,13 @@ export const CalendarPage = () => {
     return null;
   };
 
+  const badgeLabel = (event: CalendarEvent) => {
+    if (event.type === 'office') {
+      return event.branchName?.trim() || 'Sin sucursal';
+    }
+    return APPOINTMENT_TYPE_LABELS[event.type];
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-8">
       <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-gradient-to-br from-primary/10 via-card to-accent/5 p-6 sm:p-8 shadow-sm">
@@ -100,38 +115,42 @@ export const CalendarPage = () => {
             <div>
               <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">Calendario</h1>
               <p className="text-muted-foreground mt-1 max-w-xl">
-                Citas internas, CAS, Consulado y viajes en una sola vista. Las citas de oficina se ordenan por hora.
+                Citas internas, CAS, Consulado y viajes. Filtra por sucursal; en oficina el distintivo muestra la
+                sucursal y el nombre del cliente va en el título.
               </p>
             </div>
           </div>
         </div>
         <div className="relative mt-5 space-y-2">
-          <p className="text-xs font-medium text-muted-foreground">Mostrar en el calendario (solo esta vista)</p>
-          <div className="flex flex-wrap gap-x-4 gap-y-2.5">
-            {(
-              [
-                { key: 'office' as const, dot: 'bg-green-600', label: 'Oficina' },
-                { key: 'cas' as const, dot: 'bg-blue-600', label: 'CAS' },
-                { key: 'consular' as const, dot: 'bg-red-600', label: 'Consulado' },
-                { key: 'trip' as const, dot: 'bg-violet-600', label: 'Viajes' },
-              ] as const
-            ).map(({ key, dot, label }) => (
-              <div key={key} className="flex items-center gap-2 rounded-full bg-background/80 px-2.5 py-1 shadow-sm border border-border/40">
-                <Checkbox
-                  id={`cal-filter-${key}`}
-                  checked={showCategory[key]}
-                  onCheckedChange={(checked) =>
-                    setShowCategory((prev) => ({ ...prev, [key]: checked === true }))
-                  }
-                  className="border-border/80"
-                />
-                <Label htmlFor={`cal-filter-${key}`} className="text-xs font-medium cursor-pointer flex items-center gap-2">
-                  <span className={cn('h-2.5 w-2.5 rounded-full shrink-0', dot)} aria-hidden />
-                  {label}
-                </Label>
-              </div>
-            ))}
-          </div>
+          <p className="text-xs font-medium text-muted-foreground">Mostrar sucursales (solo esta vista)</p>
+          {branchFilterKeys.length === 0 ? (
+            <p className="text-xs text-muted-foreground/90">No hay sucursales en los eventos de este mes.</p>
+          ) : (
+            <div className="flex flex-wrap gap-x-4 gap-y-2.5">
+              {branchFilterKeys.map((key) => (
+                <div
+                  key={key}
+                  className="flex items-center gap-2 rounded-full bg-background/80 px-2.5 py-1 shadow-sm border border-border/40 max-w-full"
+                >
+                  <Checkbox
+                    id={`cal-branch-${key}`}
+                    checked={showBranch[key] !== false}
+                    onCheckedChange={(checked) =>
+                      setShowBranch((prev) => ({ ...prev, [key]: checked === true }))
+                    }
+                    className="border-border/80 shrink-0"
+                  />
+                  <Label
+                    htmlFor={`cal-branch-${key}`}
+                    className="text-xs font-medium cursor-pointer flex items-center gap-2 min-w-0"
+                  >
+                    <span className="h-2.5 w-2.5 rounded-full shrink-0 bg-primary/80" aria-hidden />
+                    <span className="truncate">{branchFilterLabel(key)}</span>
+                  </Label>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -179,7 +198,7 @@ export const CalendarPage = () => {
               <div className="rounded-xl border border-dashed border-border/80 bg-muted/20 px-6 py-12 text-center">
                 <p className="text-sm text-muted-foreground">
                   {eventsOnSelectedDateRaw.length > 0
-                    ? 'Hay eventos este día, pero ninguno coincide con los filtros activos. Activa otro tipo arriba.'
+                    ? 'Hay eventos este día, pero ninguno coincide con las sucursales activas en los filtros.'
                     : 'No hay eventos para esta fecha.'}
                 </p>
               </div>
@@ -222,29 +241,28 @@ export const CalendarPage = () => {
                         )}
                         <div className="min-w-0 flex-1 space-y-2">
                           <div className="flex flex-wrap items-center gap-2">
-                            <Badge className={appointmentTypeBadgeClass(event.type)}>
-                              {APPOINTMENT_TYPE_LABELS[event.type]}
+                            <Badge
+                              className={cn(
+                                appointmentTypeBadgeClass(event.type),
+                                'max-w-[min(100%,18rem)] truncate shrink'
+                              )}
+                              title={badgeLabel(event)}
+                            >
+                              {badgeLabel(event)}
                             </Badge>
-                            <span className="text-sm font-semibold text-foreground leading-snug">{event.title}</span>
+                            <span className="text-sm font-semibold text-foreground leading-snug min-w-0">
+                              {event.title}
+                            </span>
                           </div>
-                          {event.type === 'office' && (event.branchName || event.advisorName) && (
-                            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                              {event.branchName && (
-                                <span className="inline-flex items-center gap-1.5">
-                                  <MapPin className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
-                                  <span>
-                                    Sucursal: <span className="text-foreground font-medium">{event.branchName}</span>
-                                  </span>
+                          {event.type === 'office' && event.advisorName && (
+                            <div className="text-xs text-muted-foreground">
+                              <span className="inline-flex items-center gap-1.5">
+                                <User className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
+                                <span>
+                                  Asesor:{' '}
+                                  <span className="text-foreground font-medium">{event.advisorName}</span>
                                 </span>
-                              )}
-                              {event.advisorName && (
-                                <span className="inline-flex items-center gap-1.5">
-                                  <User className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
-                                  <span>
-                                    Asesor: <span className="text-foreground font-medium">{event.advisorName}</span>
-                                  </span>
-                                </span>
-                              )}
+                              </span>
                             </div>
                           )}
                           {event.note && (

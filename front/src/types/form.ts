@@ -230,7 +230,7 @@ export interface CalendarEvent {
   tripId?: string;
   note?: string;
   status?: string;
-  /** Cita oficina: sucursal (asesor del cliente) */
+  /** Sucursal (asesor del cliente / viaje) para filtros y badge en oficina */
   branchName?: string;
   /** Cita oficina: asesor asignado al cliente */
   advisorName?: string;

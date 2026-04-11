@@ -29,11 +29,16 @@ const makeEvent = (payload: {
   tripId?: string;
   note?: string;
   status?: string;
-  /** Citas de oficina: sucursal del asesor asignado al cliente */
+  /** Sucursal (asesor del cliente / del viaje) para agrupar y filtrar en el calendario */
   branchName?: string;
-  /** Citas de oficina: asesor asignado al cliente (o quien agendó si no hay asignado) */
+  /** Cita oficina: asesor asignado al cliente (o quien agendó si no hay asignado) */
   advisorName?: string;
 }) => payload;
+
+function branchNameFromAssignedUser(assigned: { branch?: { name?: string } } | null | undefined): string | undefined {
+  const n = assigned?.branch?.name;
+  return typeof n === 'string' && n.trim() ? n.trim() : undefined;
+}
 
 /** Minutos desde medianoche para ordenar eventos del mismo día */
 function sortMinutesForEvent(e: { type: string; startTime?: string | null }): number {
@@ -90,6 +95,14 @@ export const getCalendarEvents = async (req: AuthRequest, res: Response): Promis
         'visaConsularAppointmentDate',
         'visaConsularAppointmentLocation',
       ],
+      include: [
+        {
+          model: User,
+          as: 'assignedUser',
+          attributes: ['id', 'name'],
+          include: [{ model: Branch, as: 'branch', attributes: ['id', 'name'] }],
+        },
+      ],
     });
 
     const officeAppointments = await InternalAppointment.findAll({
@@ -139,21 +152,31 @@ export const getCalendarEvents = async (req: AuthRequest, res: Response): Promis
         'consulateDepartureDate',
         'consulateReturnDate',
       ],
+      include: [
+        {
+          model: User,
+          as: 'assignedUser',
+          attributes: ['id', 'name'],
+          include: [{ model: Branch, as: 'branch', attributes: ['id', 'name'] }],
+        },
+      ],
       order: [['departure_date', 'ASC']],
     });
 
     const events: any[] = [];
-    for (const client of clients) {
+    for (const client of clients as any[]) {
+      const branchName = branchNameFromAssignedUser(client.assignedUser);
       const casDate = formatDateOnly(client.visaCasAppointmentDate);
       if (casDate && casDate >= from && casDate <= to) {
         events.push(
           makeEvent({
             type: 'cas',
             date: casDate,
-            title: `CAS - ${client.name}`,
+            title: client.name,
             clientId: client.id,
             clientName: client.name,
             note: client.visaCasAppointmentLocation || undefined,
+            branchName,
           })
         );
       }
@@ -163,10 +186,11 @@ export const getCalendarEvents = async (req: AuthRequest, res: Response): Promis
           makeEvent({
             type: 'consular',
             date: consularDate,
-            title: `Consulado - ${client.name}`,
+            title: client.name,
             clientId: client.id,
             clientName: client.name,
             note: client.visaConsularAppointmentLocation || undefined,
+            branchName,
           })
         );
       }
@@ -193,7 +217,7 @@ export const getCalendarEvents = async (req: AuthRequest, res: Response): Promis
         makeEvent({
           type: 'office',
           date: formatDateOnly(appointment.appointmentDate)!,
-          title: `Oficina — ${client?.name || 'Cliente'}`,
+          title: client?.name || 'Cliente',
           startTime: timeStr,
           clientId: client?.id,
           clientName: client?.name,
@@ -207,6 +231,7 @@ export const getCalendarEvents = async (req: AuthRequest, res: Response): Promis
 
     for (const trip of trips) {
       const tr = trip as any;
+      const tripBranch = branchNameFromAssignedUser(tr.assignedUser);
       if (tr.isVisaTrip) {
         const casD = formatDateOnly(tr.casDepartureDate);
         if (casD && casD >= from && casD <= to) {
@@ -216,6 +241,7 @@ export const getCalendarEvents = async (req: AuthRequest, res: Response): Promis
               date: casD,
               title: `Viaje (CAS salida) - ${trip.title}`,
               tripId: trip.id,
+              branchName: tripBranch,
             })
           );
         }
@@ -227,6 +253,7 @@ export const getCalendarEvents = async (req: AuthRequest, res: Response): Promis
               date: casR,
               title: `Viaje (CAS regreso) - ${trip.title}`,
               tripId: trip.id,
+              branchName: tripBranch,
             })
           );
         }
@@ -238,6 +265,7 @@ export const getCalendarEvents = async (req: AuthRequest, res: Response): Promis
               date: conD,
               title: `Viaje (consulado salida) - ${trip.title}`,
               tripId: trip.id,
+              branchName: tripBranch,
             })
           );
         }
@@ -249,6 +277,7 @@ export const getCalendarEvents = async (req: AuthRequest, res: Response): Promis
               date: conR,
               title: `Viaje (consulado regreso) - ${trip.title}`,
               tripId: trip.id,
+              branchName: tripBranch,
             })
           );
         }
@@ -261,6 +290,7 @@ export const getCalendarEvents = async (req: AuthRequest, res: Response): Promis
               date: departure,
               title: `Salida viaje - ${trip.title}`,
               tripId: trip.id,
+              branchName: tripBranch,
             })
           );
         }
@@ -272,6 +302,7 @@ export const getCalendarEvents = async (req: AuthRequest, res: Response): Promis
               date: returnDate,
               title: `Regreso viaje - ${trip.title}`,
               tripId: trip.id,
+              branchName: tripBranch,
             })
           );
         }
