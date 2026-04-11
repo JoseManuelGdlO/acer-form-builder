@@ -40,6 +40,17 @@ function branchNameFromAssignedUser(assigned: { branch?: { name?: string } } | n
   return typeof n === 'string' && n.trim() ? n.trim() : undefined;
 }
 
+/** Prioridad: primer usuario con sucursal (ej. asesor del cliente → quien agenda la cita). */
+function branchNameFromUsers(
+  ...users: ({ branch?: { name?: string } } | null | undefined)[]
+): string | undefined {
+  for (const u of users) {
+    const b = branchNameFromAssignedUser(u);
+    if (b) return b;
+  }
+  return undefined;
+}
+
 /** Minutos desde medianoche para ordenar eventos del mismo día */
 function sortMinutesForEvent(e: { type: string; startTime?: string | null }): number {
   const t = e.startTime;
@@ -124,7 +135,12 @@ export const getCalendarEvents = async (req: AuthRequest, res: Response): Promis
             },
           ],
         },
-        { model: User, as: 'appointedByUser', attributes: ['id', 'name'] },
+        {
+          model: User,
+          as: 'appointedByUser',
+          attributes: ['id', 'name'],
+          include: [{ model: Branch, as: 'branch', attributes: ['id', 'name'] }],
+        },
       ],
       order: [['appointment_date', 'ASC']],
     });
@@ -200,10 +216,7 @@ export const getCalendarEvents = async (req: AuthRequest, res: Response): Promis
       const client = appointment.client;
       const assigned = client?.assignedUser;
       const appointedBy = appointment.appointedByUser;
-      const branchName =
-        typeof assigned?.branch?.name === 'string' && assigned.branch.name.trim()
-          ? assigned.branch.name.trim()
-          : undefined;
+      const branchName = branchNameFromUsers(assigned, appointedBy);
       const advisorName =
         typeof assigned?.name === 'string' && assigned.name.trim()
           ? assigned.name.trim()
