@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FormSubmission, QUESTION_TYPE_CONFIG } from '@/types/form';
+import { FormSubmission } from '@/types/form';
 import {
   Dialog,
   DialogContent,
@@ -10,7 +10,8 @@ import { SubmissionStatusBadge } from './SubmissionStatusBadge';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { User, Mail, Phone, Calendar, FileText, MessageSquare, Loader2, CheckCircle2 } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { User, Mail, Phone, Calendar, FileText, MessageSquare, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { api } from '@/lib/api';
@@ -253,6 +254,9 @@ export const SubmissionDetailModal = ({
                       return acc;
                     }, {} as Record<string, typeof questionAnswerPairs>);
 
+                    const sectionEntries = Object.entries(sections);
+                    const firstTab = sectionEntries.length > 0 ? 'section-0' : '';
+
                     const isFileAnswer = (val: unknown): val is { fileName: string; mimeType?: string; data: string } =>
                       typeof val === 'object' && val !== null && 'fileName' in val && 'data' in val;
 
@@ -270,16 +274,29 @@ export const SubmissionDetailModal = ({
                     };
 
                     return (
-                      <div className="space-y-4">
-                        {Object.entries(sections).map(([sectionName, answers]) => (
-                          <div key={sectionName} className="space-y-2">
-                            <h4 className="text-sm font-medium text-primary flex items-center gap-2">
-                              <CheckCircle2 className="w-4 h-4" />
-                              {sectionName}
-                            </h4>
-                            <div className="grid gap-2 pl-6">
-                              {answers.map((pair, idx) => (
-                                <div 
+                      <Tabs defaultValue={firstTab} className="w-full">
+                        <div className="overflow-x-auto pb-2 -mx-1 px-1">
+                          <TabsList className="inline-flex h-auto min-h-10 w-max max-w-none flex-wrap justify-start gap-1 bg-muted/50 p-1">
+                            {sectionEntries.map(([sectionName], idx) => (
+                              <TabsTrigger
+                                key={`tab-${idx}`}
+                                value={`section-${idx}`}
+                                className="max-w-[min(100%,18rem)] shrink-0 text-left whitespace-normal data-[state=active]:text-foreground"
+                              >
+                                {sectionName}
+                              </TabsTrigger>
+                            ))}
+                          </TabsList>
+                        </div>
+                        {sectionEntries.map(([, answers], idx) => (
+                          <TabsContent
+                            key={`panel-${idx}`}
+                            value={`section-${idx}`}
+                            className="mt-3 space-y-2 focus-visible:outline-none"
+                          >
+                            <div className="grid gap-2">
+                              {answers.map((pair) => (
+                                <div
                                   key={pair.id}
                                   className="bg-muted/30 rounded-lg p-3 border border-border/30"
                                 >
@@ -315,9 +332,9 @@ export const SubmissionDetailModal = ({
                                 </div>
                               ))}
                             </div>
-                          </div>
+                          </TabsContent>
                         ))}
-                      </div>
+                      </Tabs>
                     );
                   })()
                 )}

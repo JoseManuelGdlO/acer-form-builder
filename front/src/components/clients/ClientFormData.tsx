@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { FileText, Calendar, CheckCircle2 } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { FileText, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -53,6 +54,9 @@ export const ClientFormData = ({ submissions }: ClientFormDataProps) => {
           return acc;
         }, {} as Record<string, FormAnswer[]>);
 
+        const sectionEntries = Object.entries(sections);
+        const firstTab = sectionEntries.length > 0 ? 'section-0' : '';
+
         return (
           <Card key={submission.id} className="border-border/50">
             <CardHeader className="pb-3">
@@ -67,35 +71,54 @@ export const ClientFormData = ({ submissions }: ClientFormDataProps) => {
                 </Badge>
               </div>
             </CardHeader>
-            <CardContent className="space-y-4">
-              {Object.entries(sections).map(([sectionName, answers]) => (
-                <div key={sectionName} className="space-y-2">
-                  <h4 className="text-sm font-medium text-primary flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4" />
-                    {sectionName}
-                  </h4>
-                  <div className="grid gap-2 pl-6">
-                    {answers.map((answer, idx) => (
-                      <div 
-                        key={idx}
-                        className="bg-muted/30 rounded-lg p-3 border border-border/30"
-                      >
-                        <p className="text-xs font-semibold text-foreground mb-0.5">
-                          {answer.question}
-                        </p>
-                        {answer.questionDescription ? (
-                          <p className="text-xs text-muted-foreground mb-1">
-                            {answer.questionDescription}
-                          </p>
-                        ) : null}
-                        <p className="text-sm text-foreground font-medium">
-                          {answer.answer || 'Sin respuesta'}
-                        </p>
-                      </div>
-                    ))}
+            <CardContent>
+              {sectionEntries.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-2">Sin respuestas en este envío.</p>
+              ) : (
+                <Tabs defaultValue={firstTab} className="w-full">
+                  <div className="overflow-x-auto pb-2 -mx-1 px-1">
+                    <TabsList className="inline-flex h-auto min-h-10 w-max max-w-none flex-wrap justify-start gap-1 bg-muted/50 p-1">
+                      {sectionEntries.map(([sectionName], idx) => (
+                        <TabsTrigger
+                          key={`${submission.id}-tab-${idx}`}
+                          value={`section-${idx}`}
+                          className="max-w-[min(100%,18rem)] shrink-0 text-left whitespace-normal data-[state=active]:text-foreground"
+                        >
+                          {sectionName}
+                        </TabsTrigger>
+                      ))}
+                    </TabsList>
                   </div>
-                </div>
-              ))}
+                  {sectionEntries.map(([, answers], idx) => (
+                    <TabsContent
+                      key={`${submission.id}-panel-${idx}`}
+                      value={`section-${idx}`}
+                      className="mt-3 space-y-2 focus-visible:outline-none"
+                    >
+                      <div className="grid gap-2">
+                        {answers.map((answer, aidx) => (
+                          <div
+                            key={aidx}
+                            className="bg-muted/30 rounded-lg p-3 border border-border/30"
+                          >
+                            <p className="text-xs font-semibold text-foreground mb-0.5">
+                              {answer.question}
+                            </p>
+                            {answer.questionDescription ? (
+                              <p className="text-xs text-muted-foreground mb-1">
+                                {answer.questionDescription}
+                              </p>
+                            ) : null}
+                            <p className="text-sm text-foreground font-medium">
+                              {answer.answer || 'Sin respuesta'}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </TabsContent>
+                  ))}
+                </Tabs>
+              )}
             </CardContent>
           </Card>
         );
