@@ -242,7 +242,7 @@ export const TripFormModal = ({
 
             {isVisaTrip ? (
               <div className="space-y-4">
-                <p className="text-sm font-medium text-foreground">Tramo CAS</p>
+                <p className="text-sm font-medium text-foreground">CAS</p>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="trip-cas-out">Salida al CAS *</Label>
@@ -265,7 +265,7 @@ export const TripFormModal = ({
                     />
                   </div>
                 </div>
-                <p className="text-sm font-medium text-foreground">Tramo consulado</p>
+                <p className="text-sm font-medium text-foreground">Consulado</p>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="trip-cons-out">Salida al consulado *</Label>
