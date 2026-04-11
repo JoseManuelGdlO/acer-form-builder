@@ -78,7 +78,6 @@ interface TripDetailViewProps {
   onResetSeatAssignments: () => Promise<void>;
   onLoadChangeLog: () => void;
   onLoadTripFinance: () => void;
-  onCreateTripIncome: (data: { clientId: string; amount: number; paymentDate: string; paymentType?: 'tarjeta' | 'transferencia' | 'efectivo'; referenceNumber?: string; note?: string }) => Promise<void>;
   onDeleteTripIncome: (incomeId: string) => Promise<void>;
   onCreateTripExpense: (data: { amount: number; expenseDate: string; category?: string; referenceNumber?: string; note?: string }) => Promise<void>;
   onDeleteTripExpense: (expenseId: string) => Promise<void>;
@@ -104,7 +103,6 @@ export const TripDetailView = ({
   onResetSeatAssignments,
   onLoadChangeLog,
   onLoadTripFinance,
-  onCreateTripIncome,
   onDeleteTripIncome,
   onCreateTripExpense,
   onDeleteTripExpense,
@@ -122,14 +120,6 @@ export const TripDetailView = ({
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
-  const [incomeForm, setIncomeForm] = useState({
-    clientId: '',
-    amount: '',
-    paymentDate: new Date().toISOString().slice(0, 10),
-    paymentType: 'efectivo' as 'tarjeta' | 'transferencia' | 'efectivo',
-    referenceNumber: '',
-    note: '',
-  });
   const [expenseForm, setExpenseForm] = useState({
     amount: '',
     expenseDate: new Date().toISOString().slice(0, 10),
@@ -137,7 +127,6 @@ export const TripDetailView = ({
     referenceNumber: '',
     note: '',
   });
-  const [isCreatingIncome, setIsCreatingIncome] = useState(false);
   const [isCreatingExpense, setIsCreatingExpense] = useState(false);
 
   const sharedIds = (trip.sharedCompanies ?? []).map(c => c.id);
@@ -278,35 +267,6 @@ export const TripDetailView = ({
   const consRangeStr = visaDetail
     ? `${fmtLong(trip.consulateDepartureDate)} – ${fmtLong(trip.consulateReturnDate)}`
     : '';
-
-  const handleCreateIncome = async () => {
-    if (!incomeForm.clientId || !incomeForm.amount || !incomeForm.paymentDate) {
-      toast.error('Cliente, monto y fecha son obligatorios');
-      return;
-    }
-    const amount = Number(incomeForm.amount);
-    if (!Number.isFinite(amount) || amount <= 0) {
-      toast.error('El monto debe ser mayor a 0');
-      return;
-    }
-    setIsCreatingIncome(true);
-    try {
-      await onCreateTripIncome({
-        clientId: incomeForm.clientId,
-        amount,
-        paymentDate: incomeForm.paymentDate,
-        paymentType: incomeForm.paymentType,
-        referenceNumber: incomeForm.referenceNumber || undefined,
-        note: incomeForm.note || undefined,
-      });
-      setIncomeForm((prev) => ({ ...prev, amount: '', referenceNumber: '', note: '' }));
-      toast.success('Ingreso agregado');
-    } catch (err: any) {
-      toast.error(err.message || 'Error al agregar ingreso');
-    } finally {
-      setIsCreatingIncome(false);
-    }
-  };
 
   const handleCreateExpense = async () => {
     if (!expenseForm.amount || !expenseForm.expenseDate) {
@@ -605,55 +565,11 @@ export const TripDetailView = ({
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-          <div className="space-y-2 border rounded-lg p-3">
-            <h3 className="font-medium">Agregar ingreso</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <select
-                className="h-10 rounded-md border bg-background px-3 text-sm"
-                value={incomeForm.clientId}
-                onChange={(e) => setIncomeForm((prev) => ({ ...prev, clientId: e.target.value }))}
-              >
-                <option value="">Seleccionar cliente</option>
-                {participants.map((p) => (
-                  p.client ? <option key={p.client.id} value={p.client.id}>{p.client.name}</option> : null
-                ))}
-              </select>
-              <Input
-                type="number"
-                min="0.01"
-                step="0.01"
-                placeholder="Monto"
-                value={incomeForm.amount}
-                onChange={(e) => setIncomeForm((prev) => ({ ...prev, amount: e.target.value }))}
-              />
-              <Input
-                type="date"
-                value={incomeForm.paymentDate}
-                onChange={(e) => setIncomeForm((prev) => ({ ...prev, paymentDate: e.target.value }))}
-              />
-              <select
-                className="h-10 rounded-md border bg-background px-3 text-sm"
-                value={incomeForm.paymentType}
-                onChange={(e) => setIncomeForm((prev) => ({ ...prev, paymentType: e.target.value as 'tarjeta' | 'transferencia' | 'efectivo' }))}
-              >
-                <option value="efectivo">Efectivo</option>
-                <option value="tarjeta">Tarjeta</option>
-                <option value="transferencia">Transferencia</option>
-              </select>
-              <Input
-                placeholder="Referencia (opcional)"
-                value={incomeForm.referenceNumber}
-                onChange={(e) => setIncomeForm((prev) => ({ ...prev, referenceNumber: e.target.value }))}
-              />
-              <Input
-                placeholder="Nota (opcional)"
-                value={incomeForm.note}
-                onChange={(e) => setIncomeForm((prev) => ({ ...prev, note: e.target.value }))}
-              />
-            </div>
-            <Button onClick={handleCreateIncome} disabled={isCreatingIncome}>
-              {isCreatingIncome ? 'Guardando...' : 'Agregar ingreso'}
-            </Button>
+          <div className="space-y-2 border rounded-lg p-3 bg-muted/20">
+            <h3 className="font-medium">Ingresos de clientes</h3>
+            <p className="text-sm text-muted-foreground">
+              Los cobros a clientes se registran solo desde el detalle del cliente, no desde el viaje.
+            </p>
           </div>
 
           <div className="space-y-2 border rounded-lg p-3">

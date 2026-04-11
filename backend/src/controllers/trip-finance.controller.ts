@@ -113,35 +113,6 @@ export const createTripIncome = [
       res.status(403).json({
         error: 'Los cobros a clientes solo se registran desde el detalle del cliente.',
       });
-      return;
-
-      const { clientId, amount, paymentDate, paymentType, referenceNumber, note } = req.body;
-      const client = await Client.findOne({ where: { id: clientId, companyId } });
-      if (!client) {
-        res.status(400).json({ error: 'Client not found in your company' });
-        return;
-      }
-
-      const payment = await ClientPayment.create({
-        companyId,
-        tripId,
-        clientId,
-        amount,
-        paymentDate,
-        paymentType: paymentType && PAYMENT_TYPES.includes(paymentType) ? paymentType : 'efectivo',
-        referenceNumber: referenceNumber || undefined,
-        note: note || undefined,
-      });
-
-      await logTripChange(tripId, req.user!.id, 'trip_income_created', {
-        entityType: 'payment',
-        entityId: payment.id,
-        newValue: JSON.stringify({ amount: Number(payment.amount), clientId }),
-      });
-      const withClient = await ClientPayment.findByPk(payment.id, {
-        include: [{ model: Client, as: 'client', attributes: ['id', 'name'] }],
-      });
-      res.status(201).json(withClient || payment);
     } catch (error) {
       console.error('Create trip income error:', error);
       res.status(500).json({ error: 'Internal server error' });

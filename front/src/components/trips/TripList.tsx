@@ -36,10 +36,6 @@ interface TripListProps {
   onUpdateTemplateSeatLabel?: (tripId: string, templateId: string, seatId: string, label: string) => Promise<void>;
   onLoadChangeLog: (tripId: string) => void;
   onLoadTripFinance: (tripId: string) => void;
-  onCreateTripIncome: (
-    tripId: string,
-    data: { clientId: string; amount: number; paymentDate: string; paymentType?: 'tarjeta' | 'transferencia' | 'efectivo'; referenceNumber?: string; note?: string }
-  ) => Promise<void>;
   onDeleteTripIncome: (tripId: string, incomeId: string) => Promise<void>;
   onCreateTripExpense: (
     tripId: string,
@@ -77,7 +73,6 @@ export const TripList = ({
   onUpdateTemplateSeatLabel,
   onLoadChangeLog,
   onLoadTripFinance,
-  onCreateTripIncome,
   onDeleteTripIncome,
   onCreateTripExpense,
   onDeleteTripExpense,
@@ -251,7 +246,6 @@ export const TripList = ({
           onResetSeatAssignments={async () => await onResetSeatAssignments(viewingTrip.id)}
           onLoadChangeLog={() => onLoadChangeLog(viewingTrip.id)}
           onLoadTripFinance={() => onLoadTripFinance(viewingTrip.id)}
-          onCreateTripIncome={async (data) => onCreateTripIncome(viewingTrip.id, data)}
           onDeleteTripIncome={async (incomeId) => onDeleteTripIncome(viewingTrip.id, incomeId)}
           onCreateTripExpense={async (data) => onCreateTripExpense(viewingTrip.id, data)}
           onDeleteTripExpense={async (expenseId) => onDeleteTripExpense(viewingTrip.id, expenseId)}

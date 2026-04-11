@@ -182,7 +182,6 @@ const Index = () => {
     tripIncomes,
     tripExpenses,
     fetchTripFinance,
-    createTripIncome,
     deleteTripIncome,
     createTripExpense,
     deleteTripExpense,
@@ -1145,7 +1144,6 @@ const Index = () => {
             }}
             onLoadChangeLog={handleLoadTripChangeLog}
             onLoadTripFinance={(tripId) => { fetchTripFinance(tripId, token!); }}
-            onCreateTripIncome={async (tripId, data) => { await createTripIncome(tripId, data, token!); await fetchTrip(tripId, token!); }}
             onDeleteTripIncome={async (tripId, incomeId) => { await deleteTripIncome(tripId, incomeId, token!); await fetchTrip(tripId, token!); }}
             onCreateTripExpense={async (tripId, data) => { await createTripExpense(tripId, data, token!); }}
             onDeleteTripExpense={async (tripId, expenseId) => { await deleteTripExpense(tripId, expenseId, token!); }}

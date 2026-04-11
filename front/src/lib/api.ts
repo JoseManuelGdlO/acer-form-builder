@@ -697,26 +697,6 @@ class ApiClient {
     });
   }
 
-  async createTripIncome(
-    tripId: string,
-    data: {
-      clientId: string;
-      amount: number;
-      paymentDate: string;
-      paymentType?: 'tarjeta' | 'transferencia' | 'efectivo';
-      referenceNumber?: string;
-      note?: string;
-    },
-    token?: string | null
-  ) {
-    return this.request<any>(`/trips/${tripId}/finance/incomes`, {
-      method: 'POST',
-      token: token ?? this.getToken(),
-      requireAuth: true,
-      body: JSON.stringify(data),
-    });
-  }
-
   async deleteTripIncome(tripId: string, paymentId: string, token?: string | null) {
     return this.request<{ message: string }>(`/trips/${tripId}/finance/incomes/${paymentId}`, {
       method: 'DELETE',

@@ -416,25 +416,6 @@ export const useTripStore = () => {
     });
   }, []);
 
-  const createTripIncome = useCallback(
-    async (
-      tripId: string,
-      data: {
-        clientId: string;
-        amount: number;
-        paymentDate: string;
-        paymentType?: 'tarjeta' | 'transferencia' | 'efectivo';
-        referenceNumber?: string;
-        note?: string;
-      },
-      token: string
-    ) => {
-      await api.createTripIncome(tripId, data, token);
-      await fetchTripFinance(tripId, token);
-    },
-    [fetchTripFinance]
-  );
-
   const deleteTripIncome = useCallback(async (tripId: string, incomeId: string, token: string) => {
     await api.deleteTripIncome(tripId, incomeId, token);
     await fetchTripFinance(tripId, token);
@@ -488,7 +469,6 @@ export const useTripStore = () => {
     clearSeatAssignment,
     clearCurrentTrip,
     fetchTripFinance,
-    createTripIncome,
     deleteTripIncome,
     createTripExpense,
     deleteTripExpense,
