@@ -1,4 +1,4 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import { body, validationResult } from 'express-validator';
 import { Conversations, Client } from '../models';
 import { AuthRequest } from '../middleware/auth.middleware';
@@ -13,11 +13,17 @@ const addConv = [
     .optional()
     .isIn(['usuario', 'bot'])
     .withMessage('from must be "usuario" or "bot"'),
-  async (req: Request, res: Response): Promise<void> => {
+  async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         res.status(400).json({ errors: errors.array() });
+        return;
+      }
+
+      const companyId = req.user?.companyId;
+      if (!companyId) {
+        res.status(401).json({ error: 'Authentication required' });
         return;
       }
 
@@ -33,6 +39,7 @@ const addConv = [
       ].join(':');
 
       const record = await Conversations.create({
+        companyId,
         phone,
         mensaje,
         from,
@@ -48,6 +55,7 @@ const addConv = [
           const candidateClients = await Client.findAll({
             where: {
               parentClientId: null,
+              companyId,
             },
             attributes: ['id', 'name', 'phone', 'companyId'],
           });
@@ -119,11 +127,17 @@ const updateConv = [
     .optional()
     .isBoolean()
     .withMessage('baja_logica must be true or false'),
-  async (req: Request, res: Response): Promise<void> => {
+  async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         res.status(400).json({ errors: errors.array() });
+        return;
+      }
+
+      const companyId = req.user?.companyId;
+      if (!companyId) {
+        res.status(401).json({ error: 'Authentication required' });
         return;
       }
 
@@ -149,7 +163,7 @@ const updateConv = [
 
       if (isId) {
         const id = parseInt(identifier, 10);
-        const record = await Conversations.findByPk(id);
+        const record = await Conversations.findOne({ where: { id, companyId } });
         if (!record) {
           res.status(404).json({ error: 'Conversation not found' });
           return;
@@ -158,7 +172,7 @@ const updateConv = [
         res.json(record);
       } else {
         const [count] = await Conversations.update(updateData, {
-          where: { phone: identifier },
+          where: { phone: identifier, companyId },
         });
         res.json({ updated: count, phone: identifier, ...updateData });
       }
@@ -173,7 +187,7 @@ const bajaLogicaConv = [
   body('baja_logica')
     .isBoolean()
     .withMessage('baja_logica must be true or false'),
-  async (req: Request, res: Response): Promise<void> => {
+  async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
@@ -181,9 +195,15 @@ const bajaLogicaConv = [
         return;
       }
 
+      const companyId = req.user?.companyId;
+      if (!companyId) {
+        res.status(401).json({ error: 'Authentication required' });
+        return;
+      }
+
       const { baja_logica } = req.body;
       const record = await Conversations.findOne({
-        where: { phone: req.params.phone },
+        where: { phone: req.params.phone, companyId },
         order: [['id', 'DESC']],
       });
       if (!record) {
@@ -232,7 +252,7 @@ export const getClientConversations = async (
     }
 
     const conversations = await Conversations.findAll({
-      where: { phone: client.phone },
+      where: { phone: client.phone, companyId },
       order: [['created_at', 'ASC']],
     });
 

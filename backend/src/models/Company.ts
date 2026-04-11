@@ -15,7 +15,11 @@ interface CompanyAttributes {
   updatedAt?: Date;
 }
 
-interface CompanyCreationAttributes extends Optional<CompanyAttributes, 'id' | 'logoUrl' | 'faviconUrl' | 'domain' | 'theme' | 'createdAt' | 'updatedAt'> {}
+interface CompanyCreationAttributes
+  extends Optional<
+    CompanyAttributes,
+    'id' | 'logoUrl' | 'faviconUrl' | 'domain' | 'theme' | 'createdAt' | 'updatedAt'
+  > {}
 
 export class Company extends Model<CompanyAttributes, CompanyCreationAttributes> implements CompanyAttributes {
   public id!: string;

@@ -4,9 +4,9 @@ import { authenticate } from '../middleware/auth.middleware';
 
 const router = Router();
 
-router.post('/', addConv);
-router.patch('/:id', updateConv);
-router.patch('/:phone/baja', bajaLogicaConv);
+router.post('/', authenticate, addConv);
+router.patch('/:id', authenticate, updateConv);
+router.patch('/:phone/baja', authenticate, bajaLogicaConv);
 router.get('/clients/:clientId', authenticate, getClientConversations);
 
 export default router;

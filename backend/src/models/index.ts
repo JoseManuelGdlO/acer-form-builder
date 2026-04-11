@@ -81,6 +81,8 @@ Company.hasMany(Product, { foreignKey: 'companyId', as: 'products' });
 Product.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
 Company.hasMany(VisaStatusTemplate, { foreignKey: 'companyId', as: 'visaStatusTemplates' });
 VisaStatusTemplate.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+Company.hasMany(Conversations, { foreignKey: 'companyId', as: 'conversations' });
+Conversations.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
 
 // Notifications relationships (multi-tenant)
 Company.hasMany(Notification, { foreignKey: 'companyId', as: 'notifications' });
