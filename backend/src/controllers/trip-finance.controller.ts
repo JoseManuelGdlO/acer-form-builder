@@ -110,6 +110,11 @@ export const createTripIncome = [
         return;
       }
 
+      res.status(403).json({
+        error: 'Los cobros a clientes solo se registran desde el detalle del cliente.',
+      });
+      return;
+
       const { clientId, amount, paymentDate, paymentType, referenceNumber, note } = req.body;
       const client = await Client.findOne({ where: { id: clientId, companyId } });
       if (!client) {
