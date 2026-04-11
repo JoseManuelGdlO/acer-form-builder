@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,7 +12,6 @@ import {
   X,
   Check,
   Pencil,
-  History,
   ChevronDown,
   ChevronRight,
   ShoppingBag,
@@ -92,7 +91,6 @@ export const ClientPaymentHistory = ({
   const [newPackageBeneficiaryId, setNewPackageBeneficiaryId] = useState<string>('none');
   const [paymentPackageId, setPaymentPackageId] = useState<string>('__none__');
   const [isAdding, setIsAdding] = useState(false);
-  const [historyOpen, setHistoryOpen] = useState(false);
   const [deletedHistoryOpen, setDeletedHistoryOpen] = useState(false);
   const [amount, setAmount] = useState('');
   const [paymentDate, setPaymentDate] = useState(format(new Date(), 'yyyy-MM-dd'));
@@ -226,6 +224,43 @@ export const ClientPaymentHistory = ({
     setIsEditingTotal(false);
     setEditTotalValue(totalAmountDue != null ? String(totalAmountDue) : '');
   };
+
+  /** Orden cronológico (más reciente primero): pagos, cambios de total (admin) y altas de paquete. */
+  const timelineItems = useMemo(() => {
+    type Item =
+      | { kind: 'payment'; id: string; sortAt: number; payment: ClientPayment }
+      | { kind: 'amount_due'; id: string; sortAt: number; entry: AmountDueLogEntry }
+      | { kind: 'package'; id: string; sortAt: number; pkg: ClientAcquiredPackage };
+    const items: Item[] = [];
+    for (const p of payments) {
+      items.push({
+        kind: 'payment',
+        id: `pay-${p.id}`,
+        sortAt: new Date(p.createdAt).getTime(),
+        payment: p,
+      });
+    }
+    if (isAdmin) {
+      for (const e of amountDueHistory) {
+        items.push({
+          kind: 'amount_due',
+          id: `due-${e.id}`,
+          sortAt: new Date(e.createdAt).getTime(),
+          entry: e,
+        });
+      }
+    }
+    for (const pkg of acquiredPackages) {
+      items.push({
+        kind: 'package',
+        id: `pkg-${pkg.id}`,
+        sortAt: new Date(pkg.createdAt).getTime(),
+        pkg,
+      });
+    }
+    items.sort((a, b) => b.sortAt - a.sortAt);
+    return items;
+  }, [payments, amountDueHistory, acquiredPackages, isAdmin]);
 
   return (
     <Card className="border-border/50">
@@ -410,57 +445,6 @@ export const ClientPaymentHistory = ({
             </ul>
           )}
         </div>
-
-        {/* Historial de cambios del total a pagar (solo administradores) */}
-        {isAdmin && (
-          <Collapsible open={historyOpen} onOpenChange={setHistoryOpen}>
-            <CollapsibleTrigger asChild>
-              <Button variant="ghost" size="sm" className="w-full justify-between text-muted-foreground hover:text-foreground">
-                <span className="flex items-center gap-2">
-                  {historyOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                  <History className="w-4 h-4" />
-                  Ver quién modificó el total a pagar
-                  {amountDueHistory.length > 0 && (
-                    <span className="text-xs bg-muted px-1.5 py-0.5 rounded">{amountDueHistory.length}</span>
-                  )}
-                </span>
-              </Button>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <div className="mt-2 rounded-lg border border-border/50 bg-muted/20 overflow-hidden">
-                {amountDueHistory.length === 0 ? (
-                  <p className="text-sm text-muted-foreground p-3">No hay cambios registrados aún.</p>
-                ) : (
-                  <ul className="divide-y divide-border/50 max-h-[200px] overflow-y-auto">
-                    {amountDueHistory.map((entry) => (
-                      <li key={entry.id} className="p-3 text-sm">
-                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                          <span className="text-muted-foreground">
-                            {format(new Date(entry.createdAt), "d MMM yyyy, HH:mm", { locale: es })}
-                          </span>
-                          {entry.changedByUser?.name && (
-                            <span className="font-medium text-foreground">
-                              {entry.changedByUser.name}
-                            </span>
-                          )}
-                        </div>
-                        <p className="mt-1 text-muted-foreground">
-                          <span className={entry.previousValue != null ? 'text-foreground' : ''}>
-                            {entry.previousValue != null ? entry.previousValue.toFixed(2) : '—'}
-                          </span>
-                          {' → '}
-                          <span className={entry.newValue != null ? 'text-foreground font-medium' : ''}>
-                            {entry.newValue != null ? entry.newValue.toFixed(2) : '—'}
-                          </span>
-                        </p>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
-        )}
 
         {/* Pagos eliminados (solo administradores) */}
         {isAdmin && (
@@ -649,67 +633,135 @@ export const ClientPaymentHistory = ({
           </div>
         )}
 
-        {/* Payments list */}
-        {payments.length === 0 && !isAdding ? (
-          <div className="text-center py-6 text-muted-foreground">
-            <DollarSign className="w-10 h-10 mx-auto mb-2 opacity-40" />
-            <p className="text-sm">No hay pagos registrados</p>
-            <p className="text-xs">Registra un pago para llevar el historial</p>
-          </div>
-        ) : (
-          <div className="space-y-2 max-h-[280px] overflow-y-auto">
-            {payments.map((payment) => (
-              <div
-                key={payment.id}
-                className="group flex items-start justify-between gap-2 bg-muted/30 border border-border/30 rounded-lg p-3 hover:border-border/60 transition-colors"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="text-sm font-medium text-foreground">
-                      {Number(payment.amount).toFixed(2)}
-                    </p>
-                    <span className="text-xs text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded">
-                      {PAYMENT_TYPE_LABELS[payment.paymentType || 'efectivo']}
-                    </span>
-                    {payment.acquiredPackage?.product?.title && (
-                      <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded max-w-[200px] truncate">
-                        {payment.acquiredPackage.product.title}
+        {/* Historial unificado: origen de cada movimiento */}
+        <div className="space-y-2">
+          <p className="text-xs text-muted-foreground">
+            Cada línea indica el origen: <span className="text-foreground font-medium">Registrar pago</span>,{' '}
+            <span className="text-foreground font-medium">Total a pagar</span> (ajuste del monto) o{' '}
+            <span className="text-foreground font-medium">Añadir paquete</span>.
+          </p>
+          {timelineItems.length === 0 && !isAdding ? (
+            <div className="text-center py-6 text-muted-foreground">
+              <DollarSign className="w-10 h-10 mx-auto mb-2 opacity-40" />
+              <p className="text-sm">No hay movimientos aún</p>
+              <p className="text-xs">Registra un pago o añade un paquete para ver el historial</p>
+            </div>
+          ) : (
+            <div className="space-y-2 max-h-[320px] overflow-y-auto">
+              {timelineItems.map((item) =>
+                item.kind === 'payment' ? (
+                  <div
+                    key={item.id}
+                    className="group flex items-start justify-between gap-2 bg-muted/30 border border-border/30 rounded-lg p-3 hover:border-border/60 transition-colors"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                        <span className="text-[10px] uppercase tracking-wide font-semibold text-primary bg-primary/12 px-1.5 py-0.5 rounded">
+                          Registrar pago
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-medium text-foreground">
+                          {Number(item.payment.amount).toFixed(2)}
+                        </p>
+                        <span className="text-xs text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded">
+                          {PAYMENT_TYPE_LABELS[item.payment.paymentType || 'efectivo']}
+                        </span>
+                        {item.payment.acquiredPackage?.product?.title && (
+                          <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded max-w-[200px] truncate">
+                            Paquete: {item.payment.acquiredPackage.product.title}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-muted-foreground mt-1">
+                        {item.payment.acquiredPackage?.product?.title
+                          ? 'Pago vinculado a un paquete adquirido.'
+                          : 'Pago general (sin paquete asociado).'}
+                      </p>
+                      {item.payment.note && (
+                        <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                          {item.payment.note}
+                        </p>
+                      )}
+                      {item.payment.referenceNumber && (
+                        <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                          Ticket/Transferencia: {item.payment.referenceNumber}
+                        </p>
+                      )}
+                      <span className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                        <Calendar className="w-3 h-3 shrink-0" />
+                        Fecha del pago:{' '}
+                        {format(new Date(item.payment.paymentDate), 'd MMM yyyy', { locale: es })}
                       </span>
+                    </div>
+                    {onDeletePayment && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="w-7 h-7 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => onDeletePayment(item.payment.id)}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
                     )}
                   </div>
-                  {payment.note && (
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                      {payment.note}
-                    </p>
-                  )}
-                  {payment.referenceNumber && (
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                      Ticket/Transferencia: {payment.referenceNumber}
-                    </p>
-                  )}
-                  <span className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-                    <Calendar className="w-3 h-3 shrink-0" />
-                    {format(
-                      new Date(payment.paymentDate),
-                      "d MMM yyyy",
-                      { locale: es }
-                    )}
-                  </span>
-                </div>
-                {onDeletePayment && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="w-7 h-7 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10"
-                    onClick={() => onDeletePayment(payment.id)}
+                ) : item.kind === 'amount_due' ? (
+                  <div
+                    key={item.id}
+                    className="bg-muted/30 border border-amber-500/25 rounded-lg p-3"
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </Button>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <span className="text-[10px] uppercase tracking-wide font-semibold text-amber-800 dark:text-amber-200 bg-amber-500/15 px-1.5 py-0.5 rounded">
+                        Total a pagar
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Ajuste del monto total desde el resumen «Total a pagar» (no es un pago recibido).
+                    </p>
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1 text-sm">
+                      <span className="text-muted-foreground">
+                        {format(new Date(item.entry.createdAt), 'd MMM yyyy, HH:mm', { locale: es })}
+                      </span>
+                      {item.entry.changedByUser?.name && (
+                        <span className="font-medium text-foreground">{item.entry.changedByUser.name}</span>
+                      )}
+                    </div>
+                    <p className="mt-1 text-muted-foreground text-sm">
+                      <span className={item.entry.previousValue != null ? 'text-foreground' : ''}>
+                        {item.entry.previousValue != null ? item.entry.previousValue.toFixed(2) : '—'}
+                      </span>
+                      {' → '}
+                      <span className={item.entry.newValue != null ? 'text-foreground font-medium' : ''}>
+                        {item.entry.newValue != null ? item.entry.newValue.toFixed(2) : '—'}
+                      </span>
+                    </p>
+                  </div>
+                ) : (
+                  <div key={item.id} className="bg-muted/30 border border-violet-500/20 rounded-lg p-3">
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <span className="text-[10px] uppercase tracking-wide font-semibold text-violet-800 dark:text-violet-200 bg-violet-500/12 px-1.5 py-0.5 rounded">
+                        Añadir paquete
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Registro desde «Paquetes adquiridos» al añadir un paquete a la cuenta.
+                    </p>
+                    <p className="text-sm font-medium text-foreground mt-1">
+                      {item.pkg.product?.title ?? 'Paquete'}
+                    </p>
+                    {item.pkg.beneficiary && (
+                      <p className="text-xs text-muted-foreground">Para: {item.pkg.beneficiary.name}</p>
+                    )}
+                    <span className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                      <Calendar className="w-3 h-3 shrink-0" />
+                      {format(new Date(item.pkg.createdAt), "d MMM yyyy, HH:mm", { locale: es })}
+                    </span>
+                  </div>
+                )
+              )}
+            </div>
+          )}
+        </div>
       </CardContent>
     </Card>
   );
