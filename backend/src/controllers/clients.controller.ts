@@ -305,7 +305,7 @@ export const getAllClients = async (req: AuthRequest, res: Response): Promise<vo
         companyId,
         parentClientId: { [Op.in]: clientIds },
       },
-      attributes: ['id', 'name', 'email', 'phone', 'parentClientId', 'createdAt', 'updatedAt'],
+      attributes: ['id', 'name', 'email', 'phone', 'parentClientId', 'assignedUserId', 'createdAt', 'updatedAt'],
       order: [['created_at', 'ASC']],
       raw: true,
     });
@@ -320,6 +320,7 @@ export const getAllClients = async (req: AuthRequest, res: Response): Promise<vo
         email: (child as any).email,
         phone: (child as any).phone,
         parentClientId: parentId,
+        assignedUserId: (child as any).assigned_user_id ?? (child as any).assignedUserId ?? null,
         createdAt: (child as any).created_at || (child as any).createdAt,
         updatedAt: (child as any).updated_at || (child as any).updatedAt,
       });
@@ -472,7 +473,7 @@ export const getClientById = async (req: AuthRequest, res: Response): Promise<vo
         { model: Product, as: 'product', attributes: ['id', 'title'], required: false },
         { model: VisaStatusTemplate, as: 'visaStatusTemplate', attributes: ['id', 'label', 'order', 'isActive', 'color'], required: false },
         { model: Client, as: 'parent', attributes: ['id', 'name', 'email', 'phone'], required: false },
-        { model: Client, as: 'children', attributes: ['id', 'name', 'email', 'phone', 'parentClientId', 'createdAt', 'updatedAt'], required: false },
+        { model: Client, as: 'children', attributes: ['id', 'name', 'email', 'phone', 'parentClientId', 'assignedUserId', 'createdAt', 'updatedAt'], required: false },
       ],
     });
     if (!client) {
@@ -500,7 +501,7 @@ export const getClientById = async (req: AuthRequest, res: Response): Promise<vo
     const clientJson = client.toJSON();
     const children = await Client.findAll({
       where: { companyId, parentClientId: id },
-      attributes: ['id', 'name', 'email', 'phone', 'parentClientId', 'createdAt', 'updatedAt'],
+      attributes: ['id', 'name', 'email', 'phone', 'parentClientId', 'assignedUserId', 'createdAt', 'updatedAt'],
       order: [['created_at', 'ASC']],
       raw: true,
     });
@@ -510,6 +511,7 @@ export const getClientById = async (req: AuthRequest, res: Response): Promise<vo
       email: child.email,
       phone: child.phone,
       parentClientId: child.parent_client_id ?? child.parentClientId ?? null,
+      assignedUserId: child.assigned_user_id ?? child.assignedUserId ?? null,
       createdAt: child.created_at || child.createdAt,
       updatedAt: child.updated_at || child.updatedAt,
     }));
@@ -596,6 +598,7 @@ export const createClient = [
   body('visaStatusTemplateId').optional({ values: 'falsy' }).isUUID().withMessage('Visa status template id must be a valid UUID'),
   body('productId').optional({ values: 'null' }).isUUID().withMessage('Product id must be a valid UUID'),
   body('parentClientId').optional({ values: 'null' }).isUUID().withMessage('Parent client id must be a valid UUID'),
+  body('assignedUserId').optional({ values: 'null' }).isUUID().withMessage('Assigned user id must be a valid UUID'),
   async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       const errors = validationResult(req);
@@ -609,6 +612,9 @@ export const createClient = [
         res.status(401).json({ error: 'Authentication required' });
         return;
       }
+
+      const { assignedUserId: requestedAssignedUserId, ...restBody } = req.body;
+      req.body = restBody;
 
       const normalizedPhone = typeof req.body.phone === 'string' ? req.body.phone.trim() : req.body.phone;
       if (normalizedPhone !== undefined) {
@@ -657,11 +663,29 @@ export const createClient = [
         res.status(400).json({ error: 'Visa status template not found' });
         return;
       }
+      let parentRow: InstanceType<typeof Client> | null = null;
       if (parentClientId) {
-        const parentClient = await Client.findOne({ where: { id: parentClientId, companyId } });
-        if (!parentClient) {
+        parentRow = await Client.findOne({ where: { id: parentClientId, companyId } });
+        if (!parentRow) {
           res.status(400).json({ error: 'Parent client not found' });
           return;
+        }
+      }
+
+      let assignedUserId: string | null | undefined = req.user?.id;
+      if (parentClientId && req.user?.roles.includes('super_admin')) {
+        const raw = requestedAssignedUserId as string | null | undefined;
+        if (raw === null) {
+          assignedUserId = null;
+        } else if (raw !== undefined && raw !== '') {
+          const advisor = await User.findOne({ where: { id: String(raw), companyId } });
+          if (!advisor) {
+            res.status(400).json({ error: 'Asesor no encontrado' });
+            return;
+          }
+          assignedUserId = String(raw);
+        } else {
+          assignedUserId = parentRow?.assignedUserId ?? req.user.id;
         }
       }
 
@@ -669,14 +693,14 @@ export const createClient = [
         ...req.body,
         companyId,
         parentClientId: parentClientId ?? null,
-        ...(req.user ? { assignedUserId: req.user.id } : {}),
+        ...(assignedUserId !== undefined ? { assignedUserId } : {}),
       });
       await client.reload({
         include: [
           { model: Product, as: 'product', attributes: ['id', 'title'], required: false },
           { model: VisaStatusTemplate, as: 'visaStatusTemplate', attributes: ['id', 'label', 'order', 'isActive', 'color'], required: false },
           { model: Client, as: 'parent', attributes: ['id', 'name', 'email', 'phone'], required: false },
-          { model: Client, as: 'children', attributes: ['id', 'name', 'email', 'phone', 'parentClientId', 'createdAt', 'updatedAt'], required: false },
+          { model: Client, as: 'children', attributes: ['id', 'name', 'email', 'phone', 'parentClientId', 'assignedUserId', 'createdAt', 'updatedAt'], required: false },
         ],
       });
       
@@ -889,7 +913,7 @@ export const updateClient = [
           { model: Product, as: 'product', attributes: ['id', 'title'], required: false },
           { model: VisaStatusTemplate, as: 'visaStatusTemplate', attributes: ['id', 'label', 'order', 'isActive', 'color'], required: false },
           { model: Client, as: 'parent', attributes: ['id', 'name', 'email', 'phone'], required: false },
-          { model: Client, as: 'children', attributes: ['id', 'name', 'email', 'phone', 'parentClientId', 'createdAt', 'updatedAt'], required: false },
+          { model: Client, as: 'children', attributes: ['id', 'name', 'email', 'phone', 'parentClientId', 'assignedUserId', 'createdAt', 'updatedAt'], required: false },
         ],
       });
       if (req.body.totalAmountDue !== undefined && req.user?.roles.some((role) => role === 'super_admin' || role === 'reviewer')) {

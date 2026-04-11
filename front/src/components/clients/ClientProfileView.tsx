@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Client, ClientPayment, AmountDueLogEntry, PaymentDeletedLogEntry, Form, InternalAppointment } from '@/types/form';
+import { User as UserOption } from '@/types/user';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,7 +17,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
 import { 
   User, Mail, Phone, Calendar, Clock, 
-  ArrowLeft, Edit2, FileText, UserCircle, ShoppingBag, Plus, ListChecks, NotebookPen, Wallet,
+  ArrowLeft, Edit2, FileText, UserCircle, ShoppingBag, Plus, ListChecks, NotebookPen, Wallet, Trash2,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -25,6 +26,23 @@ import { formatPhoneOptional } from '@/lib/phone';
 import { APPOINTMENT_BADGE_CLASSES } from '@/lib/appointmentColors';
 import { cn } from '@/lib/utils';
 import { parseFormSectionsFromApi } from '@/lib/formSections';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface AssignedFormSession {
   id: string;
@@ -47,13 +65,28 @@ const contrastTextColor = (backgroundHex?: string | null): string => {
 
 interface ClientProfileViewProps {
   client: Client;
+  /** Asesores para asignar a familiares (solo admin). */
+  users?: UserOption[];
   onBack: () => void;
   onEdit: () => void;
   onCreateChild?: () => void;
   onOpenClient?: (clientId: string) => void;
+  /** Solo administrador: cambia el asesor del familiar. */
+  onAssignFamilyAdvisor?: (childClientId: string, assignedUserId: string | null) => Promise<void>;
+  /** Desvincula un familiar del titular (el cliente pasa a ser titular independiente). */
+  onRemoveFamilyMember?: (childClientId: string) => Promise<void>;
 }
 
-export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpenClient }: ClientProfileViewProps) => {
+export const ClientProfileView = ({
+  client,
+  users = [],
+  onBack,
+  onEdit,
+  onCreateChild,
+  onOpenClient,
+  onAssignFamilyAdvisor,
+  onRemoveFamilyMember,
+}: ClientProfileViewProps) => {
   const { getActiveChecklistItems, fetchChecklistTemplates } = useSettingsStore();
   const { token, hasRole } = useAuth();
   const isAdmin = hasRole('super_admin');
@@ -83,6 +116,9 @@ export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpe
   const [newAppointmentRole, setNewAppointmentRole] = useState<'reviewer' | 'admin'>('reviewer');
   const [newAppointmentPurpose, setNewAppointmentPurpose] = useState('');
   const [isSubmittingAppointment, setIsSubmittingAppointment] = useState(false);
+  const [familyMemberToRemove, setFamilyMemberToRemove] = useState<Pick<Client, 'id' | 'name'> | null>(null);
+  const [isRemovingFamilyMember, setIsRemovingFamilyMember] = useState(false);
+  const [updatingAdvisorForChildId, setUpdatingAdvisorForChildId] = useState<string | null>(null);
 
   useEffect(() => {
     setClientSnapshot(client);
@@ -210,6 +246,7 @@ export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpe
                 email: child.email,
                 phone: child.phone,
                 parentClientId: child.parent_client_id ?? child.parentClientId ?? null,
+                assignedUserId: child.assigned_user_id ?? child.assignedUserId ?? undefined,
                 createdAt: new Date(child.created_at || child.createdAt),
                 updatedAt: new Date(child.updated_at || child.updatedAt),
               }))
@@ -841,6 +878,22 @@ export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpe
     },
   ];
 
+  const handleConfirmRemoveFamilyMember = async () => {
+    if (!familyMemberToRemove || !onRemoveFamilyMember) return;
+    setIsRemovingFamilyMember(true);
+    try {
+      await onRemoveFamilyMember(familyMemberToRemove.id);
+      toast.success('Familiar desvinculado del grupo');
+      setFamilyMemberToRemove(null);
+      await loadClientData();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'No se pudo desvincular al familiar';
+      toast.error(message);
+    } finally {
+      setIsRemovingFamilyMember(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -853,6 +906,7 @@ export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpe
   }
 
   return (
+    <>
     <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto p-6 space-y-6">
         {/* Header */}
@@ -975,11 +1029,75 @@ export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpe
                       <Separator className="my-4" />
                       <div className="space-y-2">
                         <p className="text-xs text-muted-foreground">Familiares de este cliente</p>
-                        <div className="flex flex-wrap gap-2">
+                        <div className="space-y-2">
                           {displayClient.children!.map((child) => (
-                            <Button key={child.id} variant="outline" size="sm" onClick={() => onOpenClient?.(child.id)}>
-                              {child.name}
-                            </Button>
+                            <div
+                              key={child.id}
+                              className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between rounded-lg border border-border/60 bg-muted/15 p-2"
+                            >
+                              <div className="inline-flex flex-wrap items-center gap-2">
+                                <div className="inline-flex items-center gap-0.5 rounded-md border border-border bg-background">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 rounded-r-none border-0 shadow-none"
+                                    onClick={() => onOpenClient?.(child.id)}
+                                  >
+                                    {child.name}
+                                  </Button>
+                                  {onRemoveFamilyMember && (
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 shrink-0 rounded-l-none text-muted-foreground hover:text-destructive"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setFamilyMemberToRemove({ id: child.id, name: child.name });
+                                      }}
+                                      aria-label={`Quitar a ${child.name} del grupo familiar`}
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  )}
+                                </div>
+                                {isAdmin && users.length > 0 && onAssignFamilyAdvisor && (
+                                  <Select
+                                    value={child.assignedUserId ?? '__none__'}
+                                    disabled={updatingAdvisorForChildId === child.id}
+                                    onValueChange={async (value) => {
+                                      setUpdatingAdvisorForChildId(child.id);
+                                      try {
+                                        await onAssignFamilyAdvisor(
+                                          child.id,
+                                          value === '__none__' ? null : value
+                                        );
+                                        toast.success('Asesor del familiar actualizado');
+                                        await loadClientData();
+                                      } catch (err: unknown) {
+                                        const message =
+                                          err instanceof Error ? err.message : 'No se pudo actualizar el asesor';
+                                        toast.error(message);
+                                      } finally {
+                                        setUpdatingAdvisorForChildId(null);
+                                      }
+                                    }}
+                                  >
+                                    <SelectTrigger className="h-8 w-[min(100%,220px)] sm:w-[220px]" data-no-view="true">
+                                      <SelectValue placeholder="Asesor" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="__none__">Sin asignar</SelectItem>
+                                      {users.map((u) => (
+                                        <SelectItem key={u.id} value={u.id}>
+                                          {u.name}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                )}
+                              </div>
+                            </div>
                           ))}
                         </div>
                       </div>
@@ -1256,5 +1374,37 @@ export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpe
         </div>
       </div>
     </div>
+
+    <AlertDialog
+      open={!!familyMemberToRemove}
+      onOpenChange={(open) => {
+        if (!open && !isRemovingFamilyMember) setFamilyMemberToRemove(null);
+      }}
+    >
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>¿Quitar familiar del grupo?</AlertDialogTitle>
+          <AlertDialogDescription>
+            {familyMemberToRemove
+              ? `«${familyMemberToRemove.name}» dejará de estar vinculado a este cliente titular y pasará a ser un cliente independiente. No se borra su expediente.`
+              : ''}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isRemovingFamilyMember}>Cancelar</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={(e) => {
+              e.preventDefault();
+              void handleConfirmRemoveFamilyMember();
+            }}
+            disabled={isRemovingFamilyMember}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          >
+            {isRemovingFamilyMember ? 'Quitando…' : 'Quitar del grupo'}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 };

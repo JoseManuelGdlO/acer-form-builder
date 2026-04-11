@@ -57,6 +57,7 @@ const mapClient = (c: any): Client => ({
           email: ch.email,
           phone: ch.phone,
           parentClientId: ch.parent_client_id ?? ch.parentClientId ?? null,
+          assignedUserId: ch.assigned_user_id ?? ch.assignedUserId ?? undefined,
           createdAt: new Date(ch.created_at || ch.createdAt),
           updatedAt: new Date(ch.updated_at || ch.updatedAt),
         }))
@@ -193,6 +194,7 @@ export const useClientStore = () => {
                 email: client.email,
                 phone: client.phone,
                 parentClientId: client.parentClientId ?? null,
+                assignedUserId: client.assignedUserId,
                 createdAt: client.createdAt,
                 updatedAt: client.updatedAt,
               },
@@ -218,12 +220,56 @@ export const useClientStore = () => {
     try {
       const updatedClient = await api.updateClient(clientId, updates, token);
       const client = mapClient(updatedClient);
-      setClients(prev =>
-        prev.map(c => c.id === clientId ? client : c)
-      );
-      setPickerClients(prev =>
-        prev.map(c => c.id === clientId ? client : c)
-      );
+
+      const mergeLists = (prev: Client[]) => {
+        const prevRow = prev.find((c) => c.id === clientId);
+        const oldPid = prevRow?.parentClientId ?? null;
+        const newPid = client.parentClientId ?? null;
+        const childSummary = {
+          id: client.id,
+          name: client.name,
+          email: client.email,
+          phone: client.phone,
+          parentClientId: client.parentClientId ?? null,
+          assignedUserId: client.assignedUserId,
+          createdAt: client.createdAt,
+          updatedAt: client.updatedAt,
+        };
+
+        let next = prev.map((c) => (c.id === clientId ? client : c));
+
+        if (oldPid !== newPid) {
+          if (oldPid) {
+            next = next.map((c) =>
+              c.id === oldPid
+                ? { ...c, children: (c.children ?? []).filter((x) => x.id !== clientId) }
+                : c
+            );
+          }
+          if (newPid) {
+            next = next.map((c) => {
+              if (c.id !== newPid) return c;
+              const ch = c.children ?? [];
+              if (ch.some((x) => x.id === clientId)) return c;
+              return { ...c, children: [...ch, childSummary] };
+            });
+          }
+        } else if (newPid) {
+          next = next.map((c) => {
+            if (c.id !== newPid) return c;
+            const ch = c.children ?? [];
+            return {
+              ...c,
+              children: ch.map((x) => (x.id === clientId ? childSummary : x)),
+            };
+          });
+        }
+
+        return next;
+      };
+
+      setClients(mergeLists);
+      setPickerClients(mergeLists);
     } catch (error) {
       console.error('Failed to update client:', error);
       throw error;

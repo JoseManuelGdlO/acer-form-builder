@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Client } from '@/types/form';
+import { User as AdvisorUser } from '@/types/user';
 import { Product } from '@/types/product';
 import { VisaStatusTemplate } from '@/types/settings';
 import { toast } from 'sonner';
@@ -21,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { User, Mail, Phone, MapPin, FileText, ShoppingBag } from 'lucide-react';
+import { User, Mail, Phone, MapPin, FileText, ShoppingBag, UserCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatPhoneNumberDisplay, isValidClientPhoneLength, normalizePhoneDigits } from '@/lib/phone';
 
@@ -29,9 +30,14 @@ interface ClientFormModalProps {
   client?: Client | null;
   availableClients?: Client[];
   defaultParentClientId?: string | null;
+  /** Asesor sugerido al crear un familiar (p. ej. el del titular); solo usa admin con dropdown. */
+  defaultAssignedUserId?: string | null;
   hideParentSelector?: boolean;
   products?: Product[];
   visaStatusTemplates?: VisaStatusTemplate[];
+  /** Revisores del listado para asignar asesor (solo admin: nuevo familiar o editar familiar). */
+  users?: AdvisorUser[];
+  isAdmin?: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSave: (clientData: Omit<Client, 'id' | 'createdAt' | 'updatedAt' | 'formsCompleted'>) => Promise<void>;
@@ -41,9 +47,12 @@ export const ClientFormModal = ({
   client,
   availableClients = [],
   defaultParentClientId = null,
+  defaultAssignedUserId = null,
   hideParentSelector = false,
   products = [],
   visaStatusTemplates = [],
+  users = [],
+  isAdmin = false,
   open,
   onOpenChange,
   onSave,
@@ -63,12 +72,17 @@ export const ClientFormModal = ({
     visaStatusTemplateId: '',
     productId: undefined as string | undefined,
     parentClientId: 'none',
+    assignedUserId: '__none__' as string,
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [phoneError, setPhoneError] = useState('');
 
   useEffect(() => {
+    const advisorValueForNewFamily =
+      isAdmin && defaultParentClientId
+        ? defaultAssignedUserId || users[0]?.id || '__none__'
+        : '__none__';
     if (client) {
       setFormData({
         name: client.name,
@@ -85,6 +99,7 @@ export const ClientFormModal = ({
         visaStatusTemplateId: client.visaStatusTemplateId || '',
         productId: client.productId || undefined,
         parentClientId: client.parentClientId || 'none',
+        assignedUserId: client.assignedUserId ?? '__none__',
       });
     } else {
       setFormData({
@@ -102,12 +117,13 @@ export const ClientFormModal = ({
         visaStatusTemplateId: visaStatusTemplates[0]?.id || '',
         productId: undefined,
         parentClientId: defaultParentClientId || 'none',
+        assignedUserId: advisorValueForNewFamily,
       });
     }
     setError('');
     setPhoneError('');
     setIsLoading(false);
-  }, [client, open, defaultParentClientId]);
+  }, [client, open, defaultParentClientId, defaultAssignedUserId, isAdmin, users, visaStatusTemplates]);
 
   useEffect(() => {
     if (!open || client || formData.visaStatusTemplateId || visaStatusTemplates.length === 0) {
@@ -144,8 +160,11 @@ export const ClientFormModal = ({
     }
 
     try {
-      await onSave({
-        ...formData,
+      const { assignedUserId: formAdvisor, ...formFields } = formData;
+      const isFamilyNew = !!defaultParentClientId && !client;
+      const isEditFamily = !!client?.parentClientId;
+      const payload: Omit<Client, 'id' | 'createdAt' | 'updatedAt' | 'formsCompleted'> = {
+        ...formFields,
         birthDate: formData.birthDate || null,
         relationshipToHolder: formData.relationshipToHolder.trim() || null,
         phone: formData.phone || '',
@@ -154,7 +173,12 @@ export const ClientFormModal = ({
         visaConsularAppointmentDate: formData.visaConsularAppointmentDate || null,
         visaConsularAppointmentLocation: formData.visaConsularAppointmentLocation.trim() || null,
         parentClientId: formData.parentClientId === 'none' ? null : formData.parentClientId,
-      });
+      };
+      if (isAdmin && (isFamilyNew || isEditFamily)) {
+        (payload as { assignedUserId?: string | null }).assignedUserId =
+          formAdvisor === '__none__' ? null : formAdvisor;
+      }
+      await onSave(payload);
       onOpenChange(false);
     } catch (error: any) {
       console.error('Error saving client:', error);
@@ -167,6 +191,8 @@ export const ClientFormModal = ({
 
   const isEditing = !!client;
   const isFamilyMode = !!defaultParentClientId && !isEditing;
+  const showAdvisorField =
+    isAdmin && users.length > 0 && (isFamilyMode || (!!client?.parentClientId && isEditing));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -281,6 +307,36 @@ export const ClientFormModal = ({
                   placeholder="Ej: Hijo, Esposa, Hermano"
                 />
               </div>
+            </div>
+          )}
+
+          {showAdvisorField && (
+            <div className="space-y-2">
+              <Label htmlFor="assignedUserId" className="flex items-center gap-2">
+                <UserCircle className="w-4 h-4" />
+                Asesor asignado al familiar
+              </Label>
+              <Select
+                value={formData.assignedUserId}
+                onValueChange={(value) => setFormData((prev) => ({ ...prev, assignedUserId: value }))}
+              >
+                <SelectTrigger id="assignedUserId">
+                  <SelectValue placeholder="Selecciona asesor" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Sin asignar</SelectItem>
+                  {users.map((u) => (
+                    <SelectItem key={u.id} value={u.id}>
+                      {u.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {isFamilyMode && (
+                <p className="text-xs text-muted-foreground">
+                  Si un revisor crea el familiar, queda asignado a él automáticamente (sin este campo).
+                </p>
+              )}
             </div>
           )}
 

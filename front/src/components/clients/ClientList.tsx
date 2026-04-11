@@ -110,6 +110,14 @@ export const ClientList = ({
 
   // Use templates from client store if available, otherwise from settings store
   // Filter only active templates and remove duplicates
+  const familyFormParent = useMemo(() => {
+    if (!defaultParentClientId) return null;
+    return (
+      clients.find((c) => c.id === defaultParentClientId) ??
+      (viewingClient?.id === defaultParentClientId ? viewingClient : null)
+    );
+  }, [defaultParentClientId, clients, viewingClient]);
+
   const checklistTemplates = useMemo(() => {
     let templates = clientStoreTemplates.length > 0 ? clientStoreTemplates : settingsTemplates;
     
@@ -362,6 +370,7 @@ export const ClientList = ({
           email: child.email,
           phone: child.phone,
           parentClientId: child.parent_client_id ?? child.parentClientId ?? null,
+          assignedUserId: child.assigned_user_id ?? child.assignedUserId ?? undefined,
           createdAt: new Date(child.created_at || child.createdAt || Date.now()),
           updatedAt: new Date(child.updated_at || child.updatedAt || Date.now()),
         }))
@@ -459,9 +468,16 @@ export const ClientList = ({
       <>
         <ClientProfileView
           client={viewingClient}
+          users={users}
           onBack={handleBackFromProfile}
           onEdit={handleEditFromProfile}
           onCreateChild={handleCreateChildFromProfile}
+          onAssignFamilyAdvisor={async (childId, assignedUserId) => {
+            await onUpdate(childId, { assignedUserId });
+          }}
+          onRemoveFamilyMember={async (childId) => {
+            await onUpdate(childId, { parentClientId: null });
+          }}
           onOpenClient={async (clientId) => {
             const nextClient = clients.find((c) => c.id === clientId);
             if (nextClient) {
@@ -487,6 +503,9 @@ export const ClientList = ({
           hideParentSelector={!editingClient}
           products={products}
           visaStatusTemplates={visaStatusTemplates}
+          users={users}
+          isAdmin={isAdmin}
+          defaultAssignedUserId={familyFormParent?.assignedUserId ?? null}
           open={isFormOpen}
           onOpenChange={(open) => {
             setIsFormOpen(open);
@@ -647,6 +666,9 @@ export const ClientList = ({
           hideParentSelector={!editingClient}
           products={products}
           visaStatusTemplates={visaStatusTemplates}
+          users={users}
+          isAdmin={isAdmin}
+          defaultAssignedUserId={familyFormParent?.assignedUserId ?? null}
           open={isFormOpen}
           onOpenChange={(open) => {
             setIsFormOpen(open);

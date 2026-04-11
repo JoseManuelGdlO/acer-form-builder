@@ -186,7 +186,7 @@ export interface Client {
   assignedTrips?: { id: string; title: string }[];
   nextOfficeAppointment?: { appointmentDate: string; purposeNote?: string | null } | null;
   parent?: Pick<Client, 'id' | 'name' | 'email' | 'phone'> | null;
-  children?: Pick<Client, 'id' | 'name' | 'email' | 'phone' | 'parentClientId' | 'createdAt' | 'updatedAt'>[];
+  children?: Pick<Client, 'id' | 'name' | 'email' | 'phone' | 'parentClientId' | 'assignedUserId' | 'createdAt' | 'updatedAt'>[];
 }
 
 export type InternalAppointmentStatus = 'scheduled' | 'completed' | 'cancelled';
