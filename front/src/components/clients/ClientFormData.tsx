@@ -6,6 +6,8 @@ import { es } from 'date-fns/locale';
 
 export interface FormAnswer {
   question: string;
+  /** Texto de ayuda bajo el título (ej. “Como figuran en el pasaporte”) */
+  questionDescription?: string;
   answer: string;
   section: string;
 }
@@ -78,9 +80,14 @@ export const ClientFormData = ({ submissions }: ClientFormDataProps) => {
                         key={idx}
                         className="bg-muted/30 rounded-lg p-3 border border-border/30"
                       >
-                        <p className="text-xs text-muted-foreground mb-1">
+                        <p className="text-xs font-semibold text-foreground mb-0.5">
                           {answer.question}
                         </p>
+                        {answer.questionDescription ? (
+                          <p className="text-xs text-muted-foreground mb-1">
+                            {answer.questionDescription}
+                          </p>
+                        ) : null}
                         <p className="text-sm text-foreground font-medium">
                           {answer.answer || 'Sin respuesta'}
                         </p>

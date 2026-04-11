@@ -24,6 +24,7 @@ import { toast } from 'sonner';
 import { formatPhoneOptional } from '@/lib/phone';
 import { APPOINTMENT_BADGE_CLASSES } from '@/lib/appointmentColors';
 import { cn } from '@/lib/utils';
+import { parseFormSectionsFromApi } from '@/lib/formSections';
 
 interface AssignedFormSession {
   id: string;
@@ -305,6 +306,7 @@ export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpe
         submissionsData.map(async (sub: any) => {
           try {
             const form = await api.getForm(sub.form_id || sub.formId);
+            const formSections = parseFormSectionsFromApi(form?.sections);
             // Transform answers from JSON to the format expected by ClientFormData
             // Support both old format (questionId: answer) and new format (questionId: { question, answer, ... })
             // Iterate over saved answers directly (not form questions) to show all answered questions
@@ -332,44 +334,61 @@ export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpe
                 // Try to find question from form first (as fallback)
                 let foundQuestion: any = null;
                 let sectionName: string = 'Sin sección';
-                if (form.sections) {
-                  for (const section of form.sections) {
-                    const question = section.questions?.find((q: any) => q.id === questionId);
-                    if (question) {
-                      foundQuestion = question;
-                      sectionName = section.title || section.label || 'Sin sección';
-                      break;
-                    }
+                for (const section of formSections) {
+                  const question = section.questions?.find((q: any) => q.id === questionId);
+                  if (question) {
+                    foundQuestion = question;
+                    sectionName = section.title || (section as { label?: string }).label || 'Sin sección';
+                    break;
                   }
                 }
                 
                 let questionText: string;
                 let answerValue: string | string[];
+                let questionDescriptionOut: string | undefined;
                 
                 if (isNewFormat) {
-                  // New format: use questionDescription as primary, question as fallback
                   const savedQuestionDescription = answerData.questionDescription;
                   const savedQuestionText = answerData.question;
-                  
-                  // Prefer questionDescription over question
-                  if (savedQuestionDescription && 
-                      typeof savedQuestionDescription === 'string' &&
-                      savedQuestionDescription.trim() !== '') {
-                    questionText = savedQuestionDescription;
-                  } else if (savedQuestionText && 
-                             typeof savedQuestionText === 'string' &&
-                             savedQuestionText.trim() !== '' &&
-                             savedQuestionText.trim().toLowerCase() !== 'nueva pregunta' &&
-                             savedQuestionText.trim().toLowerCase() !== 'nueva pregunta frecuente') {
-                    questionText = savedQuestionText;
-                  } else if (foundQuestion) {
-                    // Use form question text as fallback
-                    const formQuestionText = foundQuestion.title || foundQuestion.label || foundQuestion.text;
-                    questionText = (formQuestionText && formQuestionText.trim() !== '' && formQuestionText.trim().toLowerCase() !== 'nueva pregunta')
-                      ? formQuestionText
-                      : savedQuestionDescription || savedQuestionText || `Pregunta ${questionId.slice(0, 8)}`;
+
+                  const titleFromForm = foundQuestion
+                    ? (foundQuestion.title || foundQuestion.label || foundQuestion.text)
+                    : undefined;
+                  const validSavedTitle =
+                    savedQuestionText &&
+                    typeof savedQuestionText === 'string' &&
+                    savedQuestionText.trim() !== '' &&
+                    savedQuestionText.trim().toLowerCase() !== 'nueva pregunta' &&
+                    savedQuestionText.trim().toLowerCase() !== 'nueva pregunta frecuente';
+
+                  // Título del campo: primero el guardado (`question`), luego el del formulario; la descripción es ayuda aparte
+                  if (validSavedTitle) {
+                    questionText = savedQuestionText.trim();
+                  } else if (
+                    titleFromForm &&
+                    String(titleFromForm).trim() !== '' &&
+                    String(titleFromForm).trim().toLowerCase() !== 'nueva pregunta'
+                  ) {
+                    questionText = String(titleFromForm).trim();
+                  } else if (
+                    savedQuestionDescription &&
+                    typeof savedQuestionDescription === 'string' &&
+                    savedQuestionDescription.trim() !== ''
+                  ) {
+                    questionText = savedQuestionDescription.trim();
                   } else {
-                    questionText = savedQuestionDescription || savedQuestionText || `Pregunta ${questionId.slice(0, 8)}`;
+                    questionText = `Pregunta ${questionId.slice(0, 8)}`;
+                  }
+
+                  const desc =
+                    typeof savedQuestionDescription === 'string' && savedQuestionDescription.trim() !== ''
+                      ? savedQuestionDescription.trim()
+                      : undefined;
+                  if (desc && desc !== questionText) {
+                    questionDescriptionOut = desc;
+                  } else if (foundQuestion?.description && String(foundQuestion.description).trim() !== '') {
+                    const fd = String(foundQuestion.description).trim();
+                    if (fd !== questionText) questionDescriptionOut = fd;
                   }
                   
                   answerValue = answerData.answer;
@@ -393,6 +412,10 @@ export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpe
                     ? (foundQuestion.title || foundQuestion.label || foundQuestion.text || `Pregunta ${questionId.slice(0, 8)}`)
                     : `Pregunta ${questionId.slice(0, 8)}`;
                   answerValue = answerData;
+                  if (foundQuestion?.description && String(foundQuestion.description).trim() !== '') {
+                    const fd = String(foundQuestion.description).trim();
+                    if (fd !== questionText) questionDescriptionOut = fd;
+                  }
                 }
                 
                 const formatAnswer = (value: any): string => {
@@ -408,6 +431,7 @@ export const ClientProfileView = ({ client, onBack, onEdit, onCreateChild, onOpe
                 answers.push({
                   section: sectionName,
                   question: questionText,
+                  ...(questionDescriptionOut ? { questionDescription: questionDescriptionOut } : {}),
                   answer: Array.isArray(answerValue)
                     ? answerValue.map((v) => formatAnswer(v)).join(', ')
                     : formatAnswer(answerValue),

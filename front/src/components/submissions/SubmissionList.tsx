@@ -10,6 +10,7 @@ import { jsPDF } from 'jspdf';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { formatPhoneNumberDisplay } from '@/lib/phone';
+import { parseFormSectionsFromApi } from '@/lib/formSections';
 
 interface SubmissionListProps {
   submissions: FormSubmission[];
@@ -127,8 +128,11 @@ export const SubmissionList = ({
       }
       
       // Otherwise, fall back to form sections
-      if (submission.form && submission.form.sections) {
-        return submission.form.sections.flatMap(section => section.questions || []);
+      if (submission.form) {
+        const sections = parseFormSectionsFromApi(submission.form.sections);
+        if (sections.length > 0) {
+          return sections.flatMap(section => section.questions || []);
+        }
       }
       
       return [];

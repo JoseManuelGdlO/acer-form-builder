@@ -16,6 +16,7 @@ import { es } from 'date-fns/locale';
 import { api } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatPhoneNumberDisplay } from '@/lib/phone';
+import { parseFormSectionsFromApi } from '@/lib/formSections';
 
 interface SubmissionDetailModalProps {
   submission: FormSubmission | null;
@@ -62,7 +63,7 @@ export const SubmissionDetailModal = ({
             id: response.form.id,
             name: response.form.name,
             description: response.form.description || '',
-            sections: response.form.sections || [],
+            sections: parseFormSectionsFromApi(response.form.sections ?? []),
             createdAt: response.form.created_at ? new Date(response.form.created_at) : new Date(response.form.createdAt || Date.now()),
             updatedAt: response.form.updated_at ? new Date(response.form.updated_at) : new Date(response.form.updatedAt || Date.now()),
           } : undefined,
@@ -107,6 +108,7 @@ export const SubmissionDetailModal = ({
   const getQuestionAnswerPairs = (): QuestionAnswerPair[] => {
     const pairs: QuestionAnswerPair[] = [];
     const formToUse = fullSubmission?.form || submission?.form;
+    const sectionsList = parseFormSectionsFromApi(formToUse?.sections);
 
     Object.entries(rawAnswers).forEach(([questionId, answerData]) => {
       const isNewFormat =
@@ -117,13 +119,11 @@ export const SubmissionDetailModal = ({
 
       // Find section name for this question
       let sectionName = 'Sin sección';
-      if (formToUse?.sections) {
-        for (const section of formToUse.sections) {
-          const question = section.questions?.find((q: any) => q.id === questionId);
-          if (question) {
-            sectionName = section.title || 'Sin sección';
-            break;
-          }
+      for (const section of sectionsList) {
+        const question = section.questions?.find((q: any) => q.id === questionId);
+        if (question) {
+          sectionName = section.title || 'Sin sección';
+          break;
         }
       }
 
@@ -157,9 +157,9 @@ export const SubmissionDetailModal = ({
       }
       
       const questionTitle =
-        formToUse?.sections
-          ?.flatMap((s: { questions?: { id: string; title?: string }[] }) => s.questions || [])
-          .find((q: { id: string; title?: string }) => q.id === questionId)?.title || `Pregunta (${questionId.slice(0, 8)}…)`;
+        sectionsList
+          .flatMap((s) => s.questions || [])
+          .find((q) => q.id === questionId)?.title || `Pregunta (${questionId.slice(0, 8)}…)`;
       pairs.push({
         id: questionId,
         question: questionTitle,
@@ -283,9 +283,16 @@ export const SubmissionDetailModal = ({
                                   key={pair.id}
                                   className="bg-muted/30 rounded-lg p-3 border border-border/30"
                                 >
-                                  <p className="text-xs text-muted-foreground mb-1">
-                                    {pair.questionDescription || pair.question}
+                                  <p className="text-xs font-semibold text-foreground mb-0.5">
+                                    {pair.question}
                                   </p>
+                                  {pair.questionDescription &&
+                                  String(pair.questionDescription).trim() !== '' &&
+                                  pair.questionDescription !== pair.question ? (
+                                    <p className="text-xs text-muted-foreground mb-1">
+                                      {pair.questionDescription}
+                                    </p>
+                                  ) : null}
                                   <p className="text-sm text-foreground font-medium">
                                     {pair.answer === undefined ||
                                     pair.answer === null ||
