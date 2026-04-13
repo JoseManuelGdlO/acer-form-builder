@@ -1,5 +1,7 @@
 import { Response } from 'express';
 import { body, validationResult } from 'express-validator';
+import type { Transaction } from 'sequelize';
+import sequelize from '../config/database';
 import { ClientMessage, Client, Conversations } from '../models';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { MessageBusinessError } from '../errors/MessageBusinessError';
@@ -38,20 +40,25 @@ const createInternalMessage = async ({
   content,
   sender,
   senderId,
+  transaction,
 }: {
   companyId: string;
   clientId: string;
   content: string;
   sender: 'user' | 'client';
   senderId?: string;
+  transaction?: Transaction;
 }) => {
-  return ClientMessage.create({
-    companyId,
-    clientId,
-    content,
-    sender,
-    senderId: sender === 'user' ? senderId : undefined,
-  });
+  return ClientMessage.create(
+    {
+      companyId,
+      clientId,
+      content,
+      sender,
+      senderId: sender === 'user' ? senderId : undefined,
+    },
+    transaction ? { transaction } : undefined
+  );
 };
 
 export const getClientMessages = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -166,50 +173,70 @@ export const createMessage = [
 
       if (shouldUseTemplateFallback) {
         await sendWhatsappInitialTemplate(graphCtx, normalizedPhone);
-        await Conversations.create({
-          companyId,
-          phone: clientPhone,
-          mensaje: WHATSAPP_TEMPLATE_WINDOW_NOTICE,
-          from: 'bot',
-          fecha,
-          hora: hora as unknown as Date,
-          baja_logica: false,
-        });
-        const message = await createInternalMessage({
-          companyId,
-          clientId,
-          content: WHATSAPP_TEMPLATE_WINDOW_NOTICE,
-          sender,
-          senderId: req.user?.id,
-        });
-        res.status(201).json({
-          ...message.get({ plain: true }),
-          onlyTemplateSent: true,
-        });
+        const t = await sequelize.transaction();
+        try {
+          await Conversations.create(
+            {
+              companyId,
+              phone: clientPhone,
+              mensaje: WHATSAPP_TEMPLATE_WINDOW_NOTICE,
+              from: 'bot',
+              fecha,
+              hora: hora as unknown as Date,
+              baja_logica: false,
+            },
+            { transaction: t }
+          );
+          const message = await createInternalMessage({
+            companyId,
+            clientId,
+            content: WHATSAPP_TEMPLATE_WINDOW_NOTICE,
+            sender,
+            senderId: req.user?.id,
+            transaction: t,
+          });
+          await t.commit();
+          res.status(201).json({
+            ...message.get({ plain: true }),
+            onlyTemplateSent: true,
+          });
+        } catch (persistErr) {
+          await t.rollback();
+          throw persistErr;
+        }
         return;
       }
 
       await sendWhatsappTextMessage(graphCtx, normalizedPhone, content);
 
-      await Conversations.create({
-        companyId,
-        phone: clientPhone,
-        mensaje: content,
-        from: 'bot',
-        fecha,
-        hora: hora as unknown as Date,
-        baja_logica: false,
-      });
-
-      const message = await createInternalMessage({
-        companyId,
-        clientId,
-        content,
-        sender,
-        senderId: req.user?.id,
-      });
-
-      res.status(201).json(message);
+      const t = await sequelize.transaction();
+      try {
+        await Conversations.create(
+          {
+            companyId,
+            phone: clientPhone,
+            mensaje: content,
+            from: 'bot',
+            fecha,
+            hora: hora as unknown as Date,
+            baja_logica: false,
+          },
+          { transaction: t }
+        );
+        const message = await createInternalMessage({
+          companyId,
+          clientId,
+          content,
+          sender,
+          senderId: req.user?.id,
+          transaction: t,
+        });
+        await t.commit();
+        res.status(201).json(message);
+      } catch (persistErr) {
+        await t.rollback();
+        throw persistErr;
+      }
     } catch (error) {
       if (error instanceof MessageBusinessError) {
         res.status(error.status).json({

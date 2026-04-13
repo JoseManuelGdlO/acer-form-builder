@@ -41,15 +41,27 @@ export async function sendWhatsappTextMessage(
     }),
   });
 
+  const data = (await response.json().catch(() => null)) as
+    | { error?: { message?: string }; messages?: { id?: string }[] }
+    | null;
+
   if (!response.ok) {
-    const errorPayload = (await response.json().catch(() => null)) as
-      | { error?: { message?: string } }
-      | null;
-    const metaMessage = errorPayload?.error?.message;
+    const metaMessage = data?.error?.message;
     throw new MessageBusinessError(
       502,
       'WHATSAPP_SEND_FAILED',
       metaMessage || 'No se pudo enviar el mensaje de WhatsApp.'
+    );
+  }
+
+  if (data?.error?.message) {
+    throw new MessageBusinessError(502, 'WHATSAPP_SEND_FAILED', data.error.message);
+  }
+  if (!Array.isArray(data?.messages) || !data.messages[0]?.id) {
+    throw new MessageBusinessError(
+      502,
+      'WHATSAPP_SEND_FAILED',
+      'WhatsApp no confirmó el envío del mensaje.'
     );
   }
 }
@@ -85,15 +97,27 @@ export async function sendWhatsappInitialTemplate(ctx: WhatsAppGraphContext, to:
     }),
   });
 
+  const data = (await response.json().catch(() => null)) as
+    | { error?: { message?: string }; messages?: { id?: string }[] }
+    | null;
+
   if (!response.ok) {
-    const errorPayload = (await response.json().catch(() => null)) as
-      | { error?: { message?: string } }
-      | null;
-    const metaMessage = errorPayload?.error?.message;
+    const metaMessage = data?.error?.message;
     throw new MessageBusinessError(
       502,
       'WHATSAPP_TEMPLATE_SEND_FAILED',
       metaMessage || 'No se pudo enviar la plantilla de WhatsApp.'
+    );
+  }
+
+  if (data?.error?.message) {
+    throw new MessageBusinessError(502, 'WHATSAPP_TEMPLATE_SEND_FAILED', data.error.message);
+  }
+  if (!Array.isArray(data?.messages) || !data.messages[0]?.id) {
+    throw new MessageBusinessError(
+      502,
+      'WHATSAPP_TEMPLATE_SEND_FAILED',
+      'WhatsApp no confirmó el envío de la plantilla.'
     );
   }
 }
