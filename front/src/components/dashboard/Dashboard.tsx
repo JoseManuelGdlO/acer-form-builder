@@ -156,11 +156,11 @@ export const Dashboard = ({
     ? Math.round((submissionStats.completed / submissionStats.total) * 100) 
     : 0;
 
-  const approvedShareOfTotal = clientStats.total > 0
+  const activeClientRate = clientStats.total > 0
     ? Math.round((clientStats.active / clientStats.total) * 100)
     : 0;
 
-  // Alineado al filtro "Estado de Visa": solo plantillas activas del catálogo (ver mapServerClientStatsPayload / GET clients/stats)
+  // Mismas reglas que en Index (aprob / negad); totales vienen del API en clientStats, no de la página paginada
   const visaApprovalStats = useMemo(() => {
     const approved = clientStats.active;
     const denied = clientStats.inactive;
@@ -195,11 +195,11 @@ export const Dashboard = ({
         <StatCard
           title="Total Clientes"
           value={clientStats.total}
-          subtitle={`${clientStats.pending} otro estado de visa (catálogo activo)`}
+          subtitle={`${clientStats.active} activos`}
           icon={Users}
           color="primary"
           trend="up"
-          trendValue={`${approvedShareOfTotal}% con estado aprobado`}
+          trendValue={`${activeClientRate}% activos`}
         />
         <StatCard
           title="Respuestas"
@@ -220,14 +220,14 @@ export const Dashboard = ({
         <StatCard
           title="Visas Aprobadas vs Negadas"
           value={`${visaApprovalStats.approved} / ${visaApprovalStats.denied}`}
-          subtitle="Mismo criterio que el filtro por estado (plantillas activas)"
+          subtitle="Aprobadas / Negadas"
           icon={Scale}
           color="accent"
         />
         <StatCard
           title="Tasa de Aprobación de Visas"
           value={`${visaApprovalStats.rate}%`}
-          subtitle={`${visaApprovalStats.approved + visaApprovalStats.denied} en estado aprobado o negado`}
+          subtitle={`${visaApprovalStats.approved + visaApprovalStats.denied} casos evaluados`}
           icon={Percent}
           color="success"
         />
