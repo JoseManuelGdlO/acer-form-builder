@@ -3,6 +3,7 @@ import { body, validationResult } from 'express-validator';
 import { Conversations, Client } from '../models';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { createCompanyNotification } from './notifications.controller';
+import { recordConversationMessage } from '../services/conversationsPersistence.service';
 
 const normalizePhone = (phone: string): string => phone.replace(/\D/g, '');
 
@@ -30,22 +31,11 @@ const addConv = [
       const { phone, mensaje, from: fromBody } = req.body;
       const from = fromBody ?? 'usuario';
 
-      const now = new Date();
-      const fecha = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const hora = [
-        now.getHours().toString().padStart(2, '0'),
-        now.getMinutes().toString().padStart(2, '0'),
-        now.getSeconds().toString().padStart(2, '0'),
-      ].join(':');
-
-      const record = await Conversations.create({
+      const record = await recordConversationMessage({
         companyId,
         phone,
         mensaje,
         from,
-        fecha,
-        hora: hora as unknown as Date,
-        baja_logica: false,
       });
 
       if (from === 'usuario') {
