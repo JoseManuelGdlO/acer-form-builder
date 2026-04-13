@@ -11,6 +11,10 @@ import { sendWhatsappInitialTemplate, sendWhatsappTextMessage } from '../service
 
 const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 
+/** Mensaje guardado cuando solo se envía plantilla (ventana de 24h cerrada); el texto libre del agente no se envía ni se persiste. */
+const WHATSAPP_TEMPLATE_WINDOW_NOTICE =
+  'Se mandó una plantilla para abrir la conversación. Por favor espera a que el cliente conteste para poder empezar a hablar con él.';
+
 const normalizePhoneForWhatsapp = (phone: string): string => {
   const normalized = phone.replace(/\D/g, '');
   return normalized || phone.trim();
@@ -165,12 +169,24 @@ export const createMessage = [
         await Conversations.create({
           companyId,
           phone: clientPhone,
-          mensaje: `[Plantilla ${graphCtx.initialTemplateName} enviada]`,
+          mensaje: WHATSAPP_TEMPLATE_WINDOW_NOTICE,
           from: 'bot',
           fecha,
           hora: hora as unknown as Date,
           baja_logica: false,
         });
+        const message = await createInternalMessage({
+          companyId,
+          clientId,
+          content: WHATSAPP_TEMPLATE_WINDOW_NOTICE,
+          sender,
+          senderId: req.user?.id,
+        });
+        res.status(201).json({
+          ...message.get({ plain: true }),
+          onlyTemplateSent: true,
+        });
+        return;
       }
 
       await sendWhatsappTextMessage(graphCtx, normalizedPhone, content);
