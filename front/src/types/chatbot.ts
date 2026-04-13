@@ -17,6 +17,9 @@ export interface BotBehavior {
   fallbackMessage: string;
   responseDelay: number; // en milisegundos
   isActive: boolean;
+  branchesText: string;
+  socialLinks: string;
+  contactPhone: string;
 }
 
 export const DEFAULT_BOT_BEHAVIOR: BotBehavior = {
@@ -27,4 +30,7 @@ export const DEFAULT_BOT_BEHAVIOR: BotBehavior = {
   fallbackMessage: 'Lo siento, no tengo información sobre esa consulta. Por favor, contacta a nuestro equipo de soporte para más ayuda.',
   responseDelay: 500,
   isActive: true,
+  branchesText: '',
+  socialLinks: '',
+  contactPhone: '',
 };

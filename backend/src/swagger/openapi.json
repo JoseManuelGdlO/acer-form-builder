@@ -3800,6 +3800,54 @@
         }
       }
     },
+    "/api/messages/send-and-add-to-chat": {
+      "post": {
+        "tags": [
+          "messages"
+        ],
+        "operationId": "post__api_messages_send_and_add_to_chat",
+        "summary": "POST /api/messages/send-and-add-to-chat",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "phone": {
+                    "type": "string"
+                  },
+                  "mensaje": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "phone",
+                  "mensaje"
+                ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request (validation errors)"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
     "/api/messages/{id}": {
       "delete": {
         "tags": [
@@ -4073,7 +4121,7 @@
                 "type": "object",
                 "properties": {
                   "name": {
-                    "type": "integer"
+                    "type": "string"
                   },
                   "greeting": {
                     "type": "integer"
@@ -4092,6 +4140,15 @@
                   },
                   "isActive": {
                     "type": "boolean"
+                  },
+                  "branchesText": {
+                    "type": "string"
+                  },
+                  "socialLinks": {
+                    "type": "string"
+                  },
+                  "contactPhone": {
+                    "type": "string"
                   }
                 }
               }

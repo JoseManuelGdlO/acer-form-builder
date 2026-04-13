@@ -25,8 +25,11 @@ export const ChatbotSettings = () => {
   const { 
     faqs, 
     faqsLoading,
-    botBehavior, 
+    botBehavior,
+    botBehaviorLoading,
     fetchFAQs,
+    fetchBotBehavior,
+    flushBotBehavior,
     addFAQ, 
     updateFAQ, 
     deleteFAQ, 
@@ -37,7 +40,11 @@ export const ChatbotSettings = () => {
 
   useEffect(() => {
     fetchFAQs();
-  }, [fetchFAQs]);
+    fetchBotBehavior();
+    return () => {
+      void flushBotBehavior();
+    };
+  }, [fetchFAQs, fetchBotBehavior, flushBotBehavior]);
   
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -211,10 +218,16 @@ export const ChatbotSettings = () => {
         </TabsContent>
 
         <TabsContent value="behavior" className="mt-6">
-          <BotBehaviorSettings 
-            behavior={botBehavior} 
-            onUpdate={updateBotBehavior} 
-          />
+          {botBehaviorLoading ? (
+            <Card className="border-dashed">
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <Loader2 className="w-10 h-10 text-muted-foreground animate-spin mb-4" />
+                <p className="text-muted-foreground">Cargando configuración del bot...</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <BotBehaviorSettings behavior={botBehavior} onUpdate={updateBotBehavior} />
+          )}
         </TabsContent>
       </Tabs>
 

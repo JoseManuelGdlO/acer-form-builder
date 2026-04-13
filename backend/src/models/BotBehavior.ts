@@ -11,11 +11,18 @@ interface BotBehaviorAttributes {
   fallbackMessage: string;
   responseDelay: number;
   isActive: boolean;
+  branchesText: string | null;
+  socialLinks: string | null;
+  contactPhone: string | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
 
-interface BotBehaviorCreationAttributes extends Optional<BotBehaviorAttributes, 'id' | 'createdAt' | 'updatedAt'> {}
+interface BotBehaviorCreationAttributes
+  extends Optional<
+    BotBehaviorAttributes,
+    'id' | 'createdAt' | 'updatedAt' | 'branchesText' | 'socialLinks' | 'contactPhone'
+  > {}
 
 export class BotBehavior extends Model<BotBehaviorAttributes, BotBehaviorCreationAttributes> implements BotBehaviorAttributes {
   public id!: string;
@@ -27,6 +34,9 @@ export class BotBehavior extends Model<BotBehaviorAttributes, BotBehaviorCreatio
   public fallbackMessage!: string;
   public responseDelay!: number;
   public isActive!: boolean;
+  public branchesText!: string | null;
+  public socialLinks!: string | null;
+  public contactPhone!: string | null;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
 }
@@ -78,6 +88,18 @@ BotBehavior.init(
       type: DataTypes.BOOLEAN,
       defaultValue: true,
       allowNull: false,
+    },
+    branchesText: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
+    socialLinks: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
+    contactPhone: {
+      type: DataTypes.STRING(64),
+      allowNull: true,
     },
   },
   {

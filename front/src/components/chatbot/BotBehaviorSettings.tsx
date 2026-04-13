@@ -6,7 +6,17 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
-import { Bot, MessageSquare, Sparkles, Clock, AlertCircle, Power } from 'lucide-react';
+import {
+  Bot,
+  MessageSquare,
+  Sparkles,
+  Clock,
+  AlertCircle,
+  Power,
+  Building2,
+  Share2,
+  Phone,
+} from 'lucide-react';
 
 interface BotBehaviorSettingsProps {
   behavior: BotBehavior;
@@ -91,6 +101,57 @@ export const BotBehaviorSettings = ({ behavior, onUpdate }: BotBehaviorSettingsP
                 <SelectItem value="friendly">Amigable - Cercano y casual</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Sucursales y contacto */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Building2 className="w-5 h-5 text-primary" />
+            Sucursales y contacto
+          </CardTitle>
+          <CardDescription>
+            Información que el asistente puede usar al orientar a los clientes (texto libre).
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="branches-text">Sucursales</Label>
+            <Textarea
+              id="branches-text"
+              value={behavior.branchesText}
+              onChange={(e) => onUpdate({ branchesText: e.target.value })}
+              placeholder="Ej.: una sucursal por línea o direcciones y horarios"
+              rows={4}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="social-links" className="flex items-center gap-2">
+              <Share2 className="w-4 h-4" />
+              Enlaces a redes sociales
+            </Label>
+            <Textarea
+              id="social-links"
+              value={behavior.socialLinks}
+              onChange={(e) => onUpdate({ socialLinks: e.target.value })}
+              placeholder="Un enlace por línea (Instagram, Facebook, sitio web...)"
+              rows={3}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="contact-phone" className="flex items-center gap-2">
+              <Phone className="w-4 h-4" />
+              Teléfono de contacto
+            </Label>
+            <Input
+              id="contact-phone"
+              type="tel"
+              value={behavior.contactPhone}
+              onChange={(e) => onUpdate({ contactPhone: e.target.value })}
+              placeholder="Ej.: +52 55 1234 5678"
+            />
           </div>
         </CardContent>
       </Card>
