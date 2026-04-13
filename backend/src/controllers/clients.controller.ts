@@ -1198,7 +1198,8 @@ export const getClientStats = async (req: AuthRequest, res: Response): Promise<v
       res.status(401).json({ error: 'Authentication required' });
       return;
     }
-    const where: any = { companyId };
+    // Mismo alcance que GET /clients (listado): solo titulares, no familiares (parentClientId = null)
+    const where: any = { companyId, parentClientId: null };
 
     const assignedUserIdParam =
       typeof req.query.assignedUserId === 'string' ? req.query.assignedUserId.trim() : '';
