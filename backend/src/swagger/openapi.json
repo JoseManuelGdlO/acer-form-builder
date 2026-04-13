@@ -574,6 +574,9 @@
                   },
                   "parentClientId": {
                     "type": "string"
+                  },
+                  "assignedUserId": {
+                    "type": "string"
                   }
                 }
               }
@@ -1324,10 +1327,7 @@
                       "type": "string"
                     }
                   }
-                },
-                "required": [
-                  "title"
-                ]
+                }
               }
             }
           }

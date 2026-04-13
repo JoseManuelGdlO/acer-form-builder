@@ -2,21 +2,14 @@ import { Response } from 'express';
 import { body, validationResult } from 'express-validator';
 import { ClientMessage, Client, Conversations } from '../models';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { MessageBusinessError } from '../errors/MessageBusinessError';
+import {
+  findActiveWhatsappIntegrationByCompanyId,
+  whatsappIntegrationToGraphContext,
+} from '../services/whatsappIntegration.service';
+import { sendWhatsappInitialTemplate, sendWhatsappTextMessage } from '../services/whatsappGraph.service';
 
 const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
-
-class MessageBusinessError extends Error {
-  status: number;
-  code: string;
-  details?: Record<string, unknown>;
-
-  constructor(status: number, code: string, message: string, details?: Record<string, unknown>) {
-    super(message);
-    this.status = status;
-    this.code = code;
-    this.details = details;
-  }
-}
 
 const normalizePhoneForWhatsapp = (phone: string): string => {
   const normalized = phone.replace(/\D/g, '');
@@ -33,96 +26,6 @@ const getConversationDateParts = (): { fecha: Date; hora: string } => {
   ].join(':');
 
   return { fecha, hora };
-};
-
-const sendTextMessage = async (to: string, bodyText: string): Promise<void> => {
-  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-  const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
-  const version = process.env.WHATSAPP_VERSION || 'v22.0';
-
-  if (!phoneNumberId || !accessToken) {
-    throw new MessageBusinessError(
-      500,
-      'WHATSAPP_CONFIG_MISSING',
-      'No se pudo enviar el mensaje de WhatsApp por configuración faltante.'
-    );
-  }
-
-  const response = await fetch(`https://graph.facebook.com/${version}/${phoneNumberId}/messages`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${accessToken}`,
-    },
-    body: JSON.stringify({
-      messaging_product: 'whatsapp',
-      recipient_type: 'individual',
-      to,
-      type: 'text',
-      text: {
-        preview_url: false,
-        body: bodyText,
-      },
-    }),
-  });
-
-  if (!response.ok) {
-    const errorPayload = (await response.json().catch(() => null)) as
-      | { error?: { message?: string } }
-      | null;
-    const metaMessage = errorPayload?.error?.message;
-    throw new MessageBusinessError(
-      502,
-      'WHATSAPP_SEND_FAILED',
-      metaMessage || 'No se pudo enviar el mensaje de WhatsApp.'
-    );
-  }
-};
-
-const sendTemplateMessage = async (to: string): Promise<void> => {
-  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-  const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
-  const version = process.env.WHATSAPP_VERSION || 'v22.0';
-
-  if (!phoneNumberId || !accessToken) {
-    throw new MessageBusinessError(
-      500,
-      'WHATSAPP_CONFIG_MISSING',
-      'No se pudo enviar la plantilla de WhatsApp por configuración faltante.'
-    );
-  }
-
-  const response = await fetch(`https://graph.facebook.com/${version}/${phoneNumberId}/messages`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${accessToken}`,
-    },
-    body: JSON.stringify({
-      messaging_product: 'whatsapp',
-      recipient_type: 'individual',
-      to,
-      type: 'template',
-      template: {
-        name: 'mensaje_inicial',
-        language: {
-          code: 'es_MX',
-        },
-      },
-    }),
-  });
-
-  if (!response.ok) {
-    const errorPayload = (await response.json().catch(() => null)) as
-      | { error?: { message?: string } }
-      | null;
-    const metaMessage = errorPayload?.error?.message;
-    throw new MessageBusinessError(
-      502,
-      'WHATSAPP_TEMPLATE_SEND_FAILED',
-      metaMessage || 'No se pudo enviar la plantilla de WhatsApp.'
-    );
-  }
 };
 
 const createInternalMessage = async ({
@@ -247,12 +150,22 @@ export const createMessage = [
       const normalizedPhone = normalizePhoneForWhatsapp(clientPhone);
       const shouldUseTemplateFallback = !lastUserConversation || isWindowExpired;
 
+      const integration = await findActiveWhatsappIntegrationByCompanyId(companyId);
+      if (!integration) {
+        throw new MessageBusinessError(
+          422,
+          'WHATSAPP_INTEGRATION_NOT_CONFIGURED',
+          'No hay integración de WhatsApp activa para esta compañía. Solicita a un administrador que inserte los datos en la base de datos (tabla whatsapp_integrations).'
+        );
+      }
+      const graphCtx = whatsappIntegrationToGraphContext(integration);
+
       if (shouldUseTemplateFallback) {
-        await sendTemplateMessage(normalizedPhone);
+        await sendWhatsappInitialTemplate(graphCtx, normalizedPhone);
         await Conversations.create({
           companyId,
           phone: clientPhone,
-          mensaje: '[Plantilla mensaje_inicial enviada]',
+          mensaje: `[Plantilla ${graphCtx.initialTemplateName} enviada]`,
           from: 'bot',
           fecha,
           hora: hora as unknown as Date,
@@ -260,7 +173,7 @@ export const createMessage = [
         });
       }
 
-      await sendTextMessage(normalizedPhone, content);
+      await sendWhatsappTextMessage(graphCtx, normalizedPhone, content);
 
       await Conversations.create({
         companyId,

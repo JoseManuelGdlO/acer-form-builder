@@ -39,6 +39,7 @@ import { VisaStatusTemplate } from './VisaStatusTemplate';
 import { PushSubscription } from './PushSubscription';
 import { InternalAppointment } from './InternalAppointment';
 import { InternalAppointmentHistory } from './InternalAppointmentHistory';
+import { WhatsappIntegration } from './WhatsappIntegration';
 
 // Company relationships (multi-tenant)
 Company.hasMany(User, { foreignKey: 'companyId', as: 'users' });
@@ -83,6 +84,8 @@ Company.hasMany(VisaStatusTemplate, { foreignKey: 'companyId', as: 'visaStatusTe
 VisaStatusTemplate.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
 Company.hasMany(Conversations, { foreignKey: 'companyId', as: 'conversations' });
 Conversations.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+Company.hasOne(WhatsappIntegration, { foreignKey: 'companyId', as: 'whatsappIntegration' });
+WhatsappIntegration.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
 
 // Notifications relationships (multi-tenant)
 Company.hasMany(Notification, { foreignKey: 'companyId', as: 'notifications' });
@@ -311,4 +314,5 @@ export {
   PushSubscription,
   InternalAppointment,
   InternalAppointmentHistory,
+  WhatsappIntegration,
 };
