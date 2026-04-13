@@ -1212,6 +1212,11 @@ export const getClientStats = async (req: AuthRequest, res: Response): Promise<v
     }
 
     const total = await Client.count({ where });
+    const activeVisaStatusTemplates = await VisaStatusTemplate.findAll({
+      where: { companyId, isActive: true },
+      order: [['order', 'ASC']],
+      attributes: ['id', 'label', 'color'],
+    });
     const clients = await Client.findAll({
       where,
       attributes: ['visaStatusTemplateId'],
@@ -1230,6 +1235,12 @@ export const getClientStats = async (req: AuthRequest, res: Response): Promise<v
     res.json({
       total,
       visaStatusCounts: Object.values(visaStatusCounts),
+      /** Misma lista que el filtro "Estado de Visa" en clientes (solo activas) */
+      visaStatusTemplates: activeVisaStatusTemplates.map((t) => ({
+        id: t.id,
+        label: t.label,
+        color: t.color ?? null,
+      })),
     });
   } catch (error) {
     console.error('Get client stats error:', error);

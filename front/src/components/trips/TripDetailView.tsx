@@ -24,7 +24,7 @@ import {
   MapPinned,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { jsPDF } from 'jspdf';
 import { AddParticipantsToTripModal } from './AddParticipantsToTripModal';
@@ -252,7 +252,7 @@ export const TripDetailView = ({
   };
 
   const fmtLong = (d: string | null | undefined) =>
-    d ? format(new Date(d), "d 'de' MMMM yyyy", { locale: es }) : '';
+    d ? format(parseISO(d), "d 'de' MMMM yyyy", { locale: es }) : '';
   const departureStr = fmtLong(trip.departureDate);
   const returnStr = fmtLong(trip.returnDate);
   const visaDetail =

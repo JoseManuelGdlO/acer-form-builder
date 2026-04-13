@@ -84,6 +84,8 @@ export function BusLayoutRenderer({
         const isPending = isSeat && pendingSeatId === el.id;
         const Icon = ELEMENT_ICONS[el.type] ?? Armchair;
         const { w, h } = getElementSize(el);
+        const assignedClientName = isSeat ? ((assigned as any)?.client?.name as string | undefined) : undefined;
+        const assignedClientFirstName = clientFirstName(assignedClientName) ?? '—';
 
         return (
           <div
@@ -110,15 +112,22 @@ export function BusLayoutRenderer({
               if (!isSeat) return;
               if (!assigned && onSeatClick) onSeatClick(el.id);
             }}
+            title={isSeat && assignedClientName ? `Asiento ${el.label ?? el.id}: ${assignedClientName}` : undefined}
           >
-            <Icon className="w-4 h-4 shrink-0" />
-            <span className="text-[10px] font-medium truncate max-w-full">
-              {isSeat ? el.label ?? el.id : elementShortLabel(el.type)}
-            </span>
-            {isSeat && assigned && (
-              <span className="text-[9px] truncate max-w-full text-muted-foreground">
-                {clientFirstName((assigned as any)?.client?.name) ?? '—'}
-              </span>
+            {isSeat && assigned ? (
+              <>
+                <span className="text-[9px] font-semibold leading-none">{el.label ?? el.id}</span>
+                <span className="text-[8px] leading-[9px] text-center px-0.5 whitespace-normal break-words">
+                  {assignedClientFirstName}
+                </span>
+              </>
+            ) : (
+              <>
+                <Icon className="w-4 h-4 shrink-0" />
+                <span className="text-[10px] font-medium truncate max-w-full">
+                  {isSeat ? el.label ?? el.id : elementShortLabel(el.type)}
+                </span>
+              </>
             )}
           </div>
         );

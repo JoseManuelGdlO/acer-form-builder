@@ -9,7 +9,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { MapPin, MoreHorizontal, Eye, Pencil, Trash2, Calendar } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 interface TripCardProps {
@@ -24,7 +24,7 @@ interface TripCardProps {
 export const TripCard = ({ trip, onView, onEdit, onDelete, readOnly = false }: TripCardProps) => {
   const count = trip.participantCount ?? trip.participants?.length ?? 0;
   const fmtShort = (d: string | null | undefined) =>
-    d ? format(new Date(d), 'd MMM yyyy', { locale: es }) : '';
+    d ? format(parseISO(d), 'd MMM yyyy', { locale: es }) : '';
   const departure = fmtShort(trip.departureDate);
   const returnDate = fmtShort(trip.returnDate);
   const visa =

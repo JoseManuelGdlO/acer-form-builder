@@ -96,7 +96,7 @@ export const ClientCard = ({
               {(client.children?.length ?? 0) > 0 && (
                 <div className="flex items-center gap-1.5">
                   <User className="w-4 h-4" />
-                  <span>{client.children?.length} hijo(s)</span>
+                  <span>{client.children?.length} familiar(es)</span>
                 </div>
               )}
             </div>

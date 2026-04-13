@@ -123,7 +123,11 @@ export const ClientFormModal = ({
     setError('');
     setPhoneError('');
     setIsLoading(false);
-  }, [client, open, defaultParentClientId, defaultAssignedUserId, isAdmin, users, visaStatusTemplates]);
+    // No incluir `users` ni `visaStatusTemplates` en deps: el padre las refresca con
+    // clientes/submissions (polling, SW de WhatsApp) y nuevas referencias de array
+    // vaciarían el borrador. El otro useEffect aplica la plantilla por defecto al cargar.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intencional: solo al abrir / cambiar cliente
+  }, [client, open, defaultParentClientId, defaultAssignedUserId, isAdmin]);
 
   useEffect(() => {
     if (!open || client || formData.visaStatusTemplateId || visaStatusTemplates.length === 0) {

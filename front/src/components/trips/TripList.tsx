@@ -10,7 +10,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { MapPin, Plus, Search, Mail, Calendar as CalendarIcon, Check, X, List, CalendarDays, Bus } from 'lucide-react';
 import { toast } from 'sonner';
 import { SeatPickerModal } from './SeatPickerModal';
-import { format, startOfWeek, getDay, endOfDay } from 'date-fns';
+import { format, startOfWeek, getDay, endOfDay, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Calendar, dateFnsLocalizer } from 'react-big-calendar';
 import type { Event } from 'react-big-calendar';
@@ -124,23 +124,23 @@ export const TripList = ({
         out.push({
           id: `${trip.id}-cas`,
           title: `${titleBase} (CAS)`,
-          start: new Date(trip.casDepartureDate),
-          end: endOfDay(new Date(trip.casReturnDate)),
+          start: parseISO(trip.casDepartureDate),
+          end: endOfDay(parseISO(trip.casReturnDate)),
           resource: trip,
         });
         out.push({
           id: `${trip.id}-cons`,
           title: `${titleBase} (Consulado)`,
-          start: new Date(trip.consulateDepartureDate),
-          end: endOfDay(new Date(trip.consulateReturnDate)),
+          start: parseISO(trip.consulateDepartureDate),
+          end: endOfDay(parseISO(trip.consulateReturnDate)),
           resource: trip,
         });
       } else {
         out.push({
           id: trip.id,
           title: titleBase,
-          start: new Date(trip.departureDate),
-          end: endOfDay(new Date(trip.returnDate)),
+          start: parseISO(trip.departureDate),
+          end: endOfDay(parseISO(trip.returnDate)),
           resource: trip,
         });
       }
@@ -332,13 +332,13 @@ export const TripList = ({
                           <p className="flex items-center gap-1">
                             <CalendarIcon className="w-3.5 h-3.5 shrink-0" />
                             CAS:{' '}
-                            {format(new Date(inv.trip.casDepartureDate), 'd MMM yyyy', { locale: es })} –{' '}
-                            {format(new Date(inv.trip.casReturnDate), 'd MMM yyyy', { locale: es })}
+                            {format(parseISO(inv.trip.casDepartureDate), 'd MMM yyyy', { locale: es })} –{' '}
+                            {format(parseISO(inv.trip.casReturnDate), 'd MMM yyyy', { locale: es })}
                           </p>
                           <p className="flex items-center gap-1 pl-5">
                             Consulado:{' '}
-                            {format(new Date(inv.trip.consulateDepartureDate), 'd MMM yyyy', { locale: es })} –{' '}
-                            {format(new Date(inv.trip.consulateReturnDate), 'd MMM yyyy', { locale: es })}
+                            {format(parseISO(inv.trip.consulateDepartureDate), 'd MMM yyyy', { locale: es })} –{' '}
+                            {format(parseISO(inv.trip.consulateReturnDate), 'd MMM yyyy', { locale: es })}
                           </p>
                         </div>
                       ) : (
@@ -346,8 +346,8 @@ export const TripList = ({
                         inv.trip?.returnDate && (
                           <p className="text-sm text-muted-foreground flex items-center gap-1">
                             <CalendarIcon className="w-3.5 h-3.5" />
-                            {format(new Date(inv.trip.departureDate), 'd MMM yyyy', { locale: es })} –{' '}
-                            {format(new Date(inv.trip.returnDate), 'd MMM yyyy', { locale: es })}
+                            {format(parseISO(inv.trip.departureDate), 'd MMM yyyy', { locale: es })} –{' '}
+                            {format(parseISO(inv.trip.returnDate), 'd MMM yyyy', { locale: es })}
                           </p>
                         )
                       )}

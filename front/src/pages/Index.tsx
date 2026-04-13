@@ -84,23 +84,64 @@ const isWhatsappReplyEvent = (eventData: NotificationSyncEventData | null | unde
   return eventData.notificationData?.type === 'whatsapp_reply';
 };
 
-/** Respuesta de GET /clients/stats → mismas categorías que filteredClientStats (activo=aprobada, inactivo=negada, resto=pendiente) */
+/**
+ * GET /clients/stats — mismas reglas que el filtro "Estado de Visa" en clientes:
+ * solo plantillas activas del catálogo; conteos por id desde visaStatusCounts;
+ * aprobada/negada por etiqueta (aprob / negad) como en el resto del producto.
+ */
 function mapServerClientStatsPayload(data: {
   total?: number;
-  visaStatusCounts?: Array<{ label?: string; count?: number }>;
+  visaStatusCounts?: Array<{ id?: string; label?: string; count?: number }>;
+  visaStatusTemplates?: Array<{ id?: string; label?: string }>;
 }): { total: number; active: number; inactive: number; pending: number } {
   const total = typeof data.total === 'number' ? data.total : 0;
   const normalize = (s?: string | null) => (s || '').trim().toLowerCase();
+
+  const countsById = new Map<string, number>();
+  for (const row of data.visaStatusCounts || []) {
+    const id = row.id;
+    if (!id) continue;
+    countsById.set(id, typeof row.count === 'number' ? row.count : 0);
+  }
+
+  const catalog =
+    Array.isArray(data.visaStatusTemplates) && data.visaStatusTemplates.length > 0
+      ? data.visaStatusTemplates.filter((t): t is { id: string; label?: string } => typeof t.id === 'string')
+      : null;
+
   let active = 0;
   let inactive = 0;
-  for (const row of data.visaStatusCounts || []) {
-    const label = normalize(row.label);
-    const c = typeof row.count === 'number' ? row.count : 0;
-    if (label.includes('aprob')) active += c;
-    else if (label.includes('negad')) inactive += c;
+
+  if (catalog) {
+    for (const t of catalog) {
+      const count = countsById.get(t.id) ?? 0;
+      const label = normalize(t.label);
+      if (label.includes('aprob')) active += count;
+      else if (label.includes('negad')) inactive += count;
+    }
+  } else {
+    for (const row of data.visaStatusCounts || []) {
+      const label = normalize(row.label);
+      const c = typeof row.count === 'number' ? row.count : 0;
+      if (label.includes('aprob')) active += c;
+      else if (label.includes('negad')) inactive += c;
+    }
   }
+
   const pending = Math.max(0, total - active - inactive);
   return { total, active, inactive, pending };
+}
+
+function visaStatusCountsFromStatsRaw(raw: unknown): Record<string, number> {
+  if (!raw || typeof raw !== 'object') return {};
+  const rows = (raw as { visaStatusCounts?: Array<{ id?: string; count?: number }> }).visaStatusCounts;
+  const out: Record<string, number> = {};
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const id = row.id;
+    if (!id) continue;
+    out[id] = typeof row.count === 'number' ? row.count : 0;
+  }
+  return out;
 }
 
 const Index = () => {
@@ -218,6 +259,8 @@ const Index = () => {
   } | null>(null);
   /** Total de clientes del alcance actual (empresa o asesor en "Ver como"), sin filtros del listado — nav y resumen de clientes */
   const [clientsScopeTotal, setClientsScopeTotal] = useState<number | null>(null);
+  /** Conteos por plantilla de estado (GET /clients/stats); alinea pastillas del filtro con el total real, no solo la página */
+  const [clientVisaStatusCounts, setClientVisaStatusCounts] = useState<Record<string, number>>({});
   const { categories, fetchCategories, createCategory, updateCategory, deleteCategory } = useCategoryStore();
 
   const areClientQueriesEqual = (
@@ -343,11 +386,23 @@ const Index = () => {
       fetchSubmissions().catch((error) => {
         console.error('Failed to refresh submissions after WhatsApp reply:', error);
       });
+      const aid =
+        viewingAs && !viewingAs.roles.includes('super_admin')
+          ? viewingAs.id
+          : hasRole('super_admin') && clientListQuery.assignedUserId?.trim()
+            ? clientListQuery.assignedUserId.trim()
+            : undefined;
+      getClientStats(token, aid ? { assignedUserId: aid } : undefined)
+        .then((raw) => {
+          if (typeof raw.total === 'number') setClientsScopeTotal(raw.total);
+          setClientVisaStatusCounts(visaStatusCountsFromStatsRaw(raw));
+        })
+        .catch(() => {});
     };
 
     navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
     return () => navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage);
-  }, [token, clientListQuery, fetchClients, fetchSubmissions]);
+  }, [token, clientListQuery, fetchClients, fetchSubmissions, getClientStats, viewingAs, hasRole]);
 
   useEffect(() => {
     if (!token || activeView !== 'clients') return;
@@ -359,10 +414,22 @@ const Index = () => {
       fetchSubmissions().catch((error) => {
         console.error('Failed to refresh submissions by polling:', error);
       });
+      const aid =
+        viewingAs && !viewingAs.roles.includes('super_admin')
+          ? viewingAs.id
+          : hasRole('super_admin') && clientListQuery.assignedUserId?.trim()
+            ? clientListQuery.assignedUserId.trim()
+            : undefined;
+      getClientStats(token, aid ? { assignedUserId: aid } : undefined)
+        .then((raw) => {
+          if (typeof raw.total === 'number') setClientsScopeTotal(raw.total);
+          setClientVisaStatusCounts(visaStatusCountsFromStatsRaw(raw));
+        })
+        .catch(() => {});
     }, 60000);
 
     return () => window.clearInterval(intervalId);
-  }, [token, activeView, clientListQuery, fetchClients, fetchSubmissions]);
+  }, [token, activeView, clientListQuery, fetchClients, fetchSubmissions, getClientStats, viewingAs, hasRole]);
 
   // Inicio: totales reales (la lista de clientes va paginada; no usar solo clients.length)
   useEffect(() => {
@@ -386,20 +453,28 @@ const Index = () => {
   useEffect(() => {
     if (!token) return;
     let cancelled = false;
-    const assignedUserId =
-      viewingAs && !viewingAs.roles.includes('super_admin') ? viewingAs.id : undefined;
-    getClientStats(token, assignedUserId ? { assignedUserId } : undefined)
+    const assignedUserIdForStats =
+      viewingAs && !viewingAs.roles.includes('super_admin')
+        ? viewingAs.id
+        : hasRole('super_admin') && clientListQuery.assignedUserId?.trim()
+          ? clientListQuery.assignedUserId.trim()
+          : undefined;
+    getClientStats(token, assignedUserIdForStats ? { assignedUserId: assignedUserIdForStats } : undefined)
       .then((raw) => {
         if (cancelled) return;
         setClientsScopeTotal(typeof raw.total === 'number' ? raw.total : null);
+        setClientVisaStatusCounts(visaStatusCountsFromStatsRaw(raw));
       })
       .catch(() => {
-        if (!cancelled) setClientsScopeTotal(null);
+        if (!cancelled) {
+          setClientsScopeTotal(null);
+          setClientVisaStatusCounts({});
+        }
       });
     return () => {
       cancelled = true;
     };
-  }, [token, viewingAs, getClientStats]);
+  }, [token, viewingAs, clientListQuery.assignedUserId, getClientStats, hasRole]);
 
   useEffect(() => {
     if (!token) return;
@@ -459,16 +534,23 @@ const Index = () => {
   }, [activeView, token, hasRole]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Wrapper functions to pass token automatically
+  const assignedUserIdForClientStats = () =>
+    viewingAs && !viewingAs.roles.includes('super_admin')
+      ? viewingAs.id
+      : hasRole('super_admin') && clientListQuery.assignedUserId?.trim()
+        ? clientListQuery.assignedUserId.trim()
+        : undefined;
+
   const createClient = async (clientData: Omit<Client, 'id' | 'createdAt' | 'updatedAt' | 'formsCompleted'>) => {
     if (!token) {
       throw new Error('No token available');
     }
     const created = await createClientStore(token, clientData);
-    const assignedUserId =
-      viewingAs && !viewingAs.roles.includes('super_admin') ? viewingAs.id : undefined;
-    getClientStats(token, assignedUserId ? { assignedUserId } : undefined)
+    const aid = assignedUserIdForClientStats();
+    getClientStats(token, aid ? { assignedUserId: aid } : undefined)
       .then((raw) => {
         if (typeof raw.total === 'number') setClientsScopeTotal(raw.total);
+        setClientVisaStatusCounts(visaStatusCountsFromStatsRaw(raw));
       })
       .catch(() => {});
     return created;
@@ -478,7 +560,15 @@ const Index = () => {
     if (!token) {
       throw new Error('No token available');
     }
-    return updateClientStore(token, clientId, updates);
+    const result = await updateClientStore(token, clientId, updates);
+    const aid = assignedUserIdForClientStats();
+    getClientStats(token, aid ? { assignedUserId: aid } : undefined)
+      .then((raw) => {
+        if (typeof raw.total === 'number') setClientsScopeTotal(raw.total);
+        setClientVisaStatusCounts(visaStatusCountsFromStatsRaw(raw));
+      })
+      .catch(() => {});
+    return result;
   };
 
   const deleteClient = async (clientId: string) => {
@@ -486,11 +576,11 @@ const Index = () => {
       throw new Error('No token available');
     }
     await deleteClientStore(token, clientId);
-    const assignedUserId =
-      viewingAs && !viewingAs.roles.includes('super_admin') ? viewingAs.id : undefined;
-    getClientStats(token, assignedUserId ? { assignedUserId } : undefined)
+    const aid = assignedUserIdForClientStats();
+    getClientStats(token, aid ? { assignedUserId: aid } : undefined)
       .then((raw) => {
         if (typeof raw.total === 'number') setClientsScopeTotal(raw.total);
+        setClientVisaStatusCounts(visaStatusCountsFromStatsRaw(raw));
       })
       .catch(() => {});
   };
@@ -524,19 +614,28 @@ const Index = () => {
 
   const filteredClientStats = useMemo(() => {
     const normalize = (s?: string | null) => (s || '').trim().toLowerCase();
-    const approved = filteredClients.filter(c => normalize(c.visaStatusTemplate?.label).includes('aprob')).length;
-    const denied = filteredClients.filter(c => normalize(c.visaStatusTemplate?.label).includes('negad')).length;
-    const inProcess = filteredClients.filter(c => {
+    const activeIds = new Set(visaStatusTemplates.map((t) => t.id));
+    let approved = 0;
+    let denied = 0;
+    let other = 0;
+    for (const c of filteredClients) {
+      const tid = c.visaStatusTemplateId;
+      if (!tid || !activeIds.has(tid)) {
+        other++;
+        continue;
+      }
       const label = normalize(c.visaStatusTemplate?.label);
-      return !label.includes('aprob') && !label.includes('negad');
-    }).length;
+      if (label.includes('aprob')) approved++;
+      else if (label.includes('negad')) denied++;
+      else other++;
+    }
     return {
       total: filteredClients.length,
       active: approved,
       inactive: denied,
-      pending: inProcess,
+      pending: other,
     };
-  }, [filteredClients]);
+  }, [filteredClients, visaStatusTemplates]);
 
   const handleClientFiltersChange = useCallback((filters: {
     q?: string;
@@ -759,6 +858,7 @@ const Index = () => {
             clients={filteredClients}
             products={products}
             visaStatusTemplates={visaStatusTemplates}
+            visaStatusCountsByTemplateId={clientVisaStatusCounts}
             stats={{ total: clientsScopeTotal ?? clientPagination.total }}
             initialClientId={initialNavigation.initialClientId}
             onDelete={deleteClient}

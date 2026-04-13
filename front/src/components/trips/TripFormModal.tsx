@@ -15,6 +15,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { MapPin, Users } from 'lucide-react';
+import { format } from 'date-fns';
 
 export interface TripFormSaveData {
   title: string;
@@ -89,7 +90,7 @@ export const TripFormModal = ({
       setTitle('');
       setDestination('');
       setIsVisaTrip(false);
-      const today = new Date().toISOString().slice(0, 10);
+      const today = format(new Date(), 'yyyy-MM-dd');
       setDepartureDate(today);
       setReturnDate(today);
       setCasDepartureDate(today);

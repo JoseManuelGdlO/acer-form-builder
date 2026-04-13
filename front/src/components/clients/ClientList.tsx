@@ -34,6 +34,8 @@ interface ClientListProps {
   clients: Client[];
   products?: Product[];
   visaStatusTemplates?: VisaStatusTemplate[];
+  /** Conteos reales por plantilla (GET /clients/stats); si falta, los chips usan solo la página actual */
+  visaStatusCountsByTemplateId?: Record<string, number>;
   stats: {
     total: number;
   };
@@ -78,6 +80,7 @@ export const ClientList = ({
   clients,
   products = [],
   visaStatusTemplates = [],
+  visaStatusCountsByTemplateId,
   stats,
   onDelete,
   onCreate,
@@ -380,11 +383,24 @@ export const ClientList = ({
   });
 
   const visaStatusFilterButtons = useMemo(() => {
+    const countsMap = visaStatusCountsByTemplateId ?? {};
+    const hasServerVisaCounts = Object.keys(countsMap).length > 0;
+    const useServerVisaCounts =
+      hasServerVisaCounts &&
+      visaStatusFilter === 'all' &&
+      !searchQuery.trim() &&
+      checklistFilter === 'all' &&
+      productFilter === 'all' &&
+      branchFilter === 'all' &&
+      advisorFilter === 'all';
+
     const buttons: { key: VisaStatusFilterType; label: string; icon: React.ReactNode; count: number }[] = [
       { key: 'all', label: 'Todos', icon: <Users className="w-4 h-4" />, count: stats.total },
     ];
     visaStatusTemplates.forEach((template) => {
-      const count = clients.filter((client) => client.visaStatusTemplateId === template.id).length;
+      const count = useServerVisaCounts
+        ? (countsMap[template.id] ?? 0)
+        : clients.filter((client) => client.visaStatusTemplateId === template.id).length;
       buttons.push({
         key: template.id,
         label: template.label,
@@ -398,7 +414,18 @@ export const ClientList = ({
       });
     });
     return buttons;
-  }, [clients, stats.total, visaStatusTemplates]);
+  }, [
+    clients,
+    stats.total,
+    visaStatusTemplates,
+    visaStatusCountsByTemplateId,
+    searchQuery,
+    visaStatusFilter,
+    checklistFilter,
+    productFilter,
+    branchFilter,
+    advisorFilter,
+  ]);
 
   const checklistFilterButtons = useMemo(() => {
     const buttons: { key: ChecklistFilterType; label: string; icon: React.ReactNode; count: number; color: string }[] = [
