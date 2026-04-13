@@ -77,6 +77,28 @@ interface ClientProfileViewProps {
   onRemoveFamilyMember?: (childClientId: string) => Promise<void>;
 }
 
+const DEDUPE_AGENT_BOT_ECHO_MS = 5000;
+
+/** Evita dos burbujas agente cuando el mismo envío está en client_messages y en conversations (eco bot). */
+function mergeChatMessagesDedupingBotEcho(
+  chatMessages: ChatMessage[],
+  conversationChatMessages: ChatMessage[]
+): ChatMessage[] {
+  const agentFromClientMessages = chatMessages.filter((m) => m.sender === 'agent');
+  const filteredConv = conversationChatMessages.filter((m) => {
+    if (m.sender !== 'agent') return true;
+    const isEcho = agentFromClientMessages.some(
+      (cm) =>
+        cm.content === m.content &&
+        Math.abs(cm.timestamp.getTime() - m.timestamp.getTime()) < DEDUPE_AGENT_BOT_ECHO_MS
+    );
+    return !isEcho;
+  });
+  return [...chatMessages, ...filteredConv].sort(
+    (a, b) => a.timestamp.getTime() - b.timestamp.getTime()
+  );
+}
+
 export const ClientProfileView = ({
   client,
   users = [],
@@ -333,9 +355,7 @@ export const ClientProfileView = ({
         timestamp: new Date(m.created_at || m.createdAt),
       }));
 
-      const mergedMessages = [...chatMessages, ...botChatMessages].sort(
-        (a, b) => a.timestamp.getTime() - b.timestamp.getTime()
-      );
+      const mergedMessages = mergeChatMessagesDedupingBotEcho(chatMessages, botChatMessages);
       setMessages(mergedMessages);
 
       // Transform submissions - need to get form structure to map answers
@@ -658,14 +678,20 @@ export const ClientProfileView = ({
 
   const handleSendMessage = async (content: string) => {
     if (!token) return;
+    const trimmed = content.trim();
     try {
-      const newMessage = await api.createMessage(client.id, content, 'user', token);
+      const newMessage = await api.createMessage(client.id, trimmed, 'user', token);
       const message: ChatMessage = {
         id: newMessage.id,
         content: newMessage.content,
         sender: 'agent',
         timestamp: new Date(newMessage.created_at || newMessage.createdAt),
       };
+      if (newMessage.onlyTemplateSent === true || newMessage.only_template_sent === true) {
+        toast.info(
+          'Tu mensaje no se envió por WhatsApp todavía. Se envió solo la plantilla; cuando el cliente responda podrás escribir con normalidad.'
+        );
+      }
       setMessages(prev => [...prev, message]);
     } catch (error: any) {
       toast.error(error.message || 'Error al enviar el mensaje');

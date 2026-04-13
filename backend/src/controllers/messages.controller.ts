@@ -1,27 +1,29 @@
 import { Response } from 'express';
 import { body, validationResult } from 'express-validator';
+import type { Transaction } from 'sequelize';
+import sequelize from '../config/database';
 import { ClientMessage, Client, Conversations } from '../models';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { MessageBusinessError } from '../errors/MessageBusinessError';
+import {
+  findActiveWhatsappIntegrationByCompanyId,
+  whatsappIntegrationToGraphContext,
+} from '../services/whatsappIntegration.service';
+import { sendWhatsappInitialTemplate, sendWhatsappTextMessage } from '../services/whatsappGraph.service';
+import { recordConversationMessage } from '../services/conversationsPersistence.service';
 
 const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 
-class MessageBusinessError extends Error {
-  status: number;
-  code: string;
-  details?: Record<string, unknown>;
-
-  constructor(status: number, code: string, message: string, details?: Record<string, unknown>) {
-    super(message);
-    this.status = status;
-    this.code = code;
-    this.details = details;
-  }
-}
+/** Mensaje guardado cuando solo se envía plantilla (ventana de 24h cerrada); el texto libre del agente no se envía ni se persiste. */
+const WHATSAPP_TEMPLATE_WINDOW_NOTICE =
+  'Se mandó una plantilla para abrir la conversación. Por favor espera a que el cliente conteste para poder empezar a hablar con él.';
 
 const normalizePhoneForWhatsapp = (phone: string): string => {
   const normalized = phone.replace(/\D/g, '');
   return normalized || phone.trim();
 };
+
+const normalizePhoneDigits = (phone: string): string => phone.replace(/\D/g, '');
 
 const getConversationDateParts = (): { fecha: Date; hora: string } => {
   const now = new Date();
@@ -35,116 +37,31 @@ const getConversationDateParts = (): { fecha: Date; hora: string } => {
   return { fecha, hora };
 };
 
-const sendTextMessage = async (to: string, bodyText: string): Promise<void> => {
-  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-  const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
-  const version = process.env.WHATSAPP_VERSION || 'v22.0';
-
-  if (!phoneNumberId || !accessToken) {
-    throw new MessageBusinessError(
-      500,
-      'WHATSAPP_CONFIG_MISSING',
-      'No se pudo enviar el mensaje de WhatsApp por configuración faltante.'
-    );
-  }
-
-  const response = await fetch(`https://graph.facebook.com/${version}/${phoneNumberId}/messages`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${accessToken}`,
-    },
-    body: JSON.stringify({
-      messaging_product: 'whatsapp',
-      recipient_type: 'individual',
-      to,
-      type: 'text',
-      text: {
-        preview_url: false,
-        body: bodyText,
-      },
-    }),
-  });
-
-  if (!response.ok) {
-    const errorPayload = (await response.json().catch(() => null)) as
-      | { error?: { message?: string } }
-      | null;
-    const metaMessage = errorPayload?.error?.message;
-    throw new MessageBusinessError(
-      502,
-      'WHATSAPP_SEND_FAILED',
-      metaMessage || 'No se pudo enviar el mensaje de WhatsApp.'
-    );
-  }
-};
-
-const sendTemplateMessage = async (to: string): Promise<void> => {
-  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-  const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
-  const version = process.env.WHATSAPP_VERSION || 'v22.0';
-
-  if (!phoneNumberId || !accessToken) {
-    throw new MessageBusinessError(
-      500,
-      'WHATSAPP_CONFIG_MISSING',
-      'No se pudo enviar la plantilla de WhatsApp por configuración faltante.'
-    );
-  }
-
-  const response = await fetch(`https://graph.facebook.com/${version}/${phoneNumberId}/messages`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${accessToken}`,
-    },
-    body: JSON.stringify({
-      messaging_product: 'whatsapp',
-      recipient_type: 'individual',
-      to,
-      type: 'template',
-      template: {
-        name: 'mensaje_inicial',
-        language: {
-          code: 'es_MX',
-        },
-      },
-    }),
-  });
-
-  if (!response.ok) {
-    const errorPayload = (await response.json().catch(() => null)) as
-      | { error?: { message?: string } }
-      | null;
-    const metaMessage = errorPayload?.error?.message;
-    throw new MessageBusinessError(
-      502,
-      'WHATSAPP_TEMPLATE_SEND_FAILED',
-      metaMessage || 'No se pudo enviar la plantilla de WhatsApp.'
-    );
-  }
-};
-
 const createInternalMessage = async ({
   companyId,
   clientId,
   content,
   sender,
   senderId,
+  transaction,
 }: {
   companyId: string;
   clientId: string;
   content: string;
   sender: 'user' | 'client';
   senderId?: string;
+  transaction?: Transaction;
 }) => {
-  return ClientMessage.create({
-    companyId,
-    clientId,
-    content,
-    sender,
-    senderId: sender === 'user' ? senderId : undefined,
-  });
+  return ClientMessage.create(
+    {
+      companyId,
+      clientId,
+      content,
+      sender,
+      senderId: sender === 'user' ? senderId : undefined,
+    },
+    transaction ? { transaction } : undefined
+  );
 };
 
 export const getClientMessages = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -176,6 +93,122 @@ export const getClientMessages = async (req: AuthRequest, res: Response): Promis
     res.status(500).json({ error: 'Internal server error' });
   }
 };
+
+const findPrimaryClientsMatchingPhoneDigits = async (
+  companyId: string,
+  phoneDigits: string
+): Promise<Client[]> => {
+  if (!phoneDigits) return [];
+  const candidateClients = await Client.findAll({
+    where: {
+      parentClientId: null,
+      companyId,
+    },
+    attributes: ['id', 'name', 'phone', 'companyId'],
+  });
+  return candidateClients.filter((client) => {
+    const clientPhone = typeof client.phone === 'string' ? client.phone : '';
+    if (!clientPhone) return false;
+    return normalizePhoneDigits(clientPhone) === phoneDigits;
+  });
+};
+
+/** n8n: envía texto WhatsApp (sin ventana 24h) y persiste como addChat (`from: bot`). Opcional ClientMessage si hay un solo titular con ese teléfono. */
+export const sendAndAddToChat = [
+  body('phone').isString().notEmpty().withMessage('phone is required'),
+  body('mensaje').isString().notEmpty().withMessage('mensaje is required'),
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        res.status(400).json({ errors: errors.array() });
+        return;
+      }
+
+      const companyId = req.user?.companyId;
+      if (!companyId) {
+        res.status(401).json({ error: 'Authentication required' });
+        return;
+      }
+
+      const phone = req.body.phone as string;
+      const mensaje = req.body.mensaje as string;
+
+      const phoneDigits = normalizePhoneDigits(phone);
+      const matchedClients = await findPrimaryClientsMatchingPhoneDigits(companyId, phoneDigits);
+      if (matchedClients.length > 1) {
+        res.status(409).json({
+          error: 'Varios clientes titulares comparten este teléfono; usa POST /api/messages/clients/:clientId con el cliente concreto.',
+          code: 'MULTIPLE_CLIENTS_MATCH_PHONE',
+        });
+        return;
+      }
+
+      const integration = await findActiveWhatsappIntegrationByCompanyId(companyId);
+      if (!integration) {
+        throw new MessageBusinessError(
+          422,
+          'WHATSAPP_INTEGRATION_NOT_CONFIGURED',
+          'No hay integración de WhatsApp activa para esta compañía. Solicita a un administrador que inserte los datos en la base de datos (tabla whatsapp_integrations).'
+        );
+      }
+      const graphCtx = whatsappIntegrationToGraphContext(integration);
+      const normalizedPhone = normalizePhoneForWhatsapp(phone);
+
+      await sendWhatsappTextMessage(graphCtx, normalizedPhone, mensaje);
+
+      const singleClient = matchedClients.length === 1 ? matchedClients[0] : null;
+
+      if (singleClient) {
+        const t = await sequelize.transaction();
+        try {
+          const record = await recordConversationMessage({
+            companyId,
+            phone,
+            mensaje,
+            from: 'bot',
+            transaction: t,
+          });
+          const clientMessage = await createInternalMessage({
+            companyId,
+            clientId: singleClient.id,
+            content: mensaje,
+            sender: 'user',
+            senderId: req.user?.id,
+            transaction: t,
+          });
+          await t.commit();
+          res.status(201).json({
+            ...record.get({ plain: true }),
+            clientMessage: clientMessage.get({ plain: true }),
+          });
+        } catch (persistErr) {
+          await t.rollback();
+          throw persistErr;
+        }
+      } else {
+        const record = await recordConversationMessage({
+          companyId,
+          phone,
+          mensaje,
+          from: 'bot',
+        });
+        res.status(201).json(record.get({ plain: true }));
+      }
+    } catch (error) {
+      if (error instanceof MessageBusinessError) {
+        res.status(error.status).json({
+          error: error.message,
+          code: error.code,
+          details: error.details,
+        });
+        return;
+      }
+      console.error('sendAndAddToChat error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  },
+];
 
 export const createMessage = [
   body('content').notEmpty().withMessage('Content is required'),
@@ -247,40 +280,82 @@ export const createMessage = [
       const normalizedPhone = normalizePhoneForWhatsapp(clientPhone);
       const shouldUseTemplateFallback = !lastUserConversation || isWindowExpired;
 
+      const integration = await findActiveWhatsappIntegrationByCompanyId(companyId);
+      if (!integration) {
+        throw new MessageBusinessError(
+          422,
+          'WHATSAPP_INTEGRATION_NOT_CONFIGURED',
+          'No hay integración de WhatsApp activa para esta compañía. Solicita a un administrador que inserte los datos en la base de datos (tabla whatsapp_integrations).'
+        );
+      }
+      const graphCtx = whatsappIntegrationToGraphContext(integration);
+
       if (shouldUseTemplateFallback) {
-        await sendTemplateMessage(normalizedPhone);
-        await Conversations.create({
-          companyId,
-          phone: clientPhone,
-          mensaje: '[Plantilla mensaje_inicial enviada]',
-          from: 'bot',
-          fecha,
-          hora: hora as unknown as Date,
-          baja_logica: false,
-        });
+        await sendWhatsappInitialTemplate(graphCtx, normalizedPhone);
+        const t = await sequelize.transaction();
+        try {
+          await Conversations.create(
+            {
+              companyId,
+              phone: clientPhone,
+              mensaje: WHATSAPP_TEMPLATE_WINDOW_NOTICE,
+              from: 'bot',
+              fecha,
+              hora: hora as unknown as Date,
+              baja_logica: false,
+            },
+            { transaction: t }
+          );
+          const message = await createInternalMessage({
+            companyId,
+            clientId,
+            content: WHATSAPP_TEMPLATE_WINDOW_NOTICE,
+            sender,
+            senderId: req.user?.id,
+            transaction: t,
+          });
+          await t.commit();
+          res.status(201).json({
+            ...message.get({ plain: true }),
+            onlyTemplateSent: true,
+          });
+        } catch (persistErr) {
+          await t.rollback();
+          throw persistErr;
+        }
+        return;
       }
 
-      await sendTextMessage(normalizedPhone, content);
+      await sendWhatsappTextMessage(graphCtx, normalizedPhone, content);
 
-      await Conversations.create({
-        companyId,
-        phone: clientPhone,
-        mensaje: content,
-        from: 'bot',
-        fecha,
-        hora: hora as unknown as Date,
-        baja_logica: false,
-      });
-
-      const message = await createInternalMessage({
-        companyId,
-        clientId,
-        content,
-        sender,
-        senderId: req.user?.id,
-      });
-
-      res.status(201).json(message);
+      const t = await sequelize.transaction();
+      try {
+        await Conversations.create(
+          {
+            companyId,
+            phone: clientPhone,
+            mensaje: content,
+            from: 'bot',
+            fecha,
+            hora: hora as unknown as Date,
+            baja_logica: false,
+          },
+          { transaction: t }
+        );
+        const message = await createInternalMessage({
+          companyId,
+          clientId,
+          content,
+          sender,
+          senderId: req.user?.id,
+          transaction: t,
+        });
+        await t.commit();
+        res.status(201).json(message);
+      } catch (persistErr) {
+        await t.rollback();
+        throw persistErr;
+      }
     } catch (error) {
       if (error instanceof MessageBusinessError) {
         res.status(error.status).json({
