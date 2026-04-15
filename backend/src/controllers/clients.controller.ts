@@ -1,6 +1,6 @@
 import { Response } from 'express';
 import { body, validationResult } from 'express-validator';
-import { fn, col, Op, where as sequelizeWhere } from 'sequelize';
+import { fn, col, cast, Op, where as sequelizeWhere } from 'sequelize';
 import {
   Client,
   ClientChecklist,
@@ -155,8 +155,12 @@ export const getAllClients = async (req: AuthRequest, res: Response): Promise<vo
           sequelizeWhere(fn('LOWER', col('Client.email')), { [Op.like]: `%${loweredSearchTerm}%` }),
           sequelizeWhere(fn('LOWER', col('Client.phone')), { [Op.like]: `%${loweredSearchTerm}%` }),
         ];
-        if (/^\d{5}$/.test(searchTerm) && searchTerm !== '00000') {
-          searchFilters.push(sequelizeWhere(col('Client.postal_code'), { [Op.eq]: Number(searchTerm) }));
+        if (/^\d+$/.test(searchTerm)) {
+          searchFilters.push(
+            sequelizeWhere(cast(col('Client.postal_code'), 'TEXT'), {
+              [Op.like]: `%${searchTerm}%`,
+            })
+          );
         }
         where[Op.or] = searchFilters;
       }
