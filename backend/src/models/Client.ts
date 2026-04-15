@@ -11,6 +11,7 @@ interface ClientAttributes {
   name: string;
   email?: string;
   phone?: string;
+  postalCode?: number | null;
   address?: string;
   birthDate?: string;
   relationshipToHolder?: string;
@@ -38,6 +39,7 @@ export class Client extends Model<ClientAttributes, ClientCreationAttributes> im
   public name!: string;
   public email?: string;
   public phone?: string;
+  public postalCode?: number | null;
   public address?: string;
   public birthDate?: string;
   public relationshipToHolder?: string;
@@ -95,6 +97,15 @@ Client.init(
     phone: {
       type: DataTypes.STRING(50),
       allowNull: true,
+    },
+    postalCode: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      field: 'postal_code',
+      validate: {
+        min: 10000,
+        max: 99999,
+      },
     },
     address: {
       type: DataTypes.TEXT,

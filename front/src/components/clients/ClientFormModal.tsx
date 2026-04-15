@@ -61,6 +61,7 @@ export const ClientFormModal = ({
     name: '',
     email: '',
     phone: '',
+    postalCode: '',
     address: '',
     birthDate: '',
     relationshipToHolder: '',
@@ -77,6 +78,7 @@ export const ClientFormModal = ({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [phoneError, setPhoneError] = useState('');
+  const [postalCodeError, setPostalCodeError] = useState('');
 
   useEffect(() => {
     const advisorValueForNewFamily =
@@ -88,6 +90,7 @@ export const ClientFormModal = ({
         name: client.name,
         email: client.email,
         phone: normalizePhoneDigits(client.phone || ''),
+        postalCode: client.postalCode != null ? String(client.postalCode) : '',
         address: client.address || '',
         birthDate: client.birthDate || '',
         relationshipToHolder: client.relationshipToHolder || '',
@@ -106,6 +109,7 @@ export const ClientFormModal = ({
         name: '',
         email: '',
         phone: '',
+        postalCode: '',
         address: '',
         birthDate: '',
         relationshipToHolder: '',
@@ -122,6 +126,7 @@ export const ClientFormModal = ({
     }
     setError('');
     setPhoneError('');
+    setPostalCodeError('');
     setIsLoading(false);
     // No incluir `users` ni `visaStatusTemplates` en deps: el padre las refresca con
     // clientes/submissions (polling, SW de WhatsApp) y nuevas referencias de array
@@ -152,13 +157,39 @@ export const ClientFormModal = ({
     return true;
   };
 
+  const validatePostalCode = (value: string): boolean => {
+    if (!value.trim()) {
+      setPostalCodeError('');
+      return true;
+    }
+    if (!/^\d+$/.test(value)) {
+      setPostalCodeError('El código postal debe contener solo números.');
+      return false;
+    }
+    if (value.length !== 5) {
+      setPostalCodeError('El código postal debe tener exactamente 5 dígitos.');
+      return false;
+    }
+    if (value === '00000') {
+      setPostalCodeError('El código postal 00000 no es válido.');
+      return false;
+    }
+    setPostalCodeError('');
+    return true;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
     setPhoneError('');
+    setPostalCodeError('');
 
     if (!validatePhone(formData.phone)) {
+      setIsLoading(false);
+      return;
+    }
+    if (!validatePostalCode(formData.postalCode)) {
       setIsLoading(false);
       return;
     }
@@ -172,6 +203,7 @@ export const ClientFormModal = ({
         birthDate: formData.birthDate || null,
         relationshipToHolder: formData.relationshipToHolder.trim() || null,
         phone: formData.phone || '',
+        postalCode: formData.postalCode.trim() ? Number(formData.postalCode) : null,
         visaCasAppointmentDate: formData.visaCasAppointmentDate || null,
         visaCasAppointmentLocation: formData.visaCasAppointmentLocation.trim() || null,
         visaConsularAppointmentDate: formData.visaConsularAppointmentDate || null,
@@ -272,6 +304,41 @@ export const ClientFormModal = ({
                 <p className="text-xs text-muted-foreground">
                   10 u 11 dígitos; opcional + al inicio. Se guarda tal como lo capturas (sin espacios de la máscara).
                 </p>
+              )}
+            </div>
+          )}
+
+          {!isFamilyMode && (
+            <div className="space-y-2">
+              <Label htmlFor="postalCode">Código postal</Label>
+              <Input
+                id="postalCode"
+                type="text"
+                inputMode="numeric"
+                value={formData.postalCode}
+                onChange={e => {
+                  const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 5);
+                  setFormData(prev => ({ ...prev, postalCode: digitsOnly }));
+                  if (!digitsOnly) {
+                    setPostalCodeError('');
+                  } else if (digitsOnly === '00000') {
+                    setPostalCodeError('El código postal 00000 no es válido.');
+                  } else if (digitsOnly.length !== 5) {
+                    setPostalCodeError('El código postal debe tener exactamente 5 dígitos.');
+                  } else {
+                    setPostalCodeError('');
+                  }
+                }}
+                onBlur={() => validatePostalCode(formData.postalCode)}
+                placeholder="Ej: 64000"
+                maxLength={5}
+                className={cn(postalCodeError && 'border-destructive')}
+                aria-invalid={!!postalCodeError}
+              />
+              {postalCodeError ? (
+                <p className="text-sm text-destructive">{postalCodeError}</p>
+              ) : (
+                <p className="text-xs text-muted-foreground">5 dígitos numéricos. No se permite 00000.</p>
               )}
             </div>
           )}

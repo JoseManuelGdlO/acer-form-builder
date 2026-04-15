@@ -536,10 +536,12 @@
                 "type": "object",
                 "properties": {
                   "name": {
-                    "type": "string",
-                    "format": "date-time"
+                    "type": "string"
                   },
                   "email": {
+                    "type": "string"
+                  },
+                  "postalCode": {
                     "type": "string",
                     "format": "date-time"
                   },
@@ -977,10 +979,12 @@
                 "type": "object",
                 "properties": {
                   "name": {
-                    "type": "string",
-                    "format": "date-time"
+                    "type": "string"
                   },
                   "email": {
+                    "type": "string"
+                  },
+                  "postalCode": {
                     "type": "string",
                     "format": "date-time"
                   },

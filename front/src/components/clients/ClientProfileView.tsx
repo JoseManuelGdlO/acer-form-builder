@@ -17,7 +17,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
 import { 
   User, Mail, Phone, Calendar, Clock, 
-  ArrowLeft, Edit2, FileText, UserCircle, ShoppingBag, Plus, ListChecks, NotebookPen, Wallet, Trash2,
+  ArrowLeft, Edit2, FileText, UserCircle, ShoppingBag, Plus, ListChecks, NotebookPen, Wallet, Trash2, MapPin,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -226,6 +226,7 @@ export const ClientProfileView = ({
         setClientSnapshot({
           ...client,
           ...freshClientData,
+          postalCode: freshClientData.postal_code ?? freshClientData.postalCode ?? null,
           birthDate: freshClientData.birth_date ?? freshClientData.birthDate ?? null,
           relationshipToHolder: freshClientData.relationship_to_holder ?? freshClientData.relationshipToHolder ?? null,
           visaCasAppointmentDate: freshClientData.visa_cas_appointment_date ?? freshClientData.visaCasAppointmentDate ?? null,
@@ -881,6 +882,9 @@ export const ClientProfileView = ({
     : [
         { icon: Mail, label: 'Correo', value: displayClient.email },
         { icon: Phone, label: 'Teléfono', value: formatPhoneOptional(displayClient.phone) },
+        ...(displayClient.postalCode != null
+          ? [{ icon: MapPin, label: 'Código postal', value: String(displayClient.postalCode).padStart(5, '0') }]
+          : []),
       ];
   const infoItems = [
     ...contactInfoItems,

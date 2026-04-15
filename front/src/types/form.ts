@@ -159,6 +159,7 @@ export interface Client {
   name: string;
   email: string;
   phone?: string;
+  postalCode?: number | null;
   address?: string;
   birthDate?: string | null;
   relationshipToHolder?: string | null;

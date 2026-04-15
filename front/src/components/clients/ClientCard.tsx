@@ -89,6 +89,12 @@ export const ClientCard = ({
                   <span>{formatPhoneNumberDisplay(client.phone)}</span>
                 </div>
               )}
+              {client.postalCode != null && (
+                <div className="flex items-center gap-1.5">
+                  <MapPin className="w-4 h-4" />
+                  <span>CP: {String(client.postalCode).padStart(5, '0')}</span>
+                </div>
+              )}
               <div className="flex items-center gap-1.5">
                 <FileText className="w-4 h-4" />
                 <span>{client.formsCompleted} formularios completados</span>

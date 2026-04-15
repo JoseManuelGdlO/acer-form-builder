@@ -26,6 +26,25 @@ const parseNullableParentClientId = (value: unknown): string | null | undefined 
   return String(value);
 };
 
+const parseNullablePostalCode = (
+  value: unknown
+): { value?: number | null; error?: string } => {
+  if (value === undefined) return { value: undefined };
+  if (value === null || value === '') return { value: null };
+  const raw = String(value).trim();
+  if (!/^\d{5}$/.test(raw)) {
+    return { error: 'Postal code must contain exactly 5 digits' };
+  }
+  if (raw === '00000') {
+    return { error: 'Postal code 00000 is not valid' };
+  }
+  const numeric = Number(raw);
+  if (!Number.isInteger(numeric)) {
+    return { error: 'Postal code must be an integer' };
+  }
+  return { value: numeric };
+};
+
 const getDefaultVisaStatusTemplateId = async (companyId: string): Promise<string | null> => {
   const templates = await VisaStatusTemplate.findAll({
     where: { companyId, isActive: true },
@@ -131,11 +150,15 @@ export const getAllClients = async (req: AuthRequest, res: Response): Promise<vo
       const searchTerm = String(q).trim();
       if (searchTerm) {
         const loweredSearchTerm = searchTerm.toLowerCase();
-        where[Op.or] = [
+        const searchFilters: any[] = [
           sequelizeWhere(fn('LOWER', col('Client.name')), { [Op.like]: `%${loweredSearchTerm}%` }),
           sequelizeWhere(fn('LOWER', col('Client.email')), { [Op.like]: `%${loweredSearchTerm}%` }),
           sequelizeWhere(fn('LOWER', col('Client.phone')), { [Op.like]: `%${loweredSearchTerm}%` }),
         ];
+        if (/^\d{5}$/.test(searchTerm) && searchTerm !== '00000') {
+          searchFilters.push(sequelizeWhere(col('Client.postal_code'), { [Op.eq]: Number(searchTerm) }));
+        }
+        where[Op.or] = searchFilters;
       }
     }
 
@@ -589,6 +612,12 @@ export const getClientPaymentDeletedHistory = async (req: AuthRequest, res: Resp
 export const createClient = [
   body('name').notEmpty().withMessage('Name is required'),
   body('email').optional({ values: 'falsy' }).isEmail().normalizeEmail(),
+  body('postalCode')
+    .optional({ values: 'null' })
+    .matches(/^\d{5}$/)
+    .withMessage('Postal code must contain exactly 5 digits')
+    .custom((value) => String(value) !== '00000')
+    .withMessage('Postal code 00000 is not valid'),
   body('birthDate').optional({ values: 'null' }).isISO8601().withMessage('Birth date must be a valid date'),
   body('relationshipToHolder').optional({ values: 'null' }).isString().isLength({ max: 120 }).withMessage('Relationship to holder must be a valid string'),
   body('visaCasAppointmentDate').optional({ values: 'null' }).isISO8601().withMessage('CAS appointment date must be a valid date'),
@@ -624,6 +653,16 @@ export const createClient = [
         req.body.email = null;
       }
       const parentClientId = parseNullableParentClientId(req.body.parentClientId);
+      const parsedPostalCode = parseNullablePostalCode(req.body.postalCode);
+      if (parsedPostalCode.error) {
+        res.status(400).json({ error: parsedPostalCode.error });
+        return;
+      }
+      if (parentClientId) {
+        req.body.postalCode = null;
+      } else if (parsedPostalCode.value !== undefined) {
+        req.body.postalCode = parsedPostalCode.value;
+      }
 
       if (normalizedPhone && !parentClientId) {
         const existingClient = await Client.findOne({ where: { companyId, phone: normalizedPhone, parentClientId: null } });
@@ -776,6 +815,12 @@ export const createClient = [
 export const updateClient = [
   body('name').optional().notEmpty(),
   body('email').optional({ values: 'falsy' }).isEmail().normalizeEmail(),
+  body('postalCode')
+    .optional({ values: 'null' })
+    .matches(/^\d{5}$/)
+    .withMessage('Postal code must contain exactly 5 digits')
+    .custom((value) => String(value) !== '00000')
+    .withMessage('Postal code 00000 is not valid'),
   body('birthDate').optional({ values: 'null' }).isISO8601().withMessage('Birth date must be a valid date'),
   body('relationshipToHolder').optional({ values: 'null' }).isString().isLength({ max: 120 }).withMessage('Relationship to holder must be a valid string'),
   body('visaCasAppointmentDate').optional({ values: 'null' }).isISO8601().withMessage('CAS appointment date must be a valid date'),
@@ -831,6 +876,12 @@ export const updateClient = [
         updates.email = typeof req.body.email === 'string' && req.body.email.trim() === '' ? null : req.body.email;
       }
       if (req.body.phone !== undefined) updates.phone = req.body.phone;
+      const parsedPostalCode = parseNullablePostalCode(req.body.postalCode);
+      if (parsedPostalCode.error) {
+        res.status(400).json({ error: parsedPostalCode.error });
+        return;
+      }
+      if (req.body.postalCode !== undefined) updates.postalCode = parsedPostalCode.value;
       if (req.body.address !== undefined) updates.address = req.body.address;
       if (req.body.birthDate !== undefined) updates.birthDate = req.body.birthDate;
       if (req.body.relationshipToHolder !== undefined) updates.relationshipToHolder = req.body.relationshipToHolder;
@@ -887,6 +938,9 @@ export const updateClient = [
       const targetParentClientId = req.body.parentClientId !== undefined
         ? parseNullableParentClientId(req.body.parentClientId)
         : ((client as any).parentClientId ?? null);
+      if (targetParentClientId) {
+        updates.postalCode = null;
+      }
       const targetPhone = req.body.phone !== undefined
         ? (typeof req.body.phone === 'string' ? req.body.phone.trim() : req.body.phone)
         : client.phone;

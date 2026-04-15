@@ -339,6 +339,7 @@ export const ClientList = ({
     name: raw.name,
     email: raw.email ?? '',
     phone: raw.phone ?? '',
+    postalCode: raw.postal_code ?? raw.postalCode ?? null,
     address: raw.address ?? '',
     birthDate: raw.birth_date ?? raw.birthDate ?? null,
     relationshipToHolder: raw.relationship_to_holder ?? raw.relationshipToHolder ?? null,
@@ -607,7 +608,7 @@ export const ClientList = ({
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
           <Input
-            placeholder="Buscar por nombre, email o teléfono..."
+            placeholder="Buscar por nombre, email, teléfono o código postal..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             className="pl-10 h-12"

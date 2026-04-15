@@ -25,6 +25,7 @@ const mapClient = (c: any): Client => ({
     name: c.name,
     email: c.email,
     phone: c.phone,
+    postalCode: c.postal_code ?? c.postalCode ?? null,
     address: c.address,
     birthDate: c.birth_date ?? c.birthDate ?? null,
     relationshipToHolder: c.relationship_to_holder ?? c.relationshipToHolder ?? null,
