@@ -19,7 +19,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Eye, Trash2, User, Mail, Phone, FileText, Edit2, DollarSign, UserCircle, MapPin, Calendar } from 'lucide-react';
+import { MoreHorizontal, Eye, Trash2, User, Mail, Phone, FileText, Edit2, DollarSign, UserCircle, MapPin, Calendar, Package } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { formatPhoneNumberDisplay } from '@/lib/phone';
@@ -107,30 +107,38 @@ export const ClientCard = ({
               )}
             </div>
 
-            <div className="flex items-center gap-2 text-sm">
-              <UserCircle className="w-4 h-4 text-muted-foreground shrink-0" />
-              {isAdmin && users.length > 0 ? (
-                <Select
-                  value={client.assignedUserId ?? '__none__'}
-                  onValueChange={handleAssignAdvisor}
-                >
-                  <SelectTrigger data-no-view="true" className="h-8 w-[200px] border-muted/60 bg-muted/20">
-                    <SelectValue placeholder="Asignar asesor" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">Sin asignar</SelectItem>
-                    {users.map(u => (
-                      <SelectItem key={u.id} value={u.id}>
-                        {u.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <span className="text-muted-foreground">
-                  Asesor: {client.assignedUser?.name ?? 'Sin asignar'}
+            <div className="flex items-center gap-4 text-sm flex-wrap">
+              <div className="flex items-center gap-2 min-w-0">
+                <UserCircle className="w-4 h-4 text-muted-foreground shrink-0" />
+                {isAdmin && users.length > 0 ? (
+                  <Select
+                    value={client.assignedUserId ?? '__none__'}
+                    onValueChange={handleAssignAdvisor}
+                  >
+                    <SelectTrigger data-no-view="true" className="h-8 w-[200px] border-muted/60 bg-muted/20">
+                      <SelectValue placeholder="Asignar asesor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">Sin asignar</SelectItem>
+                      {users.map(u => (
+                        <SelectItem key={u.id} value={u.id}>
+                          {u.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <span className="text-muted-foreground">
+                    Asesor: {client.assignedUser?.name ?? 'Sin asignar'}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-1.5 text-muted-foreground min-w-0 max-w-full sm:max-w-md">
+                <Package className="w-4 h-4 shrink-0" />
+                <span className="truncate" title={client.product?.title ?? undefined}>
+                  Producto: {client.product?.title ?? 'Sin producto'}
                 </span>
-              )}
+              </div>
             </div>
 
             <div className="flex items-center gap-3 text-sm bg-muted/40 rounded-lg px-3 py-2">
