@@ -136,7 +136,7 @@ export const ClientCard = ({
               <div className="flex items-center gap-1.5 text-muted-foreground min-w-0 max-w-full sm:max-w-md">
                 <Package className="w-4 h-4 shrink-0" />
                 <span className="truncate" title={client.product?.title ?? undefined}>
-                  Producto: {client.product?.title ?? 'Sin producto'}
+                  Paquete: {client.product?.title ?? 'Sin paquete'}
                 </span>
               </div>
             </div>
