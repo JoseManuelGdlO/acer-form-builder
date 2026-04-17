@@ -13,6 +13,7 @@ import {
   UserPlus,
   Search,
   Mail,
+  Phone,
   Calendar,
   Armchair,
   RotateCcw,
@@ -458,13 +459,22 @@ export const TripDetailView = ({
         writeLine('Sin participantes registrados.');
       } else {
         participants.forEach((p, index) => {
-          const name = p.client?.name ?? p.clientId;
-          const company = p.client?.company?.name ? ` · ${p.client?.company?.name}` : '';
-          const office = p.client?.assignedUser?.branch?.name
-            ? ` · Oficina: ${p.client.assignedUser.branch.name}`
+          const c = p.client;
+          const name = c?.name ?? p.clientId;
+          const company = c?.company?.name ? ` · ${c.company.name}` : '';
+          const office = c?.assignedUser?.branch?.name
+            ? ` · Oficina: ${c.assignedUser.branch.name}`
             : '';
-          const advisor = p.client?.assignedUser?.name ? ` · Asesor: ${p.client.assignedUser.name}` : '';
+          const advisor = c?.assignedUser?.name ? ` · Asesor: ${c.assignedUser.name}` : '';
           writeLine(`${index + 1}. ${name}${company}${office}${advisor}`, { indent: 18 });
+          const email = c?.email?.trim();
+          if (email) {
+            writeLine(`Correo: ${email}`, { indent: 24 });
+          }
+          const phone = c?.phone?.trim();
+          if (phone) {
+            writeLine(`Tel.: ${phone}`, { indent: 24 });
+          }
         });
       }
 
@@ -961,6 +971,12 @@ export const TripDetailView = ({
                                 </span>
                               )}
                           </div>
+                          {c.phone?.trim() && (
+                            <div className="flex items-center gap-1 text-sm text-muted-foreground mt-0.5 min-w-0">
+                              <Phone className="w-3.5 h-3.5 shrink-0" />
+                              <span className="truncate">{c.phone.trim()}</span>
+                            </div>
+                          )}
                         </div>
                         {!reviewerMode && (
                           <Button
