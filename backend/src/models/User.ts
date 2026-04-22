@@ -4,6 +4,7 @@ import sequelize from '../config/database';
 interface UserAttributes {
   id: string;
   companyId: string;
+  roleId: string;
   branchId?: string | null;
   email: string;
   password: string;
@@ -19,6 +20,7 @@ interface UserCreationAttributes
 export class User extends Model<UserAttributes, UserCreationAttributes> implements UserAttributes {
   public id!: string;
   public companyId!: string;
+  public roleId!: string;
   public branchId?: string | null;
   public email!: string;
   public password!: string;
@@ -43,6 +45,15 @@ User.init(
         key: 'id',
       },
       onDelete: 'CASCADE',
+    },
+    roleId: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      references: {
+        model: 'roles',
+        key: 'id',
+      },
+      onDelete: 'RESTRICT',
     },
     branchId: {
       type: DataTypes.UUID,

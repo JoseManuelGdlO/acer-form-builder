@@ -25,6 +25,7 @@ import financeRoutes from './finance.routes';
 import branchesRoutes from './branches.routes';
 import internalAppointmentsRoutes from './internal-appointments.routes';
 import calendarRoutes from './calendar.routes';
+import rolesRoutes from './roles.routes';
 
 const router = Router();
 
@@ -54,5 +55,6 @@ router.use('/finance', financeRoutes);
 router.use('/branches', branchesRoutes);
 router.use('/internal-appointments', internalAppointmentsRoutes);
 router.use('/calendar', calendarRoutes);
+router.use('/roles', rolesRoutes);
 
 export default router;

@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { body, validationResult } from 'express-validator';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { hasPermission } from '../authorization/policies';
 import { TripCompany, TripExpense, ClientPayment, Client, ClientPaymentDeletedLog, TripChangeLog } from '../models';
 
 async function ensureUserCanAccessTrip(req: AuthRequest, tripId: string): Promise<boolean> {
@@ -36,7 +37,7 @@ export const getTripFinance = async (req: AuthRequest, res: Response): Promise<v
       res.status(401).json({ error: 'Authentication required' });
       return;
     }
-    if (!req.user?.roles.includes('super_admin')) {
+    if (!hasPermission(req.user?.permissions, 'trip_finance.view')) {
       res.status(403).json({ error: 'Forbidden' });
       return;
     }
@@ -99,7 +100,7 @@ export const createTripIncome = [
         res.status(401).json({ error: 'Authentication required' });
         return;
       }
-      if (!req.user?.roles.includes('super_admin')) {
+      if (!hasPermission(req.user?.permissions, 'trip_finance.view')) {
         res.status(403).json({ error: 'Forbidden' });
         return;
       }
@@ -128,7 +129,7 @@ export const deleteTripIncome = async (req: AuthRequest, res: Response): Promise
       res.status(401).json({ error: 'Authentication required' });
       return;
     }
-    if (!req.user?.roles.includes('super_admin')) {
+    if (!hasPermission(req.user?.permissions, 'trip_finance.view')) {
       res.status(403).json({ error: 'Forbidden' });
       return;
     }
@@ -187,7 +188,7 @@ export const createTripExpense = [
         res.status(401).json({ error: 'Authentication required' });
         return;
       }
-      if (!req.user?.roles.includes('super_admin')) {
+      if (!hasPermission(req.user?.permissions, 'trip_finance.view')) {
         res.status(403).json({ error: 'Forbidden' });
         return;
       }
@@ -230,7 +231,7 @@ export const deleteTripExpense = async (req: AuthRequest, res: Response): Promis
       res.status(401).json({ error: 'Authentication required' });
       return;
     }
-    if (!req.user?.roles.includes('super_admin')) {
+    if (!hasPermission(req.user?.permissions, 'trip_finance.view')) {
       res.status(403).json({ error: 'Forbidden' });
       return;
     }

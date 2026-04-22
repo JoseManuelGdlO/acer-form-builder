@@ -1,13 +1,37 @@
 import { create } from 'zustand';
-import { User, UserRole } from '@/types/user';
+import { User } from '@/types/user';
 import { api } from '@/lib/api';
-import { useAuth } from '@/contexts/AuthContext';
+
+function mapApiUser(u: Record<string, unknown>): User {
+  const role = u.role as { id?: string; name?: string; systemKey?: string | null } | undefined;
+  return {
+    id: String(u.id),
+    name: String(u.name),
+    email: String(u.email),
+    roleId: String(u.roleId ?? ''),
+    role: role?.id
+      ? { id: role.id, name: role.name ?? '', systemKey: role.systemKey ?? null }
+      : { id: '', name: '', systemKey: null },
+    permissions: Array.isArray(u.permissions) ? (u.permissions as string[]) : [],
+    status: (u.status as User['status']) || 'active',
+    createdAt: new Date((u.createdAt as string) || Date.now()),
+    branchId: (u.branchId as string | null | undefined) ?? null,
+    branch: (u.branch as User['branch']) ?? null,
+  };
+}
 
 interface UserStore {
   users: User[];
   isLoading: boolean;
   fetchUsers: (token: string) => Promise<void>;
-  addUser: (token: string, name: string, email: string, role: UserRole, password: string, branchId?: string | null) => Promise<void>;
+  addUser: (
+    token: string,
+    name: string,
+    email: string,
+    roleId: string,
+    password: string,
+    branchId?: string | null
+  ) => Promise<void>;
   updateUser: (token: string, id: string, updates: Partial<Omit<User, 'id' | 'createdAt'>>) => Promise<void>;
   deleteUser: (token: string, id: string) => Promise<void>;
   toggleUserStatus: (token: string, id: string) => Promise<void>;
@@ -16,31 +40,13 @@ interface UserStore {
 export const useUserStore = create<UserStore>((set, get) => ({
   users: [],
   isLoading: false,
-  
+
   fetchUsers: async (token: string) => {
     set({ isLoading: true });
     try {
       const usersData = await api.getUsers(token);
-      const users: User[] = usersData.map(
-        (u: {
-          id: string;
-          name: string;
-          email: string;
-          roles?: UserRole[];
-          status: 'active' | 'inactive';
-          createdAt: string | Date;
-          branchId?: string | null;
-          branch?: { id: string; name: string; isActive: boolean } | null;
-        }) => ({
-          id: u.id,
-          name: u.name,
-          email: u.email,
-          roles: u.roles || ['reviewer'],
-          status: u.status,
-          createdAt: new Date(u.createdAt),
-          branchId: u.branchId ?? null,
-          branch: u.branch ?? null,
-        }),
+      const users: User[] = (Array.isArray(usersData) ? usersData : []).map((u) =>
+        mapApiUser(u as Record<string, unknown>)
       );
       set({ users, isLoading: false });
     } catch (error) {
@@ -49,55 +55,44 @@ export const useUserStore = create<UserStore>((set, get) => ({
       throw error;
     }
   },
-  
-  addUser: async (token, name, email, role, password, branchId) => {
+
+  addUser: async (token, name, email, roleId, password, branchId) => {
     try {
       const newUser = await api.createUser(
-        { name, email, role, password, branchId: branchId ?? null },
-        token,
+        { name, email, roleId, password, branchId: branchId ?? null },
+        token
       );
-      const user: User = {
-        id: newUser.id,
-        name: newUser.name,
-        email: newUser.email,
-        roles: newUser.roles || [role],
-        status: newUser.status,
-        createdAt: new Date(newUser.createdAt || Date.now()),
-        branchId: newUser.branchId ?? null,
-        branch: newUser.branch ?? null,
-      };
+      const user = mapApiUser(newUser as Record<string, unknown>);
       set((state) => ({ users: [...state.users, user] }));
     } catch (error) {
       console.error('Failed to create user:', error);
       throw error;
     }
   },
-  
+
   updateUser: async (token, id, updates) => {
     try {
-      const updatedUser = await api.updateUser(id, updates, token);
+      const payload: Record<string, unknown> = {};
+      if (updates.name !== undefined) payload.name = updates.name;
+      if (updates.email !== undefined) payload.email = updates.email;
+      if (updates.status !== undefined) payload.status = updates.status;
+      if (updates.roleId !== undefined) payload.roleId = updates.roleId;
+      if (updates.branchId !== undefined) payload.branchId = updates.branchId;
+      const updatedUser = await api.updateUser(id, payload, token);
       const existingUser = get().users.find((u) => u.id === id);
-      const user: User = {
-        id: updatedUser.id,
-        name: updatedUser.name,
-        email: updatedUser.email,
-        roles: updatedUser.roles || ['reviewer'],
-        status: updatedUser.status,
-        createdAt: updatedUser.createdAt 
-          ? new Date(updatedUser.createdAt) 
-          : (existingUser?.createdAt || new Date()),
-        branchId: updatedUser.branchId ?? existingUser?.branchId ?? null,
-        branch: updatedUser.branch ?? existingUser?.branch ?? null,
-      };
+      const user = mapApiUser(updatedUser as Record<string, unknown>);
+      if (!user.createdAt.getTime()) {
+        user.createdAt = existingUser?.createdAt ?? new Date();
+      }
       set((state) => ({
-        users: state.users.map((u) => (u.id === id ? user : u)),
+        users: state.users.map((u) => (u.id === id ? { ...u, ...user } : u)),
       }));
     } catch (error) {
       console.error('Failed to update user:', error);
       throw error;
     }
   },
-  
+
   deleteUser: async (token, id) => {
     try {
       await api.deleteUser(id, token);
@@ -107,7 +102,7 @@ export const useUserStore = create<UserStore>((set, get) => ({
       throw error;
     }
   },
-  
+
   toggleUserStatus: async (token, id) => {
     const user = get().users.find((u) => u.id === id);
     if (user) {

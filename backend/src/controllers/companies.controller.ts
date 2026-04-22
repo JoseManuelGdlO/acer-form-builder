@@ -3,6 +3,7 @@ import { body, validationResult } from 'express-validator';
 import { Op } from 'sequelize';
 import { Company } from '../models';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { hasPermission } from '../authorization/policies';
 
 /** Normalize domain or URL to hostname only (e.g. http://192.168.100.73:8080/ -> 192.168.100.73). */
 function normalizeToHostname(domainOrUrl: string): string {
@@ -27,11 +28,11 @@ function parseDomainList(value: unknown): string[] {
 /** List companies for trip invite dropdown (super_admin only). Returns all companies except current user's. */
 export const getCompaniesForTripShare = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    if (!req.user?.roles?.includes('super_admin')) {
+    if (!hasPermission(req.user?.permissions, 'companies.view')) {
       res.status(403).json({ error: 'Forbidden' });
       return;
     }
-    const companyId = req.user.companyId;
+    const companyId = req.user?.companyId;
     if (!companyId) {
       res.status(401).json({ error: 'Authentication required' });
       return;

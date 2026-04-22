@@ -1,18 +1,8 @@
 import { User } from '@/types/user';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { UserRoleBadge } from './UserRoleBadge';
-import { Badge } from '@/components/ui/badge';
-import { MoreVertical, Pencil, Trash2, Power } from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { Mail, Pencil, Trash2, Power } from 'lucide-react';
 
 interface UserCardProps {
   user: User;
@@ -22,62 +12,45 @@ interface UserCardProps {
 }
 
 export function UserCard({ user, onEdit, onDelete, onToggleStatus }: UserCardProps) {
+  const variant = user.role.systemKey === 'super_admin' ? 'admin' : 'default';
+
   return (
-    <Card className="hover:shadow-md transition-shadow">
+    <Card>
       <CardContent className="p-4">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-center gap-3 flex-1 min-w-0">
-            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold shrink-0">
-              {user.name.charAt(0).toUpperCase()}
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="font-medium text-foreground truncate">{user.name}</h3>
-                <Badge
-                  variant={user.status === 'active' ? 'default' : 'secondary'}
-                  className={user.status === 'active' ? 'bg-green-500/10 text-green-600 border-green-500/20' : 'bg-muted text-muted-foreground'}
-                >
-                  {user.status === 'active' ? 'Activo' : 'Inactivo'}
-                </Badge>
-              </div>
-              <p className="text-sm text-muted-foreground truncate">{user.email}</p>
-              <div className="flex items-center gap-2 mt-2 flex-wrap">
-                <UserRoleBadge role={user.roles[0] || 'reviewer'} />
-                <span className="text-xs text-muted-foreground">
-                  {user.branch?.name ? `Sucursal: ${user.branch.name}` : 'Sin sucursal'}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  Creado {format(user.createdAt, "d 'de' MMMM, yyyy", { locale: es })}
-                </span>
-              </div>
-            </div>
-          </div>
-          
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="shrink-0">
-                <MoreVertical className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-popover border">
-              <DropdownMenuItem onClick={() => onEdit(user)}>
-                <Pencil className="h-4 w-4 mr-2" />
-                Editar
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onToggleStatus(user.id)}>
-                <Power className="h-4 w-4 mr-2" />
-                {user.status === 'active' ? 'Desactivar' : 'Activar'}
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => onDelete(user.id)}
-                className="text-destructive focus:text-destructive"
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="font-semibold text-lg truncate">{user.name}</h3>
+              <UserRoleBadge label={user.role.name || 'Sin rol'} variant={variant} />
+              <span
+                className={`text-xs px-2 py-0.5 rounded-full ${
+                  user.status === 'active' ? 'bg-green-500/15 text-green-700' : 'bg-muted text-muted-foreground'
+                }`}
               >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Eliminar
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                {user.status === 'active' ? 'Activo' : 'Inactivo'}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Mail className="h-4 w-4 shrink-0" />
+              <span className="truncate">{user.email}</span>
+            </div>
+            {user.branch && (
+              <p className="text-sm text-muted-foreground">Sucursal: {user.branch.name}</p>
+            )}
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <Button variant="outline" size="sm" onClick={() => onEdit(user)} className="gap-1">
+              <Pencil className="h-4 w-4" />
+              Editar
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => onToggleStatus(user.id)} className="gap-1">
+              <Power className="h-4 w-4" />
+              {user.status === 'active' ? 'Desactivar' : 'Activar'}
+            </Button>
+            <Button variant="destructive" size="sm" onClick={() => onDelete(user.id)} className="gap-1">
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>

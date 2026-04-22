@@ -1,10 +1,30 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useMemo, useCallback, ReactNode } from 'react';
 import { api } from '@/lib/api';
-import { User, UserRole } from '@/types/user';
+import { User } from '@/types/user';
+import { hasPermission, hasAnyPermission, hasAllPermissions } from '@/auth/userPermissions';
 
 interface LoginResponse {
   token: string;
-  user: { id: string; email: string; name: string; status: string; roles: string[]; company?: { id: string; name: string; slug: string; logoUrl: string | null } | null };
+  user: Record<string, unknown>;
+}
+
+function mapApiUser(raw: Record<string, unknown>): User {
+  const role = raw.role as { id?: string; name?: string; systemKey?: string | null } | undefined;
+  return {
+    id: String(raw.id),
+    email: String(raw.email),
+    name: String(raw.name),
+    status: (raw.status as User['status']) || 'active',
+    roleId: String(raw.roleId ?? ''),
+    role: role?.id
+      ? { id: role.id, name: role.name ?? '', systemKey: role.systemKey ?? null }
+      : { id: '', name: '', systemKey: null },
+    permissions: Array.isArray(raw.permissions) ? (raw.permissions as string[]) : [],
+    createdAt: new Date((raw.createdAt as string) || Date.now()),
+    company: (raw.company as User['company']) ?? null,
+    branchId: (raw.branchId as string | null | undefined) ?? null,
+    branch: (raw.branch as User['branch']) ?? null,
+  };
 }
 
 interface AuthContextType {
@@ -12,12 +32,14 @@ interface AuthContextType {
   company: User['company'];
   token: string | null;
   isLoading: boolean;
+  permissions: string[];
   login: (email: string, password: string) => Promise<void>;
   setAuthFromLoginResponse: (response: LoginResponse) => void;
   logout: () => void;
   isAuthenticated: boolean;
-  hasRole: (role: UserRole) => boolean;
-  hasAnyRole: (roles: UserRole[]) => boolean;
+  can: (key: string) => boolean;
+  canAny: (keys: string[]) => boolean;
+  canAll: (keys: string[]) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -28,6 +50,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  const permissions = useMemo(() => user?.permissions ?? [], [user]);
+
+  const can = useCallback((key: string) => hasPermission(permissions, key), [permissions]);
+  const canAny = useCallback((keys: string[]) => hasAnyPermission(permissions, keys), [permissions]);
+  const canAll = useCallback((keys: string[]) => hasAllPermissions(permissions, keys), [permissions]);
 
   useEffect(() => {
     const storedToken = localStorage.getItem(TOKEN_KEY);
@@ -42,15 +70,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const fetchUser = async (authToken: string) => {
     try {
       const response = await api.getMe(authToken);
-      setUser({
-        id: response.user.id,
-        email: response.user.email,
-        name: response.user.name,
-        roles: response.user.roles || ['reviewer'],
-        status: response.user.status,
-        createdAt: new Date(response.user.createdAt || Date.now()),
-        company: response.user.company ?? null,
-      });
+      setUser(mapApiUser(response.user as Record<string, unknown>));
     } catch (error) {
       console.error('Failed to fetch user:', error);
       localStorage.removeItem(TOKEN_KEY);
@@ -69,32 +89,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const setAuthFromLoginResponse = (response: LoginResponse) => {
     localStorage.setItem(TOKEN_KEY, response.token);
     setToken(response.token);
-    setUser({
-      id: response.user.id,
-      email: response.user.email,
-      name: response.user.name,
-      roles: response.user.roles || ['reviewer'],
-      status: response.user.status,
-      createdAt: new Date(),
-      company: response.user.company ?? null,
-    });
+    setUser(mapApiUser(response.user as Record<string, unknown>));
   };
 
   const logout = () => {
     localStorage.removeItem(TOKEN_KEY);
     setToken(null);
     setUser(null);
-    // Redirect to login
     window.location.href = '/login';
-  };
-
-  const hasRole = (role: UserRole): boolean => {
-    return user?.roles?.includes(role) ?? false;
-  };
-
-  const hasAnyRole = (roles: UserRole[]): boolean => {
-    if (!user?.roles) return false;
-    return roles.some(role => user.roles.includes(role));
   };
 
   return (
@@ -108,8 +110,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setAuthFromLoginResponse,
         logout,
         isAuthenticated: !!user && !!token,
-        hasRole,
-        hasAnyRole,
+        permissions,
+        can,
+        canAny,
+        canAll,
       }}
     >
       {children}

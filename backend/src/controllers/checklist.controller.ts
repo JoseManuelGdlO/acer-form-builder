@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { body, validationResult } from 'express-validator';
 import { ChecklistTemplate, ClientChecklist, Client } from '../models';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { hasPermission, canAccessClientRecord } from '../authorization/policies';
 
 // Templates
 export const getAllTemplates = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -9,6 +10,10 @@ export const getAllTemplates = async (req: AuthRequest, res: Response): Promise<
     const companyId = req.user?.companyId;
     if (!companyId) {
       res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+    if (!hasPermission(req.user!.permissions, 'checklist_templates.view')) {
+      res.status(403).json({ error: 'Insufficient permissions' });
       return;
     }
     const templates = await ChecklistTemplate.findAll({
@@ -122,7 +127,7 @@ export const getClientChecklist = async (req: AuthRequest, res: Response): Promi
       res.status(404).json({ error: 'Client not found' });
       return;
     }
-    if (!req.user?.roles.includes('super_admin') && client.assignedUserId !== req.user?.id) {
+    if (!hasPermission(req.user?.permissions, 'client_checklist.view') || !canAccessClientRecord(req, client)) {
       res.status(403).json({ error: 'Access denied' });
       return;
     }
@@ -201,7 +206,7 @@ export const updateChecklistItem = [
         res.status(404).json({ error: 'Client not found' });
         return;
       }
-      if (!req.user?.roles.includes('super_admin') && client.assignedUserId !== req.user?.id) {
+      if (!hasPermission(req.user?.permissions, 'client_checklist.update') || !canAccessClientRecord(req, client)) {
         res.status(403).json({ error: 'Access denied' });
         return;
       }

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { User } from '@/types/user';
+import { userSeesAllClients } from '@/auth/userPermissions';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -27,11 +28,10 @@ export const ViewAsSelector = ({ users, viewingAs, onSelectUser }: ViewAsSelecto
     setOpen(false);
   };
 
-  const activeUsers = users.filter(u => u.status === 'active');
+  const activeUsers = users.filter((u) => u.status === 'active');
 
   return (
     <>
-      {/* Banner when viewing as another user */}
       {viewingAs && (
         <div className="fixed top-0 left-0 right-0 z-50 bg-amber-500 text-amber-950 py-2 px-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -40,7 +40,7 @@ export const ViewAsSelector = ({ users, viewingAs, onSelectUser }: ViewAsSelecto
               Viendo como: <strong>{viewingAs.name}</strong>
             </span>
             <Badge variant="outline" className="bg-amber-400/50 text-amber-950 border-amber-600 text-xs">
-              {viewingAs.roles.includes('super_admin') ? 'Super Admin' : 'Revisor'}
+              {viewingAs.role.name}
             </Badge>
           </div>
           <Button
@@ -55,12 +55,9 @@ export const ViewAsSelector = ({ users, viewingAs, onSelectUser }: ViewAsSelecto
         </div>
       )}
 
-      {/* Floating selector button */}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogTrigger asChild>
-          <Button 
-            className="fixed bottom-6 right-6 z-40 gap-2 shadow-lg rounded-full h-12 px-5 bg-primary hover:bg-primary/90"
-          >
+          <Button className="fixed bottom-6 right-6 z-40 gap-2 shadow-lg rounded-full h-12 px-5 bg-primary hover:bg-primary/90">
             <Eye className="w-5 h-5" />
             <span className="hidden sm:inline">Ver como</span>
           </Button>
@@ -75,7 +72,7 @@ export const ViewAsSelector = ({ users, viewingAs, onSelectUser }: ViewAsSelecto
               Selecciona un usuario para ver el sistema desde su perspectiva
             </DialogDescription>
           </DialogHeader>
-          
+
           <ScrollArea className="max-h-[400px] pr-4">
             <div className="space-y-2">
               {activeUsers.length === 0 ? (
@@ -87,6 +84,7 @@ export const ViewAsSelector = ({ users, viewingAs, onSelectUser }: ViewAsSelecto
                 activeUsers.map((user) => (
                   <button
                     key={user.id}
+                    type="button"
                     onClick={() => handleSelectUser(user)}
                     className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-colors text-left ${
                       viewingAs?.id === user.id
@@ -95,7 +93,7 @@ export const ViewAsSelector = ({ users, viewingAs, onSelectUser }: ViewAsSelecto
                     }`}
                   >
                     <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center flex-shrink-0">
-                      {user.roles.includes('super_admin') ? (
+                      {userSeesAllClients(user) ? (
                         <Shield className="w-5 h-5 text-primary" />
                       ) : (
                         <UserIcon className="w-5 h-5 text-primary" />
@@ -105,15 +103,15 @@ export const ViewAsSelector = ({ users, viewingAs, onSelectUser }: ViewAsSelecto
                       <p className="font-medium text-foreground truncate">{user.name}</p>
                       <p className="text-sm text-muted-foreground truncate">{user.email}</p>
                     </div>
-                    <Badge 
-                      variant="outline" 
+                    <Badge
+                      variant="outline"
                       className={
-                        user.roles.includes('super_admin') 
-                          ? 'bg-primary/10 text-primary border-primary/30' 
+                        userSeesAllClients(user)
+                          ? 'bg-primary/10 text-primary border-primary/30'
                           : 'bg-accent/10 text-accent border-accent/30'
                       }
                     >
-                      {user.roles.includes('super_admin') ? 'Admin' : 'Revisor'}
+                      {user.role.name}
                     </Badge>
                   </button>
                 ))

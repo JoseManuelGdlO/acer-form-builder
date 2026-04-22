@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { body, validationResult } from 'express-validator';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { hasPermission, canAccessClientRecord } from '../authorization/policies';
 import { Client, InternalAppointment, InternalAppointmentHistory, User } from '../models';
 import sequelize from '../config/database';
 
@@ -61,7 +62,7 @@ export const getClientInternalAppointments = async (req: AuthRequest, res: Respo
       res.status(404).json({ error: 'Client not found' });
       return;
     }
-    if (req.user && !req.user.roles.includes('super_admin') && client.assignedUserId !== req.user.id) {
+    if (!hasPermission(req.user?.permissions, 'appointments.view') || !canAccessClientRecord(req, client)) {
       res.status(403).json({ error: 'Access denied' });
       return;
     }
@@ -121,7 +122,7 @@ export const createClientInternalAppointment = [
         res.status(404).json({ error: 'Client not found' });
         return;
       }
-      if (!req.user.roles.includes('super_admin') && client.assignedUserId !== req.user.id) {
+      if (!hasPermission(req.user.permissions, 'appointments.create') || !canAccessClientRecord(req, client)) {
         res.status(403).json({ error: 'Access denied' });
         return;
       }
@@ -183,8 +184,8 @@ export const updateInternalAppointment = [
         res.status(404).json({ error: 'Appointment not found' });
         return;
       }
-      const client = (appointment as any).client as any;
-      if (!req.user.roles.includes('super_admin') && client?.assignedUserId !== req.user.id) {
+      const client = (appointment as any).client as Client;
+      if (!hasPermission(req.user.permissions, 'appointments.update') || !canAccessClientRecord(req, client)) {
         res.status(403).json({ error: 'Access denied' });
         return;
       }
@@ -249,8 +250,8 @@ export const deleteInternalAppointment = async (req: AuthRequest, res: Response)
       res.status(404).json({ error: 'Appointment not found' });
       return;
     }
-    const client = (appointment as any).client as any;
-    if (!req.user.roles.includes('super_admin') && client?.assignedUserId !== req.user.id) {
+    const client = (appointment as any).client as Client;
+    if (!hasPermission(req.user.permissions, 'appointments.delete') || !canAccessClientRecord(req, client)) {
       res.status(403).json({ error: 'Access denied' });
       return;
     }
@@ -288,8 +289,8 @@ export const getInternalAppointmentHistory = async (req: AuthRequest, res: Respo
       res.status(404).json({ error: 'Appointment not found' });
       return;
     }
-    const client = (appointment as any).client as any;
-    if (req.user && !req.user.roles.includes('super_admin') && client?.assignedUserId !== req.user.id) {
+    const client = (appointment as any).client as Client;
+    if (!hasPermission(req.user?.permissions, 'appointments.view') || !canAccessClientRecord(req, client)) {
       res.status(403).json({ error: 'Access denied' });
       return;
     }

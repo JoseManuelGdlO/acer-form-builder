@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import * as botController from '../controllers/bot.controller';
 import { authenticate } from '../middleware/auth.middleware';
-import { requireAdmin } from '../middleware/role.middleware';
+import { requireAnyPermission } from '../middleware/permission.middleware';
 
 const router = Router();
 
@@ -9,6 +9,6 @@ const router = Router();
 router.get('/', authenticate, botController.getBotBehavior);
 
 // Protected route (write - admin only)
-router.put('/', authenticate, requireAdmin, botController.updateBotBehavior);
+router.put('/', authenticate, requireAnyPermission('bot_behavior.update'), botController.updateBotBehavior);
 
 export default router;

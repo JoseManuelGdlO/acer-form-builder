@@ -1,8 +1,54 @@
 import { Response } from 'express';
 import { body, validationResult } from 'express-validator';
-import { Branch, User, UserRole as UserRoleModel } from '../models';
+import { Branch, User, Role, Permission } from '../models';
 import { hashPassword } from '../utils/password';
 import { AuthRequest } from '../middleware/auth.middleware';
+
+const roleIncludePermissions = {
+  model: Role,
+  as: 'role',
+  attributes: ['id', 'name', 'systemKey'],
+  include: [
+    {
+      model: Permission,
+      as: 'permissions',
+      attributes: ['key'],
+      through: { attributes: [] },
+    },
+  ],
+};
+
+function serializeUser(user: User): Record<string, unknown> {
+  const role = (user as any).role as (Role & { permissions?: { key: string }[] }) | undefined;
+  const permissionRows = role?.permissions;
+  const permissions = Array.isArray(permissionRows)
+    ? permissionRows.map((p) => p.key).filter(Boolean)
+    : [];
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    status: user.status,
+    roleId: (user as any).roleId,
+    role: role
+      ? {
+          id: role.id,
+          name: role.name,
+          systemKey: role.systemKey,
+        }
+      : null,
+    permissions,
+    branchId: (user as any).branchId ?? null,
+    branch: (user as any).branch
+      ? {
+          id: (user as any).branch.id,
+          name: (user as any).branch.name,
+          isActive: (user as any).branch.isActive,
+        }
+      : null,
+    createdAt: user.createdAt,
+  };
+}
 
 export const getAllUsers = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -14,11 +60,7 @@ export const getAllUsers = async (req: AuthRequest, res: Response): Promise<void
     const users = await User.findAll({
       where: { companyId },
       include: [
-        {
-          model: UserRoleModel,
-          as: 'roles',
-          attributes: ['role'],
-        },
+        roleIncludePermissions,
         {
           model: Branch,
           as: 'branch',
@@ -28,24 +70,7 @@ export const getAllUsers = async (req: AuthRequest, res: Response): Promise<void
       order: [['created_at', 'DESC']],
     });
 
-    const usersWithRoles = users.map((user) => ({
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      status: user.status,
-      roles: (user as any).roles?.map((r: UserRoleModel) => r.role) || [],
-      branchId: (user as any).branchId ?? null,
-      branch: (user as any).branch
-        ? {
-            id: (user as any).branch.id,
-            name: (user as any).branch.name,
-            isActive: (user as any).branch.isActive,
-          }
-        : null,
-      createdAt: user.createdAt,
-    }));
-
-    res.json(usersWithRoles);
+    res.json(users.map((u) => serializeUser(u)));
   } catch (error) {
     console.error('Get all users error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -64,11 +89,7 @@ export const getUserById = async (req: AuthRequest, res: Response): Promise<void
     const user = await User.findOne({
       where: { id, companyId },
       include: [
-        {
-          model: UserRoleModel,
-          as: 'roles',
-          attributes: ['role'],
-        },
+        roleIncludePermissions,
         {
           model: Branch,
           as: 'branch',
@@ -82,24 +103,7 @@ export const getUserById = async (req: AuthRequest, res: Response): Promise<void
       return;
     }
 
-    const roles = (user as any).roles?.map((r: UserRoleModel) => r.role) || [];
-
-    res.json({
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      status: user.status,
-      roles,
-      branchId: (user as any).branchId ?? null,
-      branch: (user as any).branch
-        ? {
-            id: (user as any).branch.id,
-            name: (user as any).branch.name,
-            isActive: (user as any).branch.isActive,
-          }
-        : null,
-      createdAt: user.createdAt,
-    });
+    res.json(serializeUser(user));
   } catch (error) {
     console.error('Get user by id error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -110,7 +114,7 @@ export const createUser = [
   body('email').isEmail().normalizeEmail(),
   body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
   body('name').notEmpty().withMessage('Name is required'),
-  body('role').isIn(['super_admin', 'reviewer']).withMessage('Invalid role'),
+  body('roleId').isUUID().withMessage('roleId is required'),
   body('branchId')
     .optional({ nullable: true })
     .custom((value) => {
@@ -128,11 +132,17 @@ export const createUser = [
         return;
       }
 
-      const { email, password, name, role } = req.body;
+      const { email, password, name, roleId } = req.body;
       const rawBranchId = req.body.branchId;
       const companyId = req.user?.companyId;
       if (!companyId) {
         res.status(401).json({ error: 'Authentication required' });
+        return;
+      }
+
+      const role = await Role.findOne({ where: { id: roleId, companyId } });
+      if (!role) {
+        res.status(400).json({ error: 'Invalid role for this company' });
         return;
       }
 
@@ -158,6 +168,7 @@ export const createUser = [
 
       const user = await User.create({
         companyId,
+        roleId,
         email,
         password: hashedPassword,
         name,
@@ -165,20 +176,13 @@ export const createUser = [
         branchId,
       });
 
-      await UserRoleModel.create({
-        userId: user.id,
-        role,
+      const full = await User.findByPk(user.id, {
+        include: [roleIncludePermissions, { model: Branch, as: 'branch', attributes: ['id', 'name', 'isActive'] }],
       });
 
       res.status(201).json({
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        status: user.status,
-        roles: [role],
-        branchId: user.branchId ?? null,
+        ...serializeUser(full!),
         branch,
-        createdAt: user.createdAt,
       });
     } catch (error) {
       console.error('Create user error:', error);
@@ -191,7 +195,7 @@ export const updateUser = [
   body('name').optional().notEmpty(),
   body('email').optional().isEmail().normalizeEmail(),
   body('status').optional().isIn(['active', 'inactive']),
-  body('role').optional().isIn(['super_admin', 'reviewer']),
+  body('roleId').optional().isUUID(),
   body('branchId')
     .optional({ nullable: true })
     .custom((value) => {
@@ -210,7 +214,7 @@ export const updateUser = [
       }
 
       const { id } = req.params;
-      const { name, email, status, role, password } = req.body;
+      const { name, email, status, roleId, password } = req.body;
       const rawBranchId = req.body.branchId;
       const companyId = req.user?.companyId;
       if (!companyId) {
@@ -224,7 +228,6 @@ export const updateUser = [
         return;
       }
 
-      // Check if email is being changed and if it's already taken in this company
       if (email && email !== user.email) {
         const existingUser = await User.findOne({ where: { email, companyId } });
         if (existingUser) {
@@ -236,6 +239,14 @@ export const updateUser = [
       if (name) user.name = name;
       if (email) user.email = email;
       if (status) user.status = status;
+      if (roleId) {
+        const role = await Role.findOne({ where: { id: roleId, companyId } });
+        if (!role) {
+          res.status(400).json({ error: 'Invalid role for this company' });
+          return;
+        }
+        (user as any).roleId = roleId;
+      }
       if (rawBranchId !== undefined) {
         if (rawBranchId === null || rawBranchId === '') {
           user.branchId = null;
@@ -254,45 +265,11 @@ export const updateUser = [
 
       await user.save();
 
-      // Update role if provided
-      if (role) {
-        await UserRoleModel.destroy({ where: { userId: id } });
-        await UserRoleModel.create({ userId: id, role });
-      }
-
       const updatedUser = await User.findByPk(id, {
-        include: [
-          {
-            model: UserRoleModel,
-            as: 'roles',
-            attributes: ['role'],
-          },
-          {
-            model: Branch,
-            as: 'branch',
-            attributes: ['id', 'name', 'isActive'],
-          },
-        ],
+        include: [roleIncludePermissions, { model: Branch, as: 'branch', attributes: ['id', 'name', 'isActive'] }],
       });
 
-      const roles = (updatedUser as any).roles?.map((r: UserRoleModel) => r.role) || [];
-
-      res.json({
-        id: updatedUser!.id,
-        email: updatedUser!.email,
-        name: updatedUser!.name,
-        status: updatedUser!.status,
-        roles,
-        branchId: (updatedUser as any).branchId ?? null,
-        branch: (updatedUser as any).branch
-          ? {
-              id: (updatedUser as any).branch.id,
-              name: (updatedUser as any).branch.name,
-              isActive: (updatedUser as any).branch.isActive,
-            }
-          : null,
-        createdAt: updatedUser!.createdAt,
-      });
+      res.json(serializeUser(updatedUser!));
     } catch (error) {
       console.error('Update user error:', error);
       res.status(500).json({ error: 'Internal server error' });
@@ -309,7 +286,6 @@ export const deleteUser = async (req: AuthRequest, res: Response): Promise<void>
       return;
     }
 
-    // Prevent deleting yourself
     if (req.user?.id === id) {
       res.status(400).json({ error: 'Cannot delete your own account' });
       return;

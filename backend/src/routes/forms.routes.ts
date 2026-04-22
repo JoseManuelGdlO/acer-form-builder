@@ -3,7 +3,7 @@ import * as formsController from '../controllers/forms.controller';
 import * as formSessionsController from '../controllers/form-sessions.controller';
 import * as submissionsController from '../controllers/submissions.controller';
 import { authenticate } from '../middleware/auth.middleware';
-import { requireAdmin } from '../middleware/role.middleware';
+import { requireAnyPermission } from '../middleware/permission.middleware';
 
 const router = Router();
 
@@ -22,9 +22,9 @@ router.patch('/:id/sessions/:sessionId/submission', ...submissionsController.upd
 router.get('/:id', formsController.getFormById);
 
 // Protected routes (write - admin only)
-router.post('/', authenticate, requireAdmin, formsController.createForm);
+router.post('/', authenticate, requireAnyPermission('forms.create'), formsController.createForm);
 router.post('/:id/sessions', authenticate, formSessionsController.createFormSession);
-router.put('/:id', authenticate, requireAdmin, formsController.updateForm);
-router.delete('/:id', authenticate, requireAdmin, formsController.deleteForm);
+router.put('/:id', authenticate, requireAnyPermission('forms.update'), formsController.updateForm);
+router.delete('/:id', authenticate, requireAnyPermission('forms.delete'), formsController.deleteForm);
 
 export default router;

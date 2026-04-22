@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { body, validationResult } from 'express-validator';
 import { Conversations, Client } from '../models';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { hasPermission, canAccessClientRecord } from '../authorization/policies';
 import { createCompanyNotification } from './notifications.controller';
 import { recordConversationMessage } from '../services/conversationsPersistence.service';
 
@@ -231,7 +232,7 @@ export const getClientConversations = async (
       return;
     }
 
-    if (!req.user?.roles.includes('super_admin') && client.assignedUserId !== req.user?.id) {
+    if (!hasPermission(req.user?.permissions, 'conversations.view') || !canAccessClientRecord(req, client)) {
       res.status(403).json({ error: 'Access denied' });
       return;
     }

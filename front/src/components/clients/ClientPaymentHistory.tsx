@@ -80,9 +80,9 @@ export const ClientPaymentHistory = ({
   onDeletePayment,
   familyMembers = [],
 }: ClientPaymentHistoryProps) => {
-  const { hasRole, token } = useAuth();
-  const isAdmin = hasRole('super_admin');
-  const canEditTotalAmountDue = hasRole('super_admin') || hasRole('reviewer');
+  const { can, token } = useAuth();
+  const canViewAuditLogs = can('client_audit_logs.view');
+  const canEditTotalAmountDue = can('client_financials.update');
   const [acquiredPackages, setAcquiredPackages] = useState<ClientAcquiredPackage[]>([]);
   const [productChoices, setProductChoices] = useState<Product[]>([]);
   const [packagesLoading, setPackagesLoading] = useState(true);
@@ -240,7 +240,7 @@ export const ClientPaymentHistory = ({
         payment: p,
       });
     }
-    if (isAdmin) {
+    if (canViewAuditLogs) {
       for (const e of amountDueHistory) {
         items.push({
           kind: 'amount_due',
@@ -260,7 +260,7 @@ export const ClientPaymentHistory = ({
     }
     items.sort((a, b) => b.sortAt - a.sortAt);
     return items;
-  }, [payments, amountDueHistory, acquiredPackages, isAdmin]);
+  }, [payments, amountDueHistory, acquiredPackages, canViewAuditLogs]);
 
   return (
     <Card className="border-border/50">
@@ -446,8 +446,8 @@ export const ClientPaymentHistory = ({
           )}
         </div>
 
-        {/* Pagos eliminados (solo administradores) */}
-        {isAdmin && (
+        {/* Pagos eliminados (permiso de auditoría) */}
+        {canViewAuditLogs && (
           <Collapsible open={deletedHistoryOpen} onOpenChange={setDeletedHistoryOpen}>
             <CollapsibleTrigger asChild>
               <Button variant="ghost" size="sm" className="w-full justify-between text-muted-foreground hover:text-foreground">

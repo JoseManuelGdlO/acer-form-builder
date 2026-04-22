@@ -3,6 +3,7 @@ import { body, validationResult } from 'express-validator';
 import { Op } from 'sequelize';
 import { ClientGroup, Client, ClientGroupMember, FormSubmission, TripGroup, Trip } from '../models';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { hasPermission, canViewAllClients } from '../authorization/policies';
 
 async function attachLastSubmissionToClients(clients: any[]): Promise<any[]> {
   if (clients.length === 0) return clients;
@@ -32,7 +33,7 @@ async function attachLastSubmissionToClients(clients: any[]): Promise<any[]> {
 
 const buildWhere = (req: AuthRequest): { assignedUserId?: string } => {
   const where: { assignedUserId?: string } = {};
-  if (req.user && !req.user.roles.includes('super_admin')) {
+  if (req.user && !canViewAllClients(req)) {
     where.assignedUserId = req.user.id;
   }
   return where;
@@ -40,6 +41,10 @@ const buildWhere = (req: AuthRequest): { assignedUserId?: string } => {
 
 export const getAllGroups = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
+    if (!hasPermission(req.user!.permissions, 'groups.view')) {
+      res.status(403).json({ error: 'Insufficient permissions' });
+      return;
+    }
     const where = buildWhere(req);
     const groups = await ClientGroup.findAll({
       where,
@@ -81,6 +86,10 @@ export const getAllGroups = async (req: AuthRequest, res: Response): Promise<voi
 
 export const getGroupById = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
+    if (!hasPermission(req.user!.permissions, 'groups.view')) {
+      res.status(403).json({ error: 'Insufficient permissions' });
+      return;
+    }
     const { id } = req.params;
     const where = buildWhere(req);
     const group = await ClientGroup.findOne({
@@ -127,9 +136,13 @@ export const createGroup = [
         res.status(400).json({ errors: errors.array() });
         return;
       }
+      if (!hasPermission(req.user!.permissions, 'groups.create')) {
+        res.status(403).json({ error: 'Insufficient permissions' });
+        return;
+      }
       const { title, clientIds } = req.body;
       const createPayload: { title: string; assignedUserId?: string } = { title };
-      if (req.user && !req.user.roles.includes('super_admin')) {
+      if (req.user && !canViewAllClients(req)) {
         createPayload.assignedUserId = req.user.id;
       }
       const group = await ClientGroup.create(createPayload);
@@ -166,6 +179,10 @@ export const updateGroup = [
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         res.status(400).json({ errors: errors.array() });
+        return;
+      }
+      if (!hasPermission(req.user!.permissions, 'groups.update')) {
+        res.status(403).json({ error: 'Insufficient permissions' });
         return;
       }
       const { id } = req.params;
@@ -208,6 +225,10 @@ export const updateGroup = [
 
 export const deleteGroup = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
+    if (!hasPermission(req.user!.permissions, 'groups.delete')) {
+      res.status(403).json({ error: 'Insufficient permissions' });
+      return;
+    }
     const { id } = req.params;
     const where = buildWhere(req);
     const group = await ClientGroup.findOne({ where: { id, ...where } });

@@ -18,6 +18,7 @@ import {
   Branch,
 } from '../models';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { hasPermission } from '../authorization/policies';
 
 function parseBoolVisa(v: unknown): boolean {
   return v === true || v === 'true';
@@ -45,18 +46,12 @@ function validateVisaTripDates(d: {
   return null;
 }
 
-function requireSuperAdmin(req: AuthRequest, res: Response): boolean {
-  if (!req.user?.roles?.includes('super_admin')) {
-    res.status(403).json({ error: 'Forbidden' });
+function requireTripPermission(req: AuthRequest, res: Response, key: string): boolean {
+  if (!req.user) {
+    res.status(401).json({ error: 'Authentication required' });
     return false;
   }
-  return true;
-}
-
-/** super_admin or reviewer — read trips, add participants, assign seats */
-function requireSuperAdminOrReviewer(req: AuthRequest, res: Response): boolean {
-  const roles = req.user?.roles || [];
-  if (!roles.includes('super_admin') && !roles.includes('reviewer')) {
+  if (!hasPermission(req.user.permissions, key)) {
     res.status(403).json({ error: 'Forbidden' });
     return false;
   }
@@ -90,7 +85,7 @@ async function logTripChange(
 
 export const getAllTrips = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    if (!requireSuperAdminOrReviewer(req, res)) return;
+    if (!requireTripPermission(req, res, 'trips.view')) return;
     const companyId = req.user?.companyId;
     if (!companyId) {
       res.status(401).json({ error: 'Authentication required' });
@@ -126,7 +121,7 @@ export const getAllTrips = async (req: AuthRequest, res: Response): Promise<void
 
 export const getTripById = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    if (!requireSuperAdminOrReviewer(req, res)) return;
+    if (!requireTripPermission(req, res, 'trips.view')) return;
     const { id } = req.params;
     const companyId = req.user?.companyId;
     if (!companyId) {
@@ -262,7 +257,7 @@ export const createTrip = [
   body('invitedCompanyIds.*').optional().isUUID(),
   async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-      if (!requireSuperAdmin(req, res)) return;
+      if (!requireTripPermission(req, res, 'trips.create')) return;
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         res.status(400).json({ errors: errors.array() });
@@ -403,7 +398,7 @@ export const updateTrip = [
   body('invitedCompanyIds.*').optional().isUUID(),
   async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-      if (!requireSuperAdmin(req, res)) return;
+      if (!requireTripPermission(req, res, 'trips.update')) return;
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         res.status(400).json({ errors: errors.array() });
@@ -590,7 +585,7 @@ export const updateTrip = [
 
 export const deleteTrip = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    if (!requireSuperAdmin(req, res)) return;
+    if (!requireTripPermission(req, res, 'trips.delete')) return;
     const { id } = req.params;
     const inTrip = await ensureUserCompanyInTrip(req, id);
     if (!inTrip) {
@@ -617,7 +612,7 @@ export const addParticipants = [
   body('groupIds.*').optional().isUUID(),
   async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-      if (!requireSuperAdminOrReviewer(req, res)) return;
+      if (!requireTripPermission(req, res, 'trips.participants_manage')) return;
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         res.status(400).json({ errors: errors.array() });
@@ -727,7 +722,7 @@ export const addParticipants = [
 
 export const removeParticipant = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    if (!requireSuperAdmin(req, res)) return;
+    if (!requireTripPermission(req, res, 'trips.office_admin')) return;
     const { id, clientId } = req.params;
     const companyId = req.user!.companyId;
     const inTrip = await ensureUserCompanyInTrip(req, id);
@@ -798,7 +793,7 @@ export const setSeatAssignment = [
   body('seatId').optional().isString().trim().notEmpty(),
   async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-      if (!requireSuperAdminOrReviewer(req, res)) return;
+      if (!requireTripPermission(req, res, 'trips.participants_manage')) return;
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         res.status(400).json({ errors: errors.array() });
@@ -888,7 +883,7 @@ export const setSeatAssignment = [
 
 export const clearSeatAssignment = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    if (!requireSuperAdmin(req, res)) return;
+    if (!requireTripPermission(req, res, 'trips.office_admin')) return;
     const { id, clientId } = req.params;
     const seatId = (req.body?.seatId ?? req.query?.seatId) as string | undefined;
     const inTrip = await ensureUserCompanyInTrip(req, id);
@@ -919,7 +914,7 @@ export const clearSeatAssignment = async (req: AuthRequest, res: Response): Prom
 
 export const resetSeatAssignments = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    if (!requireSuperAdmin(req, res)) return;
+    if (!requireTripPermission(req, res, 'trips.office_admin')) return;
     const { id } = req.params;
     const inTrip = await ensureUserCompanyInTrip(req, id);
     if (!inTrip) {
@@ -938,7 +933,7 @@ export const resetSeatAssignments = async (req: AuthRequest, res: Response): Pro
 
 export const getTripInvitations = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    if (!requireSuperAdmin(req, res)) return;
+    if (!requireTripPermission(req, res, 'trips.office_admin')) return;
     const companyId = req.user?.companyId;
     if (!companyId) {
       res.status(401).json({ error: 'Authentication required' });
@@ -984,7 +979,7 @@ export const getTripInvitations = async (req: AuthRequest, res: Response): Promi
 
 export const acceptTripInvitation = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    if (!requireSuperAdmin(req, res)) return;
+    if (!requireTripPermission(req, res, 'trip_invitations.update')) return;
     const { id } = req.params;
     const companyId = req.user!.companyId;
     const inv = await TripInvitation.findByPk(id, {
@@ -1014,7 +1009,7 @@ export const acceptTripInvitation = async (req: AuthRequest, res: Response): Pro
 
 export const rejectTripInvitation = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    if (!requireSuperAdmin(req, res)) return;
+    if (!requireTripPermission(req, res, 'trip_invitations.update')) return;
     const { id } = req.params;
     const companyId = req.user!.companyId;
     const inv = await TripInvitation.findByPk(id);
@@ -1037,7 +1032,7 @@ export const rejectTripInvitation = async (req: AuthRequest, res: Response): Pro
 
 export const getTripChangeLog = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    if (!requireSuperAdmin(req, res)) return;
+    if (!requireTripPermission(req, res, 'trips.office_admin')) return;
     const { id } = req.params;
     const inTrip = await ensureUserCompanyInTrip(req, id);
     if (!inTrip) {

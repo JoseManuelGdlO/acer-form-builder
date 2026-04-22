@@ -1,10 +1,69 @@
 import { Request, Response } from 'express';
 import { body, validationResult } from 'express-validator';
-import { User, UserRole as UserRoleModel, Company } from '../models';
-import { UserRole } from '../types';
+import { User, Company, Role, Permission } from '../models';
 import { hashPassword, comparePassword } from '../utils/password';
 import { generateToken, generatePermanentToken } from '../utils/jwt';
 import { AuthRequest } from '../middleware/auth.middleware';
+
+function buildAuthUserPayload(user: User): {
+  id: string;
+  email: string;
+  name: string;
+  status: string;
+  role: { id: string; name: string; systemKey: string | null };
+  permissions: string[];
+  company: { id: string; name: string; slug: string; logoUrl: string | null } | null;
+} {
+  const role = (user as any).role as Role | undefined;
+  const company = (user as any).company as Company | undefined;
+  const permissionRows = (role as any)?.permissions as Permission[] | undefined;
+  const permissions = permissionRows?.map((p) => p.key).filter(Boolean) || [];
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    status: user.status,
+    role: {
+      id: role?.id || '',
+      name: role?.name || '',
+      systemKey: (role as any)?.systemKey ?? null,
+    },
+    permissions,
+    company: company
+      ? {
+          id: company.id,
+          name: company.name,
+          slug: company.slug,
+          logoUrl: (company as any).logoUrl ?? null,
+        }
+      : null,
+  };
+}
+
+async function loadUserForAuth(userId: string): Promise<User | null> {
+  return User.findByPk(userId, {
+    include: [
+      {
+        model: Role,
+        as: 'role',
+        attributes: ['id', 'name', 'systemKey'],
+        include: [
+          {
+            model: Permission,
+            as: 'permissions',
+            attributes: ['key'],
+            through: { attributes: [] },
+          },
+        ],
+      },
+      {
+        model: Company,
+        as: 'company',
+        attributes: ['id', 'name', 'slug', 'logoUrl'],
+      },
+    ],
+  });
+}
 
 export const login = [
   body('email').isEmail().normalizeEmail(),
@@ -23,9 +82,17 @@ export const login = [
         where: { email },
         include: [
           {
-            model: UserRoleModel,
-            as: 'roles',
-            attributes: ['role'],
+            model: Role,
+            as: 'role',
+            attributes: ['id', 'name', 'systemKey'],
+            include: [
+              {
+                model: Permission,
+                as: 'permissions',
+                attributes: ['key'],
+                through: { attributes: [] },
+              },
+            ],
           },
           {
             model: Company,
@@ -51,31 +118,16 @@ export const login = [
         return;
       }
 
-      const company = (user as any).company;
       const companyId = (user as any).companyId;
-      const roles = (user as any).roles?.map((r: UserRoleModel) => r.role) || [];
       const token = generateToken({
         userId: user.id,
         companyId,
         email: user.email,
-        roles,
       });
 
       res.json({
         token,
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          status: user.status,
-          roles,
-          company: company ? {
-            id: company.id,
-            name: company.name,
-            slug: company.slug,
-            logoUrl: company.logoUrl,
-          } : null,
-        },
+        user: buildAuthUserPayload(user),
       });
     } catch (error) {
       console.error('Login error:', error);
@@ -99,7 +151,6 @@ export const register = [
 
       const { email, password, name, companySlug } = req.body;
 
-      // Resolve company (default slug 'saru' if not provided)
       const slug = companySlug || 'saru';
       const company = await Company.findOne({ where: { slug } });
       if (!company) {
@@ -107,59 +158,45 @@ export const register = [
         return;
       }
 
-      // Check if user already exists in this company (email unique per company)
       const existingUser = await User.findOne({ where: { email, companyId: company.id } });
       if (existingUser) {
         res.status(400).json({ error: 'User already exists in this company' });
         return;
       }
 
-      // Check if this is the first user in the app (make them super_admin)
       const userCount = await User.count();
       const isFirstUser = userCount === 0;
+      const systemKey = isFirstUser ? 'super_admin' : 'reviewer';
 
-      // Hash password
+      const roleRow = await Role.findOne({
+        where: { companyId: company.id, systemKey },
+      });
+      if (!roleRow) {
+        res.status(500).json({ error: 'Company roles not configured. Run database migrations.' });
+        return;
+      }
+
       const hashedPassword = await hashPassword(password);
 
-      // Create user with companyId
       const user = await User.create({
         companyId: company.id,
+        roleId: roleRow.id,
         email,
         password: hashedPassword,
         name,
         status: 'active',
       });
 
-      // Assign role (first user = super_admin, others = reviewer by default)
-      const role: UserRole = isFirstUser ? 'super_admin' : 'reviewer';
-      await UserRoleModel.create({
-        userId: user.id,
-        role,
-      });
-
-      const roles: UserRole[] = [role];
+      const fullUser = await loadUserForAuth(user.id);
       const token = generateToken({
         userId: user.id,
         companyId: company.id,
         email: user.email,
-        roles,
       });
 
       res.status(201).json({
         token,
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          status: user.status,
-          roles,
-          company: {
-            id: company.id,
-            name: company.name,
-            slug: company.slug,
-            logoUrl: company.logoUrl,
-          },
-        },
+        user: fullUser ? buildAuthUserPayload(fullUser) : buildAuthUserPayload(user as any),
       });
     } catch (error) {
       console.error('Register error:', error);
@@ -175,43 +212,15 @@ export const me = async (req: AuthRequest, res: Response): Promise<void> => {
       return;
     }
 
-    const user = await User.findByPk(req.user.id, {
-      include: [
-        {
-          model: UserRoleModel,
-          as: 'roles',
-          attributes: ['role'],
-        },
-        {
-          model: Company,
-          as: 'company',
-          attributes: ['id', 'name', 'slug', 'logoUrl'],
-        },
-      ],
-    });
+    const user = await loadUserForAuth(req.user.id);
 
     if (!user) {
       res.status(404).json({ error: 'User not found' });
       return;
     }
 
-    const roles = (user as any).roles?.map((r: UserRoleModel) => r.role) || [];
-    const company = (user as any).company;
-
     res.json({
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        status: user.status,
-        roles,
-        company: company ? {
-          id: company.id,
-          name: company.name,
-          slug: company.slug,
-          logoUrl: company.logoUrl,
-        } : null,
-      },
+      user: buildAuthUserPayload(user),
     });
   } catch (error) {
     console.error('Me error:', error);
@@ -226,20 +235,7 @@ export const getPermanentToken = async (req: AuthRequest, res: Response): Promis
       return;
     }
 
-    const user = await User.findByPk(req.user.id, {
-      include: [
-        {
-          model: UserRoleModel,
-          as: 'roles',
-          attributes: ['role'],
-        },
-        {
-          model: Company,
-          as: 'company',
-          attributes: ['id', 'name', 'slug', 'logoUrl'],
-        },
-      ],
-    });
+    const user = await loadUserForAuth(req.user.id);
 
     if (!user) {
       res.status(404).json({ error: 'User not found' });
@@ -251,34 +247,17 @@ export const getPermanentToken = async (req: AuthRequest, res: Response): Promis
       return;
     }
 
-    const roles = (user as any).roles?.map((r: UserRoleModel) => r.role) || [];
-    const company = (user as any).company;
     const companyId = (user as any).companyId;
 
     const token = generatePermanentToken({
       userId: user.id,
       companyId,
       email: user.email,
-      roles,
     });
 
     res.json({
       token,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        status: user.status,
-        roles,
-        company: company
-          ? {
-              id: company.id,
-              name: company.name,
-              slug: company.slug,
-              logoUrl: company.logoUrl,
-            }
-          : null,
-      },
+      user: buildAuthUserPayload(user),
     });
   } catch (error) {
     console.error('getPermanentToken error:', error);
@@ -287,7 +266,5 @@ export const getPermanentToken = async (req: AuthRequest, res: Response): Promis
 };
 
 export const logout = async (_req: Request, res: Response): Promise<void> => {
-  // JWT is stateless, so logout is handled client-side by removing the token
-  // In a production app, you might want to implement a token blacklist
   res.json({ message: 'Logged out successfully' });
 };

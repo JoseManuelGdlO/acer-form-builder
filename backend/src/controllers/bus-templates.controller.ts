@@ -3,6 +3,7 @@ import { body, validationResult } from 'express-validator';
 import { BusTemplate } from '../models';
 import type { BusLayout } from '../models/BusTemplate';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { hasPermission } from '../authorization/policies';
 
 const LAYOUT_TYPES = ['seat', 'bathroom', 'stairs', 'door', 'driver', 'aisle', 'blocked'] as const;
 
@@ -69,8 +70,8 @@ function validateLayout(layout: unknown): { valid: boolean; error?: string } {
   return { valid: true };
 }
 
-function requireSuperAdmin(req: AuthRequest, res: Response): boolean {
-  if (!req.user?.roles?.includes('super_admin')) {
+function requireBusTemplatePermission(req: AuthRequest, res: Response, key: string): boolean {
+  if (!hasPermission(req.user?.permissions, key)) {
     res.status(403).json({ error: 'Forbidden' });
     return false;
   }
@@ -79,7 +80,7 @@ function requireSuperAdmin(req: AuthRequest, res: Response): boolean {
 
 export const getAllBusTemplates = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    if (!requireSuperAdmin(req, res)) return;
+    if (!requireBusTemplatePermission(req, res, 'trip_bus_templates.view')) return;
     const companyId = req.user?.companyId;
     if (!companyId) {
       res.status(401).json({ error: 'Authentication required' });
@@ -98,7 +99,7 @@ export const getAllBusTemplates = async (req: AuthRequest, res: Response): Promi
 
 export const getBusTemplateById = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    if (!requireSuperAdmin(req, res)) return;
+    if (!requireBusTemplatePermission(req, res, 'trip_bus_templates.view')) return;
     const { id } = req.params;
     const companyId = req.user?.companyId;
     if (!companyId) {
@@ -131,7 +132,7 @@ export const createBusTemplate = [
   body('layout').optional().isObject(),
   async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-      if (!requireSuperAdmin(req, res)) return;
+      if (!requireBusTemplatePermission(req, res, 'trip_bus_templates.create')) return;
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         res.status(400).json({ errors: errors.array() });
@@ -195,7 +196,7 @@ export const updateBusTemplate = [
   body('layout').optional().isObject(),
   async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-      if (!requireSuperAdmin(req, res)) return;
+      if (!requireBusTemplatePermission(req, res, 'trip_bus_templates.update')) return;
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         res.status(400).json({ errors: errors.array() });
@@ -246,7 +247,7 @@ export const updateBusTemplate = [
 
 export const deleteBusTemplate = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    if (!requireSuperAdmin(req, res)) return;
+    if (!requireBusTemplatePermission(req, res, 'trip_bus_templates.delete')) return;
     const { id } = req.params;
     const companyId = req.user?.companyId;
     if (!companyId) {

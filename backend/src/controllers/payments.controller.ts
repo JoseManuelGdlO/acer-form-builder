@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { body, validationResult } from 'express-validator';
 import { ClientPayment, Client, ClientPaymentDeletedLog, ClientAcquiredPackage, Product } from '../models';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { hasPermission, canAccessClientRecord } from '../authorization/policies';
 
 const PAYMENTS_ONLY_PRIMARY_MESSAGE =
   'Las cuentas de pago solo se gestionan en el cliente titular. Abre el perfil del titular para ver o registrar pagos.';
@@ -13,7 +14,7 @@ export const getCompanyPayments = async (req: AuthRequest, res: Response): Promi
       res.status(401).json({ error: 'Authentication required' });
       return;
     }
-    if (!req.user?.roles.includes('super_admin')) {
+    if (!hasPermission(req.user?.permissions, 'payment_logs.view')) {
       res.status(403).json({ error: 'Only super_admin can view all payment logs' });
       return;
     }
@@ -57,7 +58,7 @@ export const getClientPayments = async (req: AuthRequest, res: Response): Promis
       res.status(400).json({ error: PAYMENTS_ONLY_PRIMARY_MESSAGE });
       return;
     }
-    if (!req.user?.roles.includes('super_admin') && client.assignedUserId !== req.user?.id) {
+    if (!hasPermission(req.user?.permissions, 'client_payments.view') || !canAccessClientRecord(req, client)) {
       res.status(403).json({ error: 'Access denied' });
       return;
     }
@@ -116,7 +117,7 @@ export const createPayment = [
         res.status(400).json({ error: PAYMENTS_ONLY_PRIMARY_MESSAGE });
         return;
       }
-      if (!req.user?.roles.includes('super_admin') && client.assignedUserId !== req.user?.id) {
+      if (!hasPermission(req.user?.permissions, 'client_payments.create') || !canAccessClientRecord(req, client)) {
         res.status(403).json({ error: 'Access denied' });
         return;
       }
@@ -183,7 +184,7 @@ export const deletePayment = async (req: AuthRequest, res: Response): Promise<vo
       res.status(400).json({ error: PAYMENTS_ONLY_PRIMARY_MESSAGE });
       return;
     }
-    if (!req.user?.roles.includes('super_admin')) {
+    if (!hasPermission(req.user?.permissions, 'client_payments.delete')) {
       res.status(403).json({ error: 'Only administrators can delete payments' });
       return;
     }

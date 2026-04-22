@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { body, validationResult } from 'express-validator';
 import webpush from 'web-push';
 import { Op } from 'sequelize';
-import { Notification, NotificationRecipient, PushSubscription, User, UserRole } from '../models';
+import { Notification, NotificationRecipient, PushSubscription, User, Role } from '../models';
 import { AuthRequest } from '../middleware/auth.middleware';
 
 const VAPID_ADMIN_EMAIL = process.env.VAPID_ADMIN_EMAIL || 'admin@example.com';
@@ -71,18 +71,19 @@ export const createCompanyNotification = async ({
     where: { companyId },
     include: [
       {
-        model: UserRole,
-        as: 'roles',
-        attributes: ['role'],
+        model: Role,
+        as: 'role',
+        attributes: ['systemKey'],
       },
     ],
   });
 
   const allowedRoles = Array.isArray(audienceRoles) && audienceRoles.length > 0 ? audienceRoles : null;
   const recipients = users.filter((u) => {
-    const roles = (u as any).roles as Array<{ role: AudienceRole }> | undefined;
+    const systemKey = (u as any).role?.systemKey as string | null | undefined;
     if (!allowedRoles) return true;
-    return roles?.some((r) => allowedRoles.includes(r.role)) ?? false;
+    if (!systemKey) return false;
+    return allowedRoles.includes(systemKey as AudienceRole);
   });
 
   const notification = await Notification.create({

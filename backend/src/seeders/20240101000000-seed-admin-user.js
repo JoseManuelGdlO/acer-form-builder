@@ -8,11 +8,12 @@ module.exports = {
     const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
     const adminName = process.env.ADMIN_NAME || 'Administrador';
 
-    const [companies] = await queryInterface.sequelize.query(
+    const companies = await queryInterface.sequelize.query(
       `SELECT id FROM companies WHERE slug = 'saru' LIMIT 1`,
       { type: Sequelize.QueryTypes.SELECT }
     );
-    const companyId = Array.isArray(companies) && companies[0] ? companies[0].id : null;
+    const companyRow = Array.isArray(companies) ? companies[0] : null;
+    const companyId = companyRow?.id ?? null;
     if (!companyId) {
       console.log('Default company (saru) not found. Run migrations first.');
       return;
@@ -31,12 +32,27 @@ module.exports = {
       return;
     }
 
+    const roleRows = await queryInterface.sequelize.query(
+      `SELECT id FROM roles WHERE company_id = :companyId AND system_key = 'super_admin' LIMIT 1`,
+      {
+        replacements: { companyId },
+        type: Sequelize.QueryTypes.SELECT,
+      }
+    );
+    const roleRow = Array.isArray(roleRows) ? roleRows[0] : null;
+    const roleId = roleRow?.id ?? null;
+    if (!roleId) {
+      console.log('Super admin role not found for company. Run RBAC migration first.');
+      return;
+    }
+
     const hashedPassword = await bcrypt.hash(adminPassword, 10);
 
     await queryInterface.bulkInsert('users', [
       {
         id: Sequelize.literal('UUID()'),
         company_id: companyId,
+        role_id: roleId,
         email: adminEmail,
         password: hashedPassword,
         name: adminName,
@@ -46,40 +62,16 @@ module.exports = {
       },
     ]);
 
-    const createdUser = await queryInterface.sequelize.query(
-      `SELECT id FROM users WHERE email = :email AND company_id = :companyId LIMIT 1`,
-      {
-        replacements: { email: adminEmail, companyId },
-        type: Sequelize.QueryTypes.SELECT,
-      }
-    );
-
-    if (createdUser && createdUser.length > 0) {
-      const userId = createdUser[0].id;
-
-      // Create super_admin role for the user
-      await queryInterface.bulkInsert('user_roles', [
-        {
-          id: Sequelize.literal('UUID()'),
-          user_id: userId,
-          role: 'super_admin',
-          created_at: new Date(),
-          updated_at: new Date(),
-        },
-      ]);
-
-      console.log(`✅ Admin user created successfully!`);
-      console.log(`   Email: ${adminEmail}`);
-      console.log(`   Password: ${adminPassword}`);
-      console.log(`   Role: super_admin`);
-    }
+    console.log(`✅ Admin user created successfully!`);
+    console.log(`   Email: ${adminEmail}`);
+    console.log(`   Password: ${adminPassword}`);
+    console.log(`   Role: super_admin (role_id)`);
   },
 
   async down(queryInterface, Sequelize) {
     const adminEmail = process.env.ADMIN_EMAIL || 'admin@saruvisas.com';
-    
-    // Get user ID
-    const user = await queryInterface.sequelize.query(
+
+    const userRows = await queryInterface.sequelize.query(
       `SELECT id FROM users WHERE email = :email LIMIT 1`,
       {
         replacements: { email: adminEmail },
@@ -87,22 +79,21 @@ module.exports = {
       }
     );
 
-    if (user && user.length > 0) {
-      const userId = user[0].id;
-      
-      // Delete user role
-      await queryInterface.bulkDelete('user_roles', {
-        user_id: userId,
-      });
+    if (userRows.length > 0) {
+      const userId = userRows[0].id;
+      await queryInterface.bulkDelete('users', { id: userId });
+    }
 
-      const [companies] = await queryInterface.sequelize.query(
-        `SELECT id FROM companies WHERE slug = 'saru' LIMIT 1`,
-        { type: Sequelize.QueryTypes.SELECT }
-      );
-      const companyId = Array.isArray(companies) && companies[0] ? companies[0].id : null;
+    const companies = await queryInterface.sequelize.query(
+      `SELECT id FROM companies WHERE slug = 'saru' LIMIT 1`,
+      { type: Sequelize.QueryTypes.SELECT }
+    );
+    const companyRow = Array.isArray(companies) ? companies[0] : null;
+    const companyId = companyRow?.id ?? null;
+    if (companyId) {
       await queryInterface.bulkDelete('users', {
         email: adminEmail,
-        ...(companyId && { company_id: companyId }),
+        company_id: companyId,
       });
     }
   },

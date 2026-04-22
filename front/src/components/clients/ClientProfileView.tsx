@@ -110,9 +110,11 @@ export const ClientProfileView = ({
   onRemoveFamilyMember,
 }: ClientProfileViewProps) => {
   const { getActiveChecklistItems, fetchChecklistTemplates } = useSettingsStore();
-  const { token, hasRole } = useAuth();
-  const isAdmin = hasRole('super_admin');
-  const canEditTotalAmountDue = hasRole('super_admin') || hasRole('reviewer');
+  const { token, can } = useAuth();
+  const canViewAuditLogs = can('client_audit_logs.view');
+  const canReassignAdvisor = can('clients.reassign_advisor');
+  const canDeletePayments = can('client_payments.delete');
+  const canEditTotalAmountDue = can('client_financials.update');
   /** Solo el titular gestiona pagos; los hijos no tienen sección de pagos. */
   const isChildClient = Boolean(client.parentClientId);
   const [isLoading, setIsLoading] = useState(true);
@@ -167,8 +169,8 @@ export const ClientProfileView = ({
         api.getSubmissions({ clientId: client.id }, token).catch(() => []),
         api.getClientChecklist(client.id, token).catch(() => []),
         isChildClient ? Promise.resolve([]) : api.getClientPayments(client.id, token).catch(() => []),
-        isChildClient || !isAdmin ? Promise.resolve([]) : api.getClientAmountDueHistory(client.id, token).catch(() => []),
-        isChildClient || !isAdmin ? Promise.resolve([]) : api.getClientPaymentDeletedHistory(client.id, token).catch(() => []),
+        isChildClient || !canViewAuditLogs ? Promise.resolve([]) : api.getClientAmountDueHistory(client.id, token).catch(() => []),
+        isChildClient || !canViewAuditLogs ? Promise.resolve([]) : api.getClientPaymentDeletedHistory(client.id, token).catch(() => []),
         api.getForms().catch(() => []),
         api.getClientFormSessions(client.id, token).catch(() => []),
         api.getClientInternalAppointments(client.id, token).catch(() => ({ upcoming: [], history: [] })),
@@ -607,7 +609,7 @@ export const ClientProfileView = ({
     try {
       await api.deletePayment(paymentId, token);
       setPayments(prev => prev.filter(p => p.id !== paymentId));
-      if (isAdmin) {
+      if (canViewAuditLogs) {
         const deletedData = await api.getClientPaymentDeletedHistory(client.id, token).catch(() => []);
         const entries: PaymentDeletedLogEntry[] = (deletedData || []).map((h: any) => ({
           id: h.id,
@@ -633,7 +635,7 @@ export const ClientProfileView = ({
     try {
       await api.updateClient(client.id, { totalAmountDue: value }, token);
       setClientSnapshot(prev => ({ ...prev, totalAmountDue: value ?? undefined }));
-      if (isAdmin) {
+      if (canViewAuditLogs) {
         const historyData = await api.getClientAmountDueHistory(client.id, token).catch(() => []);
         const entries: AmountDueLogEntry[] = (historyData || []).map((h: any) => ({
           id: h.id,
@@ -1091,7 +1093,7 @@ export const ClientProfileView = ({
                                     </Button>
                                   )}
                                 </div>
-                                {isAdmin && users.length > 0 && onAssignFamilyAdvisor && (
+                                {canReassignAdvisor && users.length > 0 && onAssignFamilyAdvisor && (
                                   <Select
                                     value={child.assignedUserId ?? '__none__'}
                                     disabled={updatingAdvisorForChildId === child.id}
@@ -1307,7 +1309,7 @@ export const ClientProfileView = ({
                       amountDueHistory={amountDueHistory}
                       paymentDeletedHistory={paymentDeletedHistory}
                       onAddPayment={handleAddPayment}
-                      onDeletePayment={isAdmin ? handleDeletePayment : undefined}
+                      onDeletePayment={canDeletePayments ? handleDeletePayment : undefined}
                       familyMembers={displayClient.children ?? []}
                     />
                   </AccordionContent>

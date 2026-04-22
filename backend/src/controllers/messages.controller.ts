@@ -4,6 +4,7 @@ import type { Transaction } from 'sequelize';
 import sequelize from '../config/database';
 import { ClientMessage, Client, Conversations } from '../models';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { hasPermission, canAccessClientRecord } from '../authorization/policies';
 import { MessageBusinessError } from '../errors/MessageBusinessError';
 import {
   findActiveWhatsappIntegrationByCompanyId,
@@ -77,7 +78,7 @@ export const getClientMessages = async (req: AuthRequest, res: Response): Promis
       res.status(404).json({ error: 'Client not found' });
       return;
     }
-    if (!req.user?.roles.includes('super_admin') && client.assignedUserId !== req.user?.id) {
+    if (!hasPermission(req.user?.permissions, 'client_messages.view') || !canAccessClientRecord(req, client)) {
       res.status(403).json({ error: 'Access denied' });
       return;
     }
@@ -233,7 +234,7 @@ export const createMessage = [
         res.status(404).json({ error: 'Client not found' });
         return;
       }
-      if (!req.user?.roles.includes('super_admin') && client.assignedUserId !== req.user?.id) {
+      if (!hasPermission(req.user?.permissions, 'client_messages.create') || !canAccessClientRecord(req, client)) {
         res.status(403).json({ error: 'Access denied' });
         return;
       }
@@ -387,7 +388,11 @@ export const deleteMessage = async (req: AuthRequest, res: Response): Promise<vo
     }
 
     const client = await Client.findOne({ where: { id: message.clientId, companyId } });
-    if (!req.user?.roles.includes('super_admin') && client && client.assignedUserId !== req.user?.id) {
+    if (
+      !hasPermission(req.user?.permissions, 'client_messages.delete') ||
+      !client ||
+      !canAccessClientRecord(req, client)
+    ) {
       res.status(403).json({ error: 'Access denied' });
       return;
     }

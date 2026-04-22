@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { verifyToken, extractTokenFromHeader } from '../utils/jwt';
-import { User, UserRole } from '../models';
+import { User, Role, Permission } from '../models';
 import { JwtPayload } from '../types';
 
 export interface AuthRequest extends Request {
@@ -9,7 +9,10 @@ export interface AuthRequest extends Request {
     companyId: string;
     email: string;
     name: string;
-    roles: string[];
+    roleId: string;
+    roleName: string;
+    systemKey: string | null;
+    permissions: string[];
   };
 }
 
@@ -28,13 +31,21 @@ export const authenticate = async (
 
     const payload = verifyToken(token) as JwtPayload;
 
-    // Fetch user with roles from database
     const user = await User.findByPk(payload.userId, {
+      attributes: ['id', 'companyId', 'roleId', 'email', 'name', 'status'],
       include: [
         {
-          model: UserRole,
-          as: 'roles',
-          attributes: ['role'],
+          model: Role,
+          as: 'role',
+          attributes: ['id', 'name', 'systemKey'],
+          include: [
+            {
+              model: Permission,
+              as: 'permissions',
+              attributes: ['key'],
+              through: { attributes: [] },
+            },
+          ],
         },
       ],
     });
@@ -54,13 +65,19 @@ export const authenticate = async (
       return;
     }
 
-    // Attach user to request (companyId always from DB for tenant isolation)
+    const role = (user as any).role as Role | undefined;
+    const permissionRows = (role as any)?.permissions as Permission[] | undefined;
+    const permissions = permissionRows?.map((p) => p.key).filter(Boolean) || [];
+
     req.user = {
       id: user.id,
       companyId: userCompanyId,
       email: user.email,
       name: user.name,
-      roles: (user as any).roles?.map((r: UserRole) => r.role) || [],
+      roleId: (user as any).roleId,
+      roleName: role?.name || '',
+      systemKey: (role as any)?.systemKey ?? null,
+      permissions,
     };
 
     next();

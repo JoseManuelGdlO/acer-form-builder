@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { User, UserRole } from '@/types/user';
+import { User } from '@/types/user';
 import { useSettingsStore } from '@/hooks/useSettingsStore';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -20,22 +20,38 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Shield, Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
+
+export interface RoleOption {
+  id: string;
+  name: string;
+  systemKey: string | null;
+}
 
 interface UserFormModalProps {
   open: boolean;
   onClose: () => void;
-  onSave: (name: string, email: string, role: UserRole, password: string, branchId?: string | null) => Promise<void>;
-  onUpdate?: (id: string, updates: { name?: string; email?: string; role?: UserRole; branchId?: string | null }) => Promise<void>;
+  onSave: (
+    name: string,
+    email: string,
+    roleId: string,
+    password: string,
+    branchId?: string | null
+  ) => Promise<void>;
+  onUpdate?: (
+    id: string,
+    updates: { name?: string; email?: string; roleId?: string; branchId?: string | null }
+  ) => Promise<void>;
   user?: User | null;
+  roles: RoleOption[];
 }
 
-export function UserFormModal({ open, onClose, onSave, onUpdate, user }: UserFormModalProps) {
+export function UserFormModal({ open, onClose, onSave, onUpdate, user, roles }: UserFormModalProps) {
   const NONE_VALUE = 'none';
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState<UserRole>('reviewer');
+  const [roleId, setRoleId] = useState('');
   const [branchId, setBranchId] = useState<string>(NONE_VALUE);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -46,25 +62,27 @@ export function UserFormModal({ open, onClose, onSave, onUpdate, user }: UserFor
   const { token } = useAuth();
   const { branches, fetchBranches } = useSettingsStore();
 
+  const defaultRoleId = roles[0]?.id ?? '';
+
   useEffect(() => {
     if (user) {
       setName(user.name);
       setEmail(user.email);
-      setRole(user.roles[0] || 'reviewer');
+      setRoleId(user.roleId || defaultRoleId);
       setBranchId(user.branchId ?? NONE_VALUE);
       setPassword('');
       setConfirmPassword('');
     } else {
       setName('');
       setEmail('');
-      setRole('reviewer');
+      setRoleId(defaultRoleId);
       setBranchId(NONE_VALUE);
       setPassword('');
       setConfirmPassword('');
     }
     setError('');
     setShowPassword(false);
-  }, [user, open]);
+  }, [user, open, defaultRoleId]);
 
   useEffect(() => {
     if (!open) return;
@@ -78,12 +96,15 @@ export function UserFormModal({ open, onClose, onSave, onUpdate, user }: UserFor
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !email.trim()) return;
+    if (!roleId) {
+      setError('Selecciona un rol');
+      return;
+    }
 
     setIsLoading(true);
     setError('');
 
     try {
-      // Validar contraseña solo para nuevos usuarios
       if (!user) {
         if (password.length < 6) {
           setError('La contraseña debe tener al menos 6 caracteres');
@@ -101,16 +122,16 @@ export function UserFormModal({ open, onClose, onSave, onUpdate, user }: UserFor
         await onUpdate(user.id, {
           name,
           email,
-          role,
+          roleId,
           branchId: branchId === NONE_VALUE ? null : branchId || null,
         });
       } else {
-        await onSave(name, email, role, password, branchId === NONE_VALUE ? null : branchId || null);
+        await onSave(name, email, roleId, password, branchId === NONE_VALUE ? null : branchId || null);
       }
       onClose();
-    } catch (error: unknown) {
-      console.error('Error saving user:', error);
-      setError(error instanceof Error ? error.message : 'Error al guardar el usuario. Por favor, intenta nuevamente.');
+    } catch (err: unknown) {
+      console.error('Error saving user:', err);
+      setError(err instanceof Error ? err.message : 'Error al guardar el usuario. Por favor, intenta nuevamente.');
     } finally {
       setIsLoading(false);
     }
@@ -149,23 +170,16 @@ export function UserFormModal({ open, onClose, onSave, onUpdate, user }: UserFor
           </div>
           <div className="space-y-2">
             <Label htmlFor="role">Rol</Label>
-            <Select value={role} onValueChange={(value: UserRole) => setRole(value)}>
+            <Select value={roleId} onValueChange={setRoleId}>
               <SelectTrigger>
                 <SelectValue placeholder="Selecciona un rol" />
               </SelectTrigger>
               <SelectContent className="bg-popover border">
-                <SelectItem value="super_admin">
-                  <div className="flex items-center gap-2">
-                    <Shield className="h-4 w-4 text-primary" />
-                    Super Administrador
-                  </div>
-                </SelectItem>
-                <SelectItem value="reviewer">
-                  <div className="flex items-center gap-2">
-                    <Eye className="h-4 w-4" />
-                    Revisor
-                  </div>
-                </SelectItem>
+                {roles.map((r) => (
+                  <SelectItem key={r.id} value={r.id}>
+                    {r.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -189,8 +203,7 @@ export function UserFormModal({ open, onClose, onSave, onUpdate, user }: UserFor
               </SelectContent>
             </Select>
           </div>
-          
-          {/* Password fields - solo para nuevos usuarios */}
+
           {!user && (
             <>
               <div className="space-y-2">
@@ -200,7 +213,10 @@ export function UserFormModal({ open, onClose, onSave, onUpdate, user }: UserFor
                     id="password"
                     type={showPassword ? 'text' : 'password'}
                     value={password}
-                    onChange={(e) => { setPassword(e.target.value); setError(''); }}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      setError('');
+                    }}
                     placeholder="Mínimo 6 caracteres"
                     required
                   />
@@ -221,7 +237,10 @@ export function UserFormModal({ open, onClose, onSave, onUpdate, user }: UserFor
                   id="confirmPassword"
                   type={showPassword ? 'text' : 'password'}
                   value={confirmPassword}
-                  onChange={(e) => { setConfirmPassword(e.target.value); setError(''); }}
+                  onChange={(e) => {
+                    setConfirmPassword(e.target.value);
+                    setError('');
+                  }}
                   placeholder="Repite la contraseña"
                   required
                 />
@@ -229,9 +248,7 @@ export function UserFormModal({ open, onClose, onSave, onUpdate, user }: UserFor
             </>
           )}
 
-          {error && (
-            <p className="text-sm text-destructive">{error}</p>
-          )}
+          {error && <p className="text-sm text-destructive">{error}</p>}
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>

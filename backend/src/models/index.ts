@@ -1,7 +1,9 @@
 import sequelize from '../config/database';
 import { Company } from './Company';
 import { User } from './User';
-import { UserRole } from './UserRole';
+import { Permission } from './Permission';
+import { Role } from './Role';
+import { RolePermission } from './RolePermission';
 import { Branch } from './Branch';
 import { Client } from './Client';
 import { Form } from './Form';
@@ -136,9 +138,26 @@ Client.belongsTo(Product, { foreignKey: 'productId', as: 'product' });
 VisaStatusTemplate.hasMany(Client, { foreignKey: 'visaStatusTemplateId', as: 'clients' });
 Client.belongsTo(VisaStatusTemplate, { foreignKey: 'visaStatusTemplateId', as: 'visaStatusTemplate' });
 
-// User relationships
-User.hasMany(UserRole, { foreignKey: 'userId', as: 'roles' });
-UserRole.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+// Roles & permissions (RBAC)
+Company.hasMany(Role, { foreignKey: 'companyId', as: 'roles' });
+Role.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+Role.belongsToMany(Permission, {
+  through: RolePermission,
+  foreignKey: 'roleId',
+  otherKey: 'permissionId',
+  as: 'permissions',
+});
+Permission.belongsToMany(Role, {
+  through: RolePermission,
+  foreignKey: 'permissionId',
+  otherKey: 'roleId',
+  as: 'roles',
+});
+RolePermission.belongsTo(Role, { foreignKey: 'roleId', as: 'role' });
+RolePermission.belongsTo(Permission, { foreignKey: 'permissionId', as: 'permission' });
+
+User.belongsTo(Role, { foreignKey: 'roleId', as: 'role' });
+Role.hasMany(User, { foreignKey: 'roleId', as: 'users' });
 
 User.hasMany(Client, { foreignKey: 'assignedUserId', as: 'assignedClients' });
 Client.belongsTo(User, { foreignKey: 'assignedUserId', as: 'assignedUser' });
@@ -277,7 +296,9 @@ export {
   Company,
   Branch,
   User,
-  UserRole,
+  Permission,
+  Role,
+  RolePermission,
   Notification,
   NotificationRecipient,
   Client,

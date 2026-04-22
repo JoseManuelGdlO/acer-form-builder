@@ -19,6 +19,7 @@ import {
   InternalAppointment,
 } from '../models';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { hasPermission, canViewAllClients, canAccessClientRecord } from '../authorization/policies';
 
 const parseNullableParentClientId = (value: unknown): string | null | undefined => {
   if (value === undefined) return undefined;
@@ -118,6 +119,13 @@ export const getAllClients = async (req: AuthRequest, res: Response): Promise<vo
       res.status(401).json({ error: 'Authentication required' });
       return;
     }
+    if (
+      !hasPermission(req.user!.permissions, 'clients.view_all') &&
+      !hasPermission(req.user!.permissions, 'clients.view_assigned')
+    ) {
+      res.status(403).json({ error: 'Insufficient permissions' });
+      return;
+    }
     const {
       assignedUserId,
       branchId,
@@ -133,8 +141,8 @@ export const getAllClients = async (req: AuthRequest, res: Response): Promise<vo
     const parsedLimit = Math.min(100, Math.max(1, parseInt(String(limit || '20'), 10) || 20));
     const offset = (parsedPage - 1) * parsedLimit;
 
-    // If user is reviewer, only show assigned clients
-    if (req.user && !req.user.roles.includes('super_admin')) {
+    // Assigned-only scope when user cannot view all clients
+    if (req.user && !canViewAllClients(req)) {
       where.assignedUserId = req.user.id;
     } else if (assignedUserId) {
       where.assignedUserId = assignedUserId;
@@ -242,7 +250,7 @@ export const getAllClients = async (req: AuthRequest, res: Response): Promise<vo
     }
 
     let filterBranchId: string | undefined;
-    if (req.user?.roles.includes('super_admin') && branchId) {
+    if (canViewAllClients(req) && branchId) {
       const rawBranch = String(branchId).trim();
       if (rawBranch) {
         const branchRow = await Branch.findOne({
@@ -508,12 +516,9 @@ export const getClientById = async (req: AuthRequest, res: Response): Promise<vo
       return;
     }
 
-    // Check if reviewer can access this client
-    if (req.user && !req.user.roles.includes('super_admin')) {
-      if (client.assignedUserId !== req.user.id) {
-        res.status(403).json({ error: 'Access denied' });
-        return;
-      }
+    if (!canAccessClientRecord(req, client)) {
+      res.status(403).json({ error: 'Access denied' });
+      return;
     }
 
     const participations = await TripParticipant.findAll({
@@ -557,7 +562,7 @@ export const getClientById = async (req: AuthRequest, res: Response): Promise<vo
 
 export const getClientAmountDueHistory = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    if (!req.user?.roles.includes('super_admin')) {
+    if (!hasPermission(req.user?.permissions, 'client_audit_logs.view')) {
       res.status(403).json({ error: 'Solo administradores pueden ver el historial de cambios del total a pagar' });
       return;
     }
@@ -586,7 +591,7 @@ export const getClientAmountDueHistory = async (req: AuthRequest, res: Response)
 
 export const getClientPaymentDeletedHistory = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    if (!req.user?.roles.includes('super_admin')) {
+    if (!hasPermission(req.user?.permissions, 'client_audit_logs.view')) {
       res.status(403).json({ error: 'Solo administradores pueden ver el historial de pagos eliminados' });
       return;
     }
@@ -643,6 +648,10 @@ export const createClient = [
       const companyId = req.user?.companyId;
       if (!companyId) {
         res.status(401).json({ error: 'Authentication required' });
+        return;
+      }
+      if (!hasPermission(req.user!.permissions, 'clients.create')) {
+        res.status(403).json({ error: 'Insufficient permissions' });
         return;
       }
 
@@ -716,7 +725,7 @@ export const createClient = [
       }
 
       let assignedUserId: string | null | undefined = req.user?.id;
-      if (parentClientId && req.user?.roles.includes('super_admin')) {
+      if (parentClientId && hasPermission(req.user?.permissions, 'clients.reassign_advisor')) {
         const raw = requestedAssignedUserId as string | null | undefined;
         if (raw === null) {
           assignedUserId = null;
@@ -728,7 +737,7 @@ export const createClient = [
           }
           assignedUserId = String(raw);
         } else {
-          assignedUserId = parentRow?.assignedUserId ?? req.user.id;
+          assignedUserId = parentRow?.assignedUserId ?? req.user!.id;
         }
       }
 
@@ -856,15 +865,16 @@ export const updateClient = [
         return;
       }
 
-      // Check if reviewer can update this client
-      if (req.user && !req.user.roles.includes('super_admin')) {
-        if (client.assignedUserId !== req.user.id) {
-          res.status(403).json({ error: 'Access denied' });
-          return;
-        }
+      if (!hasPermission(req.user!.permissions, 'clients.update')) {
+        res.status(403).json({ error: 'Access denied' });
+        return;
+      }
+      if (!canAccessClientRecord(req, client)) {
+        res.status(403).json({ error: 'Access denied' });
+        return;
       }
 
-      if (req.body.totalAmountDue !== undefined && !req.user?.roles.some((role) => role === 'super_admin' || role === 'reviewer')) {
+      if (req.body.totalAmountDue !== undefined && !hasPermission(req.user?.permissions, 'client_financials.update')) {
         res.status(403).json({ error: 'No tienes permisos para modificar el total a pagar' });
         return;
       }
@@ -902,10 +912,10 @@ export const updateClient = [
         const parentClientId = parseNullableParentClientId(req.body.parentClientId);
         updates.parentClientId = parentClientId;
       }
-      if (req.body.assignedUserId !== undefined && req.user?.roles.includes('super_admin')) {
+      if (req.body.assignedUserId !== undefined && hasPermission(req.user?.permissions, 'clients.reassign_advisor')) {
         updates.assignedUserId = req.body.assignedUserId || null;
       }
-      if (req.body.totalAmountDue !== undefined && req.user?.roles.some((role) => role === 'super_admin' || role === 'reviewer')) {
+      if (req.body.totalAmountDue !== undefined && hasPermission(req.user?.permissions, 'client_financials.update')) {
         updates.totalAmountDue = req.body.totalAmountDue;
       }
 
@@ -974,7 +984,7 @@ export const updateClient = [
           { model: Client, as: 'children', attributes: ['id', 'name', 'email', 'phone', 'parentClientId', 'assignedUserId', 'createdAt', 'updatedAt'], required: false },
         ],
       });
-      if (req.body.totalAmountDue !== undefined && req.user?.roles.some((role) => role === 'super_admin' || role === 'reviewer')) {
+      if (req.body.totalAmountDue !== undefined && hasPermission(req.user?.permissions, 'client_financials.update')) {
         const newVal = req.body.totalAmountDue === null || req.body.totalAmountDue === undefined
           ? null
           : Number(req.body.totalAmountDue);
@@ -1074,7 +1084,7 @@ export const getClientAcquiredPackages = async (req: AuthRequest, res: Response)
       res.status(404).json({ error: 'Client not found' });
       return;
     }
-    if (req.user && !req.user.roles.includes('super_admin') && client.assignedUserId !== req.user.id) {
+    if (!canAccessClientRecord(req, client)) {
       res.status(403).json({ error: 'Access denied' });
       return;
     }
@@ -1121,7 +1131,7 @@ export const createClientAcquiredPackage = [
         res.status(404).json({ error: 'Client not found' });
         return;
       }
-      if (req.user && !req.user.roles.includes('super_admin') && client.assignedUserId !== req.user.id) {
+      if (!canAccessClientRecord(req, client)) {
         res.status(403).json({ error: 'Access denied' });
         return;
       }
@@ -1184,7 +1194,7 @@ export const deleteClientAcquiredPackage = async (req: AuthRequest, res: Respons
       res.status(404).json({ error: 'Client not found' });
       return;
     }
-    if (req.user && !req.user.roles.includes('super_admin') && client.assignedUserId !== req.user.id) {
+    if (!canAccessClientRecord(req, client)) {
       res.status(403).json({ error: 'Access denied' });
       return;
     }
@@ -1233,12 +1243,13 @@ export const deleteClient = async (req: AuthRequest, res: Response): Promise<voi
       return;
     }
 
-    // Check if reviewer can delete this client
-    if (req.user && !req.user.roles.includes('super_admin')) {
-      if (client.assignedUserId !== req.user.id) {
-        res.status(403).json({ error: 'Access denied' });
-        return;
-      }
+    if (!hasPermission(req.user!.permissions, 'clients.delete')) {
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
+    if (!canAccessClientRecord(req, client)) {
+      res.status(403).json({ error: 'Access denied' });
+      return;
     }
 
     await client.destroy();
@@ -1262,11 +1273,9 @@ export const getClientStats = async (req: AuthRequest, res: Response): Promise<v
     const assignedUserIdParam =
       typeof req.query.assignedUserId === 'string' ? req.query.assignedUserId.trim() : '';
 
-    // Super admin puede acotar por asesor (p. ej. "Ver como" revisor)
-    if (assignedUserIdParam && req.user?.roles.includes('super_admin')) {
+    if (assignedUserIdParam && canViewAllClients(req)) {
       where.assignedUserId = assignedUserIdParam;
-    } else if (req.user && !req.user.roles.includes('super_admin')) {
-      // Revisor: solo clientes asignados
+    } else if (req.user && !canViewAllClients(req)) {
       where.assignedUserId = req.user.id;
     }
 

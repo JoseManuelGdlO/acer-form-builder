@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { body, validationResult } from 'express-validator';
 import { Op } from 'sequelize';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { hasPermission } from '../authorization/policies';
 import { ClientPayment, FinanceExpense, Client, Product, Trip, User } from '../models';
 
 type Granularity = 'hourly' | 'daily' | 'weekly' | 'monthly' | 'bimonthly' | 'quarterly' | 'semiannual' | 'annual';
@@ -153,7 +154,7 @@ export const getFinanceOverview = async (req: AuthRequest, res: Response): Promi
       res.status(401).json({ error: 'Authentication required' });
       return;
     }
-    if (!req.user?.roles.includes('super_admin')) {
+    if (!hasPermission(req.user?.permissions, 'finance.view')) {
       res.status(403).json({ error: 'Only super_admin can access finance overview' });
       return;
     }
@@ -481,7 +482,7 @@ export const createFinanceExpense = [
         res.status(401).json({ error: 'Authentication required' });
         return;
       }
-      if (!req.user?.roles.includes('super_admin')) {
+      if (!hasPermission(req.user?.permissions, 'finance.view')) {
         res.status(403).json({ error: 'Forbidden' });
         return;
       }
@@ -520,7 +521,7 @@ export const deleteFinanceExpense = async (req: AuthRequest, res: Response): Pro
       res.status(401).json({ error: 'Authentication required' });
       return;
     }
-    if (!req.user?.roles.includes('super_admin')) {
+    if (!hasPermission(req.user?.permissions, 'finance.view')) {
       res.status(403).json({ error: 'Forbidden' });
       return;
     }

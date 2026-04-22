@@ -189,6 +189,79 @@ class ApiClient {
     });
   }
 
+  // Roles & permission catalog
+  async getPermissionCatalog(token?: string | null) {
+    return this.request<{ groups: Array<{ id: string; label: string; keys: string[] }> }>('/roles/catalog', {
+      method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async listRoles(token?: string | null) {
+    return this.request<
+      Array<{
+        id: string;
+        name: string;
+        description: string | null;
+        isSystem: boolean;
+        systemKey: string | null;
+        permissions: string[];
+      }>
+    >('/roles', {
+      method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async createRole(
+    body: { name: string; description?: string; permissionKeys: string[] },
+    token?: string | null
+  ) {
+    return this.request<{
+      id: string;
+      name: string;
+      description: string | null;
+      isSystem: boolean;
+      systemKey: string | null;
+      permissions: string[];
+    }>('/roles', {
+      method: 'POST',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+      body: JSON.stringify(body),
+    });
+  }
+
+  async updateRole(
+    id: string,
+    body: { name?: string; description?: string; permissionKeys?: string[] },
+    token?: string | null
+  ) {
+    return this.request<{
+      id: string;
+      name: string;
+      description: string | null;
+      isSystem: boolean;
+      systemKey: string | null;
+      permissions: string[];
+    }>(`/roles/${id}`, {
+      method: 'PUT',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+      body: JSON.stringify(body),
+    });
+  }
+
+  async deleteRole(id: string, token?: string | null) {
+    return this.request<{ message: string }>(`/roles/${id}`, {
+      method: 'DELETE',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
   // Clients
   async getClients(
     params?: {

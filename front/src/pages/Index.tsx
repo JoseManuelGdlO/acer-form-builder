@@ -27,7 +27,10 @@ import type { Category } from '@/types/category';
 import { Dashboard } from '@/components/dashboard/Dashboard';
 import { ViewAsSelector } from '@/components/admin/ViewAsSelector';
 import { AppHeader } from '@/components/layout/AppHeader';
-import { RoleGuard } from '@/components/auth/RoleGuard';
+import { PermissionGuard } from '@/components/auth/PermissionGuard';
+import { VIEW_ENTRY_PERMISSIONS, type ShellView } from '@/auth/viewPermissions';
+import { userSeesAllClients } from '@/auth/userPermissions';
+import { RolesAdminPage } from '@/components/admin/RolesAdminPage';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -35,26 +38,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { LayoutDashboard, FileText, Users, UserCog, Bot, Settings, Receipt, ChevronDown, ShoppingBag, MapPin, ChartNoAxesCombined, Calendar } from 'lucide-react';
+import { LayoutDashboard, FileText, Users, UserCog, Bot, Settings, Receipt, ChevronDown, ShoppingBag, MapPin, ChartNoAxesCombined, Calendar, Boxes, Shield } from 'lucide-react';
 import { User } from '@/types/user';
 import { Client } from '@/types/form';
 import { Product } from '@/types/product';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
 
-type View =
-  | 'dashboard'
-  | 'forms'
-  | 'clients'
-  | 'products'
-  | 'calendar'
-  | 'finance'
-  | 'paymentLogs'
-  | 'groups'
-  | 'trips'
-  | 'users'
-  | 'chatbot'
-  | 'settings';
+type View = ShellView;
 
 const parseInitialClientNavigation = (): { initialView: View; initialClientId: string | null } => {
   if (typeof window === 'undefined') {
@@ -65,8 +56,26 @@ const parseInitialClientNavigation = (): { initialView: View; initialClientId: s
   const viewParam = params.get('view');
   const clientIdParam = params.get('clientId');
 
-  if (viewParam === 'clients') {
-    return { initialView: 'clients', initialClientId: clientIdParam };
+  const fromQuery: View[] = [
+    'dashboard',
+    'forms',
+    'clients',
+    'products',
+    'calendar',
+    'finance',
+    'paymentLogs',
+    'groups',
+    'trips',
+    'users',
+    'roles',
+    'chatbot',
+    'settings',
+  ];
+  if (viewParam && fromQuery.includes(viewParam as View)) {
+    return {
+      initialView: viewParam as View,
+      initialClientId: viewParam === 'clients' ? clientIdParam : null,
+    };
   }
 
   return { initialView: 'dashboard', initialClientId: null };
@@ -235,7 +244,7 @@ const Index = () => {
     deleteTemplate: deleteBusTemplateStore,
   } = useBusTemplateStore();
   const [companiesForTripShare, setCompaniesForTripShare] = useState<{ id: string; name: string }[]>([]);
-  const { token, hasRole } = useAuth();
+  const { token, can, canAny } = useAuth();
   const { users, fetchUsers } = useUserStore();
   const [productModalOpen, setProductModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -300,10 +309,10 @@ const Index = () => {
   }, [currentForm]);
 
   useEffect(() => {
-    if (currentForm && !hasRole('super_admin')) {
+    if (currentForm && !can('forms.update')) {
       void selectForm(null);
     }
-  }, [currentForm, hasRole, selectForm]);
+  }, [currentForm, can, selectForm]);
 
   const normalizeCategoryKey = (input: string): string | null => {
     const v = String(input || '')
@@ -324,6 +333,11 @@ const Index = () => {
     },
     [fetchChangeLog, token]
   );
+
+  useEffect(() => {
+    if (!token || !can('session.view_as')) return;
+    fetchUsers(token).catch(() => {});
+  }, [token, can, fetchUsers]);
 
   // Load data when component mounts or when token changes
   useEffect(() => {
@@ -367,7 +381,7 @@ const Index = () => {
       fetchProducts(token).catch((error) => {
         console.error('Failed to fetch products:', error);
       });
-      if (hasRole('super_admin')) {
+      if (canAny(['users.view', 'clients.reassign_advisor'])) {
         fetchUsers(token).catch((error) => {
           console.error('Failed to fetch users:', error);
         });
@@ -387,9 +401,9 @@ const Index = () => {
         console.error('Failed to refresh submissions after WhatsApp reply:', error);
       });
       const aid =
-        viewingAs && !viewingAs.roles.includes('super_admin')
+        viewingAs && !userSeesAllClients(viewingAs)
           ? viewingAs.id
-          : hasRole('super_admin') && clientListQuery.assignedUserId?.trim()
+          : can('clients.view_all') && clientListQuery.assignedUserId?.trim()
             ? clientListQuery.assignedUserId.trim()
             : undefined;
       getClientStats(token, aid ? { assignedUserId: aid } : undefined)
@@ -402,7 +416,7 @@ const Index = () => {
 
     navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
     return () => navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage);
-  }, [token, clientListQuery, fetchClients, fetchSubmissions, getClientStats, viewingAs, hasRole]);
+  }, [token, clientListQuery, fetchClients, fetchSubmissions, getClientStats, viewingAs, can]);
 
   useEffect(() => {
     if (!token || activeView !== 'clients') return;
@@ -415,9 +429,9 @@ const Index = () => {
         console.error('Failed to refresh submissions by polling:', error);
       });
       const aid =
-        viewingAs && !viewingAs.roles.includes('super_admin')
+        viewingAs && !userSeesAllClients(viewingAs)
           ? viewingAs.id
-          : hasRole('super_admin') && clientListQuery.assignedUserId?.trim()
+          : can('clients.view_all') && clientListQuery.assignedUserId?.trim()
             ? clientListQuery.assignedUserId.trim()
             : undefined;
       getClientStats(token, aid ? { assignedUserId: aid } : undefined)
@@ -429,14 +443,14 @@ const Index = () => {
     }, 60000);
 
     return () => window.clearInterval(intervalId);
-  }, [token, activeView, clientListQuery, fetchClients, fetchSubmissions, getClientStats, viewingAs, hasRole]);
+  }, [token, activeView, clientListQuery, fetchClients, fetchSubmissions, getClientStats, viewingAs, can]);
 
   // Inicio: totales reales (la lista de clientes va paginada; no usar solo clients.length)
   useEffect(() => {
     if (!token || activeView !== 'dashboard') return;
     let cancelled = false;
     const assignedUserId =
-      viewingAs && !viewingAs.roles.includes('super_admin') ? viewingAs.id : undefined;
+      viewingAs && !userSeesAllClients(viewingAs) ? viewingAs.id : undefined;
     getClientStats(token, assignedUserId ? { assignedUserId } : undefined)
       .then((raw) => {
         if (cancelled) return;
@@ -454,9 +468,9 @@ const Index = () => {
     if (!token) return;
     let cancelled = false;
     const assignedUserIdForStats =
-      viewingAs && !viewingAs.roles.includes('super_admin')
+      viewingAs && !userSeesAllClients(viewingAs)
         ? viewingAs.id
-        : hasRole('super_admin') && clientListQuery.assignedUserId?.trim()
+        : can('clients.view_all') && clientListQuery.assignedUserId?.trim()
           ? clientListQuery.assignedUserId.trim()
           : undefined;
     getClientStats(token, assignedUserIdForStats ? { assignedUserId: assignedUserIdForStats } : undefined)
@@ -474,13 +488,13 @@ const Index = () => {
     return () => {
       cancelled = true;
     };
-  }, [token, viewingAs, clientListQuery.assignedUserId, getClientStats, hasRole]);
+  }, [token, viewingAs, clientListQuery.assignedUserId, getClientStats, can]);
 
   useEffect(() => {
     if (!token) return;
     if (activeView !== 'trips' && activeView !== 'groups') return;
     const opts =
-      viewingAs && !viewingAs.roles.includes('super_admin')
+      viewingAs && !userSeesAllClients(viewingAs)
         ? { assignedUserId: viewingAs.id }
         : undefined;
     fetchClientsForPickers(token, opts).catch((error) => {
@@ -512,12 +526,12 @@ const Index = () => {
   // Viajes: lista para admin y revisor; invitaciones y plantillas solo admin
   useEffect(() => {
     if (!token || activeView !== 'trips') return;
-    if (hasRole('super_admin') || hasRole('reviewer')) {
+    if (can('trips.view')) {
       fetchTrips(token).catch((error) => {
         console.error('Failed to fetch trips:', error);
       });
     }
-    if (hasRole('super_admin')) {
+    if (can('trips.office_admin')) {
       fetchInvitations(token).catch((error) => {
         console.error('Failed to fetch invitations:', error);
       });
@@ -531,13 +545,13 @@ const Index = () => {
         setCompaniesForTripShare(Array.isArray(list) ? list : []);
       }).catch(() => setCompaniesForTripShare([]));
     }
-  }, [activeView, token, hasRole]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activeView, token, can]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Wrapper functions to pass token automatically
   const assignedUserIdForClientStats = () =>
-    viewingAs && !viewingAs.roles.includes('super_admin')
+    viewingAs && !userSeesAllClients(viewingAs)
       ? viewingAs.id
-      : hasRole('super_admin') && clientListQuery.assignedUserId?.trim()
+      : can('clients.view_all') && clientListQuery.assignedUserId?.trim()
         ? clientListQuery.assignedUserId.trim()
         : undefined;
 
@@ -602,13 +616,13 @@ const Index = () => {
   const filteredClients = useMemo(() => {
     if (!viewingAs) return clients;
     // Super admins see all, reviewers see only their assigned clients
-    if (viewingAs.roles.includes('super_admin')) return clients;
+    if (userSeesAllClients(viewingAs)) return clients;
     return clients.filter(client => client.assignedUserId === viewingAs.id);
   }, [clients, viewingAs]);
 
   const clientsForTripAndGroupPickers = useMemo(() => {
     if (!viewingAs) return pickerClients;
-    if (viewingAs.roles.includes('super_admin')) return pickerClients;
+    if (userSeesAllClients(viewingAs)) return pickerClients;
     return pickerClients.filter((c) => c.assignedUserId === viewingAs.id);
   }, [pickerClients, viewingAs]);
 
@@ -680,112 +694,162 @@ const Index = () => {
     [currentForm, editorHasUnsavedChanges, selectForm, token, fetchForms]
   );
 
-  const NavigationButtons = ({ current }: { current: View }) => (
-    <>
-      <Button
-        variant={current === 'dashboard' ? 'default' : 'ghost'}
-        size="sm"
-        onClick={() => handleNavigate('dashboard')}
-        className="h-8 gap-1.5 px-2 text-xs sm:text-sm"
-      >
-        <LayoutDashboard className="w-4 h-4 shrink-0" />
-        <span className="hidden sm:inline">Inicio</span>
-      </Button>
-      <Button
-        variant={current === 'clients' ? 'default' : 'ghost'}
-        size="sm"
-        onClick={() => handleNavigate('clients')}
-        className="h-8 gap-1.5 px-2 text-xs sm:text-sm"
-      >
-        <Users className="w-4 h-4 shrink-0" />
-        <span className="hidden sm:inline">Clientes</span>
-        {clientsScopeTotal !== null && clientsScopeTotal > 0 && (
-          <span className="px-1.5 py-0.5 text-xs rounded-full bg-secondary/20 text-secondary">
-            {clientsScopeTotal}
-          </span>
+  const NavigationButtons = ({ current }: { current: View }) => {
+    const adminNavActive = ['finance', 'paymentLogs', 'users', 'roles', 'chatbot', 'settings'].includes(current);
+    const showAdminMenu = canAny([
+      'nav.admin.view',
+      'nav.finance.view',
+      'nav.payment_logs.view',
+      'nav.users.view',
+      'nav.chatbot.view',
+      'nav.settings.view',
+      'roles.view',
+    ]);
+
+    return (
+      <>
+        {canAny(VIEW_ENTRY_PERMISSIONS.dashboard) && (
+          <Button
+            variant={current === 'dashboard' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => handleNavigate('dashboard')}
+            className="h-8 gap-1.5 px-2 text-xs sm:text-sm"
+          >
+            <LayoutDashboard className="w-4 h-4 shrink-0" />
+            <span className="hidden sm:inline">Inicio</span>
+          </Button>
         )}
-      </Button>
-      {(hasRole('super_admin') || hasRole('reviewer')) && (
-        <Button
-          variant={current === 'trips' ? 'default' : 'ghost'}
-          size="sm"
-          onClick={() => handleNavigate('trips')}
-          className="h-8 gap-1.5 px-2 text-xs sm:text-sm"
-        >
-          <MapPin className="w-4 h-4 shrink-0" />
-          <span className="hidden sm:inline">Viajes</span>
-        </Button>
-      )}
-      <Button
-        variant={current === 'calendar' ? 'default' : 'ghost'}
-        size="sm"
-        onClick={() => handleNavigate('calendar')}
-        className="h-8 gap-1.5 px-2 text-xs sm:text-sm"
-      >
-        <Calendar className="w-4 h-4 shrink-0" />
-        <span className="hidden sm:inline">Calendario</span>
-      </Button>
-      <Button
-        variant={current === 'forms' ? 'default' : 'ghost'}
-        size="sm"
-        onClick={() => handleNavigate('forms')}
-        className="h-8 gap-1.5 px-2 text-xs sm:text-sm"
-      >
-        <FileText className="w-4 h-4 shrink-0" />
-        <span className="hidden sm:inline">Formularios</span>
-      </Button>
-      <Button
-        variant={current === 'products' ? 'default' : 'ghost'}
-        size="sm"
-        onClick={() => handleNavigate('products')}
-        className="h-8 gap-1.5 px-2 text-xs sm:text-sm"
-      >
-        <ShoppingBag className="w-4 h-4 shrink-0" />
-        <span className="hidden sm:inline">Productos</span>
-      </Button>
-      <RoleGuard allowedRoles={['super_admin']}>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant={['finance', 'paymentLogs', 'users', 'chatbot', 'settings'].includes(current) ? 'default' : 'ghost'}
-              size="sm"
-              className="h-8 gap-1.5 px-2 text-xs sm:text-sm"
-            >
-              <Settings className="w-4 h-4 shrink-0" />
-              <span className="hidden sm:inline">Administración</span>
-              <ChevronDown className="w-3.5 h-3.5 shrink-0 opacity-70" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-52">
-            <DropdownMenuItem onClick={() => handleNavigate('finance')} className="gap-2 cursor-pointer">
-              <ChartNoAxesCombined className="w-4 h-4" />
-              Finanzas
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleNavigate('paymentLogs')} className="gap-2 cursor-pointer">
-              <Receipt className="w-4 h-4" />
-              Logs de pagos
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleNavigate('users')} className="gap-2 cursor-pointer">
-              <UserCog className="w-4 h-4" />
-              Usuarios
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleNavigate('chatbot')} className="gap-2 cursor-pointer">
-              <Bot className="w-4 h-4" />
-              Chatbot
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleNavigate('settings')} className="gap-2 cursor-pointer">
-              <Settings className="w-4 h-4" />
-              Configuración
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </RoleGuard>
-    </>
-  );
+        {canAny(VIEW_ENTRY_PERMISSIONS.clients) && (
+          <Button
+            variant={current === 'clients' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => handleNavigate('clients')}
+            className="h-8 gap-1.5 px-2 text-xs sm:text-sm"
+          >
+            <Users className="w-4 h-4 shrink-0" />
+            <span className="hidden sm:inline">Clientes</span>
+            {clientsScopeTotal !== null && clientsScopeTotal > 0 && (
+              <span className="px-1.5 py-0.5 text-xs rounded-full bg-secondary/20 text-secondary">
+                {clientsScopeTotal}
+              </span>
+            )}
+          </Button>
+        )}
+        {canAny(VIEW_ENTRY_PERMISSIONS.trips) && (
+          <Button
+            variant={current === 'trips' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => handleNavigate('trips')}
+            className="h-8 gap-1.5 px-2 text-xs sm:text-sm"
+          >
+            <MapPin className="w-4 h-4 shrink-0" />
+            <span className="hidden sm:inline">Viajes</span>
+          </Button>
+        )}
+        {canAny(VIEW_ENTRY_PERMISSIONS.calendar) && (
+          <Button
+            variant={current === 'calendar' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => handleNavigate('calendar')}
+            className="h-8 gap-1.5 px-2 text-xs sm:text-sm"
+          >
+            <Calendar className="w-4 h-4 shrink-0" />
+            <span className="hidden sm:inline">Calendario</span>
+          </Button>
+        )}
+        {canAny(VIEW_ENTRY_PERMISSIONS.forms) && (
+          <Button
+            variant={current === 'forms' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => handleNavigate('forms')}
+            className="h-8 gap-1.5 px-2 text-xs sm:text-sm"
+          >
+            <FileText className="w-4 h-4 shrink-0" />
+            <span className="hidden sm:inline">Formularios</span>
+          </Button>
+        )}
+        {canAny(VIEW_ENTRY_PERMISSIONS.products) && (
+          <Button
+            variant={current === 'products' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => handleNavigate('products')}
+            className="h-8 gap-1.5 px-2 text-xs sm:text-sm"
+          >
+            <ShoppingBag className="w-4 h-4 shrink-0" />
+            <span className="hidden sm:inline">Productos</span>
+          </Button>
+        )}
+        {canAny(VIEW_ENTRY_PERMISSIONS.groups) && (
+          <Button
+            variant={current === 'groups' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => handleNavigate('groups')}
+            className="h-8 gap-1.5 px-2 text-xs sm:text-sm"
+          >
+            <Boxes className="w-4 h-4 shrink-0" />
+            <span className="hidden sm:inline">Grupos</span>
+          </Button>
+        )}
+        {showAdminMenu && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant={adminNavActive ? 'default' : 'ghost'}
+                size="sm"
+                className="h-8 gap-1.5 px-2 text-xs sm:text-sm"
+              >
+                <Settings className="w-4 h-4 shrink-0" />
+                <span className="hidden sm:inline">Administración</span>
+                <ChevronDown className="w-3.5 h-3.5 shrink-0 opacity-70" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              {can('nav.finance.view') && (
+                <DropdownMenuItem onClick={() => handleNavigate('finance')} className="gap-2 cursor-pointer">
+                  <ChartNoAxesCombined className="w-4 h-4" />
+                  Finanzas
+                </DropdownMenuItem>
+              )}
+              {can('nav.payment_logs.view') && (
+                <DropdownMenuItem onClick={() => handleNavigate('paymentLogs')} className="gap-2 cursor-pointer">
+                  <Receipt className="w-4 h-4" />
+                  Logs de pagos
+                </DropdownMenuItem>
+              )}
+              {can('nav.users.view') && (
+                <DropdownMenuItem onClick={() => handleNavigate('users')} className="gap-2 cursor-pointer">
+                  <UserCog className="w-4 h-4" />
+                  Usuarios
+                </DropdownMenuItem>
+              )}
+              {can('roles.view') && (
+                <DropdownMenuItem onClick={() => handleNavigate('roles')} className="gap-2 cursor-pointer">
+                  <Shield className="w-4 h-4" />
+                  Roles y permisos
+                </DropdownMenuItem>
+              )}
+              {can('nav.chatbot.view') && (
+                <DropdownMenuItem onClick={() => handleNavigate('chatbot')} className="gap-2 cursor-pointer">
+                  <Bot className="w-4 h-4" />
+                  Chatbot
+                </DropdownMenuItem>
+              )}
+              {can('nav.settings.view') && (
+                <DropdownMenuItem onClick={() => handleNavigate('settings')} className="gap-2 cursor-pointer">
+                  <Settings className="w-4 h-4" />
+                  Configuración
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+      </>
+    );
+  };
 
   // Floating View As selector - always visible
   const FloatingViewAs = () =>
-    hasRole('super_admin') ? (
+    can('session.view_as') ? (
       <ViewAsSelector
         users={users}
         viewingAs={viewingAs}
@@ -793,8 +857,8 @@ const Index = () => {
       />
     ) : null;
 
-  // Si estamos editando un formulario, mostramos el editor (solo administradores)
-  if (currentForm && hasRole('super_admin')) {
+  // Si estamos editando un formulario, mostramos el editor (solo quien puede editar formularios)
+  if (currentForm && can('forms.update')) {
     return (
       <>
         <FloatingViewAs />
@@ -865,7 +929,7 @@ const Index = () => {
             onCreate={async (data) => { await createClient(data); }}
             onUpdate={async (id, data) => { await updateClient(id, data); }}
             users={users}
-            isAdmin={hasRole('super_admin')}
+            isAdmin={viewingAs ? userSeesAllClients(viewingAs) : can('clients.view_all')}
             pagination={clientPagination}
             initialQuery={clientListQuery}
             onFiltersChange={handleClientFiltersChange}
@@ -1009,7 +1073,7 @@ const Index = () => {
                     Quitar filtros
                   </Button>
                 </div>
-                {hasRole('super_admin') && (
+                {canAny(['categories.create', 'categories.update', 'categories.delete']) && (
                   <Button
                     type="button"
                     variant="outline"
@@ -1024,7 +1088,7 @@ const Index = () => {
           </div>
           <ProductsList
             products={products}
-            readOnly={!hasRole('super_admin')}
+            readOnly={!canAny(['products.create', 'products.update', 'products.delete'])}
             onCreate={handleCreate}
             onEdit={handleEdit}
             onDelete={handleDelete}
@@ -1037,7 +1101,7 @@ const Index = () => {
               return acc;
             }, {})}
           />
-          {hasRole('super_admin') && (
+          {canAny(['products.create', 'products.update']) && (
             <>
               <ProductFormModal
                 open={productModalOpen}
@@ -1111,7 +1175,14 @@ const Index = () => {
 
   if (activeView === 'finance') {
     return (
-      <RoleGuard allowedRoles={['super_admin']} fallback={<div className="min-h-screen flex items-center justify-center"><p className="text-muted-foreground">No tienes permisos para acceder a esta sección</p></div>}>
+      <PermissionGuard
+        anyOf={['finance.view', 'nav.finance.view']}
+        fallback={
+          <div className="min-h-screen flex items-center justify-center">
+            <p className="text-muted-foreground">No tienes permisos para acceder a esta sección</p>
+          </div>
+        }
+      >
         <>
           <FloatingViewAs />
           <div className={`min-h-screen bg-background ${viewingAs ? 'pt-10' : ''}`}>
@@ -1123,14 +1194,20 @@ const Index = () => {
             </div>
           </div>
         </>
-      </RoleGuard>
+      </PermissionGuard>
     );
   }
 
-  // Vista de logs de pagos (solo super_admin)
   if (activeView === 'paymentLogs') {
     return (
-      <RoleGuard allowedRoles={['super_admin']} fallback={<div className="min-h-screen flex items-center justify-center"><p className="text-muted-foreground">No tienes permisos para acceder a esta sección</p></div>}>
+      <PermissionGuard
+        anyOf={['payment_logs.view', 'nav.payment_logs.view']}
+        fallback={
+          <div className="min-h-screen flex items-center justify-center">
+            <p className="text-muted-foreground">No tienes permisos para acceder a esta sección</p>
+          </div>
+        }
+      >
         <>
           <FloatingViewAs />
           <div className={`min-h-screen bg-background ${viewingAs ? 'pt-10' : ''}`}>
@@ -1143,7 +1220,7 @@ const Index = () => {
             </div>
           </div>
         </>
-      </RoleGuard>
+      </PermissionGuard>
     );
   }
 
@@ -1170,14 +1247,14 @@ const Index = () => {
 
   // Vista de viajes (admin y revisor)
   if (activeView === 'trips') {
-    if (!hasRole('super_admin') && !hasRole('reviewer')) {
+    if (!can('trips.view')) {
       return (
         <div className="min-h-screen flex items-center justify-center">
           <p className="text-muted-foreground">No tienes permisos para acceder a esta sección.</p>
         </div>
       );
     }
-    const tripReviewerMode = !hasRole('super_admin');
+    const tripReviewerMode = !can('trips.office_admin');
     return (
       <>
         <FloatingViewAs />
@@ -1262,10 +1339,41 @@ const Index = () => {
     );
   }
 
-  // Vista de usuarios
+  if (activeView === 'roles') {
+    return (
+      <PermissionGuard
+        anyOf={['roles.view']}
+        fallback={
+          <div className="min-h-screen flex items-center justify-center">
+            <p className="text-muted-foreground">No tienes permisos para acceder a esta sección</p>
+          </div>
+        }
+      >
+        <>
+          <FloatingViewAs />
+          <div className={`min-h-screen bg-background ${viewingAs ? 'pt-10' : ''}`}>
+            <AppHeader>
+              <NavigationButtons current="roles" />
+            </AppHeader>
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+              <RolesAdminPage />
+            </div>
+          </div>
+        </>
+      </PermissionGuard>
+    );
+  }
+
   if (activeView === 'users') {
     return (
-      <RoleGuard allowedRoles={['super_admin']} fallback={<div className="min-h-screen flex items-center justify-center"><p className="text-muted-foreground">No tienes permisos para acceder a esta sección</p></div>}>
+      <PermissionGuard
+        anyOf={['users.view', 'nav.users.view']}
+        fallback={
+          <div className="min-h-screen flex items-center justify-center">
+            <p className="text-muted-foreground">No tienes permisos para acceder a esta sección</p>
+          </div>
+        }
+      >
         <>
           <FloatingViewAs />
           <div className={`min-h-screen bg-background ${viewingAs ? 'pt-10' : ''}`}>
@@ -1278,14 +1386,20 @@ const Index = () => {
             </div>
           </div>
         </>
-      </RoleGuard>
+      </PermissionGuard>
     );
   }
 
-  // Vista de chatbot
   if (activeView === 'chatbot') {
     return (
-      <RoleGuard allowedRoles={['super_admin']} fallback={<div className="min-h-screen flex items-center justify-center"><p className="text-muted-foreground">No tienes permisos para acceder a esta sección</p></div>}>
+      <PermissionGuard
+        anyOf={['bot_behavior.view', 'nav.chatbot.view']}
+        fallback={
+          <div className="min-h-screen flex items-center justify-center">
+            <p className="text-muted-foreground">No tienes permisos para acceder a esta sección</p>
+          </div>
+        }
+      >
         <>
           <FloatingViewAs />
           <div className={`min-h-screen bg-background ${viewingAs ? 'pt-10' : ''}`}>
@@ -1298,14 +1412,27 @@ const Index = () => {
             </div>
           </div>
         </>
-      </RoleGuard>
+      </PermissionGuard>
     );
   }
 
-  // Vista de configuración
   if (activeView === 'settings') {
     return (
-      <RoleGuard allowedRoles={['super_admin']} fallback={<div className="min-h-screen flex items-center justify-center"><p className="text-muted-foreground">No tienes permisos para acceder a esta sección</p></div>}>
+      <PermissionGuard
+        anyOf={[
+          'nav.settings.view',
+          'company_branding.view',
+          'branches.view',
+          'visa_status_templates.view',
+          'checklist_templates.view',
+          'faqs.view',
+        ]}
+        fallback={
+          <div className="min-h-screen flex items-center justify-center">
+            <p className="text-muted-foreground">No tienes permisos para acceder a esta sección</p>
+          </div>
+        }
+      >
         <>
           <FloatingViewAs />
           <div className={`min-h-screen bg-background ${viewingAs ? 'pt-10' : ''}`}>
@@ -1317,7 +1444,7 @@ const Index = () => {
             </div>
           </div>
         </>
-      </RoleGuard>
+      </PermissionGuard>
     );
   }
 
@@ -1362,7 +1489,7 @@ const Index = () => {
 
         <FormList
           forms={forms}
-          readOnly={!hasRole('super_admin')}
+          readOnly={!canAny(['forms.update', 'forms.create', 'forms.delete'])}
           onSelectForm={async (formId) => {
             await selectForm(formId);
           }}

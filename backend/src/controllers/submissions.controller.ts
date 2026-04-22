@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { body, validationResult } from 'express-validator';
 import { FormSubmission, Form, Client, FormSession, VisaStatusTemplate } from '../models';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { canViewAllSubmissions, canAccessSubmissionForClientSync, hasPermission } from '../authorization/policies';
 import { Op } from 'sequelize';
 
 const getDefaultVisaStatusTemplateId = async (companyId: string): Promise<string | null> => {
@@ -38,8 +39,7 @@ export const getAllSubmissions = async (req: AuthRequest, res: Response): Promis
     if (clientId) where.clientId = clientId;
     if (status) where.status = status;
 
-    // If user is reviewer, only show submissions of assigned clients
-    if (req.user && !req.user.roles.includes('super_admin')) {
+    if (req.user && !canViewAllSubmissions(req)) {
       const assignedClients = await Client.findAll({
         where: { companyId, assignedUserId: req.user.id },
         attributes: ['id'],
@@ -95,15 +95,10 @@ export const getSubmissionById = async (req: AuthRequest, res: Response): Promis
       return;
     }
 
-    // Check if reviewer can access this submission
-    if (req.user && !req.user.roles.includes('super_admin')) {
-      if (submission.clientId) {
-        const client = await Client.findByPk(submission.clientId);
-        if (client && client.assignedUserId !== req.user.id) {
-          res.status(403).json({ error: 'Access denied' });
-          return;
-        }
-      }
+    const clientRow = (submission as any).client as Client | null;
+    if (submission.clientId && clientRow && !canAccessSubmissionForClientSync(req, clientRow)) {
+      res.status(403).json({ error: 'Access denied' });
+      return;
     }
 
     res.json(submission);
@@ -295,14 +290,15 @@ export const updateSubmission = [
         return;
       }
 
-      // Check if reviewer can update this submission
-      if (req.user && !req.user.roles.includes('super_admin')) {
-        if (submission.clientId) {
-          const client = await Client.findByPk(submission.clientId);
-          if (client && client.assignedUserId !== req.user.id) {
-            res.status(403).json({ error: 'Access denied' });
-            return;
-          }
+      if (!hasPermission(req.user!.permissions, 'submissions.update')) {
+        res.status(403).json({ error: 'Access denied' });
+        return;
+      }
+      if (submission.clientId) {
+        const client = await Client.findByPk(submission.clientId);
+        if (client && !canAccessSubmissionForClientSync(req, client)) {
+          res.status(403).json({ error: 'Access denied' });
+          return;
         }
       }
 
@@ -349,14 +345,15 @@ export const deleteSubmission = async (req: AuthRequest, res: Response): Promise
       return;
     }
 
-    // Check if reviewer can delete this submission
-    if (req.user && !req.user.roles.includes('super_admin')) {
-      if (submission.clientId) {
-        const client = await Client.findByPk(submission.clientId);
-        if (client && client.assignedUserId !== req.user.id) {
-          res.status(403).json({ error: 'Access denied' });
-          return;
-        }
+    if (!hasPermission(req.user!.permissions, 'submissions.delete')) {
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
+    if (submission.clientId) {
+      const client = await Client.findByPk(submission.clientId);
+      if (client && !canAccessSubmissionForClientSync(req, client)) {
+        res.status(403).json({ error: 'Access denied' });
+        return;
       }
     }
 
@@ -377,8 +374,7 @@ export const getSubmissionStats = async (req: AuthRequest, res: Response): Promi
     }
     const where: any = { companyId };
 
-    // If user is reviewer, only count submissions of assigned clients
-    if (req.user && !req.user.roles.includes('super_admin')) {
+    if (req.user && !canViewAllSubmissions(req)) {
       const assignedClients = await Client.findAll({
         where: { companyId, assignedUserId: req.user.id },
         attributes: ['id'],

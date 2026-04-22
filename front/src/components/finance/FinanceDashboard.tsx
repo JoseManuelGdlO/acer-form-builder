@@ -96,9 +96,9 @@ export const FinanceDashboard = () => {
 
     api.getUsers(token)
       .then((list) => {
-        const users = (Array.isArray(list) ? list : []) as Array<{ id: string; name: string; roles?: string[] }>;
+        const users = (Array.isArray(list) ? list : []) as Array<{ id: string; name: string; role?: { systemKey?: string | null } }>;
         const mapped = users
-          .filter((u) => Array.isArray(u.roles) && u.roles.includes('reviewer'))
+          .filter((u) => u.role?.systemKey === 'reviewer')
           .map((u) => ({ id: u.id, name: u.name }))
           .sort((a, b) => a.name.localeCompare(b.name));
         setAdvisors(mapped);

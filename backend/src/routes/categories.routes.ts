@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/auth.middleware';
-import { requireAdmin } from '../middleware/role.middleware';
+import { requireAnyPermission } from '../middleware/permission.middleware';
 import * as categoriesController from '../controllers/categories.controller';
 
 const router = Router();
@@ -8,9 +8,9 @@ const router = Router();
 router.use(authenticate);
 
 router.get('/', categoriesController.getCategories);
-router.post('/', requireAdmin, categoriesController.createCategory);
-router.put('/:id', requireAdmin, categoriesController.updateCategory);
-router.delete('/:id', requireAdmin, categoriesController.deleteCategory);
+router.post('/', requireAnyPermission('categories.create'), categoriesController.createCategory);
+router.put('/:id', requireAnyPermission('categories.update'), categoriesController.updateCategory);
+router.delete('/:id', requireAnyPermission('categories.delete'), categoriesController.deleteCategory);
 
 export default router;
 

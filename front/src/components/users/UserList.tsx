@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { User, UserRole } from '@/types/user';
+import { User } from '@/types/user';
 import { useUserStore } from '@/hooks/useUserStore';
 import { useAuth } from '@/contexts/AuthContext';
+import { api } from '@/lib/api';
 import { UserCard } from './UserCard';
-import { UserFormModal } from './UserFormModal';
+import { UserFormModal, type RoleOption } from './UserFormModal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Plus, Search, Users, Shield, Eye } from 'lucide-react';
@@ -25,8 +26,8 @@ export function UserList() {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [roles, setRoles] = useState<RoleOption[]>([]);
 
-  // Load users when component mounts or token changes
   useEffect(() => {
     if (token && users.length === 0) {
       fetchUsers(token).catch((error) => {
@@ -35,14 +36,30 @@ export function UserList() {
     }
   }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    if (!token) return;
+    api
+      .listRoles(token)
+      .then((list) => {
+        setRoles(
+          (Array.isArray(list) ? list : []).map((r) => ({
+            id: r.id,
+            name: r.name,
+            systemKey: r.systemKey,
+          }))
+        );
+      })
+      .catch(() => setRoles([]));
+  }, [token]);
+
   const filteredUsers = users.filter(
     (user) =>
       user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       user.email.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const superAdminCount = users.filter((u) => u.roles.includes('super_admin')).length;
-  const reviewerCount = users.filter((u) => u.roles.includes('reviewer')).length;
+  const superAdminCount = users.filter((u) => u.role.systemKey === 'super_admin').length;
+  const reviewerCount = users.filter((u) => u.role.systemKey === 'reviewer').length;
 
   const handleEdit = (user: User) => {
     setEditingUser(user);
@@ -54,27 +71,35 @@ export function UserList() {
     setEditingUser(null);
   };
 
-  const handleSave = async (name: string, email: string, role: UserRole, password: string, branchId?: string | null) => {
+  const handleSave = async (
+    name: string,
+    email: string,
+    roleId: string,
+    password: string,
+    branchId?: string | null
+  ) => {
     if (!token) {
       console.error('No token available');
       return;
     }
     try {
-      await addUser(token, name, email, role, password, branchId ?? null);
+      await addUser(token, name, email, roleId, password, branchId ?? null);
     } catch (error) {
       console.error('Error creating user:', error);
       throw error;
     }
   };
 
-  type UserUpdatePayload = { name?: string; email?: string; role?: UserRole; branchId?: string | null };
-  const handleUpdate = async (id: string, updates: UserUpdatePayload) => {
+  const handleUpdate = async (
+    id: string,
+    updates: { name?: string; email?: string; roleId?: string; branchId?: string | null }
+  ) => {
     if (!token) {
       console.error('No token available');
       return;
     }
     try {
-      await updateUser(token, id, updates as unknown as Partial<Omit<User, 'id' | 'createdAt'>>);
+      await updateUser(token, id, updates as Partial<Omit<User, 'id' | 'createdAt'>>);
     } catch (error) {
       console.error('Error updating user:', error);
       throw error;
@@ -94,7 +119,6 @@ export function UserList() {
 
   return (
     <div className="space-y-6">
-      {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-card border rounded-lg p-4 flex items-center gap-3">
           <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
@@ -111,7 +135,7 @@ export function UserList() {
           </div>
           <div>
             <p className="text-2xl font-bold">{superAdminCount}</p>
-            <p className="text-sm text-muted-foreground">Super Admins</p>
+            <p className="text-sm text-muted-foreground">Super administradores</p>
           </div>
         </div>
         <div className="bg-card border rounded-lg p-4 flex items-center gap-3">
@@ -120,12 +144,11 @@ export function UserList() {
           </div>
           <div>
             <p className="text-2xl font-bold">{reviewerCount}</p>
-            <p className="text-sm text-muted-foreground">Revisores</p>
+            <p className="text-sm text-muted-foreground">Revisores (plantilla)</p>
           </div>
         </div>
       </div>
 
-      {/* Header */}
       <div className="flex flex-col sm:flex-row gap-4 justify-between">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -142,7 +165,6 @@ export function UserList() {
         </Button>
       </div>
 
-      {/* User List */}
       {filteredUsers.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
           {searchQuery ? 'No se encontraron usuarios' : 'No hay usuarios registrados'}
@@ -161,16 +183,15 @@ export function UserList() {
         </div>
       )}
 
-      {/* Form Modal */}
       <UserFormModal
         open={isModalOpen}
         onClose={handleCloseModal}
         onSave={handleSave}
         onUpdate={handleUpdate}
         user={editingUser}
+        roles={roles}
       />
 
-      {/* Delete Confirmation */}
       <AlertDialog open={!!deletingUserId} onOpenChange={() => setDeletingUserId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -181,7 +202,10 @@ export function UserList() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
               Eliminar
             </AlertDialogAction>
           </AlertDialogFooter>

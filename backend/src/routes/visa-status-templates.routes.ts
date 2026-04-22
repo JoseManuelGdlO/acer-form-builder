@@ -1,13 +1,13 @@
 import { Router } from 'express';
 import * as visaStatusTemplatesController from '../controllers/visa-status-templates.controller';
 import { authenticate } from '../middleware/auth.middleware';
-import { requireAdmin } from '../middleware/role.middleware';
+import { requireAnyPermission } from '../middleware/permission.middleware';
 
 const router = Router();
 
 router.get('/', authenticate, visaStatusTemplatesController.getAllVisaStatusTemplates);
-router.post('/', authenticate, requireAdmin, visaStatusTemplatesController.createVisaStatusTemplate);
-router.put('/:id', authenticate, requireAdmin, visaStatusTemplatesController.updateVisaStatusTemplate);
-router.delete('/:id', authenticate, requireAdmin, visaStatusTemplatesController.deleteVisaStatusTemplate);
+router.post('/', authenticate, requireAnyPermission('visa_status_templates.create'), visaStatusTemplatesController.createVisaStatusTemplate);
+router.put('/:id', authenticate, requireAnyPermission('visa_status_templates.update'), visaStatusTemplatesController.updateVisaStatusTemplate);
+router.delete('/:id', authenticate, requireAnyPermission('visa_status_templates.delete'), visaStatusTemplatesController.deleteVisaStatusTemplate);
 
 export default router;

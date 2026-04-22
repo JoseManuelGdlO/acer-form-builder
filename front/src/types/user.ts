@@ -1,5 +1,3 @@
-export type UserRole = 'super_admin' | 'reviewer';
-
 export interface Company {
   id: string;
   name: string;
@@ -7,11 +5,20 @@ export interface Company {
   logoUrl: string | null;
 }
 
+export interface UserRoleInfo {
+  id: string;
+  name: string;
+  systemKey: string | null;
+}
+
 export interface User {
   id: string;
   name: string;
   email: string;
-  roles: UserRole[];
+  roleId: string;
+  role: UserRoleInfo;
+  /** Effective permission keys from the user's role (for UI gating). */
+  permissions: string[];
   createdAt: Date;
   status: 'active' | 'inactive';
   company?: Company | null;

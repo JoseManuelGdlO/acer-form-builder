@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { body, validationResult } from 'express-validator';
 import { ClientNote, Client } from '../models';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { hasPermission, canAccessClientRecord } from '../authorization/policies';
 
 export const getClientNotes = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -16,7 +17,7 @@ export const getClientNotes = async (req: AuthRequest, res: Response): Promise<v
       res.status(404).json({ error: 'Client not found' });
       return;
     }
-    if (!req.user?.roles.includes('super_admin') && client.assignedUserId !== req.user?.id) {
+    if (!hasPermission(req.user?.permissions, 'client_notes.view') || !canAccessClientRecord(req, client)) {
       res.status(403).json({ error: 'Access denied' });
       return;
     }
@@ -55,7 +56,7 @@ export const createNote = [
         res.status(404).json({ error: 'Client not found' });
         return;
       }
-      if (!req.user?.roles.includes('super_admin') && client.assignedUserId !== req.user?.id) {
+      if (!hasPermission(req.user?.permissions, 'client_notes.create') || !canAccessClientRecord(req, client)) {
         res.status(403).json({ error: 'Access denied' });
         return;
       }
@@ -99,7 +100,11 @@ export const updateNote = [
       }
 
       const client = await Client.findOne({ where: { id: note.clientId, companyId } });
-      if (!req.user?.roles.includes('super_admin') && client && client.assignedUserId !== req.user?.id) {
+      if (
+        !hasPermission(req.user?.permissions, 'client_notes.update') ||
+        !client ||
+        !canAccessClientRecord(req, client)
+      ) {
         res.status(403).json({ error: 'Access denied' });
         return;
       }
@@ -129,7 +134,11 @@ export const deleteNote = async (req: AuthRequest, res: Response): Promise<void>
     }
 
     const client = await Client.findOne({ where: { id: note.clientId, companyId } });
-    if (!req.user?.roles.includes('super_admin') && client && client.assignedUserId !== req.user?.id) {
+    if (
+      !hasPermission(req.user?.permissions, 'client_notes.delete') ||
+      !client ||
+      !canAccessClientRecord(req, client)
+    ) {
       res.status(403).json({ error: 'Access denied' });
       return;
     }

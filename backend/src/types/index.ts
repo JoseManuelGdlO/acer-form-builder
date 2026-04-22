@@ -1,4 +1,3 @@
-export type UserRole = 'super_admin' | 'reviewer';
 export type ClientStatus = 'active' | 'inactive' | 'pending';
 export type SubmissionStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
 export type QuestionType = 
@@ -17,5 +16,4 @@ export interface JwtPayload {
   userId: string;
   companyId: string;
   email: string;
-  roles: UserRole[];
 }
