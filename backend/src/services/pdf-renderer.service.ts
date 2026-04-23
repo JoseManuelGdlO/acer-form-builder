@@ -107,8 +107,20 @@ export const renderMappedPdf = async (params: {
   const pdf = await PDFDocument.load(inputBytes);
   await pdf.embedFont(StandardFonts.Helvetica);
   const pages = pdf.getPages();
+  let sections: any[] = [];
+  const rawSections = (form as any).sections;
+  if (Array.isArray(rawSections)) {
+    sections = rawSections;
+  } else if (typeof rawSections === 'string') {
+    try {
+      const parsed = JSON.parse(rawSections);
+      sections = Array.isArray(parsed) ? parsed : [];
+    } catch {
+      sections = [];
+    }
+  }
 
-  const questions = ((form.sections ?? []) as any[]).flatMap((s) => (s.questions ?? []) as QuestionLike[]);
+  const questions = sections.flatMap((s) => (s?.questions ?? []) as QuestionLike[]);
   for (const question of questions) {
     const mapping = question.pdfMapping;
     if (!mapping || mapping.templateId !== template.id || !Array.isArray(mapping.placements)) continue;
