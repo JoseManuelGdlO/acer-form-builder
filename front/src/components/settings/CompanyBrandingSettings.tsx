@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Collapsible,
   CollapsibleContent,
@@ -202,6 +203,7 @@ export function CompanyBrandingSettings() {
   const [logoUrl, setLogoUrl] = useState('');
   const [faviconUrl, setFaviconUrl] = useState('');
   const [theme, setTheme] = useState<Record<string, string>>({});
+  const [advisorClientAccessMode, setAdvisorClientAccessMode] = useState<'assigned_only' | 'company_wide'>('assigned_only');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -225,6 +227,7 @@ export function CompanyBrandingSettings() {
           setLogoUrl(company.logoUrl ?? '');
           setFaviconUrl(company.faviconUrl ?? '');
           setTheme(mergeWithDefaultTheme(parseSavedTheme(company.theme)));
+          setAdvisorClientAccessMode(company.advisorClientAccessMode ?? 'assigned_only');
         }
       })
       .catch(() => {
@@ -246,6 +249,7 @@ export function CompanyBrandingSettings() {
         logoUrl: logoUrl.trim() || null,
         faviconUrl: faviconUrl.trim() || null,
         theme,
+        advisorClientAccessMode,
       });
       const mergedAfterSave = mergeWithDefaultTheme({
         ...theme,
@@ -358,6 +362,32 @@ export function CompanyBrandingSettings() {
 
   return (
     <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Globe className="w-5 h-5 text-primary" />
+            <CardTitle>Visibilidad de clientes para asesores</CardTitle>
+          </div>
+          <CardDescription>
+            Define si los asesores ven solo sus clientes o todo el catálogo de la compañía.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            <Label htmlFor="advisor-client-access-mode">Modelo de acceso</Label>
+            <Select value={advisorClientAccessMode} onValueChange={(v: 'assigned_only' | 'company_wide') => setAdvisorClientAccessMode(v)}>
+              <SelectTrigger id="advisor-client-access-mode">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-popover border">
+                <SelectItem value="assigned_only">Asignado por asesor</SelectItem>
+                <SelectItem value="company_wide">Todos los asesores ven/editan todo</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">

@@ -58,7 +58,7 @@ export const getMyCompany = async (req: AuthRequest, res: Response): Promise<voi
     }
 
     const company = await Company.findByPk(companyId, {
-      attributes: ['id', 'name', 'slug', 'logoUrl', 'faviconUrl', 'domain', 'theme'],
+      attributes: ['id', 'name', 'slug', 'logoUrl', 'faviconUrl', 'domain', 'theme', 'advisorClientAccessMode'],
     });
 
     if (!company) {
@@ -74,6 +74,7 @@ export const getMyCompany = async (req: AuthRequest, res: Response): Promise<voi
       faviconUrl: (company as any).faviconUrl ?? null,
       domain: (company as any).domain ?? null,
       theme: (company as any).theme ?? null,
+      advisorClientAccessMode: (company as any).advisorClientAccessMode ?? 'assigned_only',
     });
   } catch (error) {
     console.error('Get my company error:', error);
@@ -86,6 +87,7 @@ export const updateMyCompany = [
   body('logoUrl').optional({ nullable: true }).isString().trim(),
   body('faviconUrl').optional({ nullable: true }).isString().trim(),
   body('theme').optional({ nullable: true }).isObject(),
+  body('advisorClientAccessMode').optional().isIn(['assigned_only', 'company_wide']),
   async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       const errors = validationResult(req);
@@ -112,6 +114,7 @@ export const updateMyCompany = [
         logoUrl?: string | null;
         faviconUrl?: string | null;
         theme?: Record<string, string> | null;
+        advisorClientAccessMode?: 'assigned_only' | 'company_wide';
       } = {};
 
       if (domain !== undefined) {
@@ -152,13 +155,16 @@ export const updateMyCompany = [
       if (theme !== undefined) {
         updates.theme = theme && typeof theme === 'object' ? theme : null;
       }
+      if (req.body.advisorClientAccessMode !== undefined) {
+        updates.advisorClientAccessMode = req.body.advisorClientAccessMode;
+      }
 
       if (Object.keys(updates).length > 0) {
         await company.update(updates);
       }
 
       const updated = await Company.findByPk(companyId, {
-        attributes: ['id', 'name', 'slug', 'logoUrl', 'faviconUrl', 'domain', 'theme'],
+        attributes: ['id', 'name', 'slug', 'logoUrl', 'faviconUrl', 'domain', 'theme', 'advisorClientAccessMode'],
       });
 
       res.json({
@@ -169,6 +175,7 @@ export const updateMyCompany = [
         faviconUrl: (updated as any).faviconUrl ?? null,
         domain: (updated as any).domain ?? null,
         theme: (updated as any).theme ?? null,
+        advisorClientAccessMode: (updated as any).advisorClientAccessMode ?? 'assigned_only',
       });
     } catch (error) {
       console.error('Update my company error:', error);

@@ -138,15 +138,42 @@ class ApiClient {
   }
 
   async getMyCompany(token?: string | null) {
-    return this.request<{ id: string; name: string; slug: string; logoUrl: string | null; faviconUrl: string | null; domain: string | null; theme: Record<string, string> | null }>('/companies/me', {
+    return this.request<{
+      id: string;
+      name: string;
+      slug: string;
+      logoUrl: string | null;
+      faviconUrl: string | null;
+      domain: string | null;
+      theme: Record<string, string> | null;
+      advisorClientAccessMode: 'assigned_only' | 'company_wide';
+    }>('/companies/me', {
       method: 'GET',
       token: token ?? this.getToken(),
       requireAuth: true,
     });
   }
 
-  async updateMyCompany(data: { domain?: string | null; logoUrl?: string | null; faviconUrl?: string | null; theme?: Record<string, string> | null }, token?: string | null) {
-    return this.request<{ id: string; name: string; slug: string; logoUrl: string | null; faviconUrl: string | null; domain: string | null; theme: Record<string, string> | null }>('/companies/me', {
+  async updateMyCompany(
+    data: {
+      domain?: string | null;
+      logoUrl?: string | null;
+      faviconUrl?: string | null;
+      theme?: Record<string, string> | null;
+      advisorClientAccessMode?: 'assigned_only' | 'company_wide';
+    },
+    token?: string | null
+  ) {
+    return this.request<{
+      id: string;
+      name: string;
+      slug: string;
+      logoUrl: string | null;
+      faviconUrl: string | null;
+      domain: string | null;
+      theme: Record<string, string> | null;
+      advisorClientAccessMode: 'assigned_only' | 'company_wide';
+    }>('/companies/me', {
       method: 'PATCH',
       token: token ?? this.getToken(),
       requireAuth: true,

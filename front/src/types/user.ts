@@ -3,6 +3,7 @@ export interface Company {
   name: string;
   slug: string;
   logoUrl: string | null;
+  advisorClientAccessMode?: 'assigned_only' | 'company_wide';
 }
 
 export interface UserRoleInfo {

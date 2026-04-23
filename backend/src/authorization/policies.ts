@@ -16,7 +16,9 @@ export function hasAllPermissions(permissions: string[] | undefined, keys: reado
 }
 
 export function canViewAllClients(req: AuthRequest): boolean {
-  return hasPermission(req.user?.permissions, 'clients.view_all');
+  if (hasPermission(req.user?.permissions, 'clients.view_all')) return true;
+  return (req.user as any)?.company?.advisorClientAccessMode === 'company_wide'
+    && hasPermission(req.user?.permissions, 'clients.view_assigned');
 }
 
 /** Assigned-only scope (excludes view_all unless they also have view_assigned — view_all implies all) */

@@ -11,6 +11,7 @@ interface CompanyAttributes {
   faviconUrl?: string | null;
   domain?: string | null;
   theme?: CompanyTheme | null;
+  advisorClientAccessMode?: 'assigned_only' | 'company_wide';
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -18,7 +19,7 @@ interface CompanyAttributes {
 interface CompanyCreationAttributes
   extends Optional<
     CompanyAttributes,
-    'id' | 'logoUrl' | 'faviconUrl' | 'domain' | 'theme' | 'createdAt' | 'updatedAt'
+    'id' | 'logoUrl' | 'faviconUrl' | 'domain' | 'theme' | 'advisorClientAccessMode' | 'createdAt' | 'updatedAt'
   > {}
 
 export class Company extends Model<CompanyAttributes, CompanyCreationAttributes> implements CompanyAttributes {
@@ -29,6 +30,7 @@ export class Company extends Model<CompanyAttributes, CompanyCreationAttributes>
   public faviconUrl!: string | null;
   public domain!: string | null;
   public theme!: CompanyTheme | null;
+  public advisorClientAccessMode!: 'assigned_only' | 'company_wide';
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
 }
@@ -65,6 +67,11 @@ Company.init(
     theme: {
       type: DataTypes.JSON,
       allowNull: true,
+    },
+    advisorClientAccessMode: {
+      type: DataTypes.ENUM('assigned_only', 'company_wide'),
+      allowNull: false,
+      defaultValue: 'assigned_only',
     },
   },
   {

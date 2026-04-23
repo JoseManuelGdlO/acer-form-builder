@@ -16,5 +16,9 @@ export function hasAllPermissions(permissions: readonly string[] | undefined, ke
 
 /** User can see the full client directory (filters, all rows), not only assigned clients. */
 export function userSeesAllClients(user: User | null | undefined): boolean {
-  return hasPermission(user?.permissions, 'clients.view_all');
+  if (hasPermission(user?.permissions, 'clients.view_all')) return true;
+  return (
+    hasPermission(user?.permissions, 'clients.view_assigned') &&
+    user?.company?.advisorClientAccessMode === 'company_wide'
+  );
 }

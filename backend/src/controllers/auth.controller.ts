@@ -12,7 +12,13 @@ function buildAuthUserPayload(user: User): {
   status: string;
   role: { id: string; name: string; systemKey: string | null };
   permissions: string[];
-  company: { id: string; name: string; slug: string; logoUrl: string | null } | null;
+  company: {
+    id: string;
+    name: string;
+    slug: string;
+    logoUrl: string | null;
+    advisorClientAccessMode: 'assigned_only' | 'company_wide';
+  } | null;
 } {
   const role = (user as any).role as Role | undefined;
   const company = (user as any).company as Company | undefined;
@@ -35,6 +41,7 @@ function buildAuthUserPayload(user: User): {
           name: company.name,
           slug: company.slug,
           logoUrl: (company as any).logoUrl ?? null,
+          advisorClientAccessMode: (company as any).advisorClientAccessMode ?? 'assigned_only',
         }
       : null,
   };
@@ -59,7 +66,7 @@ async function loadUserForAuth(userId: string): Promise<User | null> {
       {
         model: Company,
         as: 'company',
-        attributes: ['id', 'name', 'slug', 'logoUrl'],
+        attributes: ['id', 'name', 'slug', 'logoUrl', 'advisorClientAccessMode'],
       },
     ],
   });
@@ -97,7 +104,7 @@ export const login = [
           {
             model: Company,
             as: 'company',
-            attributes: ['id', 'name', 'slug', 'logoUrl'],
+            attributes: ['id', 'name', 'slug', 'logoUrl', 'advisorClientAccessMode'],
           },
         ],
       });

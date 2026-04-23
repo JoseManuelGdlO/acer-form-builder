@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { verifyToken, extractTokenFromHeader } from '../utils/jwt';
-import { User, Role, Permission } from '../models';
+import { User, Role, Permission, Company } from '../models';
 import { JwtPayload } from '../types';
 
 export interface AuthRequest extends Request {
@@ -13,6 +13,9 @@ export interface AuthRequest extends Request {
     roleName: string;
     systemKey: string | null;
     permissions: string[];
+    company?: {
+      advisorClientAccessMode: 'assigned_only' | 'company_wide';
+    };
   };
 }
 
@@ -47,6 +50,11 @@ export const authenticate = async (
             },
           ],
         },
+        {
+          model: Company,
+          as: 'company',
+          attributes: ['advisorClientAccessMode'],
+        },
       ],
     });
 
@@ -78,6 +86,11 @@ export const authenticate = async (
       roleName: role?.name || '',
       systemKey: (role as any)?.systemKey ?? null,
       permissions,
+      company: {
+        advisorClientAccessMode: ((user as any).company?.advisorClientAccessMode ?? 'assigned_only') as
+          | 'assigned_only'
+          | 'company_wide',
+      },
     };
 
     next();
