@@ -262,6 +262,7 @@ const Index = () => {
     q?: string;
     visaStatusTemplateId?: string;
     checklistTemplateId?: string;
+    checklistMode?: 'completed' | 'not_completed';
     productId?: string;
     branchId?: string;
     assignedUserId?: string;
@@ -285,6 +286,7 @@ const Index = () => {
       q?: string;
       visaStatusTemplateId?: string;
       checklistTemplateId?: string;
+      checklistMode?: 'completed' | 'not_completed';
       productId?: string;
       branchId?: string;
       assignedUserId?: string;
@@ -295,6 +297,7 @@ const Index = () => {
       q?: string;
       visaStatusTemplateId?: string;
       checklistTemplateId?: string;
+      checklistMode?: 'completed' | 'not_completed';
       productId?: string;
       branchId?: string;
       assignedUserId?: string;
@@ -305,6 +308,7 @@ const Index = () => {
     a.q === b.q &&
     a.visaStatusTemplateId === b.visaStatusTemplateId &&
     a.checklistTemplateId === b.checklistTemplateId &&
+    a.checklistMode === b.checklistMode &&
     a.productId === b.productId &&
     a.branchId === b.branchId &&
     a.assignedUserId === b.assignedUserId &&
@@ -668,6 +672,7 @@ const Index = () => {
     q?: string;
     visaStatusTemplateId?: string;
     checklistTemplateId?: string;
+    checklistMode?: 'completed' | 'not_completed';
     productId?: string;
     branchId?: string;
     assignedUserId?: string;

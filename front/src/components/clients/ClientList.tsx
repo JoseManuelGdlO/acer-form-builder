@@ -55,6 +55,7 @@ interface ClientListProps {
     q?: string;
     visaStatusTemplateId?: string;
     checklistTemplateId?: string;
+    checklistMode?: 'completed' | 'not_completed';
     productId?: string;
     branchId?: string;
     assignedUserId?: string;
@@ -63,6 +64,7 @@ interface ClientListProps {
     q?: string;
     visaStatusTemplateId?: string;
     checklistTemplateId?: string;
+    checklistMode?: 'completed' | 'not_completed';
     productId?: string;
     branchId?: string;
     assignedUserId?: string;
@@ -71,6 +73,7 @@ interface ClientListProps {
 }
 
 type ChecklistFilterType = 'all' | string; // 'all' or templateId
+type ChecklistMode = 'completed' | 'not_completed';
 type ProductFilterType = 'all' | string;
 type VisaStatusFilterType = 'all' | string;
 type BranchFilterType = 'all' | string;
@@ -96,6 +99,7 @@ export const ClientList = ({
   const [searchQuery, setSearchQuery] = useState(initialQuery?.q || '');
   const [visaStatusFilter, setVisaStatusFilter] = useState<VisaStatusFilterType>(initialQuery?.visaStatusTemplateId || 'all');
   const [checklistFilter, setChecklistFilter] = useState<ChecklistFilterType>(initialQuery?.checklistTemplateId || 'all');
+  const [checklistMode, setChecklistMode] = useState<ChecklistMode>(initialQuery?.checklistMode || 'completed');
   const [productFilter, setProductFilter] = useState<ProductFilterType>(initialQuery?.productId || 'all');
   const [branchFilter, setBranchFilter] = useState<BranchFilterType>(initialQuery?.branchId || 'all');
   const [advisorFilter, setAdvisorFilter] = useState<AdvisorFilterType>(initialQuery?.assignedUserId || 'all');
@@ -247,6 +251,7 @@ export const ClientList = ({
         q: searchQuery.trim() || undefined,
         visaStatusTemplateId: visaStatusFilter === 'all' ? undefined : visaStatusFilter,
         checklistTemplateId: checklistFilter === 'all' ? undefined : checklistFilter,
+        checklistMode: checklistFilter === 'all' ? undefined : checklistMode,
         productId: productFilter === 'all' ? undefined : productFilter,
         ...(isAdmin
           ? {
@@ -261,6 +266,7 @@ export const ClientList = ({
     searchQuery,
     visaStatusFilter,
     checklistFilter,
+    checklistMode,
     productFilter,
     branchFilter,
     advisorFilter,
@@ -485,6 +491,7 @@ export const ClientList = ({
   const clearFilters = () => {
     setVisaStatusFilter('all');
     setChecklistFilter('all');
+    setChecklistMode('completed');
     setProductFilter('all');
     setBranchFilter('all');
     setAdvisorFilter('all');
@@ -740,7 +747,7 @@ export const ClientList = ({
               </div>
 
               <div>
-                <h3 className="text-xs font-medium text-muted-foreground mb-2">Filtro por Último Checklist Completado</h3>
+                <h3 className="text-xs font-medium text-muted-foreground mb-2">Filtro por Checklist</h3>
                 <div className="flex flex-wrap gap-2">
                   {checklistFilterButtons.map(filter => (
                     <button
@@ -758,6 +765,23 @@ export const ClientList = ({
                     </button>
                   ))}
                 </div>
+                {checklistFilter !== 'all' && (
+                  <div className="mt-3 space-y-2">
+                    <Label htmlFor="client-filter-checklist-mode">Modo del checklist seleccionado</Label>
+                    <Select
+                      value={checklistMode}
+                      onValueChange={(v) => setChecklistMode(v as ChecklistMode)}
+                    >
+                      <SelectTrigger id="client-filter-checklist-mode" className="w-full max-w-md">
+                        <SelectValue placeholder="Selecciona un modo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="completed">Completado</SelectItem>
+                        <SelectItem value="not_completed">No completado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
 
               <div>

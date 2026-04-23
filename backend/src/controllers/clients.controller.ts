@@ -132,6 +132,7 @@ export const getAllClients = async (req: AuthRequest, res: Response): Promise<vo
       productId,
       visaStatusTemplateId,
       checklistTemplateId,
+      checklistMode,
       q,
       page,
       limit,
@@ -175,6 +176,10 @@ export const getAllClients = async (req: AuthRequest, res: Response): Promise<vo
     }
 
     if (checklistTemplateId) {
+      const normalizedChecklistMode =
+        typeof checklistMode === 'string' && checklistMode.trim() === 'not_completed'
+          ? 'not_completed'
+          : 'completed';
       const selectedTemplate = await ChecklistTemplate.findOne({
         where: { id: String(checklistTemplateId), companyId, isActive: true },
         attributes: ['id', 'order'],
@@ -189,17 +194,6 @@ export const getAllClients = async (req: AuthRequest, res: Response): Promise<vo
         return;
       }
 
-      const higherTemplates = await ChecklistTemplate.findAll({
-        where: {
-          companyId,
-          isActive: true,
-          order: { [Op.gt]: selectedTemplate.order ?? 0 },
-        },
-        attributes: ['id'],
-        raw: true,
-      });
-      const higherTemplateIds = higherTemplates.map((template: any) => template.id);
-
       const targetRows = await ClientChecklist.findAll({
         where: {
           companyId,
@@ -211,42 +205,76 @@ export const getAllClients = async (req: AuthRequest, res: Response): Promise<vo
       });
       const targetClientIds = Array.from(new Set(targetRows.map((row: any) => row.clientId).filter(Boolean)));
 
-      if (targetClientIds.length === 0) {
-        res.json({
-          data: [],
-          meta: { page: parsedPage, limit: parsedLimit, total: 0, totalPages: 0 },
-          templates: [],
-          visaStatusTemplates: [],
-        });
-        return;
-      }
-
-      let clientIdsWithHigherStep = new Set<string>();
-      if (higherTemplateIds.length > 0) {
-        const higherRows = await ClientChecklist.findAll({
-          where: {
-            companyId,
-            clientId: { [Op.in]: targetClientIds },
-            templateId: { [Op.in]: higherTemplateIds },
-            isCompleted: true,
-          },
-          attributes: ['clientId'],
+      if (normalizedChecklistMode === 'not_completed') {
+        const candidateRows = await Client.findAll({
+          where,
+          attributes: ['id'],
           raw: true,
         });
-        clientIdsWithHigherStep = new Set(higherRows.map((row: any) => row.clientId).filter(Boolean));
+        const candidateClientIds = Array.from(new Set(candidateRows.map((row: any) => row.id).filter(Boolean)));
+        const completedClientIds = new Set(targetClientIds);
+        const filteredByChecklist = candidateClientIds.filter((id) => !completedClientIds.has(id));
+
+        if (filteredByChecklist.length === 0) {
+          res.json({
+            data: [],
+            meta: { page: parsedPage, limit: parsedLimit, total: 0, totalPages: 0 },
+            templates: [],
+            visaStatusTemplates: [],
+          });
+          return;
+        }
+        where.id = { [Op.in]: filteredByChecklist };
+      } else {
+        const higherTemplates = await ChecklistTemplate.findAll({
+          where: {
+            companyId,
+            isActive: true,
+            order: { [Op.gt]: selectedTemplate.order ?? 0 },
+          },
+          attributes: ['id'],
+          raw: true,
+        });
+        const higherTemplateIds = higherTemplates.map((template: any) => template.id);
+
+        if (targetClientIds.length === 0) {
+          res.json({
+            data: [],
+            meta: { page: parsedPage, limit: parsedLimit, total: 0, totalPages: 0 },
+            templates: [],
+            visaStatusTemplates: [],
+          });
+          return;
+        }
+
+        let clientIdsWithHigherStep = new Set<string>();
+        if (higherTemplateIds.length > 0) {
+          const higherRows = await ClientChecklist.findAll({
+            where: {
+              companyId,
+              clientId: { [Op.in]: targetClientIds },
+              templateId: { [Op.in]: higherTemplateIds },
+              isCompleted: true,
+            },
+            attributes: ['clientId'],
+            raw: true,
+          });
+          clientIdsWithHigherStep = new Set(higherRows.map((row: any) => row.clientId).filter(Boolean));
+        }
+
+        const filteredByChecklist = targetClientIds.filter((id) => !clientIdsWithHigherStep.has(id));
+        if (filteredByChecklist.length === 0) {
+          res.json({
+            data: [],
+            meta: { page: parsedPage, limit: parsedLimit, total: 0, totalPages: 0 },
+            templates: [],
+            visaStatusTemplates: [],
+          });
+          return;
+        }
+        where.id = { [Op.in]: filteredByChecklist };
       }
 
-      const filteredByChecklist = targetClientIds.filter((id) => !clientIdsWithHigherStep.has(id));
-      if (filteredByChecklist.length === 0) {
-        res.json({
-          data: [],
-          meta: { page: parsedPage, limit: parsedLimit, total: 0, totalPages: 0 },
-          templates: [],
-          visaStatusTemplates: [],
-        });
-        return;
-      }
-      where.id = { [Op.in]: filteredByChecklist };
     }
 
     let filterBranchId: string | undefined;

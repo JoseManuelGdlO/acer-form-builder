@@ -298,6 +298,7 @@ class ApiClient {
       productId?: string;
       visaStatusTemplateId?: string;
       checklistTemplateId?: string;
+      checklistMode?: 'completed' | 'not_completed';
       page?: number;
       limit?: number;
     },
