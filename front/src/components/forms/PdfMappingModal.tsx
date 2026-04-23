@@ -57,8 +57,9 @@ export const PdfMappingModal = ({ open, onOpenChange, question, template, value,
       setRenderError(null);
       try {
         const pdfjsLib = await import('pdfjs-dist');
+        const workerVersion = (pdfjsLib as any).version || '5.6.205';
         (pdfjsLib as any).GlobalWorkerOptions.workerSrc =
-          'https://unpkg.com/pdfjs-dist@4.8.69/build/pdf.worker.min.mjs';
+          `https://unpkg.com/pdfjs-dist@${workerVersion}/build/pdf.worker.min.mjs`;
         const response = await fetch(template.fileUrl);
         if (!response.ok) {
           throw new Error(`No se pudo cargar el archivo PDF (${response.status})`);
