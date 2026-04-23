@@ -34,6 +34,34 @@ const upload = multer({
   },
 });
 
+const resolveActiveTemplateForForm = async (form: Form, companyId: string) => {
+  const formId = form.id;
+  let template: PdfTemplate | null = null;
+
+  if (form.pdfTemplateId) {
+    template = await PdfTemplate.findOne({
+      where: {
+        id: form.pdfTemplateId,
+        companyId,
+        formId,
+        isDeleted: false,
+      },
+    });
+  }
+
+  if (!template) {
+    template = await PdfTemplate.findOne({
+      where: { companyId, formId, isDeleted: false },
+      order: [['created_at', 'DESC']],
+    });
+    if (template && form.pdfTemplateId !== template.id) {
+      await form.update({ pdfTemplateId: template.id });
+    }
+  }
+
+  return template;
+};
+
 export const uploadPdfTemplate = [
   upload.single('template'),
   async (req: AuthRequest, res: Response): Promise<void> => {
@@ -97,10 +125,12 @@ export const getPdfTemplateByForm = async (req: AuthRequest, res: Response): Pro
       res.status(401).json({ error: 'Authentication required' });
       return;
     }
-    const template = await PdfTemplate.findOne({
-      where: { companyId, formId, isDeleted: false },
-      order: [['created_at', 'DESC']],
-    });
+    const form = await Form.findOne({ where: { id: formId, companyId, isDeleted: false } });
+    if (!form) {
+      res.status(404).json({ error: 'Form not found' });
+      return;
+    }
+    const template = await resolveActiveTemplateForForm(form, companyId);
     if (!template) {
       res.status(404).json({ error: 'Template not found' });
       return;
@@ -131,9 +161,7 @@ export const getPdfTemplateFileByForm = async (req: AuthRequest, res: Response):
       res.status(404).json({ error: 'Form not found' });
       return;
     }
-    const where: Record<string, unknown> = { companyId, formId, isDeleted: false };
-    if (form.pdfTemplateId) where.id = form.pdfTemplateId;
-    const template = await PdfTemplate.findOne({ where, order: [['created_at', 'DESC']] });
+    const template = await resolveActiveTemplateForForm(form, companyId);
     if (!template) {
       res.status(404).json({ error: 'Template not found' });
       return;
@@ -163,9 +191,7 @@ export const renderFormPdfPreview = async (req: AuthRequest, res: Response): Pro
       return;
     }
 
-    const where: Record<string, unknown> = { companyId, formId, isDeleted: false };
-    if (form.pdfTemplateId) where.id = form.pdfTemplateId;
-    const template = await PdfTemplate.findOne({ where });
+    const template = await resolveActiveTemplateForForm(form, companyId);
     if (!template) {
       res.status(400).json({ error: 'No PDF template configured for this form' });
       return;
@@ -203,9 +229,7 @@ export const renderSubmissionPdf = async (req: AuthRequest, res: Response): Prom
       res.status(400).json({ error: 'Submission has no linked form' });
       return;
     }
-    const where: Record<string, unknown> = { companyId, formId: form.id, isDeleted: false };
-    if (form.pdfTemplateId) where.id = form.pdfTemplateId;
-    const template = await PdfTemplate.findOne({ where });
+    const template = await resolveActiveTemplateForForm(form, companyId);
     if (!template) {
       res.status(400).json({ error: 'No PDF template configured for this form' });
       return;
