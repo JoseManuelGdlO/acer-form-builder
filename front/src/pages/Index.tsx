@@ -5,6 +5,7 @@ import { useClientStore } from '@/hooks/useClientStore';
 import { useGroupStore } from '@/hooks/useGroupStore';
 import { useProductStore } from '@/hooks/useProductStore';
 import { useTripStore } from '@/hooks/useTripStore';
+import { useStaffStore } from '@/hooks/useStaffStore';
 import { useBusTemplateStore } from '@/hooks/useBusTemplateStore';
 import { useUserStore } from '@/hooks/useUserStore';
 import { useAuth } from '@/contexts/AuthContext';
@@ -236,6 +237,13 @@ const Index = () => {
     createTripExpense,
     deleteTripExpense,
   } = useTripStore();
+  const {
+    staffMembers,
+    fetchStaffMembers,
+    createStaffMember,
+    updateStaffMember,
+    deleteStaffMember,
+  } = useStaffStore();
   const {
     templates: busTemplates,
     fetchTemplates: fetchBusTemplates,
@@ -544,6 +552,11 @@ const Index = () => {
       api.getCompaniesForTripShare(token).then((list) => {
         setCompaniesForTripShare(Array.isArray(list) ? list : []);
       }).catch(() => setCompaniesForTripShare([]));
+    }
+    if (can('trips.participants_manage')) {
+      fetchStaffMembers(token).catch((error) => {
+        console.error('Failed to fetch staff members:', error);
+      });
     }
   }, [activeView, token, can]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1267,6 +1280,7 @@ const Index = () => {
             trips={trips}
             invitations={invitations}
             availableClients={clientsForTripAndGroupPickers}
+            availableStaffMembers={staffMembers}
             companiesForInvite={companiesForTripShare}
             onCreate={async (data) => {
               await createTrip(token!, data);
@@ -1324,6 +1338,9 @@ const Index = () => {
             onDeleteTripIncome={async (tripId, incomeId) => { await deleteTripIncome(tripId, incomeId, token!); await fetchTrip(tripId, token!); }}
             onCreateTripExpense={async (tripId, data) => { await createTripExpense(tripId, data, token!); }}
             onDeleteTripExpense={async (tripId, expenseId) => { await deleteTripExpense(tripId, expenseId, token!); }}
+            onCreateStaffMember={async (data) => { await createStaffMember(token!, data); }}
+            onUpdateStaffMember={async (id, data) => { await updateStaffMember(token!, id, data); }}
+            onDeleteStaffMember={async (id) => { await deleteStaffMember(token!, id); }}
             financeSummary={tripFinanceSummary}
             tripIncomes={tripIncomes}
             tripExpenses={tripExpenses}

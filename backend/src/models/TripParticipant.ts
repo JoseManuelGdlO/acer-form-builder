@@ -5,9 +5,11 @@ interface TripParticipantAttributes {
   id: string;
   tripId: string;
   clientId: string | null;
-  participantType: 'client' | 'companion';
+  staffMemberId: string | null;
+  participantType: 'client' | 'companion' | 'staff';
   name: string | null;
   phone: string | null;
+  role: string | null;
   createdAt?: Date;
 }
 
@@ -17,9 +19,11 @@ export class TripParticipant extends Model<TripParticipantAttributes, TripPartic
   public id!: string;
   public tripId!: string;
   public clientId!: string | null;
-  public participantType!: 'client' | 'companion';
+  public staffMemberId!: string | null;
+  public participantType!: 'client' | 'companion' | 'staff';
   public name!: string | null;
   public phone!: string | null;
+  public role!: string | null;
   public readonly createdAt!: Date;
 }
 
@@ -42,8 +46,15 @@ TripParticipant.init(
       references: { model: 'clients', key: 'id' },
       onDelete: 'CASCADE',
     },
+    staffMemberId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      references: { model: 'staff_members', key: 'id' },
+      onDelete: 'SET NULL',
+      onUpdate: 'CASCADE',
+    },
     participantType: {
-      type: DataTypes.ENUM('client', 'companion'),
+      type: DataTypes.ENUM('client', 'companion', 'staff'),
       allowNull: false,
       defaultValue: 'client',
     },
@@ -53,6 +64,10 @@ TripParticipant.init(
     },
     phone: {
       type: DataTypes.STRING,
+      allowNull: true,
+    },
+    role: {
+      type: DataTypes.STRING(255),
       allowNull: true,
     },
   },
@@ -67,6 +82,11 @@ TripParticipant.init(
         unique: true,
         fields: ['trip_id', 'client_id'],
       },
+      {
+        unique: true,
+        fields: ['trip_id', 'staff_member_id'],
+        name: 'trip_participants_trip_staff_member_unique',
+      },
     ],
     validate: {
       participantConsistency(this: TripParticipant) {
@@ -75,6 +95,9 @@ TripParticipant.init(
         }
         if (this.participantType === 'companion' && !this.name?.trim()) {
           throw new Error('companion participant requires name');
+        }
+        if (this.participantType === 'staff' && !this.staffMemberId) {
+          throw new Error('staff participant requires staffMemberId');
         }
       },
     },

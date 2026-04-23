@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Trip, TripInvitation, Client, BusTemplate, TripIncome, TripExpense, TripFinanceSummary } from '@/types/form';
+import { Trip, TripInvitation, Client, StaffMember, BusTemplate, TripIncome, TripExpense, TripFinanceSummary } from '@/types/form';
 import { TripCard } from './TripCard';
 import { TripDetailView } from './TripDetailView';
 import { TripFormModal, type TripFormSaveData } from './TripFormModal';
@@ -7,9 +7,10 @@ import { BusTemplateList } from './BusTemplateList';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { MapPin, Plus, Search, Mail, Calendar as CalendarIcon, Check, X, List, CalendarDays, Bus } from 'lucide-react';
+import { MapPin, Plus, Search, Mail, Calendar as CalendarIcon, Check, X, List, CalendarDays, Bus, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { SeatPickerModal } from './SeatPickerModal';
+import { StaffCatalogView } from './StaffCatalogView';
 import { format, startOfWeek, getDay, endOfDay, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Calendar, dateFnsLocalizer } from 'react-big-calendar';
@@ -22,11 +23,12 @@ interface TripListProps {
   trips: Trip[];
   invitations: TripInvitation[];
   availableClients: Client[];
+  availableStaffMembers: StaffMember[];
   companiesForInvite: { id: string; name: string }[];
   onCreate: (data: TripFormSaveData) => Promise<void>;
   onUpdate: (tripId: string, data: Partial<Trip> & { invitedCompanyIds?: string[] }) => Promise<void>;
   onDelete: (tripId: string) => Promise<void>;
-  onAddParticipants: (tripId: string, data: { clientIds?: string[]; companions?: { name: string; phone?: string }[] }) => Promise<void>;
+  onAddParticipants: (tripId: string, data: { clientIds?: string[]; staffMemberIds?: string[]; companions?: { name: string; phone?: string }[] }) => Promise<void>;
   onRemoveParticipant: (tripId: string, participantId: string) => Promise<void>;
   onAcceptInvitation: (invitationId: string) => Promise<void>;
   onRejectInvitation: (invitationId: string) => Promise<void>;
@@ -42,6 +44,9 @@ interface TripListProps {
     data: { amount: number; expenseDate: string; category?: string; referenceNumber?: string; note?: string }
   ) => Promise<void>;
   onDeleteTripExpense: (tripId: string, expenseId: string) => Promise<void>;
+  onCreateStaffMember: (data: { name: string; phone?: string | null; role?: string | null; notes?: string | null }) => Promise<void>;
+  onUpdateStaffMember: (id: string, data: { name?: string; phone?: string | null; role?: string | null; notes?: string | null }) => Promise<void>;
+  onDeleteStaffMember: (id: string) => Promise<void>;
   financeSummary: TripFinanceSummary | null;
   tripIncomes: TripIncome[];
   tripExpenses: TripExpense[];
@@ -59,6 +64,7 @@ export const TripList = ({
   trips,
   invitations,
   availableClients,
+  availableStaffMembers,
   companiesForInvite,
   onCreate,
   onUpdate,
@@ -76,6 +82,9 @@ export const TripList = ({
   onDeleteTripIncome,
   onCreateTripExpense,
   onDeleteTripExpense,
+  onCreateStaffMember,
+  onUpdateStaffMember,
+  onDeleteStaffMember,
   financeSummary,
   tripIncomes,
   tripExpenses,
@@ -94,6 +103,7 @@ export const TripList = ({
   const [seatPickerTrip, setSeatPickerTrip] = useState<Trip | null>(null);
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
   const [showBusTemplates, setShowBusTemplates] = useState(false);
+  const [showStaffCatalog, setShowStaffCatalog] = useState(false);
 
   const filteredTrips = useMemo(() => {
     if (!searchQuery.trim()) return trips;
@@ -215,6 +225,17 @@ export const TripList = ({
       />
     );
   }
+  if (!reviewerMode && showStaffCatalog) {
+    return (
+      <StaffCatalogView
+        staffMembers={availableStaffMembers}
+        onBack={() => setShowStaffCatalog(false)}
+        onCreate={onCreateStaffMember}
+        onUpdate={onUpdateStaffMember}
+        onDelete={onDeleteStaffMember}
+      />
+    );
+  }
 
   if (viewingTrip) {
     return (
@@ -222,6 +243,7 @@ export const TripList = ({
         <TripDetailView
           trip={viewingTrip}
           availableClients={availableClients}
+          availableStaffMembers={availableStaffMembers}
           companiesForInvite={companiesForInvite}
           changeLog={changeLog.filter(e => e.tripId === viewingTrip.id)}
           reviewerMode={reviewerMode}
@@ -262,8 +284,8 @@ export const TripList = ({
             trip={trips.find(t => t.id === seatPickerTrip.id) ?? seatPickerTrip}
             open={!!seatPickerTrip}
             onOpenChange={open => { if (!open) setSeatPickerTrip(null); }}
-            onAssign={async (clientId, seat) => {
-              await onSetSeatAssignment(seatPickerTrip.id, clientId, seat);
+            onAssign={async (participantId, seat) => {
+              await onSetSeatAssignment(seatPickerTrip.id, participantId, seat);
             }}
             onClear={async (opts) => {
               await onClearSeatAssignment(seatPickerTrip.id, opts);
@@ -293,6 +315,10 @@ export const TripList = ({
           </div>
           {!reviewerMode && (
             <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setShowStaffCatalog(true)} className="gap-2">
+                <Users className="w-4 h-4" />
+                Staff
+              </Button>
               <Button variant="outline" onClick={() => setShowBusTemplates(true)} className="gap-2">
                 <Bus className="w-4 h-4" />
                 Mis camiones
@@ -510,8 +536,8 @@ export const TripList = ({
             trip={trips.find(t => t.id === seatPickerTrip.id) ?? seatPickerTrip}
             open={!!seatPickerTrip}
             onOpenChange={open => { if (!open) setSeatPickerTrip(null); }}
-            onAssign={async (clientId, seat) => {
-              await onSetSeatAssignment(seatPickerTrip.id, clientId, seat);
+            onAssign={async (participantId, seat) => {
+              await onSetSeatAssignment(seatPickerTrip.id, participantId, seat);
             }}
             onClear={async (opts) => {
               await onClearSeatAssignment(seatPickerTrip.id, opts);

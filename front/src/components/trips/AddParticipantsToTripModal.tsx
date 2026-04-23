@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Client } from '@/types/form';
+import { Client, StaffMember } from '@/types/form';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -21,9 +21,10 @@ interface AddParticipantsToTripModalProps {
   tripTitle: string;
   currentParticipantIds: string[];
   availableClients: Client[];
+  availableStaffMembers: StaffMember[];
   totalSeats: number;
   currentCount: number;
-  onAdd: (data: { clientIds?: string[]; companions?: { name: string; phone?: string }[] }) => Promise<void>;
+  onAdd: (data: { clientIds?: string[]; staffMemberIds?: string[]; companions?: { name: string; phone?: string }[] }) => Promise<void>;
 }
 
 export const AddParticipantsToTripModal = ({
@@ -32,12 +33,15 @@ export const AddParticipantsToTripModal = ({
   tripTitle,
   currentParticipantIds,
   availableClients,
+  availableStaffMembers,
   totalSeats,
   currentCount,
   onAdd,
 }: AddParticipantsToTripModalProps) => {
   const [clientSearch, setClientSearch] = useState('');
+  const [staffSearch, setStaffSearch] = useState('');
   const [selectedClientIds, setSelectedClientIds] = useState<Set<string>>(new Set());
+  const [selectedStaffIds, setSelectedStaffIds] = useState<Set<string>>(new Set());
   const [companions, setCompanions] = useState<Array<{ name: string; phone: string }>>([{ name: '', phone: '' }]);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -66,15 +70,35 @@ export const AddParticipantsToTripModal = ({
       return next;
     });
   };
+  const filteredStaffMembers = useMemo(() => {
+    const list = availableStaffMembers.filter((s) => !currentSet.has(s.id));
+    if (!staffSearch.trim()) return list;
+    const q = staffSearch.toLowerCase();
+    return list.filter(
+      (s) =>
+        s.name.toLowerCase().includes(q) ||
+        (s.phone && s.phone.includes(staffSearch)) ||
+        (s.role && s.role.toLowerCase().includes(q))
+    );
+  }, [availableStaffMembers, currentSet, staffSearch]);
+  const toggleStaff = (id: string) => {
+    setSelectedStaffIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const validCompanions = companions.filter(c => c.name.trim());
-  const countNewClients = selectedClientIds.size;
+  const countNewClients = selectedClientIds.size + selectedStaffIds.size;
   const countNewCompanions = validCompanions.length;
   const wouldExceed = currentCount + countNewClients + countNewCompanions > totalSeats;
 
   const handleSubmit = async () => {
     const clientIds = Array.from(selectedClientIds);
-    if (clientIds.length === 0 && validCompanions.length === 0) {
+    const staffMemberIds = Array.from(selectedStaffIds);
+    if (clientIds.length === 0 && staffMemberIds.length === 0 && validCompanions.length === 0) {
       toast.info('Selecciona un cliente o captura al menos un acompañante');
       return;
     }
@@ -86,10 +110,13 @@ export const AddParticipantsToTripModal = ({
     try {
       await onAdd({
         clientIds: clientIds.length ? clientIds : undefined,
+        staffMemberIds: staffMemberIds.length ? staffMemberIds : undefined,
         companions: validCompanions.length ? validCompanions : undefined,
       });
       setSelectedClientIds(new Set());
+      setSelectedStaffIds(new Set());
       setClientSearch('');
+      setStaffSearch('');
       setCompanions([{ name: '', phone: '' }]);
       onOpenChange(false);
       toast.success('Participantes agregados al viaje');
@@ -134,6 +161,34 @@ export const AddParticipantsToTripModal = ({
                     <label key={c.id} className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-muted/50 cursor-pointer">
                       <Checkbox checked={selectedClientIds.has(c.id)} onCheckedChange={() => toggleClient(c.id)} />
                       <span className="text-sm truncate">{c.name}</span>
+                    </label>
+                  ))
+                )}
+              </div>
+            </ScrollArea>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Staff</Label>
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar staff..."
+                value={staffSearch}
+                onChange={(e) => setStaffSearch(e.target.value)}
+                className="pl-8 h-9"
+              />
+            </div>
+            <ScrollArea className="border rounded-md h-[120px]">
+              <div className="p-2 space-y-1">
+                {filteredStaffMembers.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-2">No hay staff disponible o ya está en el viaje.</p>
+                ) : (
+                  filteredStaffMembers.map((s) => (
+                    <label key={s.id} className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-muted/50 cursor-pointer">
+                      <Checkbox checked={selectedStaffIds.has(s.id)} onCheckedChange={() => toggleStaff(s.id)} />
+                      <span className="text-sm truncate">{s.name}</span>
+                      {s.role && <span className="text-xs text-muted-foreground">({s.role})</span>}
                     </label>
                   ))
                 )}

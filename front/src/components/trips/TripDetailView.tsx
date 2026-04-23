@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Trip, Client, TripChangeLogEntry, TripIncome, TripExpense, TripFinanceSummary } from '@/types/form';
+import { Trip, Client, StaffMember, TripChangeLogEntry, TripIncome, TripExpense, TripFinanceSummary } from '@/types/form';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -68,12 +68,13 @@ const ACTION_LABELS: Record<string, string> = {
 interface TripDetailViewProps {
   trip: Trip;
   availableClients: Client[];
+  availableStaffMembers: StaffMember[];
   companiesForInvite: { id: string; name: string }[];
   changeLog: TripChangeLogEntry[];
   onBack: () => void;
   onEdit: (trip: Trip) => void;
   onDelete: (tripId: string) => Promise<void>;
-  onAddParticipants: (data: { clientIds?: string[]; companions?: { name: string; phone?: string }[] }) => Promise<void>;
+  onAddParticipants: (data: { clientIds?: string[]; staffMemberIds?: string[]; companions?: { name: string; phone?: string }[] }) => Promise<void>;
   onRemoveParticipant: (participantId: string) => Promise<void>;
   onOpenSeatPicker: () => void;
   onResetSeatAssignments: () => Promise<void>;
@@ -93,6 +94,7 @@ interface TripDetailViewProps {
 export const TripDetailView = ({
   trip,
   availableClients,
+  availableStaffMembers,
   companiesForInvite,
   changeLog,
   onBack,
@@ -178,14 +180,23 @@ export const TripDetailView = ({
   const filteredParticipants = memberSearch.trim()
     ? participants.filter(p => {
         const c = p.client;
-        if (!c) return false;
         const q = memberSearch.toLowerCase();
         const companionName = p.companion?.name ?? '';
         const companionPhone = p.companion?.phone ?? '';
-        if (!c) {
+        const staffName = p.staffMember?.name ?? '';
+        const staffPhone = p.staffMember?.phone ?? '';
+        const staffRole = p.staffMember?.role ?? '';
+        if (!c && p.participantType !== 'staff') {
           return (
             companionName.toLowerCase().includes(q) ||
             companionPhone.includes(memberSearch)
+          );
+        }
+        if (!c && p.participantType === 'staff') {
+          return (
+            staffName.toLowerCase().includes(q) ||
+            staffPhone.includes(memberSearch) ||
+            staffRole.toLowerCase().includes(q)
           );
         }
         const branchName = c.assignedUser?.branch?.name ?? '';
@@ -469,21 +480,28 @@ export const TripDetailView = ({
         participants.forEach((p, index) => {
           const c = p.client;
           const isCompanion = p.participantType === 'companion';
-          const name = isCompanion ? (p.companion?.name ?? 'Acompañante') : (c?.name ?? p.clientId);
+          const isStaff = p.participantType === 'staff';
+          const name = isCompanion
+            ? (p.companion?.name ?? 'Acompañante')
+            : isStaff
+              ? (p.staffMember?.name ?? p.companion?.name ?? 'Staff')
+              : (c?.name ?? p.clientId);
           const company = c?.company?.name ? ` · ${c.company.name}` : '';
+          const staffRole = isStaff && p.staffMember?.role ? ` · Rol: ${p.staffMember.role}` : '';
           const office = c?.assignedUser?.branch?.name
             ? ` · Oficina: ${c.assignedUser.branch.name}`
             : '';
           const advisor = c?.assignedUser?.name ? ` · Asesor: ${c.assignedUser.name}` : '';
-          writeLine(`${index + 1}. ${name}${company}${office}${advisor}`, { indent: 18 });
+          writeLine(`${index + 1}. ${name}${company}${staffRole}${office}${advisor}`, { indent: 18 });
           const email = c?.email?.trim();
           if (email) {
             writeLine(`Correo: ${email}`, { indent: 24 });
           }
           const phone = c?.phone?.trim();
           const companionPhone = p.companion?.phone?.trim();
-          if (phone || companionPhone) {
-            writeLine(`Tel.: ${phone ?? companionPhone}`, { indent: 24 });
+          const staffPhone = p.staffMember?.phone?.trim();
+          if (phone || companionPhone || staffPhone) {
+            writeLine(`Tel.: ${phone ?? companionPhone ?? staffPhone}`, { indent: 24 });
           }
         });
       }
@@ -893,7 +911,8 @@ export const TripDetailView = ({
                   {filteredParticipants.map(p => {
                     const c = p.client;
                     const isCompanion = p.participantType === 'companion';
-                    if (!c && !isCompanion) return null;
+                    const isStaff = p.participantType === 'staff';
+                    if (!c && !isCompanion && !isStaff) return null;
                     const rowNumber = participants.indexOf(p) + 1;
                     const childInGroup = c ? isParticipantChildInTrip(c, participantIdSet) : false;
                     const coId = c?.company?.id;
@@ -933,11 +952,14 @@ export const TripDetailView = ({
                                 F
                               </span>
                             )}
-                            <p className="font-medium truncate">{isCompanion ? p.companion?.name : c.name}</p>
+                            <p className="font-medium truncate">{isCompanion ? p.companion?.name : isStaff ? p.staffMember?.name ?? p.companion?.name ?? p.id : c.name}</p>
                             {isCompanion && (
                               <Badge variant="secondary" className="text-xs">Acompañante</Badge>
                             )}
-                            {!isCompanion && c?.company && (
+                            {isStaff && (
+                              <Badge variant="secondary" className="text-xs">Staff</Badge>
+                            )}
+                            {!isCompanion && !isStaff && c?.company && (
                               <Badge
                                 variant="outline"
                                 className="text-xs shrink-0 font-medium"
@@ -956,13 +978,13 @@ export const TripDetailView = ({
                             )}
                           </div>
                           <div className="flex items-center gap-x-3 gap-y-1 text-sm text-muted-foreground flex-wrap mt-0.5">
-                            {c?.assignedUser?.branch?.name && (
+                            {!isStaff && c?.assignedUser?.branch?.name && (
                               <span className="flex items-center gap-1 min-w-0">
                                 <MapPinned className="w-3.5 h-3.5 shrink-0" />
                                 <span className="truncate">Oficina: {c.assignedUser.branch.name}</span>
                               </span>
                             )}
-                            {c?.assignedUser?.name && (
+                            {!isStaff && c?.assignedUser?.name && (
                               <span className="flex items-center gap-1 min-w-0">
                                 <UserCircle className="w-3.5 h-3.5 shrink-0" />
                                 <span className="truncate">Asesor: {c.assignedUser.name}</span>
@@ -970,13 +992,13 @@ export const TripDetailView = ({
                             )}
                           </div>
                           <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
-                            {c?.email && (
+                            {!isStaff && c?.email && (
                               <span className="flex items-center gap-1 truncate">
                                 <Mail className="w-3.5 h-3.5 shrink-0" />
                                 {c?.email}
                               </span>
                             )}
-                            {c?.tripBalanceDue != null &&
+                            {!isStaff && c?.tripBalanceDue != null &&
                               c?.tripBalanceDue !== undefined &&
                               Number(c?.tripBalanceDue) > 0 && (
                                 <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
@@ -985,10 +1007,15 @@ export const TripDetailView = ({
                                 </span>
                               )}
                           </div>
-                          {(isCompanion ? p.companion?.phone?.trim() : c.phone?.trim()) && (
+                          {(isCompanion ? p.companion?.phone?.trim() : isStaff ? p.staffMember?.phone?.trim() : c.phone?.trim()) && (
                             <div className="flex items-center gap-1 text-sm text-muted-foreground mt-0.5 min-w-0">
                               <Phone className="w-3.5 h-3.5 shrink-0" />
-                              <span className="truncate">{isCompanion ? p.companion?.phone?.trim() : c.phone.trim()}</span>
+                              <span className="truncate">{isCompanion ? p.companion?.phone?.trim() : isStaff ? p.staffMember?.phone?.trim() : c.phone.trim()}</span>
+                            </div>
+                          )}
+                          {isStaff && p.staffMember?.role?.trim() && (
+                            <div className="text-xs text-muted-foreground mt-0.5">
+                              Rol: {p.staffMember.role.trim()}
                             </div>
                           )}
                         </div>
@@ -1060,8 +1087,13 @@ export const TripDetailView = ({
           open={addModalOpen}
           onOpenChange={setAddModalOpen}
           tripTitle={trip.title}
-          currentParticipantIds={participants.map(p => p.client?.id).filter(Boolean) as string[]}
+          currentParticipantIds={
+            participants
+              .map((p) => (p.participantType === 'staff' ? p.staffMemberId : p.client?.id))
+              .filter(Boolean) as string[]
+          }
           availableClients={availableClients}
+          availableStaffMembers={availableStaffMembers}
           totalSeats={trip.totalSeats}
           currentCount={participants.length}
           onAdd={onAddParticipants}

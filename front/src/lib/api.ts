@@ -693,7 +693,7 @@ class ApiClient {
 
   async addTripParticipants(
     tripId: string,
-    data: { clientIds?: string[]; companions?: { name: string; phone?: string }[] },
+    data: { clientIds?: string[]; staffMemberIds?: string[]; companions?: { name: string; phone?: string }[] },
     token?: string | null
   ) {
     return this.request<any>(`/trips/${tripId}/participants`, {
@@ -753,6 +753,48 @@ class ApiClient {
     const id = opts.participantId ?? opts.clientId;
     if (!id) throw new Error('participantId, clientId or seatId required');
     return this.request<{ message: string }>(`/trips/${tripId}/seat-assignments/${id}`, {
+      method: 'DELETE',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  // Staff members catalog
+  async getStaffMembers(token?: string | null) {
+    return this.request<any[]>('/staff-members', {
+      method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async createStaffMember(
+    data: { name: string; phone?: string | null; role?: string | null; notes?: string | null },
+    token?: string | null
+  ) {
+    return this.request<any>('/staff-members', {
+      method: 'POST',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateStaffMember(
+    id: string,
+    data: { name?: string; phone?: string | null; role?: string | null; notes?: string | null },
+    token?: string | null
+  ) {
+    return this.request<any>(`/staff-members/${id}`, {
+      method: 'PUT',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteStaffMember(id: string, token?: string | null) {
+    return this.request<{ message: string }>(`/staff-members/${id}`, {
       method: 'DELETE',
       token: token ?? this.getToken(),
       requireAuth: true,

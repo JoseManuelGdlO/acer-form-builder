@@ -13,6 +13,7 @@ import {
   BusTemplate,
   Client,
   ClientGroupMember,
+  StaffMember,
   Company,
   User,
   Branch,
@@ -178,6 +179,12 @@ export const getTripById = async (req: AuthRequest, res: Response): Promise<void
               ],
               attributes: ['id', 'name', 'email', 'phone', 'companyId', 'totalAmountDue', 'parentClientId', 'assignedUserId'],
             },
+            {
+              model: StaffMember,
+              as: 'staffMember',
+              attributes: ['id', 'name', 'phone', 'role', 'notes', 'companyId'],
+              required: false,
+            },
           ],
         },
         {
@@ -194,7 +201,7 @@ export const getTripById = async (req: AuthRequest, res: Response): Promise<void
             {
               model: TripParticipant,
               as: 'participant',
-              attributes: ['id', 'participantType', 'name', 'phone', 'clientId'],
+              attributes: ['id', 'participantType', 'name', 'phone', 'role', 'clientId', 'staffMemberId'],
             },
           ],
         },
@@ -213,7 +220,7 @@ export const getTripById = async (req: AuthRequest, res: Response): Promise<void
     // Strip totalAmountDue for participants from other companies; saldo pendiente solo para titulares
     if (j.participants) {
       j.participants = j.participants.map((p: any) => {
-        if (p.participantType === 'companion') return p;
+        if (p.participantType !== 'client') return p;
         const client = p.client || {};
         if (client.companyId !== companyId && client.totalAmountDue !== undefined) {
           const out = { ...p };
@@ -244,7 +251,7 @@ export const getTripById = async (req: AuthRequest, res: Response): Promise<void
         );
       }
       j.participants = (j.participants as any[]).map((p: any) => {
-        if (p.participantType === 'companion') {
+        if (p.participantType !== 'client') {
           return {
             ...p,
             client: null,
@@ -643,6 +650,8 @@ export const deleteTrip = async (req: AuthRequest, res: Response): Promise<void>
 export const addParticipants = [
   body('clientIds').optional().isArray(),
   body('clientIds.*').optional().isUUID(),
+  body('staffMemberIds').optional().isArray(),
+  body('staffMemberIds.*').optional().isUUID(),
   body('companions').optional().isArray(),
   body('companions.*.name').optional().isString().trim().notEmpty(),
   body('companions.*.phone').optional({ nullable: true }).isString().trim(),
@@ -671,6 +680,7 @@ export const addParticipants = [
       const currentCount = await TripParticipant.count({ where: { tripId: id } });
       const totalSeats = (trip as any).totalSeats;
       const clientIds = Array.isArray(req.body.clientIds) ? req.body.clientIds : [];
+      const staffMemberIds = Array.isArray(req.body.staffMemberIds) ? req.body.staffMemberIds : [];
       const companions = Array.isArray(req.body.companions) ? req.body.companions : [];
       const groupIds = Array.isArray(req.body.groupIds) ? req.body.groupIds : [];
       let toAdd: string[] = [...clientIds];
@@ -716,13 +726,51 @@ export const addParticipants = [
       const existing = await TripParticipant.findAll({ where: { tripId: id }, attributes: ['clientId'] });
       const existingSet = new Set(existing.map(e => e.clientId));
       const newClients = toAdd.filter(cid => !existingSet.has(cid));
+      const existingStaff = await TripParticipant.findAll({ where: { tripId: id }, attributes: ['staffMemberId'] });
+      const existingStaffSet = new Set(existingStaff.map((e: any) => e.staffMemberId).filter(Boolean));
+      const uniqueStaffIds = [...new Set(staffMemberIds)] as string[];
+      if (uniqueStaffIds.length > 0) {
+        const staffRows = await StaffMember.findAll({
+          where: { id: { [Op.in]: uniqueStaffIds }, companyId },
+          attributes: ['id', 'name', 'phone', 'role'],
+        });
+        if (staffRows.length !== uniqueStaffIds.length) {
+          res.status(400).json({ error: 'Solo puedes añadir staff de tu compañía' });
+          return;
+        }
+      }
+      const newStaffIds = uniqueStaffIds.filter((sid) => !existingStaffSet.has(sid));
       const companionCount = companions.filter((c: any) => typeof c?.name === 'string' && c.name.trim()).length;
-      if (currentCount + newClients.length + companionCount > totalSeats) {
+      if (currentCount + newClients.length + newStaffIds.length + companionCount > totalSeats) {
         res.status(400).json({ error: 'Se ha alcanzado el límite de plazas' });
         return;
       }
       for (const cid of newClients) {
         await TripParticipant.create({ tripId: id, clientId: cid, participantType: 'client' });
+      }
+      const createdStaff: Array<{ staffMemberId: string; name: string; phone: string | null; role: string | null }> = [];
+      if (newStaffIds.length > 0) {
+        const rows = await StaffMember.findAll({
+          where: { id: { [Op.in]: newStaffIds }, companyId },
+          attributes: ['id', 'name', 'phone', 'role'],
+        });
+        for (const row of rows) {
+          await TripParticipant.create({
+            tripId: id,
+            participantType: 'staff',
+            staffMemberId: row.id,
+            clientId: null,
+            name: row.name,
+            phone: row.phone ?? null,
+            role: row.role ?? null,
+          });
+          createdStaff.push({
+            staffMemberId: row.id,
+            name: row.name,
+            phone: row.phone ?? null,
+            role: row.role ?? null,
+          });
+        }
       }
       const createdCompanions: Array<{ name: string; phone: string | null }> = [];
       for (const companion of companions) {
@@ -735,11 +783,12 @@ export const addParticipants = [
           clientId: null,
           name,
           phone: phone || null,
+          role: null,
         });
         createdCompanions.push({ name, phone: phone || null });
       }
       await logTripChange(id, req.user!.id, 'participant_added', {
-        newValue: JSON.stringify({ clientIds: newClients, groupIds, companions: createdCompanions }),
+        newValue: JSON.stringify({ clientIds: newClients, groupIds, staff: createdStaff, companions: createdCompanions }),
       });
       const tripWithParticipants = await Trip.findByPk(id, {
         include: [
@@ -762,6 +811,12 @@ export const addParticipants = [
                   },
                 ],
                 attributes: ['id', 'name', 'email', 'phone', 'companyId', 'totalAmountDue', 'parentClientId', 'assignedUserId'],
+              },
+              {
+                model: StaffMember,
+                as: 'staffMember',
+                attributes: ['id', 'name', 'phone', 'role', 'notes', 'companyId'],
+                required: false,
               },
             ],
           },
@@ -799,8 +854,22 @@ export const removeParticipant = async (req: AuthRequest, res: Response): Promis
       res.status(403).json({ error: 'Solo puedes quitar participantes de tu compañía' });
       return;
     }
+    if (participant.participantType === 'staff' && participant.staffMemberId) {
+      const staff = await StaffMember.findByPk(participant.staffMemberId, { attributes: ['companyId'] });
+      if (staff && (staff as any).companyId !== companyId) {
+        res.status(403).json({ error: 'Solo puedes quitar staff de tu compañía' });
+        return;
+      }
+    }
     await TripSeatAssignment.destroy({ where: { tripId: id, participantId: participant.id } });
-    const name = participant.participantType === 'companion' ? participant.name : client ? (client as any).name : clientId;
+    const name =
+      participant.participantType === 'companion'
+        ? participant.name
+        : participant.participantType === 'staff'
+          ? participant.name
+          : client
+            ? (client as any).name
+            : clientId;
     await participant.destroy();
     await logTripChange(id, req.user!.id, 'participant_removed', { oldValue: name });
     res.json({ message: 'Participant removed' });
@@ -937,7 +1006,7 @@ export const setSeatAssignment = [
             as: 'seatAssignments',
             include: [
               { model: Client, as: 'client', required: false, include: [{ model: Company, as: 'company', attributes: ['id', 'name'] }] },
-              { model: TripParticipant, as: 'participant', attributes: ['id', 'participantType', 'name', 'phone', 'clientId'] },
+              { model: TripParticipant, as: 'participant', attributes: ['id', 'participantType', 'name', 'phone', 'role', 'clientId', 'staffMemberId'] },
             ],
           },
         ],

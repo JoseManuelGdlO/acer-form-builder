@@ -312,6 +312,17 @@ export interface Group {
 
 // ============= Trips =============
 
+export interface StaffMember {
+  id: string;
+  companyId: string;
+  name: string;
+  phone?: string | null;
+  role?: string | null;
+  notes?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 /** Asesor del cliente en contexto de viaje, con sucursal (oficina) si aplica */
 export interface TripParticipantAdvisor extends ClientAssignedUser {
   branch?: { id: string; name: string } | null;
@@ -333,10 +344,12 @@ export interface TripSeatAssignmentEntry {
   seatId?: string | null;
   participant?: {
     id: string;
-    participantType: 'client' | 'companion';
+    participantType: 'client' | 'companion' | 'staff';
     name?: string | null;
     phone?: string | null;
+    role?: string | null;
     clientId?: string | null;
+    staffMemberId?: string | null;
   };
   client?: Client & { company?: { id: string; name: string } };
 }
@@ -410,9 +423,11 @@ export interface Trip {
   sharedCompanies?: { id: string; name: string }[];
   participants?: {
     id: string;
-    participantType?: 'client' | 'companion';
+    participantType?: 'client' | 'companion' | 'staff';
     clientId?: string | null;
     companion?: { name: string; phone?: string | null };
+    staffMemberId?: string | null;
+    staffMember?: StaffMember | null;
     client?: TripParticipantClient | null;
   }[];
   seatAssignments?: TripSeatAssignmentEntry[];

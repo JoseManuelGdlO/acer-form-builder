@@ -25,10 +25,11 @@ function parseJsonIfString<T>(value: unknown): T | null {
 }
 
 function mapParticipant(p: any) {
-  const participantType = (p.participant_type ?? p.participantType ?? 'client') as 'client' | 'companion';
+  const participantType = (p.participant_type ?? p.participantType ?? 'client') as 'client' | 'companion' | 'staff';
   const client = p.client || {};
   const companionName = p.name ?? p.companion_name ?? null;
   const companionPhone = p.phone ?? p.companion_phone ?? null;
+  const staffMemberRaw = p.staff_member ?? p.staffMember ?? null;
   const company = client.company || {};
   const au = client.assigned_user ?? client.assignedUser;
   const br = au?.branch;
@@ -67,6 +68,19 @@ function mapParticipant(p: any) {
     id: p.id,
     participantType,
     clientId: p.client_id ?? p.clientId ?? null,
+    staffMemberId: p.staff_member_id ?? p.staffMemberId ?? null,
+    staffMember: staffMemberRaw
+      ? {
+          id: staffMemberRaw.id,
+          companyId: staffMemberRaw.company_id ?? staffMemberRaw.companyId,
+          name: staffMemberRaw.name,
+          phone: staffMemberRaw.phone ?? null,
+          role: staffMemberRaw.role ?? null,
+          notes: staffMemberRaw.notes ?? null,
+          createdAt: staffMemberRaw.created_at ?? staffMemberRaw.createdAt,
+          updatedAt: staffMemberRaw.updated_at ?? staffMemberRaw.updatedAt,
+        }
+      : null,
     companion:
       participantType === 'companion'
         ? {
@@ -74,7 +88,7 @@ function mapParticipant(p: any) {
             phone: companionPhone,
           }
         : undefined,
-    client: participantType === 'companion' ? null : tripClient,
+    client: participantType === 'client' ? tripClient : null,
   };
 }
 
@@ -94,7 +108,9 @@ function mapSeatAssignment(s: any): TripSeatAssignmentEntry {
       participantType: participant.participant_type ?? participant.participantType ?? 'client',
       name: participant.name ?? null,
       phone: participant.phone ?? null,
+      role: participant.role ?? null,
       clientId: participant.client_id ?? participant.clientId ?? null,
+      staffMemberId: participant.staff_member_id ?? participant.staffMemberId ?? null,
     };
   }
   if (client.id) {
@@ -369,7 +385,11 @@ export const useTripStore = () => {
   }, [currentTrip?.id]);
 
   const addParticipants = useCallback(
-    async (token: string, tripId: string, data: { clientIds?: string[]; companions?: { name: string; phone?: string }[] }) => {
+    async (
+      token: string,
+      tripId: string,
+      data: { clientIds?: string[]; staffMemberIds?: string[]; companions?: { name: string; phone?: string }[] }
+    ) => {
     const updated = await api.addTripParticipants(tripId, data, token);
     const trip = mapTrip(updated);
     setTrips(prev => prev.map(t => (t.id === tripId ? trip : t)));

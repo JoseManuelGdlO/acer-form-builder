@@ -42,6 +42,7 @@ import { PushSubscription } from './PushSubscription';
 import { InternalAppointment } from './InternalAppointment';
 import { InternalAppointmentHistory } from './InternalAppointmentHistory';
 import { WhatsappIntegration } from './WhatsappIntegration';
+import { StaffMember } from './StaffMember';
 
 // Company relationships (multi-tenant)
 Company.hasMany(User, { foreignKey: 'companyId', as: 'users' });
@@ -88,6 +89,8 @@ Company.hasMany(Conversations, { foreignKey: 'companyId', as: 'conversations' })
 Conversations.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
 Company.hasOne(WhatsappIntegration, { foreignKey: 'companyId', as: 'whatsappIntegration' });
 WhatsappIntegration.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+Company.hasMany(StaffMember, { foreignKey: 'companyId', as: 'staffMembers' });
+StaffMember.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
 
 // Notifications relationships (multi-tenant)
 Company.hasMany(Notification, { foreignKey: 'companyId', as: 'notifications' });
@@ -244,6 +247,8 @@ Trip.hasMany(TripParticipant, { foreignKey: 'tripId', as: 'participants' });
 TripParticipant.belongsTo(Trip, { foreignKey: 'tripId', as: 'trip' });
 TripParticipant.belongsTo(Client, { foreignKey: 'clientId', as: 'client' });
 Client.hasMany(TripParticipant, { foreignKey: 'clientId', as: 'tripParticipants' });
+TripParticipant.belongsTo(StaffMember, { foreignKey: 'staffMemberId', as: 'staffMember' });
+StaffMember.hasMany(TripParticipant, { foreignKey: 'staffMemberId', as: 'tripParticipants' });
 
 Trip.hasMany(TripGroup, { foreignKey: 'tripId', as: 'tripGroups' });
 TripGroup.belongsTo(Trip, { foreignKey: 'tripId', as: 'trip' });
@@ -338,4 +343,5 @@ export {
   InternalAppointment,
   InternalAppointmentHistory,
   WhatsappIntegration,
+  StaffMember,
 };

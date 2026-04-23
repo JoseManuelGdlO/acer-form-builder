@@ -238,7 +238,7 @@ export function SeatPickerModal({
                               onClick={() => handleAssign(p.id)}
                               disabled={assigning}
                             >
-                              {p.client?.name ?? p.companion?.name ?? p.id}
+                              {p.client?.name ?? p.staffMember?.name ?? p.companion?.name ?? p.id}
                               {p.client?.company && (
                                 <span className="text-muted-foreground text-xs">({p.client.company.name})</span>
                               )}
@@ -251,7 +251,11 @@ export function SeatPickerModal({
                   {pendingSeatId && assignmentBySeatId[pendingSeatId] && (
                     <div className="text-sm flex items-center gap-2 flex-wrap">
                       <span className="text-muted-foreground">Asignado a: </span>
-                      <span>{(assignmentBySeatId[pendingSeatId] as any)?.client?.name ?? assignmentBySeatId[pendingSeatId].participant?.name ?? assignmentBySeatId[pendingSeatId].clientId}</span>
+                      <span>
+                        {(assignmentBySeatId[pendingSeatId] as any)?.client?.name ??
+                          assignmentBySeatId[pendingSeatId].participant?.name ??
+                          assignmentBySeatId[pendingSeatId].clientId}
+                      </span>
                       {!reviewerSeatMode && (
                         <Button
                           variant="ghost"
@@ -401,7 +405,7 @@ export function SeatPickerModal({
                             onClick={() => handleAssign(p.id)}
                             disabled={assigning}
                           >
-                            {p.client?.name ?? p.companion?.name ?? p.id}
+                            {p.client?.name ?? p.staffMember?.name ?? p.companion?.name ?? p.id}
                             {p.client?.company && (
                               <span className="text-muted-foreground text-xs">({p.client.company.name})</span>
                             )}
