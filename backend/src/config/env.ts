@@ -30,4 +30,6 @@ export const config = {
   },
   /** Ruta base para subida de archivos (logos, productos, etc.). Por defecto usa ./uploads desde el directorio de trabajo del proceso. */
   uploadsDir: process.env.UPLOADS_DIR || 'uploads',
+  /** Limite maximo (MB) para plantilla PDF de formularios */
+  pdfTemplateMaxMb: parseInt(process.env.PDF_TEMPLATE_MAX_MB || '25', 10),
 };

@@ -24,7 +24,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 15 * 1024 * 1024 },
+  limits: { fileSize: config.pdfTemplateMaxMb * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     if (file.mimetype !== 'application/pdf') {
       cb(new Error('Only PDF files are allowed'));
@@ -79,7 +79,12 @@ export const uploadPdfTemplate = [
       });
     } catch (error) {
       console.error('Upload PDF template error:', error);
-      res.status(500).json({ error: 'Internal server error' });
+      if (error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE') {
+        res.status(413).json({ error: `Template exceeds ${config.pdfTemplateMaxMb}MB limit` });
+        return;
+      }
+      const details = error instanceof Error ? error.message : 'Unknown upload error';
+      res.status(500).json({ error: 'Internal server error', details });
     }
   },
 ];

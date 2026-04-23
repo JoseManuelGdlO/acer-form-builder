@@ -28,6 +28,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
+const MAX_TEMPLATE_SIZE_MB = 25;
 
 interface FormEditorProps {
   form: Form;
@@ -240,6 +241,11 @@ export const FormEditor = ({
   const handleTemplateUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    if (file.size > MAX_TEMPLATE_SIZE_MB * 1024 * 1024) {
+      toast.error(`El PDF supera el limite de ${MAX_TEMPLATE_SIZE_MB}MB.`);
+      event.target.value = '';
+      return;
+    }
     setIsUploadingTemplate(true);
     try {
       const tpl = await api.uploadFormPdfTemplate(form.id, file);
