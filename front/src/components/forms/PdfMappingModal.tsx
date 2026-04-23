@@ -35,6 +35,7 @@ function questionTypeToDefaultMode(type: Question['type']): QuestionPdfPlacement
 export const PdfMappingModal = ({ open, onOpenChange, question, template, value, onSave }: PdfMappingModalProps) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [isRendering, setIsRendering] = useState(false);
+  const [renderError, setRenderError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [placements, setPlacements] = useState<QuestionPdfPlacement[]>([]);
 
@@ -53,11 +54,20 @@ export const PdfMappingModal = ({ open, onOpenChange, question, template, value,
     let cancelled = false;
     const render = async () => {
       setIsRendering(true);
+      setRenderError(null);
       try {
         const pdfjsLib = await import('pdfjs-dist');
-        (pdfjsLib as any).GlobalWorkerOptions.workerSrc =
-          'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs';
-        const loadingTask = (pdfjsLib as any).getDocument(template.fileUrl);
+        (pdfjsLib as any).GlobalWorkerOptions.workerSrc = new URL(
+          'pdfjs-dist/build/pdf.worker.min.mjs',
+          import.meta.url
+        ).toString();
+
+        const response = await fetch(template.fileUrl);
+        if (!response.ok) {
+          throw new Error(`No se pudo cargar el archivo PDF (${response.status})`);
+        }
+        const bytes = new Uint8Array(await response.arrayBuffer());
+        const loadingTask = (pdfjsLib as any).getDocument({ data: bytes });
         const pdf = await loadingTask.promise;
         const page = await pdf.getPage(currentPage);
         const viewport = page.getViewport({ scale: 1.2 });
@@ -67,9 +77,11 @@ export const PdfMappingModal = ({ open, onOpenChange, question, template, value,
         if (!context) return;
         canvas.width = viewport.width;
         canvas.height = viewport.height;
+        context.clearRect(0, 0, canvas.width, canvas.height);
         await page.render({ canvasContext: context, viewport }).promise;
       } catch (error) {
         console.error('Error rendering PDF page:', error);
+        setRenderError(error instanceof Error ? error.message : 'Error desconocido al renderizar PDF');
       } finally {
         if (!cancelled) setIsRendering(false);
       }
@@ -139,6 +151,11 @@ export const PdfMappingModal = ({ open, onOpenChange, question, template, value,
               </div>
             </div>
             <canvas ref={canvasRef} className="max-w-full border rounded cursor-crosshair" onClick={handleCanvasClick} />
+            {renderError && (
+              <p className="text-sm text-destructive mt-2">
+                No se pudo mostrar el PDF: {renderError}
+              </p>
+            )}
           </div>
           <div className="space-y-3">
             <div className="space-y-1">
