@@ -25,7 +25,10 @@ function parseJsonIfString<T>(value: unknown): T | null {
 }
 
 function mapParticipant(p: any) {
+  const participantType = (p.participant_type ?? p.participantType ?? 'client') as 'client' | 'companion';
   const client = p.client || {};
+  const companionName = p.name ?? p.companion_name ?? null;
+  const companionPhone = p.phone ?? p.companion_phone ?? null;
   const company = client.company || {};
   const au = client.assigned_user ?? client.assignedUser;
   const br = au?.branch;
@@ -62,19 +65,38 @@ function mapParticipant(p: any) {
   }
   return {
     id: p.id,
-    clientId: p.client_id ?? p.clientId,
-    client: tripClient,
+    participantType,
+    clientId: p.client_id ?? p.clientId ?? null,
+    companion:
+      participantType === 'companion'
+        ? {
+            name: companionName ?? '',
+            phone: companionPhone,
+          }
+        : undefined,
+    client: participantType === 'companion' ? null : tripClient,
   };
 }
 
 function mapSeatAssignment(s: any): TripSeatAssignmentEntry {
   const client = s.client || {};
   const entry: TripSeatAssignmentEntry = {
+    participantId: s.participant_id ?? s.participantId ?? undefined,
     clientId: s.client_id ?? s.clientId,
     seatNumber: s.seat_number ?? s.seatNumber ?? null,
     seatId: s.seat_id ?? s.seatId ?? null,
   };
   if (s.id) (entry as any).id = s.id;
+  const participant = s.participant || {};
+  if (participant.id) {
+    entry.participant = {
+      id: participant.id,
+      participantType: participant.participant_type ?? participant.participantType ?? 'client',
+      name: participant.name ?? null,
+      phone: participant.phone ?? null,
+      clientId: participant.client_id ?? participant.clientId ?? null,
+    };
+  }
   if (client.id) {
     (entry as any).client = {
       ...client,
@@ -346,16 +368,19 @@ export const useTripStore = () => {
     if (currentTrip?.id === tripId) setCurrentTrip(null);
   }, [currentTrip?.id]);
 
-  const addParticipants = useCallback(async (token: string, tripId: string, data: { clientIds?: string[] }) => {
+  const addParticipants = useCallback(
+    async (token: string, tripId: string, data: { clientIds?: string[]; companions?: { name: string; phone?: string }[] }) => {
     const updated = await api.addTripParticipants(tripId, data, token);
     const trip = mapTrip(updated);
     setTrips(prev => prev.map(t => (t.id === tripId ? trip : t)));
     if (currentTrip?.id === tripId) setCurrentTrip(trip);
     return trip;
-  }, [currentTrip?.id]);
+    },
+    [currentTrip?.id]
+  );
 
-  const removeParticipant = useCallback(async (token: string, tripId: string, clientId: string) => {
-    await api.removeTripParticipant(tripId, clientId, token);
+  const removeParticipant = useCallback(async (token: string, tripId: string, participantId: string) => {
+    await api.removeTripParticipant(tripId, participantId, token);
     const trip = await api.getTrip(tripId, token);
     const mapped = mapTrip(trip);
     setTrips(prev => prev.map(t => (t.id === tripId ? mapped : t)));
@@ -366,12 +391,12 @@ export const useTripStore = () => {
     async (
       token: string,
       tripId: string,
-      clientId: string,
+      participantId: string,
       seat: { seatNumber?: number; seatId?: string }
     ) => {
       await api.setTripSeatAssignment(
         tripId,
-        { clientId, ...(seat.seatId != null ? { seatId: seat.seatId } : { seatNumber: seat.seatNumber! }) },
+        { participantId, ...(seat.seatId != null ? { seatId: seat.seatId } : { seatNumber: seat.seatNumber! }) },
         token
       );
       const trip = await api.getTrip(tripId, token);
@@ -391,7 +416,7 @@ export const useTripStore = () => {
   }, [currentTrip?.id]);
 
   const clearSeatAssignment = useCallback(
-    async (token: string, tripId: string, opts: { clientId?: string; seatId?: string }) => {
+    async (token: string, tripId: string, opts: { participantId?: string; clientId?: string; seatId?: string }) => {
       await api.clearTripSeatAssignment(tripId, opts, token);
       const trip = await api.getTrip(tripId, token);
       const mapped = mapTrip(trip);

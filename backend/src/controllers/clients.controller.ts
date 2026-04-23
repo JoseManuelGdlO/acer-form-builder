@@ -370,7 +370,7 @@ export const getAllClients = async (req: AuthRequest, res: Response): Promise<vo
     for (const tp of tripParticipations) {
       const cid = tp.clientId;
       const trip = (tp as any).trip;
-      if (!trip) continue;
+      if (!trip || !cid) continue;
       if (!assignedTripsByClientId[cid]) assignedTripsByClientId[cid] = [];
       assignedTripsByClientId[cid].push({ id: trip.id, title: trip.title });
     }

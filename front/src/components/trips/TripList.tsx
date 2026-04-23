@@ -26,13 +26,13 @@ interface TripListProps {
   onCreate: (data: TripFormSaveData) => Promise<void>;
   onUpdate: (tripId: string, data: Partial<Trip> & { invitedCompanyIds?: string[] }) => Promise<void>;
   onDelete: (tripId: string) => Promise<void>;
-  onAddParticipants: (tripId: string, data: { clientIds?: string[] }) => Promise<void>;
-  onRemoveParticipant: (tripId: string, clientId: string) => Promise<void>;
+  onAddParticipants: (tripId: string, data: { clientIds?: string[]; companions?: { name: string; phone?: string }[] }) => Promise<void>;
+  onRemoveParticipant: (tripId: string, participantId: string) => Promise<void>;
   onAcceptInvitation: (invitationId: string) => Promise<void>;
   onRejectInvitation: (invitationId: string) => Promise<void>;
   onResetSeatAssignments: (tripId: string) => Promise<void>;
-  onSetSeatAssignment: (tripId: string, clientId: string, seat: { seatNumber?: number; seatId?: string }) => Promise<void>;
-  onClearSeatAssignment: (tripId: string, opts: { clientId?: string; seatId?: string }) => Promise<void>;
+  onSetSeatAssignment: (tripId: string, participantId: string, seat: { seatNumber?: number; seatId?: string }) => Promise<void>;
+  onClearSeatAssignment: (tripId: string, opts: { participantId?: string; clientId?: string; seatId?: string }) => Promise<void>;
   onUpdateTemplateSeatLabel?: (tripId: string, templateId: string, seatId: string, label: string) => Promise<void>;
   onLoadChangeLog: (tripId: string) => void;
   onLoadTripFinance: (tripId: string) => void;
@@ -239,8 +239,8 @@ export const TripList = ({
           onAddParticipants={async data => {
             await onAddParticipants(viewingTrip.id, data);
           }}
-          onRemoveParticipant={async clientId => {
-            await onRemoveParticipant(viewingTrip.id, clientId);
+          onRemoveParticipant={async participantId => {
+            await onRemoveParticipant(viewingTrip.id, participantId);
           }}
           onOpenSeatPicker={() => setSeatPickerTrip(viewingTrip)}
           onResetSeatAssignments={async () => await onResetSeatAssignments(viewingTrip.id)}

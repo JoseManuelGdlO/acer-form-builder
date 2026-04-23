@@ -693,7 +693,7 @@ class ApiClient {
 
   async addTripParticipants(
     tripId: string,
-    data: { clientIds?: string[] },
+    data: { clientIds?: string[]; companions?: { name: string; phone?: string }[] },
     token?: string | null
   ) {
     return this.request<any>(`/trips/${tripId}/participants`, {
@@ -704,8 +704,8 @@ class ApiClient {
     });
   }
 
-  async removeTripParticipant(tripId: string, clientId: string, token?: string | null) {
-    return this.request<{ message: string }>(`/trips/${tripId}/participants/${clientId}`, {
+  async removeTripParticipant(tripId: string, participantId: string, token?: string | null) {
+    return this.request<{ message: string }>(`/trips/${tripId}/participants/${participantId}`, {
       method: 'DELETE',
       token: token ?? this.getToken(),
       requireAuth: true,
@@ -714,7 +714,7 @@ class ApiClient {
 
   async setTripSeatAssignment(
     tripId: string,
-    data: { clientId: string; seatNumber?: number; seatId?: string },
+    data: { participantId?: string; clientId?: string; seatNumber?: number; seatId?: string },
     token?: string | null
   ) {
     const res = await this.request<any>(`/trips/${tripId}/seat-assignments`, {
@@ -736,10 +736,10 @@ class ApiClient {
 
   async clearTripSeatAssignment(
     tripId: string,
-    optsOrClientId: { clientId?: string; seatId?: string } | string,
+    optsOrClientId: { participantId?: string; clientId?: string; seatId?: string } | string,
     token?: string | null
   ) {
-    const opts = typeof optsOrClientId === 'string' ? { clientId: optsOrClientId } : optsOrClientId;
+    const opts = typeof optsOrClientId === 'string' ? { participantId: optsOrClientId } : optsOrClientId;
     if (opts.seatId) {
       return this.request<{ message: string }>(
         `/trips/${tripId}/seat-assignments/by-seat?seatId=${encodeURIComponent(opts.seatId)}`,
@@ -750,8 +750,9 @@ class ApiClient {
         }
       );
     }
-    if (!opts.clientId) throw new Error('clientId or seatId required');
-    return this.request<{ message: string }>(`/trips/${tripId}/seat-assignments/${opts.clientId}`, {
+    const id = opts.participantId ?? opts.clientId;
+    if (!id) throw new Error('participantId, clientId or seatId required');
+    return this.request<{ message: string }>(`/trips/${tripId}/seat-assignments/${id}`, {
       method: 'DELETE',
       token: token ?? this.getToken(),
       requireAuth: true,

@@ -83,6 +83,27 @@ async function logTripChange(
   });
 }
 
+async function resolveParticipantForTrip(
+  tripId: string,
+  ids: { participantId?: string; clientId?: string }
+): Promise<{ participant: TripParticipant; clientId: string | null } | null> {
+  if (ids.participantId) {
+    const participant = await TripParticipant.findOne({
+      where: { id: ids.participantId, tripId },
+    });
+    if (!participant) return null;
+    return { participant, clientId: participant.clientId ?? null };
+  }
+  if (ids.clientId) {
+    const participant = await TripParticipant.findOne({
+      where: { tripId, clientId: ids.clientId },
+    });
+    if (!participant) return null;
+    return { participant, clientId: participant.clientId ?? null };
+  }
+  return null;
+}
+
 export const getAllTrips = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     if (!requireTripPermission(req, res, 'trips.view')) return;
@@ -144,6 +165,7 @@ export const getTripById = async (req: AuthRequest, res: Response): Promise<void
             {
               model: Client,
               as: 'client',
+              required: false,
               include: [
                 { model: Company, as: 'company', attributes: ['id', 'name'] },
                 {
@@ -165,8 +187,14 @@ export const getTripById = async (req: AuthRequest, res: Response): Promise<void
             {
               model: Client,
               as: 'client',
+              required: false,
               include: [{ model: Company, as: 'company', attributes: ['id', 'name'] }],
               attributes: ['id', 'name', 'companyId'],
+            },
+            {
+              model: TripParticipant,
+              as: 'participant',
+              attributes: ['id', 'participantType', 'name', 'phone', 'clientId'],
             },
           ],
         },
@@ -185,6 +213,7 @@ export const getTripById = async (req: AuthRequest, res: Response): Promise<void
     // Strip totalAmountDue for participants from other companies; saldo pendiente solo para titulares
     if (j.participants) {
       j.participants = j.participants.map((p: any) => {
+        if (p.participantType === 'companion') return p;
         const client = p.client || {};
         if (client.companyId !== companyId && client.totalAmountDue !== undefined) {
           const out = { ...p };
@@ -215,6 +244,12 @@ export const getTripById = async (req: AuthRequest, res: Response): Promise<void
         );
       }
       j.participants = (j.participants as any[]).map((p: any) => {
+        if (p.participantType === 'companion') {
+          return {
+            ...p,
+            client: null,
+          };
+        }
         const c = p.client;
         if (!c || c.companyId !== companyId) return p;
         if (c.parentClientId) {
@@ -608,6 +643,9 @@ export const deleteTrip = async (req: AuthRequest, res: Response): Promise<void>
 export const addParticipants = [
   body('clientIds').optional().isArray(),
   body('clientIds.*').optional().isUUID(),
+  body('companions').optional().isArray(),
+  body('companions.*.name').optional().isString().trim().notEmpty(),
+  body('companions.*.phone').optional({ nullable: true }).isString().trim(),
   body('groupIds').optional().isArray(),
   body('groupIds.*').optional().isUUID(),
   async (req: AuthRequest, res: Response): Promise<void> => {
@@ -633,6 +671,7 @@ export const addParticipants = [
       const currentCount = await TripParticipant.count({ where: { tripId: id } });
       const totalSeats = (trip as any).totalSeats;
       const clientIds = Array.isArray(req.body.clientIds) ? req.body.clientIds : [];
+      const companions = Array.isArray(req.body.companions) ? req.body.companions : [];
       const groupIds = Array.isArray(req.body.groupIds) ? req.body.groupIds : [];
       let toAdd: string[] = [...clientIds];
       for (const gid of groupIds) {
@@ -677,15 +716,30 @@ export const addParticipants = [
       const existing = await TripParticipant.findAll({ where: { tripId: id }, attributes: ['clientId'] });
       const existingSet = new Set(existing.map(e => e.clientId));
       const newClients = toAdd.filter(cid => !existingSet.has(cid));
-      if (currentCount + newClients.length > totalSeats) {
+      const companionCount = companions.filter((c: any) => typeof c?.name === 'string' && c.name.trim()).length;
+      if (currentCount + newClients.length + companionCount > totalSeats) {
         res.status(400).json({ error: 'Se ha alcanzado el límite de plazas' });
         return;
       }
       for (const cid of newClients) {
-        await TripParticipant.create({ tripId: id, clientId: cid });
+        await TripParticipant.create({ tripId: id, clientId: cid, participantType: 'client' });
+      }
+      const createdCompanions: Array<{ name: string; phone: string | null }> = [];
+      for (const companion of companions) {
+        const name = typeof companion?.name === 'string' ? companion.name.trim() : '';
+        if (!name) continue;
+        const phone = typeof companion?.phone === 'string' ? companion.phone.trim() : '';
+        await TripParticipant.create({
+          tripId: id,
+          participantType: 'companion',
+          clientId: null,
+          name,
+          phone: phone || null,
+        });
+        createdCompanions.push({ name, phone: phone || null });
       }
       await logTripChange(id, req.user!.id, 'participant_added', {
-        newValue: JSON.stringify({ clientIds: newClients, groupIds }),
+        newValue: JSON.stringify({ clientIds: newClients, groupIds, companions: createdCompanions }),
       });
       const tripWithParticipants = await Trip.findByPk(id, {
         include: [
@@ -696,6 +750,7 @@ export const addParticipants = [
               {
                 model: Client,
                 as: 'client',
+                required: false,
                 include: [
                   { model: Company, as: 'company', attributes: ['id', 'name'] },
                   {
@@ -723,25 +778,29 @@ export const addParticipants = [
 export const removeParticipant = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     if (!requireTripPermission(req, res, 'trips.office_admin')) return;
-    const { id, clientId } = req.params;
+    const { id, participantId } = req.params;
     const companyId = req.user!.companyId;
     const inTrip = await ensureUserCompanyInTrip(req, id);
     if (!inTrip) {
       res.status(404).json({ error: 'Trip not found' });
       return;
     }
-    const participant = await TripParticipant.findOne({ where: { tripId: id, clientId } });
+    let participant = await TripParticipant.findOne({ where: { tripId: id, id: participantId } });
+    if (!participant) {
+      participant = await TripParticipant.findOne({ where: { tripId: id, clientId: participantId } });
+    }
     if (!participant) {
       res.status(404).json({ error: 'Participant not found' });
       return;
     }
-    const client = await Client.findByPk(clientId);
-    if (client && (client as any).companyId !== companyId) {
+    const clientId = participant.clientId;
+    const client = clientId ? await Client.findByPk(clientId) : null;
+    if (participant.participantType === 'client' && client && (client as any).companyId !== companyId) {
       res.status(403).json({ error: 'Solo puedes quitar participantes de tu compañía' });
       return;
     }
-    await TripSeatAssignment.destroy({ where: { tripId: id, clientId } });
-    const name = client ? (client as any).name : clientId;
+    await TripSeatAssignment.destroy({ where: { tripId: id, participantId: participant.id } });
+    const name = participant.participantType === 'companion' ? participant.name : client ? (client as any).name : clientId;
     await participant.destroy();
     await logTripChange(id, req.user!.id, 'participant_removed', { oldValue: name });
     res.json({ message: 'Participant removed' });
@@ -788,7 +847,8 @@ function seatIdExistsInLayout(layout: any, seatId: string): boolean {
 }
 
 export const setSeatAssignment = [
-  body('clientId').notEmpty().isUUID(),
+  body('participantId').optional().isUUID(),
+  body('clientId').optional().isUUID(),
   body('seatNumber').optional().isInt({ min: 1 }),
   body('seatId').optional().isString().trim().notEmpty(),
   async (req: AuthRequest, res: Response): Promise<void> => {
@@ -800,7 +860,17 @@ export const setSeatAssignment = [
         return;
       }
       const { id } = req.params;
-      const { clientId, seatNumber, seatId } = req.body;
+      const { participantId, clientId, seatNumber, seatId } = req.body;
+      if (!participantId && !clientId) {
+        res.status(400).json({ error: 'participantId or clientId is required' });
+        return;
+      }
+      const resolved = await resolveParticipantForTrip(id, { participantId, clientId });
+      if (!resolved) {
+        res.status(400).json({ error: 'Participant is not in trip' });
+        return;
+      }
+      const participant = resolved.participant;
       const inTrip = await ensureUserCompanyInTrip(req, id);
       if (!inTrip) {
         res.status(404).json({ error: 'Trip not found' });
@@ -827,12 +897,7 @@ export const setSeatAssignment = [
           return;
         }
       }
-      const isParticipant = await TripParticipant.findOne({ where: { tripId: id, clientId } });
-      if (!isParticipant) {
-        res.status(400).json({ error: 'Client is not a participant' });
-        return;
-      }
-      const existingByClient = await TripSeatAssignment.findOne({ where: { tripId: id, clientId } });
+      const existingByParticipant = await TripSeatAssignment.findOne({ where: { tripId: id, participantId: participant.id } });
       let existingBySeat: TripSeatAssignment | null = null;
       if (useSeatId) {
         existingBySeat = await TripSeatAssignment.findOne({ where: { tripId: id, seatId: String(seatId).trim() } });
@@ -840,16 +905,17 @@ export const setSeatAssignment = [
         existingBySeat = await TripSeatAssignment.findOne({ where: { tripId: id, seatNumber } });
       }
       let oldValue: string | null = null;
-      if (existingByClient) {
-        oldValue = existingByClient.seatId ?? (existingByClient.seatNumber != null ? String(existingByClient.seatNumber) : null);
-        await existingByClient.destroy();
+      if (existingByParticipant) {
+        oldValue = existingByParticipant.seatId ?? (existingByParticipant.seatNumber != null ? String(existingByParticipant.seatNumber) : null);
+        await existingByParticipant.destroy();
       }
-      if (existingBySeat && existingBySeat.clientId !== clientId) {
+      if (existingBySeat && existingBySeat.participantId !== participant.id) {
         await existingBySeat.destroy();
       }
-      const payload: { tripId: string; clientId: string; seatNumber?: number | null; seatId?: string | null } = {
+      const payload: { tripId: string; participantId: string; clientId?: string | null; seatNumber?: number | null; seatId?: string | null } = {
         tripId: id,
-        clientId,
+        participantId: participant.id,
+        clientId: participant.clientId ?? null,
       };
       if (useSeatId) {
         payload.seatId = String(seatId).trim();
@@ -860,7 +926,7 @@ export const setSeatAssignment = [
       }
       await TripSeatAssignment.create(payload as any);
       await logTripChange(id, req.user!.id, 'seat_assigned', {
-        entityId: clientId,
+        entityId: participant.id,
         oldValue,
         newValue: useSeatId ? String(seatId) : String(seatNumber),
       });
@@ -869,7 +935,10 @@ export const setSeatAssignment = [
           {
             model: TripSeatAssignment,
             as: 'seatAssignments',
-            include: [{ model: Client, as: 'client', include: [{ model: Company, as: 'company', attributes: ['id', 'name'] }] }],
+            include: [
+              { model: Client, as: 'client', required: false, include: [{ model: Company, as: 'company', attributes: ['id', 'name'] }] },
+              { model: TripParticipant, as: 'participant', attributes: ['id', 'participantType', 'name', 'phone', 'clientId'] },
+            ],
           },
         ],
       });
@@ -884,8 +953,9 @@ export const setSeatAssignment = [
 export const clearSeatAssignment = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     if (!requireTripPermission(req, res, 'trips.office_admin')) return;
-    const { id, clientId } = req.params;
+    const { id, participantId } = req.params;
     const seatId = (req.body?.seatId ?? req.query?.seatId) as string | undefined;
+    const clientId = (req.body?.clientId ?? req.query?.clientId) as string | undefined;
     const inTrip = await ensureUserCompanyInTrip(req, id);
     if (!inTrip) {
       res.status(404).json({ error: 'Trip not found' });
@@ -894,15 +964,20 @@ export const clearSeatAssignment = async (req: AuthRequest, res: Response): Prom
     let assignment: TripSeatAssignment | null;
     if (seatId != null && String(seatId).trim() !== '') {
       assignment = await TripSeatAssignment.findOne({ where: { tripId: id, seatId: String(seatId).trim() } });
+    } else if (participantId) {
+      assignment = await TripSeatAssignment.findOne({ where: { tripId: id, participantId } });
     } else if (clientId) {
       assignment = await TripSeatAssignment.findOne({ where: { tripId: id, clientId } });
     } else {
-      res.status(400).json({ error: 'clientId or seatId required' });
+      res.status(400).json({ error: 'participantId, clientId or seatId required' });
       return;
     }
     if (assignment) {
       const oldVal = assignment.seatId ?? (assignment.seatNumber != null ? String(assignment.seatNumber) : null);
-      await logTripChange(id, req.user!.id, 'seat_cleared', { oldValue: oldVal, entityId: assignment.clientId });
+      await logTripChange(id, req.user!.id, 'seat_cleared', {
+        oldValue: oldVal,
+        entityId: assignment.participantId ?? assignment.clientId ?? undefined,
+      });
       await assignment.destroy();
     }
     res.json({ message: 'Seat cleared' });

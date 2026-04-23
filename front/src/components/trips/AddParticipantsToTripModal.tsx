@@ -23,7 +23,7 @@ interface AddParticipantsToTripModalProps {
   availableClients: Client[];
   totalSeats: number;
   currentCount: number;
-  onAdd: (data: { clientIds?: string[] }) => Promise<void>;
+  onAdd: (data: { clientIds?: string[]; companions?: { name: string; phone?: string }[] }) => Promise<void>;
 }
 
 export const AddParticipantsToTripModal = ({
@@ -38,6 +38,7 @@ export const AddParticipantsToTripModal = ({
 }: AddParticipantsToTripModalProps) => {
   const [clientSearch, setClientSearch] = useState('');
   const [selectedClientIds, setSelectedClientIds] = useState<Set<string>>(new Set());
+  const [companions, setCompanions] = useState<Array<{ name: string; phone: string }>>([{ name: '', phone: '' }]);
   const [isLoading, setIsLoading] = useState(false);
 
   const currentSet = useMemo(() => new Set(currentParticipantIds), [currentParticipantIds]);
@@ -66,13 +67,15 @@ export const AddParticipantsToTripModal = ({
     });
   };
 
+  const validCompanions = companions.filter(c => c.name.trim());
   const countNewClients = selectedClientIds.size;
-  const wouldExceed = currentCount + countNewClients > totalSeats;
+  const countNewCompanions = validCompanions.length;
+  const wouldExceed = currentCount + countNewClients + countNewCompanions > totalSeats;
 
   const handleSubmit = async () => {
     const clientIds = Array.from(selectedClientIds);
-    if (clientIds.length === 0) {
-      toast.info('Selecciona al menos un cliente');
+    if (clientIds.length === 0 && validCompanions.length === 0) {
+      toast.info('Selecciona un cliente o captura al menos un acompañante');
       return;
     }
     if (wouldExceed) {
@@ -81,9 +84,13 @@ export const AddParticipantsToTripModal = ({
     }
     setIsLoading(true);
     try {
-      await onAdd({ clientIds: clientIds.length ? clientIds : undefined });
+      await onAdd({
+        clientIds: clientIds.length ? clientIds : undefined,
+        companions: validCompanions.length ? validCompanions : undefined,
+      });
       setSelectedClientIds(new Set());
       setClientSearch('');
+      setCompanions([{ name: '', phone: '' }]);
       onOpenChange(false);
       toast.success('Participantes agregados al viaje');
     } catch (err: any) {
@@ -134,9 +141,54 @@ export const AddParticipantsToTripModal = ({
             </ScrollArea>
           </div>
 
-          {countNewClients > 0 && (
+          <div className="space-y-2">
+            <Label>Acompañantes</Label>
+            <div className="space-y-2 max-h-[180px] overflow-y-auto pr-1">
+              {companions.map((companion, idx) => (
+                <div key={`companion-${idx}`} className="grid grid-cols-[1fr_1fr_auto] gap-2">
+                  <Input
+                    placeholder="Nombre del acompañante"
+                    value={companion.name}
+                    onChange={(e) =>
+                      setCompanions(prev =>
+                        prev.map((c, i) => (i === idx ? { ...c, name: e.target.value } : c))
+                      )
+                    }
+                  />
+                  <Input
+                    placeholder="Teléfono (opcional)"
+                    value={companion.phone}
+                    onChange={(e) =>
+                      setCompanions(prev =>
+                        prev.map((c, i) => (i === idx ? { ...c, phone: e.target.value } : c))
+                      )
+                    }
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() =>
+                      setCompanions(prev => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== idx)))
+                    }
+                    disabled={companions.length <= 1}
+                  >
+                    Quitar
+                  </Button>
+                </div>
+              ))}
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setCompanions(prev => [...prev, { name: '', phone: '' }])}
+            >
+              Agregar acompañante
+            </Button>
+          </div>
+
+          {(countNewClients > 0 || countNewCompanions > 0) && (
             <p className="text-sm text-muted-foreground">
-              Se agregarán {countNewClients} participante(s). Total: {currentCount + countNewClients}/{totalSeats}.
+              Se agregarán {countNewClients + countNewCompanions} participante(s). Total: {currentCount + countNewClients + countNewCompanions}/{totalSeats}.
               {wouldExceed && (
                 <span className="text-destructive block mt-1">Supera el límite de plazas.</span>
               )}
@@ -148,7 +200,7 @@ export const AddParticipantsToTripModal = ({
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
             Cancelar
           </Button>
-          <Button type="button" onClick={handleSubmit} disabled={isLoading || selectedClientIds.size === 0 || wouldExceed}>
+          <Button type="button" onClick={handleSubmit} disabled={isLoading || wouldExceed}>
             {isLoading ? 'Agregando...' : 'Agregar'}
           </Button>
         </DialogFooter>

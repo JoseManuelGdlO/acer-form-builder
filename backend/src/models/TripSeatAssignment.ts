@@ -4,7 +4,8 @@ import sequelize from '../config/database';
 interface TripSeatAssignmentAttributes {
   id: string;
   tripId: string;
-  clientId: string;
+  clientId: string | null;
+  participantId: string | null;
   seatNumber: number | null;
   seatId: string | null;
   createdAt?: Date;
@@ -15,7 +16,8 @@ interface TripSeatAssignmentCreationAttributes extends Optional<TripSeatAssignme
 export class TripSeatAssignment extends Model<TripSeatAssignmentAttributes, TripSeatAssignmentCreationAttributes> implements TripSeatAssignmentAttributes {
   public id!: string;
   public tripId!: string;
-  public clientId!: string;
+  public clientId!: string | null;
+  public participantId!: string | null;
   public seatNumber!: number | null;
   public seatId!: string | null;
   public readonly createdAt!: Date;
@@ -36,8 +38,14 @@ TripSeatAssignment.init(
     },
     clientId: {
       type: DataTypes.UUID,
-      allowNull: false,
+      allowNull: true,
       references: { model: 'clients', key: 'id' },
+      onDelete: 'CASCADE',
+    },
+    participantId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      references: { model: 'trip_participants', key: 'id' },
       onDelete: 'CASCADE',
     },
     seatNumber: {
@@ -59,6 +67,11 @@ TripSeatAssignment.init(
       {
         unique: true,
         fields: ['trip_id', 'client_id'],
+      },
+      {
+        unique: true,
+        fields: ['trip_id', 'participant_id'],
+        name: 'trip_seat_assignments_trip_participant_unique',
       },
       {
         unique: true,

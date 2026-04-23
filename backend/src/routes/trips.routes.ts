@@ -16,9 +16,10 @@ router.post('/', tripsController.createTrip);
 router.put('/:id', tripsController.updateTrip);
 router.delete('/:id', tripsController.deleteTrip);
 router.post('/:id/participants', tripsController.addParticipants);
-router.delete('/:id/participants/:clientId', tripsController.removeParticipant);
+router.delete('/:id/participants/:participantId', tripsController.removeParticipant);
 router.post('/:id/seat-assignments', tripsController.setSeatAssignment);
 router.delete('/:id/seat-assignments', tripsController.resetSeatAssignments);
-router.delete('/:id/seat-assignments/:clientId', tripsController.clearSeatAssignment);
+router.delete('/:id/seat-assignments/by-seat', tripsController.clearSeatAssignment);
+router.delete('/:id/seat-assignments/:participantId', tripsController.clearSeatAssignment);
 
 export default router;

@@ -73,8 +73,8 @@ interface TripDetailViewProps {
   onBack: () => void;
   onEdit: (trip: Trip) => void;
   onDelete: (tripId: string) => Promise<void>;
-  onAddParticipants: (data: { clientIds?: string[] }) => Promise<void>;
-  onRemoveParticipant: (clientId: string) => Promise<void>;
+  onAddParticipants: (data: { clientIds?: string[]; companions?: { name: string; phone?: string }[] }) => Promise<void>;
+  onRemoveParticipant: (participantId: string) => Promise<void>;
   onOpenSeatPicker: () => void;
   onResetSeatAssignments: () => Promise<void>;
   onLoadChangeLog: () => void;
@@ -180,6 +180,14 @@ export const TripDetailView = ({
         const c = p.client;
         if (!c) return false;
         const q = memberSearch.toLowerCase();
+        const companionName = p.companion?.name ?? '';
+        const companionPhone = p.companion?.phone ?? '';
+        if (!c) {
+          return (
+            companionName.toLowerCase().includes(q) ||
+            companionPhone.includes(memberSearch)
+          );
+        }
         const branchName = c.assignedUser?.branch?.name ?? '';
         const advisorName = c.assignedUser?.name ?? '';
         return (
@@ -460,7 +468,8 @@ export const TripDetailView = ({
       } else {
         participants.forEach((p, index) => {
           const c = p.client;
-          const name = c?.name ?? p.clientId;
+          const isCompanion = p.participantType === 'companion';
+          const name = isCompanion ? (p.companion?.name ?? 'Acompañante') : (c?.name ?? p.clientId);
           const company = c?.company?.name ? ` · ${c.company.name}` : '';
           const office = c?.assignedUser?.branch?.name
             ? ` · Oficina: ${c.assignedUser.branch.name}`
@@ -472,8 +481,9 @@ export const TripDetailView = ({
             writeLine(`Correo: ${email}`, { indent: 24 });
           }
           const phone = c?.phone?.trim();
-          if (phone) {
-            writeLine(`Tel.: ${phone}`, { indent: 24 });
+          const companionPhone = p.companion?.phone?.trim();
+          if (phone || companionPhone) {
+            writeLine(`Tel.: ${phone ?? companionPhone}`, { indent: 24 });
           }
         });
       }
@@ -496,7 +506,7 @@ export const TripDetailView = ({
         });
         assignments.forEach((a, index) => {
           const label = a.seatId ? getSeatLabelById(a.seatId) : String(a.seatNumber ?? '—');
-          const clientName = a.client?.name ?? a.clientId;
+          const clientName = a.client?.name ?? a.participant?.name ?? a.clientId ?? a.participantId ?? '—';
           writeLine(`${index + 1}. Asiento ${label} -> ${clientName}`, { indent: 18 });
         });
       }
@@ -882,10 +892,11 @@ export const TripDetailView = ({
                 <ul className="divide-y">
                   {filteredParticipants.map(p => {
                     const c = p.client;
-                    if (!c) return null;
+                    const isCompanion = p.participantType === 'companion';
+                    if (!c && !isCompanion) return null;
                     const rowNumber = participants.indexOf(p) + 1;
-                    const childInGroup = isParticipantChildInTrip(c, participantIdSet);
-                    const coId = c.company?.id;
+                    const childInGroup = c ? isParticipantChildInTrip(c, participantIdSet) : false;
+                    const coId = c?.company?.id;
                     const coColors = coId ? companyColorById.get(coId) : undefined;
                     return (
                       <li
@@ -922,8 +933,11 @@ export const TripDetailView = ({
                                 F
                               </span>
                             )}
-                            <p className="font-medium truncate">{c.name}</p>
-                            {c.company && (
+                            <p className="font-medium truncate">{isCompanion ? p.companion?.name : c.name}</p>
+                            {isCompanion && (
+                              <Badge variant="secondary" className="text-xs">Acompañante</Badge>
+                            )}
+                            {!isCompanion && c?.company && (
                               <Badge
                                 variant="outline"
                                 className="text-xs shrink-0 font-medium"
@@ -942,13 +956,13 @@ export const TripDetailView = ({
                             )}
                           </div>
                           <div className="flex items-center gap-x-3 gap-y-1 text-sm text-muted-foreground flex-wrap mt-0.5">
-                            {c.assignedUser?.branch?.name && (
+                            {c?.assignedUser?.branch?.name && (
                               <span className="flex items-center gap-1 min-w-0">
                                 <MapPinned className="w-3.5 h-3.5 shrink-0" />
                                 <span className="truncate">Oficina: {c.assignedUser.branch.name}</span>
                               </span>
                             )}
-                            {c.assignedUser?.name && (
+                            {c?.assignedUser?.name && (
                               <span className="flex items-center gap-1 min-w-0">
                                 <UserCircle className="w-3.5 h-3.5 shrink-0" />
                                 <span className="truncate">Asesor: {c.assignedUser.name}</span>
@@ -956,25 +970,25 @@ export const TripDetailView = ({
                             )}
                           </div>
                           <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
-                            {c.email && (
+                            {c?.email && (
                               <span className="flex items-center gap-1 truncate">
                                 <Mail className="w-3.5 h-3.5 shrink-0" />
-                                {c.email}
+                                {c?.email}
                               </span>
                             )}
-                            {c.tripBalanceDue != null &&
-                              c.tripBalanceDue !== undefined &&
-                              Number(c.tripBalanceDue) > 0 && (
+                            {c?.tripBalanceDue != null &&
+                              c?.tripBalanceDue !== undefined &&
+                              Number(c?.tripBalanceDue) > 0 && (
                                 <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
                                   <DollarSign className="w-3.5 h-3.5" />
-                                  Pendiente: ${Number(c.tripBalanceDue).toLocaleString()}
+                                  Pendiente: ${Number(c?.tripBalanceDue).toLocaleString()}
                                 </span>
                               )}
                           </div>
-                          {c.phone?.trim() && (
+                          {(isCompanion ? p.companion?.phone?.trim() : c.phone?.trim()) && (
                             <div className="flex items-center gap-1 text-sm text-muted-foreground mt-0.5 min-w-0">
                               <Phone className="w-3.5 h-3.5 shrink-0" />
-                              <span className="truncate">{c.phone.trim()}</span>
+                              <span className="truncate">{isCompanion ? p.companion?.phone?.trim() : c.phone.trim()}</span>
                             </div>
                           )}
                         </div>
@@ -983,7 +997,7 @@ export const TripDetailView = ({
                             variant="ghost"
                             size="sm"
                             className="text-destructive hover:text-destructive shrink-0"
-                            onClick={() => onRemoveParticipant(c.id)}
+                            onClick={() => onRemoveParticipant(p.id)}
                           >
                             Quitar
                           </Button>

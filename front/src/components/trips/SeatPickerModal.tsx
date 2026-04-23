@@ -32,8 +32,8 @@ interface SeatPickerModalProps {
   trip: Trip;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onAssign: (clientId: string, seat: { seatNumber?: number; seatId?: string }) => Promise<void>;
-  onClear: (opts: { clientId?: string; seatId?: string }) => Promise<void>;
+  onAssign: (participantId: string, seat: { seatNumber?: number; seatId?: string }) => Promise<void>;
+  onClear: (opts: { participantId?: string; clientId?: string; seatId?: string }) => Promise<void>;
   onReset: () => Promise<void>;
   onUpdateTemplateSeatLabel?: (tripId: string, templateId: string, seatId: string, label: string) => Promise<void>;
   /** Revisor: solo asignar asientos, sin quitar ni reiniciar */
@@ -83,7 +83,7 @@ export function SeatPickerModal({
   const participantsWithoutSeat = useMemo(
     () =>
       (trip.participants ?? []).filter(
-        (p) => !seatAssignments.some((s) => s.clientId === p.clientId)
+        (p) => !seatAssignments.some((s) => (s.participantId ?? s.clientId) === p.id)
       ),
     [trip.participants, seatAssignments]
   );
@@ -99,11 +99,11 @@ export function SeatPickerModal({
     setPendingSeatNumber(null);
   };
 
-  const handleAssign = async (clientId: string) => {
+  const handleAssign = async (participantId: string) => {
     if (pendingSeatId) {
       setAssigning(true);
       try {
-        await onAssign(clientId, { seatId: pendingSeatId });
+        await onAssign(participantId, { seatId: pendingSeatId });
         setPendingSeatId(null);
       } finally {
         setAssigning(false);
@@ -113,7 +113,7 @@ export function SeatPickerModal({
     if (pendingSeatNumber != null) {
       setAssigning(true);
       try {
-        await onAssign(clientId, { seatNumber: pendingSeatNumber });
+        await onAssign(participantId, { seatNumber: pendingSeatNumber });
         setPendingSeatNumber(null);
       } finally {
         setAssigning(false);
@@ -121,7 +121,7 @@ export function SeatPickerModal({
     }
   };
 
-  const handleClear = async (opts: { clientId?: string; seatId?: string }) => {
+  const handleClear = async (opts: { participantId?: string; clientId?: string; seatId?: string }) => {
     try {
       await onClear(opts);
     } catch (_) {}
@@ -230,15 +230,15 @@ export function SeatPickerModal({
                         <li className="text-sm text-muted-foreground">Todos tienen asiento.</li>
                       ) : (
                         participantsWithoutSeat.map((p) => (
-                          <li key={p.clientId}>
+                          <li key={p.id}>
                             <Button
                               variant="ghost"
                               size="sm"
                               className="w-full justify-start gap-2"
-                              onClick={() => handleAssign(p.clientId)}
+                              onClick={() => handleAssign(p.id)}
                               disabled={assigning}
                             >
-                              {p.client?.name ?? p.clientId}
+                              {p.client?.name ?? p.companion?.name ?? p.id}
                               {p.client?.company && (
                                 <span className="text-muted-foreground text-xs">({p.client.company.name})</span>
                               )}
@@ -251,7 +251,7 @@ export function SeatPickerModal({
                   {pendingSeatId && assignmentBySeatId[pendingSeatId] && (
                     <div className="text-sm flex items-center gap-2 flex-wrap">
                       <span className="text-muted-foreground">Asignado a: </span>
-                      <span>{(assignmentBySeatId[pendingSeatId] as any)?.client?.name ?? assignmentBySeatId[pendingSeatId].clientId}</span>
+                      <span>{(assignmentBySeatId[pendingSeatId] as any)?.client?.name ?? assignmentBySeatId[pendingSeatId].participant?.name ?? assignmentBySeatId[pendingSeatId].clientId}</span>
                       {!reviewerSeatMode && (
                         <Button
                           variant="ghost"
@@ -287,9 +287,9 @@ export function SeatPickerModal({
                         })()
                       : seatLabel(a.seatNumber!);
                     return (
-                      <li key={(a as any).id ?? a.clientId + (a.seatId ?? a.seatNumber)} className="flex items-center justify-between gap-2 text-sm">
+                      <li key={(a as any).id ?? (a.participantId ?? a.clientId) + (a.seatId ?? a.seatNumber)} className="flex items-center justify-between gap-2 text-sm">
                         <span>
-                          Asiento {label}: {(a as any).client?.name ?? a.clientId}
+                          Asiento {label}: {(a as any).client?.name ?? a.participant?.name ?? a.clientId}
                           {(a as any).client?.company && (
                             <span className="text-muted-foreground text-xs ml-1">({(a as any).client.company.name})</span>
                           )}
@@ -393,15 +393,15 @@ export function SeatPickerModal({
                       <li className="text-sm text-muted-foreground">Todos tienen asiento.</li>
                     ) : (
                       participantsWithoutSeat.map((p) => (
-                        <li key={p.clientId}>
+                        <li key={p.id}>
                           <Button
                             variant="ghost"
                             size="sm"
                             className="w-full justify-start gap-2"
-                            onClick={() => handleAssign(p.clientId)}
+                            onClick={() => handleAssign(p.id)}
                             disabled={assigning}
                           >
-                            {p.client?.name ?? p.clientId}
+                            {p.client?.name ?? p.companion?.name ?? p.id}
                             {p.client?.company && (
                               <span className="text-muted-foreground text-xs">({p.client.company.name})</span>
                             )}
@@ -426,9 +426,9 @@ export function SeatPickerModal({
                   .filter((a) => a.seatNumber != null)
                   .sort((a, b) => (a.seatNumber ?? 0) - (b.seatNumber ?? 0))
                   .map((a) => (
-                    <li key={a.clientId + (a.seatNumber ?? '')} className="flex items-center justify-between gap-2 text-sm">
+                    <li key={(a.participantId ?? a.clientId) + (a.seatNumber ?? '')} className="flex items-center justify-between gap-2 text-sm">
                       <span>
-                        Asiento {seatLabel(a.seatNumber!)}: {(a as any).client?.name ?? a.clientId}
+                        Asiento {seatLabel(a.seatNumber!)}: {(a as any).client?.name ?? a.participant?.name ?? a.clientId}
                         {(a as any).client?.company && (
                           <span className="text-muted-foreground text-xs ml-1">({(a as any).client.company.name})</span>
                         )}
@@ -438,7 +438,7 @@ export function SeatPickerModal({
                           variant="ghost"
                           size="sm"
                           className="shrink-0 text-destructive hover:text-destructive"
-                          onClick={() => handleClear({ clientId: a.clientId })}
+                          onClick={() => handleClear({ participantId: a.participantId, clientId: a.clientId ?? undefined })}
                         >
                           <UserMinus className="w-3.5 h-3.5" />
                         </Button>

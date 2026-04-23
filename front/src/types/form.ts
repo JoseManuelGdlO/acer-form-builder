@@ -327,9 +327,17 @@ export interface TripParticipantClient extends Omit<Client, 'assignedUser'> {
 
 export interface TripSeatAssignmentEntry {
   id?: string;
-  clientId: string;
+  participantId?: string;
+  clientId?: string | null;
   seatNumber?: number | null;
   seatId?: string | null;
+  participant?: {
+    id: string;
+    participantType: 'client' | 'companion';
+    name?: string | null;
+    phone?: string | null;
+    clientId?: string | null;
+  };
   client?: Client & { company?: { id: string; name: string } };
 }
 
@@ -400,7 +408,13 @@ export interface Trip {
   busTemplate?: BusTemplate | null;
   assignedUserId?: string | null;
   sharedCompanies?: { id: string; name: string }[];
-  participants?: { id: string; clientId: string; client?: TripParticipantClient }[];
+  participants?: {
+    id: string;
+    participantType?: 'client' | 'companion';
+    clientId?: string | null;
+    companion?: { name: string; phone?: string | null };
+    client?: TripParticipantClient | null;
+  }[];
   seatAssignments?: TripSeatAssignmentEntry[];
   participantCount?: number;
   createdAt?: string;

@@ -254,6 +254,8 @@ Trip.hasMany(TripSeatAssignment, { foreignKey: 'tripId', as: 'seatAssignments' }
 TripSeatAssignment.belongsTo(Trip, { foreignKey: 'tripId', as: 'trip' });
 TripSeatAssignment.belongsTo(Client, { foreignKey: 'clientId', as: 'client' });
 Client.hasMany(TripSeatAssignment, { foreignKey: 'clientId', as: 'tripSeatAssignments' });
+TripSeatAssignment.belongsTo(TripParticipant, { foreignKey: 'participantId', as: 'participant' });
+TripParticipant.hasMany(TripSeatAssignment, { foreignKey: 'participantId', as: 'seatAssignments' });
 
 Trip.hasMany(TripChangeLog, { foreignKey: 'tripId', as: 'changeLog' });
 TripChangeLog.belongsTo(Trip, { foreignKey: 'tripId', as: 'trip' });
