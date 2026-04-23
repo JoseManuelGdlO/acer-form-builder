@@ -51,7 +51,7 @@ export const PdfMappingModal = ({ open, onOpenChange, question, template, value,
   }, [open, value, question.type]);
 
   useEffect(() => {
-    if (!open || !canvasRef.current || !template?.fileUrl) return;
+    if (!open || !template?.fileUrl) return;
     let cancelled = false;
     const render = async () => {
       setIsRendering(true);
@@ -70,15 +70,45 @@ export const PdfMappingModal = ({ open, onOpenChange, question, template, value,
         const loadingTask = (pdfjsLib as any).getDocument({ data: bytes });
         const pdf = await loadingTask.promise;
         const page = await pdf.getPage(currentPage);
-        const viewport = page.getViewport({ scale: 1.2 });
+        const viewport = page.getViewport({ scale: 1 });
         if (cancelled) return;
-        const canvas = canvasRef.current!;
+        const canvas = canvasRef.current;
+        if (!canvas) {
+          requestAnimationFrame(() => {
+            if (!cancelled) render();
+          });
+          return;
+        }
         const context = canvas.getContext('2d');
         if (!context) return;
         canvas.width = viewport.width;
         canvas.height = viewport.height;
         context.clearRect(0, 0, canvas.width, canvas.height);
         await page.render({ canvasContext: context, viewport }).promise;
+
+        // Draw overlays for all placements of the current page.
+        const currentPagePlacements = placements.filter((p) => p.page === currentPage);
+        for (const p of currentPagePlacements) {
+          context.save();
+          context.strokeStyle = '#eab308';
+          context.lineWidth = 2;
+          context.setLineDash([6, 4]);
+          context.strokeRect(p.x, p.y, p.width, p.height);
+          context.setLineDash([]);
+          context.fillStyle = 'rgba(234,179,8,0.14)';
+          context.fillRect(p.x, p.y, p.width, p.height);
+
+          // Crosshair marker for anchor point.
+          context.strokeStyle = '#ef4444';
+          context.lineWidth = 1.5;
+          context.beginPath();
+          context.moveTo(p.x - 6, p.y);
+          context.lineTo(p.x + 6, p.y);
+          context.moveTo(p.x, p.y - 6);
+          context.lineTo(p.x, p.y + 6);
+          context.stroke();
+          context.restore();
+        }
       } catch (error) {
         console.error('Error rendering PDF page:', error);
         setRenderError(error instanceof Error ? error.message : 'Error desconocido al renderizar PDF');
@@ -90,7 +120,7 @@ export const PdfMappingModal = ({ open, onOpenChange, question, template, value,
     return () => {
       cancelled = true;
     };
-  }, [open, currentPage, template?.fileUrl]);
+  }, [open, currentPage, template?.fileUrl, template?.formId, placements]);
 
   const activePlacement = useMemo(
     () => placements.find((p) => p.page === currentPage) ?? placements[0],
@@ -105,8 +135,10 @@ export const PdfMappingModal = ({ open, onOpenChange, question, template, value,
   const handleCanvasClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
     if (!activePlacement) return;
     const rect = event.currentTarget.getBoundingClientRect();
-    const x = Math.max(0, Math.round(event.clientX - rect.left));
-    const y = Math.max(0, Math.round(event.clientY - rect.top));
+    const scaleX = event.currentTarget.width / rect.width;
+    const scaleY = event.currentTarget.height / rect.height;
+    const x = Math.max(0, Math.round((event.clientX - rect.left) * scaleX));
+    const y = Math.max(0, Math.round((event.clientY - rect.top) * scaleY));
     updatePlacement({ x, y, page: currentPage });
   };
 
