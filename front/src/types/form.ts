@@ -47,6 +47,27 @@ export interface Question {
    * según la respuesta de otras preguntas.
    */
   visibility?: QuestionVisibility;
+  pdfMapping?: QuestionPdfMapping;
+}
+
+export type PdfFieldMode = 'text' | 'checkbox' | 'image' | 'attachment_link' | 'attachment_embed';
+export type PdfFieldAlign = 'left' | 'center' | 'right';
+
+export interface QuestionPdfPlacement {
+  id: string;
+  page: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  fontSize?: number;
+  align?: PdfFieldAlign;
+  mode: PdfFieldMode;
+}
+
+export interface QuestionPdfMapping {
+  templateId: string;
+  placements: QuestionPdfPlacement[];
 }
 
 export interface FormSection {
@@ -61,8 +82,19 @@ export interface Form {
   name: string;
   description?: string;
   sections: FormSection[];
+  pdfTemplateId?: string | null;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface PdfTemplate {
+  id: string;
+  formId: string;
+  fileName: string;
+  fileUrl: string;
+  pageCount: number;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export const QUESTION_TYPE_CONFIG: Record<QuestionType, { label: string; icon: string; description: string }> = {

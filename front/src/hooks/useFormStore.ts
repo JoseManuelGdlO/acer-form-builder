@@ -36,6 +36,7 @@ export const useFormStore = () => {
       name: formData.name,
       description: formData.description || '',
       sections,
+      pdfTemplateId: formData.pdfTemplateId ?? formData.pdf_template_id ?? null,
       createdAt: formData.created_at ? new Date(formData.created_at) : new Date(formData.createdAt || Date.now()),
       updatedAt: formData.updated_at ? new Date(formData.updated_at) : new Date(formData.updatedAt || Date.now()),
     };

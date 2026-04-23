@@ -107,6 +107,26 @@ class ApiClient {
     }
   }
 
+  private async requestBlob(
+    endpoint: string,
+    options: RequestOptions = {}
+  ): Promise<Blob> {
+    const { token, requireAuth = false, ...fetchOptions } = options;
+    const isFormData = fetchOptions.body instanceof FormData;
+    const headers: HeadersInit = {
+      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
+      ...fetchOptions.headers,
+    };
+    const authToken = token !== undefined ? token : (requireAuth ? this.getToken() : null);
+    if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+    const response = await fetch(`${this.baseURL}${endpoint}`, { ...fetchOptions, headers });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+      throw new Error(error.error || `HTTP error! status: ${response.status}`);
+    }
+    return response.blob();
+  }
+
   // Auth
   async login(email: string, password: string) {
     return this.request<{ token: string; user: any }>('/auth/login', {
@@ -914,6 +934,50 @@ class ApiClient {
       token: token ?? this.getToken(),
       requireAuth: true,
       body: JSON.stringify(formData),
+    });
+  }
+
+  async getFormPdfTemplate(formId: string, token?: string | null) {
+    const data = await this.request<any>(`/forms/${formId}/pdf-template`, {
+      method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+    if (data?.fileUrl?.startsWith('/')) {
+      data.fileUrl = `${this.baseURL.replace('/api', '')}${data.fileUrl}`;
+    }
+    return data;
+  }
+
+  async uploadFormPdfTemplate(formId: string, template: File, token?: string | null) {
+    const formData = new FormData();
+    formData.append('template', template);
+    const data = await this.request<any>(`/forms/${formId}/pdf-template`, {
+      method: 'POST',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+      body: formData as unknown as BodyInit,
+      headers: {},
+    });
+    if (data?.fileUrl?.startsWith('/')) {
+      data.fileUrl = `${this.baseURL.replace('/api', '')}${data.fileUrl}`;
+    }
+    return data;
+  }
+
+  async downloadFormPdfPreview(formId: string, token?: string | null) {
+    return this.requestBlob(`/forms/${formId}/pdf-preview`, {
+      method: 'POST',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async downloadSubmissionPdf(submissionId: string, token?: string | null) {
+    return this.requestBlob(`/submissions/${submissionId}/pdf`, {
+      method: 'POST',
+      token: token ?? this.getToken(),
+      requireAuth: true,
     });
   }
 

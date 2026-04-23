@@ -6,7 +6,7 @@ import {
   SortableContext,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import { FormSection, Question, QuestionType, QUESTION_TYPE_CONFIG } from '@/types/form';
+import { FormSection, Question, QuestionType, QUESTION_TYPE_CONFIG, PdfTemplate } from '@/types/form';
 import { QuestionCard } from './QuestionCard';
 import { QuestionTypeIcon } from './QuestionTypeIcon';
 import { Input } from '@/components/ui/input';
@@ -46,6 +46,7 @@ interface SectionCardProps {
    * Lista completa de preguntas del formulario (para configurar dependencias).
    */
   allQuestions: Question[];
+  pdfTemplate?: PdfTemplate | null;
 }
 
 export const SectionCard = ({
@@ -64,6 +65,7 @@ export const SectionCard = ({
   onReorderQuestions,
   canDelete,
   allQuestions,
+  pdfTemplate,
 }: SectionCardProps) => {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
 
@@ -205,6 +207,7 @@ export const SectionCard = ({
                   onUpdate={updates => onUpdateQuestion(question.id, updates)}
                   onDelete={() => onDeleteQuestion(question.id)}
                   allQuestions={allQuestions}
+                  pdfTemplate={pdfTemplate}
                 />
               ))}
             </div>

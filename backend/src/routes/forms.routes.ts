@@ -2,6 +2,7 @@ import { Router } from 'express';
 import * as formsController from '../controllers/forms.controller';
 import * as formSessionsController from '../controllers/form-sessions.controller';
 import * as submissionsController from '../controllers/submissions.controller';
+import * as pdfController from '../controllers/pdf.controller';
 import { authenticate } from '../middleware/auth.middleware';
 import { requireAnyPermission } from '../middleware/permission.middleware';
 
@@ -19,6 +20,9 @@ router.post('/:id/sessions/:sessionId/complete', formSessionsController.complete
 router.get('/:id/sessions/:sessionId/submission', submissionsController.getSubmissionBySession);
 router.post('/:id/sessions/:sessionId/submission', ...submissionsController.createSubmissionFromSession);
 router.patch('/:id/sessions/:sessionId/submission', ...submissionsController.updateSubmissionFromSession);
+router.get('/:id/pdf-template', authenticate, pdfController.getPdfTemplateByForm);
+router.post('/:id/pdf-template', authenticate, requireAnyPermission('forms.update'), ...pdfController.uploadPdfTemplate);
+router.post('/:id/pdf-preview', authenticate, requireAnyPermission('forms.update'), pdfController.renderFormPdfPreview);
 router.get('/:id', formsController.getFormById);
 
 // Protected routes (write - admin only)

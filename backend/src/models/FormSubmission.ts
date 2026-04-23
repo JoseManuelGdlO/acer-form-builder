@@ -12,7 +12,7 @@ interface FormSubmissionAttributes {
   respondentEmail?: string;
   respondentPhone?: string;
   status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
-  answers: Record<string, string | string[]>;
+  answers: Record<string, unknown>;
   clientId?: string;
   submittedAt?: Date;
   updatedAt?: Date;
@@ -30,7 +30,7 @@ export class FormSubmission extends Model<FormSubmissionAttributes, FormSubmissi
   public respondentEmail?: string;
   public respondentPhone?: string;
   public status!: 'pending' | 'in_progress' | 'completed' | 'cancelled';
-  public answers!: Record<string, string | string[]>;
+  public answers!: Record<string, unknown>;
   public clientId?: string;
   public submittedAt!: Date;
   public readonly createdAt!: Date;

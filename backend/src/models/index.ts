@@ -43,6 +43,7 @@ import { InternalAppointment } from './InternalAppointment';
 import { InternalAppointmentHistory } from './InternalAppointmentHistory';
 import { WhatsappIntegration } from './WhatsappIntegration';
 import { StaffMember } from './StaffMember';
+import { PdfTemplate } from './PdfTemplate';
 
 // Company relationships (multi-tenant)
 Company.hasMany(User, { foreignKey: 'companyId', as: 'users' });
@@ -55,6 +56,8 @@ Company.hasMany(Client, { foreignKey: 'companyId', as: 'clients' });
 Client.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
 Company.hasMany(Form, { foreignKey: 'companyId', as: 'forms' });
 Form.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+Company.hasMany(PdfTemplate, { foreignKey: 'companyId', as: 'pdfTemplates' });
+PdfTemplate.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
 Company.hasMany(FormSubmission, { foreignKey: 'companyId', as: 'submissions' });
 FormSubmission.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
 Company.hasMany(FormSession, { foreignKey: 'companyId', as: 'sessions' });
@@ -293,6 +296,8 @@ FormSession.belongsTo(Client, { foreignKey: 'clientId', as: 'client' });
 
 Form.hasMany(FormSubmission, { foreignKey: 'formId', as: 'submissions' });
 FormSubmission.belongsTo(Form, { foreignKey: 'formId', as: 'form' });
+Form.hasMany(PdfTemplate, { foreignKey: 'formId', as: 'pdfTemplates' });
+PdfTemplate.belongsTo(Form, { foreignKey: 'formId', as: 'form' });
 
 // Checklist relationships
 ChecklistTemplate.hasMany(ClientChecklist, { foreignKey: 'templateId', as: 'clientChecklists' });
@@ -344,4 +349,5 @@ export {
   InternalAppointmentHistory,
   WhatsappIntegration,
   StaffMember,
+  PdfTemplate,
 };

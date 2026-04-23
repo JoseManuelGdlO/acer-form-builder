@@ -15,6 +15,7 @@ function cloneFormSectionsWithNewIds(sections: unknown): unknown[] {
     if (Array.isArray(questions)) {
       newSection.questions = questions.map((q: Record<string, unknown>) => {
         const newQ: Record<string, unknown> = { ...q, id: randomUUID() };
+        delete newQ.pdfMapping;
         const opts = q.options;
         if (Array.isArray(opts)) {
           newQ.options = opts.map((o: Record<string, unknown>) => ({
@@ -104,6 +105,7 @@ export const duplicateForm = async (req: AuthRequest, res: Response): Promise<vo
       name: `${baseName} (copia)`,
       description: source.description,
       sections: sections as any,
+      pdfTemplateId: null,
     });
     res.status(201).json(form);
   } catch (error) {

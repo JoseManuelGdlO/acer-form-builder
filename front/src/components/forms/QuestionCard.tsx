@@ -1,7 +1,8 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, Trash2, Plus } from 'lucide-react';
-import { Question, QUESTION_TYPE_CONFIG, QuestionVisibility, QuestionVisibilityMode } from '@/types/form';
+import { useState } from 'react';
+import { GripVertical, Trash2, Plus, MapPinned } from 'lucide-react';
+import { Question, QUESTION_TYPE_CONFIG, QuestionVisibility, QuestionVisibilityMode, PdfTemplate } from '@/types/form';
 import { QuestionTypeIcon } from './QuestionTypeIcon';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -16,6 +17,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { PdfMappingModal } from './PdfMappingModal';
 
 interface QuestionCardProps {
   question: Question;
@@ -23,9 +25,11 @@ interface QuestionCardProps {
   onUpdate: (updates: Partial<Question>) => void;
   onDelete: () => void;
   allQuestions: Question[];
+  pdfTemplate?: PdfTemplate | null;
 }
 
-export const QuestionCard = ({ question, sectionId, onUpdate, onDelete, allQuestions }: QuestionCardProps) => {
+export const QuestionCard = ({ question, sectionId, onUpdate, onDelete, allQuestions, pdfTemplate }: QuestionCardProps) => {
+  const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
   const {
     attributes,
     listeners,
@@ -386,12 +390,26 @@ export const QuestionCard = ({ question, sectionId, onUpdate, onDelete, allQuest
 
           {/* Footer */}
           <div className="flex items-center justify-between pt-2 border-t border-border">
-            <div className="flex items-center gap-2">
-              <Switch
-                checked={question.required}
-                onCheckedChange={checked => onUpdate({ required: checked })}
-              />
-              <span className="text-sm text-muted-foreground">Obligatorio</span>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={question.required}
+                  onCheckedChange={checked => onUpdate({ required: checked })}
+                />
+                <span className="text-sm text-muted-foreground">Obligatorio</span>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={() => setIsPdfModalOpen(true)}
+                disabled={!pdfTemplate}
+                title={pdfTemplate ? 'Setear coordenadas PDF' : 'Primero sube una plantilla PDF'}
+              >
+                <MapPinned className="w-4 h-4" />
+                Setear campo PDF
+              </Button>
             </div>
             <Button
               variant="ghost"
@@ -404,6 +422,16 @@ export const QuestionCard = ({ question, sectionId, onUpdate, onDelete, allQuest
           </div>
         </div>
       </div>
+      {pdfTemplate && (
+        <PdfMappingModal
+          open={isPdfModalOpen}
+          onOpenChange={setIsPdfModalOpen}
+          question={question}
+          template={pdfTemplate}
+          value={question.pdfMapping}
+          onSave={(pdfMapping) => onUpdate({ pdfMapping })}
+        />
+      )}
     </div>
   );
 };

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, ChangeEvent } from 'react';
 import {
   DndContext,
   DragOverlay,
@@ -19,7 +19,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { ArrowLeft, FileText, Plus, Save } from 'lucide-react';
-import { Form, FormSection, Question, QuestionType, QUESTION_TYPE_CONFIG } from '@/types/form';
+import { Form, FormSection, Question, QuestionType, QUESTION_TYPE_CONFIG, PdfTemplate } from '@/types/form';
 import { QuestionCard } from './QuestionCard';
 import { QuestionTypePalette } from './QuestionTypePalette';
 import { SectionCard } from './SectionCard';
@@ -27,6 +27,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { api } from '@/lib/api';
 
 interface FormEditorProps {
   form: Form;
@@ -64,6 +65,9 @@ export const FormEditor = ({
   });
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [pdfTemplate, setPdfTemplate] = useState<PdfTemplate | null>(null);
+  const [isUploadingTemplate, setIsUploadingTemplate] = useState(false);
+  const [isDownloadingPreview, setIsDownloadingPreview] = useState(false);
 
   useEffect(() => {
     onUnsavedChangesChange?.(hasUnsavedChanges);
@@ -77,6 +81,22 @@ export const FormEditor = ({
     });
     setHasUnsavedChanges(false);
   }, [form.id, form.updatedAt]); // Reset when form ID changes or when form is updated from backend
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadTemplate = async () => {
+      try {
+        const tpl = await api.getFormPdfTemplate(form.id);
+        if (!cancelled) setPdfTemplate(tpl);
+      } catch {
+        if (!cancelled) setPdfTemplate(null);
+      }
+    };
+    loadTemplate();
+    return () => {
+      cancelled = true;
+    };
+  }, [form.id]);
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeSectionId, setActiveSectionId] = useState<string | null>(
@@ -214,6 +234,42 @@ export const FormEditor = ({
       toast.error('Error al guardar el formulario');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleTemplateUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setIsUploadingTemplate(true);
+    try {
+      const tpl = await api.uploadFormPdfTemplate(form.id, file);
+      setPdfTemplate(tpl);
+      handleLocalUpdateForm({ pdfTemplateId: tpl.id });
+      toast.success('Plantilla PDF subida correctamente');
+    } catch (error) {
+      console.error(error);
+      toast.error('No se pudo subir la plantilla PDF');
+    } finally {
+      setIsUploadingTemplate(false);
+      event.target.value = '';
+    }
+  };
+
+  const handleDownloadPreview = async () => {
+    setIsDownloadingPreview(true);
+    try {
+      const blob = await api.downloadFormPdfPreview(form.id);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${localForm.name || 'form'}-preview.pdf`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error(error);
+      toast.error('No se pudo generar el preview PDF');
+    } finally {
+      setIsDownloadingPreview(false);
     }
   };
 
@@ -379,6 +435,31 @@ export const FormEditor = ({
                   <Save className="w-4 h-4" />
                   {isSaving ? 'Guardando...' : 'Guardar'}
                 </Button>
+                <div>
+                  <input
+                    id="pdf-template-upload"
+                    type="file"
+                    accept="application/pdf"
+                    className="hidden"
+                    onChange={handleTemplateUpload}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={isUploadingTemplate}
+                    onClick={() => document.getElementById('pdf-template-upload')?.click()}
+                  >
+                    {isUploadingTemplate ? 'Subiendo PDF...' : pdfTemplate ? 'Reemplazar plantilla PDF' : 'Subir plantilla PDF'}
+                  </Button>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={!pdfTemplate || isDownloadingPreview}
+                  onClick={handleDownloadPreview}
+                >
+                  {isDownloadingPreview ? 'Generando preview...' : 'Descargar preview dummy'}
+                </Button>
               </div>
             </div>
           </div>
@@ -435,6 +516,7 @@ export const FormEditor = ({
                       }}
                       canDelete={localForm.sections.length > 1}
                       allQuestions={allQuestions}
+                      pdfTemplate={pdfTemplate}
                     />
                   ))}
                 </SortableContext>
