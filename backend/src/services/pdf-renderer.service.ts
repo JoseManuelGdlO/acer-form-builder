@@ -96,7 +96,14 @@ export const renderMappedPdf = async (params: {
   useDummyData?: boolean;
 }): Promise<Uint8Array> => {
   const { form, template, answers = {}, useDummyData = false } = params;
-  const inputBytes = await (await import('fs/promises')).readFile(template.filePath);
+  const fs = await import('fs/promises');
+  let inputBytes: Buffer;
+  try {
+    inputBytes = await fs.readFile(template.filePath);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown file read error';
+    throw new Error(`Template file missing/unreadable at ${template.filePath}. ${message}`);
+  }
   const pdf = await PDFDocument.load(inputBytes);
   await pdf.embedFont(StandardFonts.Helvetica);
   const pages = pdf.getPages();

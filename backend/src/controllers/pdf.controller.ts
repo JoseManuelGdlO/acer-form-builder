@@ -141,7 +141,8 @@ export const renderFormPdfPreview = async (req: AuthRequest, res: Response): Pro
     res.send(Buffer.from(pdfBytes));
   } catch (error) {
     console.error('Render form PDF preview error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    const details = error instanceof Error ? error.message : 'Unknown render error';
+    res.status(500).json({ error: 'Internal server error', details });
   }
 };
 
@@ -184,7 +185,8 @@ export const renderSubmissionPdf = async (req: AuthRequest, res: Response): Prom
     res.send(Buffer.from(pdfBytes));
   } catch (error) {
     console.error('Render submission PDF error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    const details = error instanceof Error ? error.message : 'Unknown render error';
+    res.status(500).json({ error: 'Internal server error', details });
   }
 };
 
