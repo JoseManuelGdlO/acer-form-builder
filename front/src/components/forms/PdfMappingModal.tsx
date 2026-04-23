@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Question, QuestionPdfMapping, QuestionPdfPlacement, PdfTemplate } from '@/types/form';
+import { api } from '@/lib/api';
 
 interface PdfMappingModalProps {
   open: boolean;
@@ -60,11 +61,12 @@ export const PdfMappingModal = ({ open, onOpenChange, question, template, value,
         const workerVersion = (pdfjsLib as any).version || '5.6.205';
         (pdfjsLib as any).GlobalWorkerOptions.workerSrc =
           `https://unpkg.com/pdfjs-dist@${workerVersion}/build/pdf.worker.min.mjs`;
-        const response = await fetch(template.fileUrl);
-        if (!response.ok) {
-          throw new Error(`No se pudo cargar el archivo PDF (${response.status})`);
+        const templateBlob = await api.downloadFormPdfTemplateFile(template.formId);
+        const bytes = new Uint8Array(await templateBlob.arrayBuffer());
+        const header = new TextDecoder().decode(bytes.slice(0, 5));
+        if (!header.startsWith('%PDF-')) {
+          throw new Error('El archivo recibido no es un PDF valido.');
         }
-        const bytes = new Uint8Array(await response.arrayBuffer());
         const loadingTask = (pdfjsLib as any).getDocument({ data: bytes });
         const pdf = await loadingTask.promise;
         const page = await pdf.getPage(currentPage);

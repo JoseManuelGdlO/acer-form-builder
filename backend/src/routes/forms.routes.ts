@@ -21,6 +21,7 @@ router.get('/:id/sessions/:sessionId/submission', submissionsController.getSubmi
 router.post('/:id/sessions/:sessionId/submission', ...submissionsController.createSubmissionFromSession);
 router.patch('/:id/sessions/:sessionId/submission', ...submissionsController.updateSubmissionFromSession);
 router.get('/:id/pdf-template', authenticate, pdfController.getPdfTemplateByForm);
+router.get('/:id/pdf-template/file', authenticate, pdfController.getPdfTemplateFileByForm);
 router.post('/:id/pdf-template', authenticate, requireAnyPermission('forms.update'), ...pdfController.uploadPdfTemplate);
 router.post('/:id/pdf-preview', authenticate, requireAnyPermission('forms.update'), pdfController.renderFormPdfPreview);
 router.get('/:id', formsController.getFormById);

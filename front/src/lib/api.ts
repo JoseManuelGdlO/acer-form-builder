@@ -974,6 +974,14 @@ class ApiClient {
     });
   }
 
+  async downloadFormPdfTemplateFile(formId: string, token?: string | null) {
+    return this.requestBlob(`/forms/${formId}/pdf-template/file`, {
+      method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
   async downloadSubmissionPdf(submissionId: string, token?: string | null) {
     return this.requestBlob(`/submissions/${submissionId}/pdf`, {
       method: 'POST',

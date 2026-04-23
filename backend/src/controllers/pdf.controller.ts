@@ -113,6 +113,37 @@ export const getPdfTemplateByForm = async (req: AuthRequest, res: Response): Pro
   }
 };
 
+export const getPdfTemplateFileByForm = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const companyId = req.user?.companyId;
+    const formId = req.params.id;
+    if (!companyId) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+    const form = await Form.findOne({ where: { id: formId, companyId, isDeleted: false } });
+    if (!form) {
+      res.status(404).json({ error: 'Form not found' });
+      return;
+    }
+    const where: Record<string, unknown> = { companyId, formId, isDeleted: false };
+    if (form.pdfTemplateId) where.id = form.pdfTemplateId;
+    const template = await PdfTemplate.findOne({ where, order: [['created_at', 'DESC']] });
+    if (!template) {
+      res.status(404).json({ error: 'Template not found' });
+      return;
+    }
+    const file = await fs.promises.readFile(template.filePath);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${template.fileName}"`);
+    res.send(file);
+  } catch (error) {
+    console.error('Get PDF template file error:', error);
+    const details = error instanceof Error ? error.message : 'Unknown read error';
+    res.status(500).json({ error: 'Internal server error', details });
+  }
+};
+
 export const renderFormPdfPreview = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const companyId = req.user?.companyId;
