@@ -57,17 +57,12 @@ export const PdfMappingModal = ({ open, onOpenChange, question, template, value,
       setRenderError(null);
       try {
         const pdfjsLib = await import('pdfjs-dist');
-        (pdfjsLib as any).GlobalWorkerOptions.workerSrc = new URL(
-          'pdfjs-dist/build/pdf.worker.min.mjs',
-          import.meta.url
-        ).toString();
-
         const response = await fetch(template.fileUrl);
         if (!response.ok) {
           throw new Error(`No se pudo cargar el archivo PDF (${response.status})`);
         }
         const bytes = new Uint8Array(await response.arrayBuffer());
-        const loadingTask = (pdfjsLib as any).getDocument({ data: bytes });
+        const loadingTask = (pdfjsLib as any).getDocument({ data: bytes, disableWorker: true });
         const pdf = await loadingTask.promise;
         const page = await pdf.getPage(currentPage);
         const viewport = page.getViewport({ scale: 1.2 });
