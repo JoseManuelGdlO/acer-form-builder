@@ -10,7 +10,8 @@ services:
       - ./uploads:/app/uploads
     environment:
       - NODE_ENV=${NODE_ENV:-production}
-      - PORT=${PORT:-3001}
+      # Same effective port as frontend BACKEND_PORT (both read BACKEND_PORT / PORT from .env)
+      - PORT=${BACKEND_PORT:-${PORT:-3001}}
       - DB_HOST=${DB_HOST}
       - DB_PORT=${DB_PORT:-3306}
       - DB_NAME=${DB_NAME}
@@ -34,7 +35,14 @@ services:
       - WHATSAPP_VERSION=${WHATSAPP_VERSION}
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      # Uses same port as the Node process (EasyPanel may override PORT)
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('http').get('http://127.0.0.1:' + (process.env.PORT || '3001') + '/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})",
+        ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -47,8 +55,11 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        # Same-origin `/api` — nginx proxies to backend (avoids https://host:3001 TLS errors)
+        # Same-origin `/api` — nginx proxies to backend (avoids calling TLS backend URL from the browser)
         - VITE_API_URL=${VITE_API_URL:-/api}
+    environment:
+      # Must match backend PORT (Easypanel: set PORT or BACKEND_PORT once in project env)
+      - BACKEND_PORT=${BACKEND_PORT:-${PORT:-3001}}
     expose:
       - "80"
     depends_on:

@@ -13,7 +13,8 @@ Este archivo documenta todas las variables de entorno necesarias para ejecutar l
 
 ### Backend
 - `JWT_SECRET`: Secreto para firmar tokens JWT (cambiar en producción)
-- `PORT`: Puerto del backend (por defecto: 3001)
+- `PORT`: Puerto del proceso Node (por defecto: 3001). Alternativa: define `BACKEND_PORT`; Docker Compose asigna `PORT` y el nginx del frontend con la misma expresión para que el proxy y el healthcheck no se desalineen (p. ej. si Easypanel inyecta un puerto distinto).
+- `BACKEND_PORT`: Opcional. Si está definida, tiene prioridad sobre `PORT` para fijar el puerto interno común entre backend y nginx.
 - `NODE_ENV`: Entorno de ejecución (production, development)
 - `CORS_ORIGIN`: Origen permitido para CORS (por defecto: http://localhost:80)
 

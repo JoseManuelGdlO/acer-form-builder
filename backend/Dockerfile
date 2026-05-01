@@ -50,9 +50,9 @@ COPY --from=builder /app/src/config/database.js ./src/config/database.js
 # Expose port
 EXPOSE 3001
 
-# Health check
+# Health check (port follows PORT env at runtime, default 3001)
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3001/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
+  CMD node -e "require('http').get('http://127.0.0.1:' + (process.env.PORT || '3001') + '/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
 # Start script that runs migrations, seeders, and then starts the server
 CMD ["sh", "-c", "npm run migrate && npm run seed && npm start"]
