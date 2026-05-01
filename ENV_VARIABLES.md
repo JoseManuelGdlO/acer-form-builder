@@ -13,7 +13,7 @@ Este archivo documenta todas las variables de entorno necesarias para ejecutar l
 
 ### Backend
 - `JWT_SECRET`: Secreto para firmar tokens JWT (cambiar en producción)
-- `PORT`: Puerto del backend (por defecto: 3000)
+- `PORT`: Puerto del backend (por defecto: 3001)
 - `NODE_ENV`: Entorno de ejecución (production, development)
 - `CORS_ORIGIN`: Origen permitido para CORS (por defecto: http://localhost:80)
 
@@ -80,10 +80,10 @@ Las variables `WHATSAPP_*` en Docker Compose pueden quedar por compatibilidad co
 - El `company_id` de las conversaciones sale del usuario del token (`req.user.companyId` tras `authenticate`). Conviene usar un **JWT permanente** por empresa (p. ej. endpoint de token permanente del backend) y que n8n elija el Bearer según la compañía detectada (p. ej. por `phone_number_id` del webhook).
 
 ### Frontend
-- `VITE_API_URL`: URL del API backend (por defecto: http://localhost:3000/api)
+- `VITE_API_URL`: URL del API backend (por defecto: http://localhost:3001/api)
 
 ### Docker Compose
-- `BACKEND_PORT`: Puerto expuesto del backend (por defecto: 3000)
+- `BACKEND_PORT`: Puerto expuesto del backend (por defecto: 3001)
 - `FRONTEND_PORT`: Puerto expuesto del frontend (por defecto: 80)
 
 ## Ejemplo de archivo .env
@@ -93,8 +93,8 @@ Las variables `WHATSAPP_*` en Docker Compose pueden quedar por compatibilidad co
 NODE_ENV=production
 
 # Backend Configuration
-PORT=3000
-BACKEND_PORT=3000
+PORT=3001
+BACKEND_PORT=3001
 
 # Frontend Configuration
 FRONTEND_PORT=80
@@ -114,7 +114,7 @@ JWT_EXPIRES_IN=7d
 CORS_ORIGIN=http://localhost:80
 
 # Frontend API URL
-VITE_API_URL=http://localhost:3000/api
+VITE_API_URL=http://localhost:3001/api
 ```
 
 ## Uso en Easypanel

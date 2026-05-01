@@ -1,8 +1,8 @@
 import type { FinanceGranularity, FinanceOverviewResponse } from '@/types/finance';
 
-/** Base URL for API calls (e.g. `/api` or `http://localhost:3000/api`). Exported for asset URLs. */
+/** Base URL for API calls (e.g. `/api` or `http://localhost:3001/api`). Exported for asset URLs. */
 export function getApiBaseURL(): string {
-  const configured = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+  const configured = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
   if (typeof window === 'undefined') return configured;
 
   if (configured.startsWith('/')) {
@@ -14,7 +14,7 @@ export function getApiBaseURL(): string {
     const apiIsLocalhost = apiUrl.hostname === 'localhost' || apiUrl.hostname === '127.0.0.1';
     const pageIsLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
     if (apiIsLocalhost && !pageIsLocalhost) {
-      // TLS terminates on 443; do not force :3000 with https (ERR_SSL_PROTOCOL_ERROR)
+      // TLS terminates on 443; do not force :3001 with https (ERR_SSL_PROTOCOL_ERROR)
       const path = apiUrl.pathname.replace(/\/+$/, '') || '/api';
       return `${window.location.origin}${path}`;
     }

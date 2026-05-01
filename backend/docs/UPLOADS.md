@@ -43,5 +43,5 @@ Si despliegas en **Easypanel** u otro panel: añade un volumen al servicio del b
 
 ## Resumen
 
-- En **desarrollo**: no configures nada; se crea `backend/uploads/products/` y las imágenes se sirven en `http://localhost:3000/uploads/products/...`.
+- En **desarrollo**: no configures nada; se crea `backend/uploads/products/` y las imágenes se sirven en `http://localhost:3001/uploads/products/...`.
 - En **producción**: configura un volumen persistente en la ruta de `UPLOADS_DIR` para que las imágenes sobrevivan a los redespliegues.
