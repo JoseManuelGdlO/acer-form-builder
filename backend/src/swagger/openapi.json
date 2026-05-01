@@ -255,6 +255,9 @@
                   },
                   "theme": {
                     "type": "object"
+                  },
+                  "advisorClientAccessMode": {
+                    "type": "string"
                   }
                 }
               }
@@ -286,7 +289,7 @@
         ],
         "operationId": "get__api_users",
         "summary": "GET /api/users",
-        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion y rol admin.",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
         "security": [
           {
             "bearerAuth": []
@@ -298,9 +301,6 @@
           },
           "401": {
             "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
           }
         }
       },
@@ -310,7 +310,7 @@
         ],
         "operationId": "post__api_users",
         "summary": "POST /api/users",
-        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion y rol admin.",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
         "requestBody": {
           "required": true,
           "content": {
@@ -327,16 +327,13 @@
                   "name": {
                     "type": "string"
                   },
-                  "role": {
+                  "roleId": {
                     "type": "string"
                   },
                   "branchId": {
                     "type": "string"
                   }
-                },
-                "required": [
-                  "email"
-                ]
+                }
               }
             }
           }
@@ -355,9 +352,6 @@
           },
           "401": {
             "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
           }
         }
       }
@@ -369,7 +363,7 @@
         ],
         "operationId": "get__api_users__id_",
         "summary": "GET /api/users/{id}",
-        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion y rol admin.",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
         "parameters": [
           {
             "name": "id",
@@ -392,9 +386,6 @@
           },
           "401": {
             "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
           }
         }
       },
@@ -404,7 +395,7 @@
         ],
         "operationId": "put__api_users__id_",
         "summary": "PUT /api/users/{id}",
-        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion y rol admin.",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
         "parameters": [
           {
             "name": "id",
@@ -432,7 +423,7 @@
                   "status": {
                     "type": "string"
                   },
-                  "role": {
+                  "roleId": {
                     "type": "string"
                   },
                   "branchId": {
@@ -457,9 +448,6 @@
           },
           "401": {
             "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
           }
         }
       },
@@ -469,7 +457,7 @@
         ],
         "operationId": "delete__api_users__id_",
         "summary": "DELETE /api/users/{id}",
-        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion y rol admin.",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
         "parameters": [
           {
             "name": "id",
@@ -492,9 +480,6 @@
           },
           "401": {
             "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
           }
         }
       }
@@ -542,8 +527,7 @@
                     "type": "string"
                   },
                   "postalCode": {
-                    "type": "string",
-                    "format": "date-time"
+                    "type": "string"
                   },
                   "birthDate": {
                     "type": "string",
@@ -985,8 +969,7 @@
                     "type": "string"
                   },
                   "postalCode": {
-                    "type": "string",
-                    "format": "date-time"
+                    "type": "string"
                   },
                   "birthDate": {
                     "type": "string",
@@ -1651,6 +1634,30 @@
                       "type": "array"
                     }
                   },
+                  "staffMemberIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "array"
+                    }
+                  },
+                  "companions": {
+                    "type": "object",
+                    "properties": {
+                      "*": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "array"
+                          },
+                          "phone": {
+                            "type": "array"
+                          }
+                        },
+                        "required": []
+                      }
+                    },
+                    "required": []
+                  },
                   "groupIds": {
                     "type": "array",
                     "items": {
@@ -1680,13 +1687,13 @@
         }
       }
     },
-    "/api/trips/{id}/participants/{clientId}": {
+    "/api/trips/{id}/participants/{participantId}": {
       "delete": {
         "tags": [
           "trips"
         ],
-        "operationId": "delete__api_trips__id__participants__clientId_",
-        "summary": "DELETE /api/trips/{id}/participants/{clientId}",
+        "operationId": "delete__api_trips__id__participants__participantId_",
+        "summary": "DELETE /api/trips/{id}/participants/{participantId}",
         "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
         "parameters": [
           {
@@ -1699,10 +1706,10 @@
             }
           },
           {
-            "name": "clientId",
+            "name": "participantId",
             "in": "path",
             "required": true,
-            "description": "ID: clientId",
+            "description": "ID: participantId",
             "schema": {
               "type": "string"
             }
@@ -1749,6 +1756,9 @@
               "schema": {
                 "type": "object",
                 "properties": {
+                  "participantId": {
+                    "type": "integer"
+                  },
                   "clientId": {
                     "type": "integer"
                   },
@@ -1813,13 +1823,47 @@
         }
       }
     },
-    "/api/trips/{id}/seat-assignments/{clientId}": {
+    "/api/trips/{id}/seat-assignments/by-seat": {
       "delete": {
         "tags": [
           "trips"
         ],
-        "operationId": "delete__api_trips__id__seat_assignments__clientId_",
-        "summary": "DELETE /api/trips/{id}/seat-assignments/{clientId}",
+        "operationId": "delete__api_trips__id__seat_assignments_by_seat",
+        "summary": "DELETE /api/trips/{id}/seat-assignments/by-seat",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID: id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/trips/{id}/seat-assignments/{participantId}": {
+      "delete": {
+        "tags": [
+          "trips"
+        ],
+        "operationId": "delete__api_trips__id__seat_assignments__participantId_",
+        "summary": "DELETE /api/trips/{id}/seat-assignments/{participantId}",
         "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
         "parameters": [
           {
@@ -1832,10 +1876,10 @@
             }
           },
           {
-            "name": "clientId",
+            "name": "participantId",
             "in": "path",
             "required": true,
-            "description": "ID: clientId",
+            "description": "ID: participantId",
             "schema": {
               "type": "string"
             }
@@ -2366,7 +2410,7 @@
         ],
         "operationId": "post__api_forms",
         "summary": "POST /api/forms",
-        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion y rol admin.",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
         "requestBody": {
           "required": true,
           "content": {
@@ -2399,9 +2443,6 @@
           },
           "401": {
             "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
           }
         }
       }
@@ -2750,6 +2791,140 @@
         }
       }
     },
+    "/api/forms/{id}/pdf-template": {
+      "get": {
+        "tags": [
+          "forms"
+        ],
+        "operationId": "get__api_forms__id__pdf_template",
+        "summary": "GET /api/forms/{id}/pdf-template",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID: id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "forms"
+        ],
+        "operationId": "post__api_forms__id__pdf_template",
+        "summary": "POST /api/forms/{id}/pdf-template",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID: id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/forms/{id}/pdf-template/file": {
+      "get": {
+        "tags": [
+          "forms"
+        ],
+        "operationId": "get__api_forms__id__pdf_template_file",
+        "summary": "GET /api/forms/{id}/pdf-template/file",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID: id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/forms/{id}/pdf-preview": {
+      "post": {
+        "tags": [
+          "forms"
+        ],
+        "operationId": "post__api_forms__id__pdf_preview",
+        "summary": "POST /api/forms/{id}/pdf-preview",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID: id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
     "/api/forms/{id}": {
       "get": {
         "tags": [
@@ -2781,7 +2956,7 @@
         ],
         "operationId": "put__api_forms__id_",
         "summary": "PUT /api/forms/{id}",
-        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion y rol admin.",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
         "parameters": [
           {
             "name": "id",
@@ -2825,9 +3000,6 @@
           },
           "401": {
             "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
           }
         }
       },
@@ -2837,7 +3009,7 @@
         ],
         "operationId": "delete__api_forms__id_",
         "summary": "DELETE /api/forms/{id}",
-        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion y rol admin.",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
         "parameters": [
           {
             "name": "id",
@@ -2860,9 +3032,6 @@
           },
           "401": {
             "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
           }
         }
       }
@@ -2986,6 +3155,40 @@
         "operationId": "get__api_submissions_stats",
         "summary": "GET /api/submissions/stats",
         "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/submissions/{id}/pdf": {
+      "post": {
+        "tags": [
+          "submissions"
+        ],
+        "operationId": "post__api_submissions__id__pdf",
+        "summary": "POST /api/submissions/{id}/pdf",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID: id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "security": [
           {
             "bearerAuth": []
@@ -3148,7 +3351,7 @@
         ],
         "operationId": "post__api_checklist_templates",
         "summary": "POST /api/checklist/templates",
-        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion y rol admin.",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
         "requestBody": {
           "required": true,
           "content": {
@@ -3181,9 +3384,6 @@
           },
           "401": {
             "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
           }
         }
       }
@@ -3195,7 +3395,7 @@
         ],
         "operationId": "put__api_checklist_templates__id_",
         "summary": "PUT /api/checklist/templates/{id}",
-        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion y rol admin.",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
         "parameters": [
           {
             "name": "id",
@@ -3242,9 +3442,6 @@
           },
           "401": {
             "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
           }
         }
       },
@@ -3254,7 +3451,7 @@
         ],
         "operationId": "delete__api_checklist_templates__id_",
         "summary": "DELETE /api/checklist/templates/{id}",
-        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion y rol admin.",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
         "parameters": [
           {
             "name": "id",
@@ -3277,9 +3474,6 @@
           },
           "401": {
             "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
           }
         }
       }
@@ -3914,7 +4108,7 @@
         ],
         "operationId": "post__api_faqs",
         "summary": "POST /api/faqs",
-        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion y rol admin.",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
         "requestBody": {
           "required": true,
           "content": {
@@ -3950,9 +4144,6 @@
           },
           "401": {
             "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
           }
         }
       }
@@ -3996,7 +4187,7 @@
         ],
         "operationId": "put__api_faqs__id_",
         "summary": "PUT /api/faqs/{id}",
-        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion y rol admin.",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
         "parameters": [
           {
             "name": "id",
@@ -4046,9 +4237,6 @@
           },
           "401": {
             "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
           }
         }
       },
@@ -4058,7 +4246,7 @@
         ],
         "operationId": "delete__api_faqs__id_",
         "summary": "DELETE /api/faqs/{id}",
-        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion y rol admin.",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
         "parameters": [
           {
             "name": "id",
@@ -4081,9 +4269,6 @@
           },
           "401": {
             "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
           }
         }
       }
@@ -4116,7 +4301,7 @@
         ],
         "operationId": "put__api_bot",
         "summary": "PUT /api/bot",
-        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion y rol admin.",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
         "requestBody": {
           "required": true,
           "content": {
@@ -4173,9 +4358,6 @@
           },
           "401": {
             "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
           }
         }
       }
@@ -4333,7 +4515,7 @@
         ],
         "operationId": "post__api_products",
         "summary": "POST /api/products",
-        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion y rol admin.",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
         "requestBody": {
           "required": true,
           "content": {
@@ -4378,9 +4560,6 @@
           },
           "401": {
             "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
           }
         }
       }
@@ -4481,7 +4660,7 @@
         ],
         "operationId": "put__api_products__id_",
         "summary": "PUT /api/products/{id}",
-        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion y rol admin.",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
         "parameters": [
           {
             "name": "id",
@@ -4537,9 +4716,6 @@
           },
           "401": {
             "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
           }
         }
       },
@@ -4549,7 +4725,7 @@
         ],
         "operationId": "delete__api_products__id_",
         "summary": "DELETE /api/products/{id}",
-        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion y rol admin.",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
         "parameters": [
           {
             "name": "id",
@@ -4572,9 +4748,6 @@
           },
           "401": {
             "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
           }
         }
       }
@@ -4607,7 +4780,7 @@
         ],
         "operationId": "post__api_categories",
         "summary": "POST /api/categories",
-        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion y rol admin.",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
         "requestBody": {
           "required": true,
           "content": {
@@ -4643,9 +4816,6 @@
           },
           "401": {
             "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
           }
         }
       }
@@ -4657,7 +4827,7 @@
         ],
         "operationId": "put__api_categories__id_",
         "summary": "PUT /api/categories/{id}",
-        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion y rol admin.",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
         "parameters": [
           {
             "name": "id",
@@ -4701,9 +4871,6 @@
           },
           "401": {
             "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
           }
         }
       },
@@ -4713,7 +4880,7 @@
         ],
         "operationId": "delete__api_categories__id_",
         "summary": "DELETE /api/categories/{id}",
-        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion y rol admin.",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
         "parameters": [
           {
             "name": "id",
@@ -4736,9 +4903,6 @@
           },
           "401": {
             "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
           }
         }
       }
@@ -4816,7 +4980,7 @@
                 "type": "object",
                 "properties": {
                   "type": {
-                    "type": "object"
+                    "type": "string"
                   },
                   "message": {
                     "type": "array"
@@ -5019,7 +5183,7 @@
         ],
         "operationId": "post__api_visa_status_templates",
         "summary": "POST /api/visa-status-templates",
-        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion y rol admin.",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
         "requestBody": {
           "required": true,
           "content": {
@@ -5055,9 +5219,6 @@
           },
           "401": {
             "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
           }
         }
       }
@@ -5069,7 +5230,7 @@
         ],
         "operationId": "put__api_visa_status_templates__id_",
         "summary": "PUT /api/visa-status-templates/{id}",
-        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion y rol admin.",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
         "parameters": [
           {
             "name": "id",
@@ -5119,9 +5280,6 @@
           },
           "401": {
             "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
           }
         }
       },
@@ -5131,7 +5289,7 @@
         ],
         "operationId": "delete__api_visa_status_templates__id_",
         "summary": "DELETE /api/visa-status-templates/{id}",
-        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion y rol admin.",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
         "parameters": [
           {
             "name": "id",
@@ -5154,9 +5312,6 @@
           },
           "401": {
             "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
           }
         }
       }
@@ -5279,7 +5434,7 @@
         ],
         "operationId": "get__api_branches",
         "summary": "GET /api/branches",
-        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion y rol admin.",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
         "security": [
           {
             "bearerAuth": []
@@ -5291,9 +5446,6 @@
           },
           "401": {
             "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
           }
         }
       },
@@ -5303,7 +5455,7 @@
         ],
         "operationId": "post__api_branches",
         "summary": "POST /api/branches",
-        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion y rol admin.",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
         "requestBody": {
           "required": true,
           "content": {
@@ -5336,9 +5488,6 @@
           },
           "401": {
             "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
           }
         }
       }
@@ -5350,7 +5499,7 @@
         ],
         "operationId": "put__api_branches__id_",
         "summary": "PUT /api/branches/{id}",
-        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion y rol admin.",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
         "parameters": [
           {
             "name": "id",
@@ -5394,9 +5543,6 @@
           },
           "401": {
             "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
           }
         }
       },
@@ -5406,7 +5552,7 @@
         ],
         "operationId": "delete__api_branches__id_",
         "summary": "DELETE /api/branches/{id}",
-        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion y rol admin.",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
         "parameters": [
           {
             "name": "id",
@@ -5429,9 +5575,6 @@
           },
           "401": {
             "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
           }
         }
       }
@@ -5595,6 +5738,360 @@
         "operationId": "get__api_calendar_events_by_date",
         "summary": "GET /api/calendar/events/by-date",
         "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/roles/catalog": {
+      "get": {
+        "tags": [
+          "roles"
+        ],
+        "operationId": "get__api_roles_catalog",
+        "summary": "GET /api/roles/catalog",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/roles": {
+      "get": {
+        "tags": [
+          "roles"
+        ],
+        "operationId": "get__api_roles",
+        "summary": "GET /api/roles",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "roles"
+        ],
+        "operationId": "post__api_roles",
+        "summary": "POST /api/roles",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "array"
+                  },
+                  "description": {
+                    "type": "array"
+                  },
+                  "permissionKeys": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "permissionKeys"
+                ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request (validation errors)"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/roles/{id}": {
+      "put": {
+        "tags": [
+          "roles"
+        ],
+        "operationId": "put__api_roles__id_",
+        "summary": "PUT /api/roles/{id}",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID: id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "array"
+                  },
+                  "description": {
+                    "type": "array"
+                  },
+                  "permissionKeys": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request (validation errors)"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "roles"
+        ],
+        "operationId": "delete__api_roles__id_",
+        "summary": "DELETE /api/roles/{id}",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID: id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/staff-members": {
+      "get": {
+        "tags": [
+          "staff-members"
+        ],
+        "operationId": "get__api_staff_members",
+        "summary": "GET /api/staff-members",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "staff-members"
+        ],
+        "operationId": "post__api_staff_members",
+        "summary": "POST /api/staff-members",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "phone": {
+                    "type": "string"
+                  },
+                  "role": {
+                    "type": "string"
+                  },
+                  "notes": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request (validation errors)"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/staff-members/{id}": {
+      "put": {
+        "tags": [
+          "staff-members"
+        ],
+        "operationId": "put__api_staff_members__id_",
+        "summary": "PUT /api/staff-members/{id}",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID: id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "phone": {
+                    "type": "string"
+                  },
+                  "role": {
+                    "type": "string"
+                  },
+                  "notes": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request (validation errors)"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "staff-members"
+        ],
+        "operationId": "delete__api_staff_members__id_",
+        "summary": "DELETE /api/staff-members/{id}",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID: id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "security": [
           {
             "bearerAuth": []

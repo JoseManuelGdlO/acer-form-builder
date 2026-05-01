@@ -66,7 +66,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const hostname = window.location.hostname;
-    const domainToUse = hostname === 'localhost' || hostname === '127.0.0.1' ? 'saru' : hostname;
+    const domainToUse = hostname === 'localhost' || hostname === '127.0.0.1' ? 'aser' : hostname;
     loadTenant(domainToUse);
   }, [loadTenant]);
 
