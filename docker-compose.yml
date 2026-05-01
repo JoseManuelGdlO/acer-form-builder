@@ -47,7 +47,8 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        - VITE_API_URL=${VITE_API_URL:-http://localhost:3000/api}
+        # Same-origin `/api` — nginx proxies to backend (avoids https://host:3000 TLS errors)
+        - VITE_API_URL=${VITE_API_URL:-/api}
     expose:
       - "80"
     depends_on:

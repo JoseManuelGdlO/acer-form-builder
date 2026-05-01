@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { getApiBaseURL } from '@/lib/api';
 import { Product } from '@/types/product';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -13,8 +14,6 @@ interface ProductsListProps {
   readOnly?: boolean;
 }
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
-
 export const ProductsList = ({ products, onCreate, onEdit, onDelete, categoriesMap, readOnly = false }: ProductsListProps) => {
   const sortedProducts = useMemo(
     () => [...products].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()),
@@ -23,8 +22,10 @@ export const ProductsList = ({ products, onCreate, onEdit, onDelete, categoriesM
 
   const getImageUrl = (imagePath?: string | null) => {
     if (!imagePath) return null;
-    const base = API_URL.replace(/\/api\/?$/, '');
-    return `${base}/uploads/${imagePath}`;
+    const apiBase = getApiBaseURL();
+    const origin =
+      apiBase.startsWith('/') ? '' : apiBase.replace(/\/api\/?$/, '');
+    return `${origin}/uploads/${imagePath}`;
   };
 
   return (
