@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { 
   Users, FileText, ClipboardList, CheckCircle2, Clock, 
   TrendingUp, Activity, UserPlus, FileCheck, MessageSquare,
-  ArrowUpRight, ArrowDownRight, Scale, Percent
+  ArrowUpRight, ArrowDownRight, MapPin, Bus
 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -18,6 +18,14 @@ interface DashboardProps {
   clients: Client[];
   submissionStats: { total: number; pending: number; reviewed: number; completed: number };
   clientStats: { total: number; active: number; inactive: number; pending: number };
+  /** Métricas de viajes (GET /trips/stats); null si no hay permiso o aún no cargó */
+  tripStats?: {
+    upcomingTrips: number;
+    departingIn30Days: number;
+    totalSeatsUpcoming: number;
+    participantCountUpcoming: number;
+    occupancyRate: number;
+  } | null;
 }
 
 interface Activity {
@@ -95,7 +103,8 @@ export const Dashboard = ({
   submissions, 
   clients,
   submissionStats,
-  clientStats
+  clientStats,
+  tripStats = null,
 }: DashboardProps) => {
   const { tenant } = useTenant();
   const dashboardCenterLogoImage = tenant?.theme?.[DASHBOARD_CENTER_LOGO_IMAGE_KEY]?.trim() ?? '';
@@ -160,15 +169,6 @@ export const Dashboard = ({
     ? Math.round((clientStats.active / clientStats.total) * 100)
     : 0;
 
-  // Mismas reglas que en Index (aprob / negad); totales vienen del API en clientStats, no de la página paginada
-  const visaApprovalStats = useMemo(() => {
-    const approved = clientStats.active;
-    const denied = clientStats.inactive;
-    const rate =
-      approved + denied > 0 ? Math.round((approved / (approved + denied)) * 100) : 0;
-    return { approved, denied, rate };
-  }, [clientStats.active, clientStats.inactive]);
-
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -218,17 +218,25 @@ export const Dashboard = ({
           color="success"
         />
         <StatCard
-          title="Visas Aprobadas vs Negadas"
-          value={`${visaApprovalStats.approved} / ${visaApprovalStats.denied}`}
-          subtitle="Aprobadas / Negadas"
-          icon={Scale}
+          title="Viajes próximos"
+          value={tripStats ? tripStats.upcomingTrips : '—'}
+          subtitle={
+            tripStats
+              ? `Salidas en 30 días: ${tripStats.departingIn30Days}`
+              : 'Sin datos de viajes'
+          }
+          icon={MapPin}
           color="accent"
         />
         <StatCard
-          title="Tasa de Aprobación de Visas"
-          value={`${visaApprovalStats.rate}%`}
-          subtitle={`${visaApprovalStats.approved + visaApprovalStats.denied} casos evaluados`}
-          icon={Percent}
+          title="Ocupación (viajes próximos)"
+          value={tripStats ? `${tripStats.occupancyRate}%` : '—'}
+          subtitle={
+            tripStats
+              ? `Plazas: ${tripStats.participantCountUpcoming} / ${tripStats.totalSeatsUpcoming}`
+              : 'Sin datos de viajes'
+          }
+          icon={Bus}
           color="success"
         />
       </div>

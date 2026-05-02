@@ -285,18 +285,6 @@ export const TripDetailView = ({
     d ? format(parseISO(d), "d 'de' MMMM yyyy", { locale: es }) : '';
   const departureStr = fmtLong(trip.departureDate);
   const returnStr = fmtLong(trip.returnDate);
-  const visaDetail =
-    trip.isVisaTrip &&
-    trip.casDepartureDate &&
-    trip.casReturnDate &&
-    trip.consulateDepartureDate &&
-    trip.consulateReturnDate;
-  const casRangeStr = visaDetail
-    ? `${fmtLong(trip.casDepartureDate)} – ${fmtLong(trip.casReturnDate)}`
-    : '';
-  const consRangeStr = visaDetail
-    ? `${fmtLong(trip.consulateDepartureDate)} – ${fmtLong(trip.consulateReturnDate)}`
-    : '';
 
   const handleCreateExpense = async () => {
     if (!expenseForm.amount || !expenseForm.expenseDate) {
@@ -467,13 +455,7 @@ export const TripDetailView = ({
 
       writeLine(`Viaje: ${trip.title}`, { bold: true, size: 12, indent: 14 });
       writeLine(`Destino: ${trip.destination ?? '—'}`);
-      if (visaDetail) {
-        writeLine('Viaje de visas (CAS + consulado)');
-        writeLine(`CAS: ${casRangeStr}`);
-        writeLine(`Consulado: ${consRangeStr}`);
-      } else {
-        writeLine(`Fechas: ${departureStr} - ${returnStr}`);
-      }
+      writeLine(`Fechas: ${departureStr} - ${returnStr}`);
       writeLine(`Plazas: ${trip.participants?.length ?? 0}/${trip.totalSeats}`);
       writeLine(`Plantilla de camión: ${trip.busTemplate?.name ?? 'No asignada'}`);
       if (trip.notes) writeLine(`Notas: ${trip.notes}`);
@@ -739,30 +721,10 @@ export const TripDetailView = ({
                 {trip.destination}
               </p>
             )}
-            {visaDetail ? (
-              <div className="text-muted-foreground space-y-1 mt-0.5">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Badge variant="secondary">Visas · CAS + consulado</Badge>
-                </div>
-                <p className="flex items-start gap-1 text-sm">
-                  <Calendar className="w-4 h-4 shrink-0 mt-0.5" />
-                  <span>
-                    <span className="font-medium text-foreground/90">CAS:</span> {casRangeStr}
-                  </span>
-                </p>
-                <p className="flex items-start gap-1 text-sm pl-0">
-                  <span className="w-4 shrink-0" aria-hidden />
-                  <span>
-                    <span className="font-medium text-foreground/90">Consulado:</span> {consRangeStr}
-                  </span>
-                </p>
-              </div>
-            ) : (
-              <p className="text-muted-foreground flex items-center gap-1 mt-0.5">
-                <Calendar className="w-4 h-4" />
-                {departureStr} – {returnStr}
-              </p>
-            )}
+            <p className="text-muted-foreground flex items-center gap-1 mt-0.5">
+              <Calendar className="w-4 h-4" />
+              {departureStr} – {returnStr}
+            </p>
             <p className="text-sm text-muted-foreground mt-1">
               {participants.length}/{trip.totalSeats} plazas
             </p>

@@ -126,36 +126,13 @@ export const TripList = ({
     const out: Event<Trip>[] = [];
     for (const trip of filteredTrips) {
       const titleBase = trip.destination ? `${trip.title} — ${trip.destination}` : trip.title;
-      if (
-        trip.isVisaTrip &&
-        trip.casDepartureDate &&
-        trip.casReturnDate &&
-        trip.consulateDepartureDate &&
-        trip.consulateReturnDate
-      ) {
-        out.push({
-          id: `${trip.id}-cas`,
-          title: `${titleBase} (CAS)`,
-          start: parseISO(trip.casDepartureDate),
-          end: endOfDay(parseISO(trip.casReturnDate)),
-          resource: trip,
-        });
-        out.push({
-          id: `${trip.id}-cons`,
-          title: `${titleBase} (Consulado)`,
-          start: parseISO(trip.consulateDepartureDate),
-          end: endOfDay(parseISO(trip.consulateReturnDate)),
-          resource: trip,
-        });
-      } else {
-        out.push({
-          id: trip.id,
-          title: titleBase,
-          start: parseISO(trip.departureDate),
-          end: endOfDay(parseISO(trip.returnDate)),
-          resource: trip,
-        });
-      }
+      out.push({
+        id: trip.id,
+        title: titleBase,
+        start: parseISO(trip.departureDate),
+        end: endOfDay(parseISO(trip.returnDate)),
+        resource: trip,
+      });
     }
     return out;
   }, [filteredTrips]);
@@ -169,18 +146,8 @@ export const TripList = ({
           notes: data.notes,
           totalSeats: data.totalSeats,
           busTemplateId: data.busTemplateId ?? undefined,
-          isVisaTrip: data.isVisaTrip,
-          ...(data.isVisaTrip
-            ? {
-                casDepartureDate: data.casDepartureDate,
-                casReturnDate: data.casReturnDate,
-                consulateDepartureDate: data.consulateDepartureDate,
-                consulateReturnDate: data.consulateReturnDate,
-              }
-            : {
-                departureDate: data.departureDate,
-                returnDate: data.returnDate,
-              }),
+          departureDate: data.departureDate,
+          returnDate: data.returnDate,
           sharedCompanies: data.invitedCompanyIds?.map(id => {
             const c = companiesForInvite.find(x => x.id === id);
             return c ? { id: c.id, name: c.name } : { id, name: '' };
@@ -358,34 +325,14 @@ export const TripList = ({
                           {inv.trip.destination}
                         </p>
                       )}
-                      {inv.trip?.isVisaTrip &&
-                      inv.trip.casDepartureDate &&
-                      inv.trip.casReturnDate &&
-                      inv.trip.consulateDepartureDate &&
-                      inv.trip.consulateReturnDate ? (
-                        <div className="text-sm text-muted-foreground space-y-0.5 mt-1">
-                          <p className="flex items-center gap-1">
-                            <CalendarIcon className="w-3.5 h-3.5 shrink-0" />
-                            CAS:{' '}
-                            {format(parseISO(inv.trip.casDepartureDate), 'd MMM yyyy', { locale: es })} –{' '}
-                            {format(parseISO(inv.trip.casReturnDate), 'd MMM yyyy', { locale: es })}
-                          </p>
-                          <p className="flex items-center gap-1 pl-5">
-                            Consulado:{' '}
-                            {format(parseISO(inv.trip.consulateDepartureDate), 'd MMM yyyy', { locale: es })} –{' '}
-                            {format(parseISO(inv.trip.consulateReturnDate), 'd MMM yyyy', { locale: es })}
-                          </p>
-                        </div>
-                      ) : (
-                        inv.trip?.departureDate &&
+                      {inv.trip?.departureDate &&
                         inv.trip?.returnDate && (
-                          <p className="text-sm text-muted-foreground flex items-center gap-1">
+                          <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
                             <CalendarIcon className="w-3.5 h-3.5" />
                             {format(parseISO(inv.trip.departureDate), 'd MMM yyyy', { locale: es })} –{' '}
                             {format(parseISO(inv.trip.returnDate), 'd MMM yyyy', { locale: es })}
                           </p>
-                        )
-                      )}
+                        )}
                       {inv.invitedBy && (
                         <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
                           <Mail className="w-3.5 h-3.5" />

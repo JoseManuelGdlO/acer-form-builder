@@ -7,6 +7,7 @@ const router = Router();
 router.use(authenticate);
 
 router.get('/', tripsController.getAllTrips);
+router.get('/stats', tripsController.getTripStats);
 router.get('/invitations', tripsController.getTripInvitations);
 router.post('/invitations/:id/accept', tripsController.acceptTripInvitation);
 router.post('/invitations/:id/reject', tripsController.rejectTripInvitation);

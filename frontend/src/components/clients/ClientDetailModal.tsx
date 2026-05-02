@@ -24,6 +24,14 @@ export const ClientDetailModal = ({
   onOpenChange,
 }: ClientDetailModalProps) => {
   if (!client) return null;
+
+  const accountStatus =
+    client.status === 'active'
+      ? { label: 'Activo', color: '#16a34a' }
+      : client.status === 'inactive'
+        ? { label: 'Inactivo', color: '#64748b' }
+        : { label: 'Pendiente', color: '#ca8a04' };
+
   const formatBirthDate = (value?: string | null) => {
     if (!value) return 'No registrada';
     const normalized = value.length >= 10 ? value.slice(0, 10) : value;
@@ -72,7 +80,7 @@ export const ClientDetailModal = ({
                 <DialogTitle className="text-xl font-bold">
                   {client.name}
                 </DialogTitle>
-                <ClientStatusBadge label={client.visaStatusTemplate?.label} color={client.visaStatusTemplate?.color} />
+                <ClientStatusBadge label={accountStatus.label} color={accountStatus.color} />
               </div>
             </div>
           </div>

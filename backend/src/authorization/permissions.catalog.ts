@@ -127,11 +127,6 @@ export const PERMISSION_KEYS = [
   'company_branding.view',
   'company_branding.update',
 
-  'visa_status_templates.view',
-  'visa_status_templates.create',
-  'visa_status_templates.update',
-  'visa_status_templates.delete',
-
   'checklist_templates.view',
   'checklist_templates.create',
   'checklist_templates.update',
@@ -301,10 +296,6 @@ export const PERMISSION_GROUPS: { id: string; label: string; keys: readonly Perm
       'branches.delete',
       'company_branding.view',
       'company_branding.update',
-      'visa_status_templates.view',
-      'visa_status_templates.create',
-      'visa_status_templates.update',
-      'visa_status_templates.delete',
       'checklist_templates.view',
       'checklist_templates.create',
       'checklist_templates.update',

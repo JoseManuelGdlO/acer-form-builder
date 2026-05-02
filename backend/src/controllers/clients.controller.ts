@@ -14,7 +14,6 @@ import {
   TripParticipant,
   Trip,
   Product,
-  VisaStatusTemplate,
   Conversations,
   InternalAppointment,
 } from '../models';
@@ -44,16 +43,6 @@ const parseNullablePostalCode = (
     return { error: 'Postal code must be an integer' };
   }
   return { value: numeric };
-};
-
-const getDefaultVisaStatusTemplateId = async (companyId: string): Promise<string | null> => {
-  const templates = await VisaStatusTemplate.findAll({
-    where: { companyId, isActive: true },
-    order: [['order', 'ASC']],
-  });
-  if (templates.length === 0) return null;
-  const inProgress = templates.find((t) => t.label.toLowerCase().includes('proceso'));
-  return (inProgress || templates[0]).id;
 };
 
 const getWhatsappReplyStatusByPhone = async (
@@ -130,9 +119,9 @@ export const getAllClients = async (req: AuthRequest, res: Response): Promise<vo
       assignedUserId,
       branchId,
       productId,
-      visaStatusTemplateId,
       checklistTemplateId,
       checklistMode,
+      status: statusQuery,
       q,
       page,
       limit,
@@ -152,8 +141,9 @@ export const getAllClients = async (req: AuthRequest, res: Response): Promise<vo
     if (productId) {
       where.productId = productId;
     }
-    if (visaStatusTemplateId) {
-      where.visaStatusTemplateId = visaStatusTemplateId;
+    const statusStr = typeof statusQuery === 'string' ? statusQuery.trim() : '';
+    if (statusStr === 'active' || statusStr === 'inactive' || statusStr === 'pending') {
+      where.status = statusStr;
     }
     if (q) {
       const searchTerm = String(q).trim();
@@ -189,7 +179,6 @@ export const getAllClients = async (req: AuthRequest, res: Response): Promise<vo
           data: [],
           meta: { page: parsedPage, limit: parsedLimit, total: 0, totalPages: 0 },
           templates: [],
-          visaStatusTemplates: [],
         });
         return;
       }
@@ -220,7 +209,6 @@ export const getAllClients = async (req: AuthRequest, res: Response): Promise<vo
             data: [],
             meta: { page: parsedPage, limit: parsedLimit, total: 0, totalPages: 0 },
             templates: [],
-            visaStatusTemplates: [],
           });
           return;
         }
@@ -242,7 +230,6 @@ export const getAllClients = async (req: AuthRequest, res: Response): Promise<vo
             data: [],
             meta: { page: parsedPage, limit: parsedLimit, total: 0, totalPages: 0 },
             templates: [],
-            visaStatusTemplates: [],
           });
           return;
         }
@@ -268,7 +255,6 @@ export const getAllClients = async (req: AuthRequest, res: Response): Promise<vo
             data: [],
             meta: { page: parsedPage, limit: parsedLimit, total: 0, totalPages: 0 },
             templates: [],
-            visaStatusTemplates: [],
           });
           return;
         }
@@ -316,12 +302,6 @@ export const getAllClients = async (req: AuthRequest, res: Response): Promise<vo
         required: false,
       },
       {
-        model: VisaStatusTemplate,
-        as: 'visaStatusTemplate',
-        attributes: ['id', 'label', 'order', 'isActive', 'color'],
-        required: false,
-      },
-      {
         model: ClientChecklist,
         as: 'checklistItems',
         include: [
@@ -353,10 +333,6 @@ export const getAllClients = async (req: AuthRequest, res: Response): Promise<vo
 
     // Get all active checklist templates for this company
     const activeTemplates = await ChecklistTemplate.findAll({
-      where: { companyId, isActive: true },
-      order: [['order', 'ASC']],
-    });
-    const activeVisaStatusTemplates = await VisaStatusTemplate.findAll({
       where: { companyId, isActive: true },
       order: [['order', 'ASC']],
     });
@@ -504,13 +480,6 @@ export const getAllClients = async (req: AuthRequest, res: Response): Promise<vo
         order: t.order,
         isActive: t.isActive,
       })),
-      visaStatusTemplates: activeVisaStatusTemplates.map(t => ({
-        id: t.id,
-        label: t.label,
-        order: t.order,
-        isActive: t.isActive,
-        color: t.color,
-      })),
     };
 
     res.json(response);
@@ -534,7 +503,6 @@ export const getClientById = async (req: AuthRequest, res: Response): Promise<vo
       include: [
         { model: User, as: 'assignedUser', attributes: ['id', 'name', 'email'], required: false },
         { model: Product, as: 'product', attributes: ['id', 'title'], required: false },
-        { model: VisaStatusTemplate, as: 'visaStatusTemplate', attributes: ['id', 'label', 'order', 'isActive', 'color'], required: false },
         { model: Client, as: 'parent', attributes: ['id', 'name', 'email', 'phone'], required: false },
         { model: Client, as: 'children', attributes: ['id', 'name', 'email', 'phone', 'parentClientId', 'assignedUserId', 'createdAt', 'updatedAt'], required: false },
       ],
@@ -657,11 +625,7 @@ export const createClient = [
     .withMessage('Postal code 00000 is not valid'),
   body('birthDate').optional({ values: 'null' }).isISO8601().withMessage('Birth date must be a valid date'),
   body('relationshipToHolder').optional({ values: 'null' }).isString().isLength({ max: 120 }).withMessage('Relationship to holder must be a valid string'),
-  body('visaCasAppointmentDate').optional({ values: 'null' }).isISO8601().withMessage('CAS appointment date must be a valid date'),
-  body('visaCasAppointmentLocation').optional({ values: 'null' }).isString().isLength({ max: 255 }).withMessage('CAS appointment location must be a valid string'),
-  body('visaConsularAppointmentDate').optional({ values: 'null' }).isISO8601().withMessage('Consular appointment date must be a valid date'),
-  body('visaConsularAppointmentLocation').optional({ values: 'null' }).isString().isLength({ max: 255 }).withMessage('Consular appointment location must be a valid string'),
-  body('visaStatusTemplateId').optional({ values: 'falsy' }).isUUID().withMessage('Visa status template id must be a valid UUID'),
+  body('status').optional().isIn(['active', 'inactive', 'pending']).withMessage('Invalid status'),
   body('productId').optional({ values: 'null' }).isUUID().withMessage('Product id must be a valid UUID'),
   body('parentClientId').optional({ values: 'null' }).isUUID().withMessage('Parent client id must be a valid UUID'),
   body('assignedUserId').optional({ values: 'null' }).isUUID().withMessage('Assigned user id must be a valid UUID'),
@@ -724,25 +688,6 @@ export const createClient = [
         }
       }
 
-      // If not provided, assign default visa status template (same logic as submissions).
-      let visaStatusTemplateId: string | undefined = req.body.visaStatusTemplateId;
-      if (!visaStatusTemplateId) {
-        const defaultVisaStatusTemplateId = await getDefaultVisaStatusTemplateId(companyId);
-        if (!defaultVisaStatusTemplateId) {
-          res.status(400).json({ error: 'No visa status templates configured' });
-          return;
-        }
-        visaStatusTemplateId = defaultVisaStatusTemplateId;
-        req.body.visaStatusTemplateId = visaStatusTemplateId;
-      }
-
-      const visaStatusTemplate = await VisaStatusTemplate.findOne({
-        where: { id: visaStatusTemplateId, companyId },
-      });
-      if (!visaStatusTemplate) {
-        res.status(400).json({ error: 'Visa status template not found' });
-        return;
-      }
       let parentRow: InstanceType<typeof Client> | null = null;
       if (parentClientId) {
         parentRow = await Client.findOne({ where: { id: parentClientId, companyId } });
@@ -778,7 +723,6 @@ export const createClient = [
       await client.reload({
         include: [
           { model: Product, as: 'product', attributes: ['id', 'title'], required: false },
-          { model: VisaStatusTemplate, as: 'visaStatusTemplate', attributes: ['id', 'label', 'order', 'isActive', 'color'], required: false },
           { model: Client, as: 'parent', attributes: ['id', 'name', 'email', 'phone'], required: false },
           { model: Client, as: 'children', attributes: ['id', 'name', 'email', 'phone', 'parentClientId', 'assignedUserId', 'createdAt', 'updatedAt'], required: false },
         ],
@@ -864,11 +808,7 @@ export const updateClient = [
     .withMessage('Postal code 00000 is not valid'),
   body('birthDate').optional({ values: 'null' }).isISO8601().withMessage('Birth date must be a valid date'),
   body('relationshipToHolder').optional({ values: 'null' }).isString().isLength({ max: 120 }).withMessage('Relationship to holder must be a valid string'),
-  body('visaCasAppointmentDate').optional({ values: 'null' }).isISO8601().withMessage('CAS appointment date must be a valid date'),
-  body('visaCasAppointmentLocation').optional({ values: 'null' }).isString().isLength({ max: 255 }).withMessage('CAS appointment location must be a valid string'),
-  body('visaConsularAppointmentDate').optional({ values: 'null' }).isISO8601().withMessage('Consular appointment date must be a valid date'),
-  body('visaConsularAppointmentLocation').optional({ values: 'null' }).isString().isLength({ max: 255 }).withMessage('Consular appointment location must be a valid string'),
-  body('visaStatusTemplateId').optional({ values: 'falsy' }).isUUID().withMessage('Visa status template id must be a valid UUID'),
+  body('status').optional().isIn(['active', 'inactive', 'pending']).withMessage('Invalid status'),
   body('productId').optional({ values: 'null' }).isUUID().withMessage('Product id must be a valid UUID'),
   body('parentClientId').optional({ values: 'null' }).isUUID().withMessage('Parent client id must be a valid UUID'),
   body('totalAmountDue').optional({ values: 'null' }).custom((val) => val === null || val === undefined || (typeof val === 'number' && !Number.isNaN(val) && val >= 0)).withMessage('Total amount due must be a non-negative number or null'),
@@ -928,13 +868,7 @@ export const updateClient = [
       if (req.body.birthDate !== undefined) updates.birthDate = req.body.birthDate;
       if (req.body.relationshipToHolder !== undefined) updates.relationshipToHolder = req.body.relationshipToHolder;
       if (req.body.notes !== undefined) updates.notes = req.body.notes;
-      if (req.body.visaCasAppointmentDate !== undefined) updates.visaCasAppointmentDate = req.body.visaCasAppointmentDate;
-      if (req.body.visaCasAppointmentLocation !== undefined) updates.visaCasAppointmentLocation = req.body.visaCasAppointmentLocation;
-      if (req.body.visaConsularAppointmentDate !== undefined) updates.visaConsularAppointmentDate = req.body.visaConsularAppointmentDate;
-      if (req.body.visaConsularAppointmentLocation !== undefined) updates.visaConsularAppointmentLocation = req.body.visaConsularAppointmentLocation;
-      if (req.body.visaStatusTemplateId !== undefined && req.body.visaStatusTemplateId !== '') {
-        updates.visaStatusTemplateId = req.body.visaStatusTemplateId;
-      }
+      if (req.body.status !== undefined) updates.status = req.body.status;
       if (req.body.productId !== undefined) updates.productId = req.body.productId;
       if (req.body.parentClientId !== undefined) {
         const parentClientId = parseNullableParentClientId(req.body.parentClientId);
@@ -951,15 +885,6 @@ export const updateClient = [
         const product = await Product.findOne({ where: { id: req.body.productId, companyId } });
         if (!product) {
           res.status(400).json({ error: 'Product not found' });
-          return;
-        }
-      }
-      if (req.body.visaStatusTemplateId) {
-        const visaStatusTemplate = await VisaStatusTemplate.findOne({
-          where: { id: req.body.visaStatusTemplateId, companyId },
-        });
-        if (!visaStatusTemplate) {
-          res.status(400).json({ error: 'Visa status template not found' });
           return;
         }
       }
@@ -1007,7 +932,6 @@ export const updateClient = [
         include: [
           { model: User, as: 'assignedUser', attributes: ['id', 'name', 'email'], required: false },
           { model: Product, as: 'product', attributes: ['id', 'title'], required: false },
-          { model: VisaStatusTemplate, as: 'visaStatusTemplate', attributes: ['id', 'label', 'order', 'isActive', 'color'], required: false },
           { model: Client, as: 'parent', attributes: ['id', 'name', 'email', 'phone'], required: false },
           { model: Client, as: 'children', attributes: ['id', 'name', 'email', 'phone', 'parentClientId', 'assignedUserId', 'createdAt', 'updatedAt'], required: false },
         ],
@@ -1307,36 +1231,18 @@ export const getClientStats = async (req: AuthRequest, res: Response): Promise<v
       where.assignedUserId = req.user.id;
     }
 
-    const total = await Client.count({ where });
-    const activeVisaStatusTemplates = await VisaStatusTemplate.findAll({
-      where: { companyId, isActive: true },
-      order: [['order', 'ASC']],
-      attributes: ['id', 'label', 'color'],
-    });
-    const clients = await Client.findAll({
-      where,
-      attributes: ['visaStatusTemplateId'],
-      include: [{ model: VisaStatusTemplate, as: 'visaStatusTemplate', attributes: ['id', 'label', 'color'], required: false }],
-    });
-    const visaStatusCounts: Record<string, { id: string; label: string; color: string | null; count: number }> = {};
-    clients.forEach((client) => {
-      const tpl = (client as any).visaStatusTemplate;
-      if (!tpl?.id) return;
-      if (!visaStatusCounts[tpl.id]) {
-        visaStatusCounts[tpl.id] = { id: tpl.id, label: tpl.label, color: tpl.color ?? null, count: 0 };
-      }
-      visaStatusCounts[tpl.id].count += 1;
-    });
+    const [total, active, inactive, pending] = await Promise.all([
+      Client.count({ where }),
+      Client.count({ where: { ...where, status: 'active' } }),
+      Client.count({ where: { ...where, status: 'inactive' } }),
+      Client.count({ where: { ...where, status: 'pending' } }),
+    ]);
 
     res.json({
       total,
-      visaStatusCounts: Object.values(visaStatusCounts),
-      /** Misma lista que el filtro "Estado de Visa" en clientes (solo activas) */
-      visaStatusTemplates: activeVisaStatusTemplates.map((t) => ({
-        id: t.id,
-        label: t.label,
-        color: t.color ?? null,
-      })),
+      active,
+      inactive,
+      pending,
     });
   } catch (error) {
     console.error('Get client stats error:', error);

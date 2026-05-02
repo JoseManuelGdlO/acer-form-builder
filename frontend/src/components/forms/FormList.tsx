@@ -114,7 +114,7 @@ export const FormList = ({
             <p className="text-muted-foreground mt-1">
               {readOnly
                 ? 'Consulta y duplica formularios existentes'
-                : 'Crea y gestiona formularios para tus clientes de visa'}
+                : 'Crea y gestiona formularios para tus clientes'}
             </p>
           </div>
           {!readOnly && (
@@ -195,7 +195,7 @@ export const FormList = ({
                 id="name"
                 value={newFormName}
                 onChange={e => setNewFormName(e.target.value)}
-                placeholder="Ej: Solicitud de Visa B1/B2"
+                placeholder="Ej: Registro de pasajero"
               />
             </div>
             <div className="space-y-2">

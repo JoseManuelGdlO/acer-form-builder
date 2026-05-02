@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { Client } from '@/types/form';
 import { User as AdvisorUser } from '@/types/user';
 import { Product } from '@/types/product';
-import { VisaStatusTemplate } from '@/types/settings';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -34,7 +33,6 @@ interface ClientFormModalProps {
   defaultAssignedUserId?: string | null;
   hideParentSelector?: boolean;
   products?: Product[];
-  visaStatusTemplates?: VisaStatusTemplate[];
   /** Revisores del listado para asignar asesor (solo admin: nuevo familiar o editar familiar). */
   users?: AdvisorUser[];
   isAdmin?: boolean;
@@ -50,7 +48,6 @@ export const ClientFormModal = ({
   defaultAssignedUserId = null,
   hideParentSelector = false,
   products = [],
-  visaStatusTemplates = [],
   users = [],
   isAdmin = false,
   open,
@@ -66,11 +63,7 @@ export const ClientFormModal = ({
     birthDate: '',
     relationshipToHolder: '',
     notes: '',
-    visaCasAppointmentDate: '',
-    visaCasAppointmentLocation: '',
-    visaConsularAppointmentDate: '',
-    visaConsularAppointmentLocation: '',
-    visaStatusTemplateId: '',
+    status: 'pending' as Client['status'],
     productId: undefined as string | undefined,
     parentClientId: 'none',
     assignedUserId: '__none__' as string,
@@ -95,11 +88,7 @@ export const ClientFormModal = ({
         birthDate: client.birthDate || '',
         relationshipToHolder: client.relationshipToHolder || '',
         notes: client.notes || '',
-        visaCasAppointmentDate: client.visaCasAppointmentDate || '',
-        visaCasAppointmentLocation: client.visaCasAppointmentLocation || '',
-        visaConsularAppointmentDate: client.visaConsularAppointmentDate || '',
-        visaConsularAppointmentLocation: client.visaConsularAppointmentLocation || '',
-        visaStatusTemplateId: client.visaStatusTemplateId || '',
+        status: client.status,
         productId: client.productId || undefined,
         parentClientId: client.parentClientId || 'none',
         assignedUserId: client.assignedUserId ?? '__none__',
@@ -114,11 +103,7 @@ export const ClientFormModal = ({
         birthDate: '',
         relationshipToHolder: '',
         notes: '',
-        visaCasAppointmentDate: '',
-        visaCasAppointmentLocation: '',
-        visaConsularAppointmentDate: '',
-        visaConsularAppointmentLocation: '',
-        visaStatusTemplateId: visaStatusTemplates[0]?.id || '',
+        status: 'pending',
         productId: undefined,
         parentClientId: defaultParentClientId || 'none',
         assignedUserId: advisorValueForNewFamily,
@@ -128,21 +113,11 @@ export const ClientFormModal = ({
     setPhoneError('');
     setPostalCodeError('');
     setIsLoading(false);
-    // No incluir `users` ni `visaStatusTemplates` en deps: el padre las refresca con
+    // No incluir `users` en deps: el padre las refresca con
     // clientes/submissions (polling, SW de WhatsApp) y nuevas referencias de array
     // vaciarían el borrador. El otro useEffect aplica la plantilla por defecto al cargar.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intencional: solo al abrir / cambiar cliente
   }, [client, open, defaultParentClientId, defaultAssignedUserId, isAdmin]);
-
-  useEffect(() => {
-    if (!open || client || formData.visaStatusTemplateId || visaStatusTemplates.length === 0) {
-      return;
-    }
-    setFormData((prev) => ({
-      ...prev,
-      visaStatusTemplateId: visaStatusTemplates[0].id,
-    }));
-  }, [open, client, formData.visaStatusTemplateId, visaStatusTemplates]);
 
   const validatePhone = (value: string): boolean => {
     if (!value || value.trim() === '+') {
@@ -204,10 +179,6 @@ export const ClientFormModal = ({
         relationshipToHolder: formData.relationshipToHolder.trim() || null,
         phone: formData.phone || '',
         postalCode: formData.postalCode.trim() ? Number(formData.postalCode) : null,
-        visaCasAppointmentDate: formData.visaCasAppointmentDate || null,
-        visaCasAppointmentLocation: formData.visaCasAppointmentLocation.trim() || null,
-        visaConsularAppointmentDate: formData.visaConsularAppointmentDate || null,
-        visaConsularAppointmentLocation: formData.visaConsularAppointmentLocation.trim() || null,
         parentClientId: formData.parentClientId === 'none' ? null : formData.parentClientId,
       };
       if (isAdmin && (isFamilyNew || isEditFamily)) {
@@ -412,70 +383,22 @@ export const ClientFormModal = ({
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="visaStatusTemplateId">Estado de visa *</Label>
+            <Label htmlFor="status">Estado del cliente</Label>
             <Select
-              value={formData.visaStatusTemplateId}
-              onValueChange={(value) => setFormData(prev => ({ ...prev, visaStatusTemplateId: value }))}
+              value={formData.status}
+              onValueChange={(value) =>
+                setFormData((prev) => ({ ...prev, status: value as Client['status'] }))
+              }
             >
-              <SelectTrigger id="visaStatusTemplateId">
-                <SelectValue placeholder="Selecciona un estado de visa" />
+              <SelectTrigger id="status">
+                <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {visaStatusTemplates.map((template) => (
-                  <SelectItem key={template.id} value={template.id}>
-                    <span className="flex items-center gap-2">
-                      <span
-                        className="h-2.5 w-2.5 shrink-0 rounded-full border border-border/60"
-                        style={{ backgroundColor: template.color || '#94a3b8' }}
-                      />
-                      {template.label}
-                    </span>
-                  </SelectItem>
-                ))}
+                <SelectItem value="pending">Pendiente</SelectItem>
+                <SelectItem value="active">Activo</SelectItem>
+                <SelectItem value="inactive">Inactivo</SelectItem>
               </SelectContent>
             </Select>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label htmlFor="visaCasAppointmentDate">Fecha cita CAS</Label>
-              <Input
-                id="visaCasAppointmentDate"
-                type="date"
-                value={formData.visaCasAppointmentDate}
-                onChange={e => setFormData(prev => ({ ...prev, visaCasAppointmentDate: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="visaCasAppointmentLocation">Lugar cita CAS</Label>
-              <Input
-                id="visaCasAppointmentLocation"
-                value={formData.visaCasAppointmentLocation}
-                onChange={e => setFormData(prev => ({ ...prev, visaCasAppointmentLocation: e.target.value }))}
-                placeholder="Ej: CAS Monterrey"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label htmlFor="visaConsularAppointmentDate">Fecha cita Consulado</Label>
-              <Input
-                id="visaConsularAppointmentDate"
-                type="date"
-                value={formData.visaConsularAppointmentDate}
-                onChange={e => setFormData(prev => ({ ...prev, visaConsularAppointmentDate: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="visaConsularAppointmentLocation">Lugar cita Consulado</Label>
-              <Input
-                id="visaConsularAppointmentLocation"
-                value={formData.visaConsularAppointmentLocation}
-                onChange={e => setFormData(prev => ({ ...prev, visaConsularAppointmentLocation: e.target.value }))}
-                placeholder="Ej: Consulado CDMX"
-              />
-            </div>
           </div>
 
           {!defaultParentClientId && !hideParentSelector && (

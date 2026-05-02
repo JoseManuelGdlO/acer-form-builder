@@ -317,7 +317,7 @@ class ApiClient {
       assignedUserId?: string;
       branchId?: string;
       productId?: string;
-      visaStatusTemplateId?: string;
+      status?: 'active' | 'inactive' | 'pending';
       checklistTemplateId?: string;
       checklistMode?: 'completed' | 'not_completed';
       page?: number;
@@ -333,7 +333,6 @@ class ApiClient {
       data: any[];
       meta: { page: number; limit: number; total: number; totalPages: number };
       templates?: any[];
-      visaStatusTemplates?: any[];
     }>(`/clients${queryParams ? `?${queryParams}` : ''}`, {
       method: 'GET',
       token: token ?? this.getToken(),
@@ -574,6 +573,20 @@ class ApiClient {
     });
   }
 
+  async getTripStats(token?: string | null) {
+    return this.request<{
+      upcomingTrips: number;
+      departingIn30Days: number;
+      totalSeatsUpcoming: number;
+      participantCountUpcoming: number;
+      occupancyRate: number;
+    }>('/trips/stats', {
+      method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
   async getTrip(id: string, token?: string | null) {
     const res = await this.request<any>(`/trips/${id}`, {
       method: 'GET',
@@ -691,11 +704,6 @@ class ApiClient {
     notes?: string;
     busTemplateId?: string | null;
     invitedCompanyIds?: string[];
-    isVisaTrip?: boolean;
-    casDepartureDate?: string;
-    casReturnDate?: string;
-    consulateDepartureDate?: string;
-    consulateReturnDate?: string;
   }, token?: string | null) {
     return this.request<any>('/trips', {
       method: 'POST',
@@ -716,11 +724,6 @@ class ApiClient {
       notes?: string;
       busTemplateId?: string | null;
       invitedCompanyIds?: string[];
-      isVisaTrip?: boolean;
-      casDepartureDate?: string | null;
-      casReturnDate?: string | null;
-      consulateDepartureDate?: string | null;
-      consulateReturnDate?: string | null;
     },
     token?: string | null
   ) {
@@ -1178,41 +1181,6 @@ class ApiClient {
     });
   }
 
-  // Visa status templates
-  async getVisaStatusTemplates(token?: string | null) {
-    return this.request<any[]>('/visa-status-templates', {
-      method: 'GET',
-      token: token ?? this.getToken(),
-      requireAuth: true,
-    });
-  }
-
-  async createVisaStatusTemplate(templateData: any, token?: string | null) {
-    return this.request<any>('/visa-status-templates', {
-      method: 'POST',
-      token: token ?? this.getToken(),
-      requireAuth: true,
-      body: JSON.stringify(templateData),
-    });
-  }
-
-  async updateVisaStatusTemplate(id: string, templateData: any, token?: string | null) {
-    return this.request<any>(`/visa-status-templates/${id}`, {
-      method: 'PUT',
-      token: token ?? this.getToken(),
-      requireAuth: true,
-      body: JSON.stringify(templateData),
-    });
-  }
-
-  async deleteVisaStatusTemplate(id: string, token?: string | null) {
-    return this.request<{ message: string }>(`/visa-status-templates/${id}`, {
-      method: 'DELETE',
-      token: token ?? this.getToken(),
-      requireAuth: true,
-    });
-  }
-
   // Branches (sucursales)
   async getBranches(token?: string | null) {
     return this.request<any[]>('/branches', {
@@ -1484,7 +1452,7 @@ class ApiClient {
     });
   }
 
-  // Products (visas)
+  // Products (catálogo comercial)
   async getProducts(token?: string | null) {
     return this.request<any[]>('/products', {
       method: 'GET',

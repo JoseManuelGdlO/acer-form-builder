@@ -21,32 +21,6 @@ import {
 import { AuthRequest } from '../middleware/auth.middleware';
 import { hasPermission } from '../authorization/policies';
 
-function parseBoolVisa(v: unknown): boolean {
-  return v === true || v === 'true';
-}
-
-function validateVisaTripDates(d: {
-  casDepartureDate: string | null | undefined;
-  casReturnDate: string | null | undefined;
-  consulateDepartureDate: string | null | undefined;
-  consulateReturnDate: string | null | undefined;
-}): string | null {
-  const { casDepartureDate, casReturnDate, consulateDepartureDate, consulateReturnDate } = d;
-  if (!casDepartureDate || !casReturnDate || !consulateDepartureDate || !consulateReturnDate) {
-    return 'Las cuatro fechas del viaje de visas son obligatorias';
-  }
-  if (casDepartureDate > casReturnDate) {
-    return 'CAS: la fecha de regreso debe ser posterior o igual a la de salida';
-  }
-  if (consulateDepartureDate > consulateReturnDate) {
-    return 'Consulado: la fecha de regreso debe ser posterior o igual a la de salida';
-  }
-  if (casReturnDate > consulateDepartureDate) {
-    return 'La salida al consulado debe ser el mismo día o posterior al regreso del CAS';
-  }
-  return null;
-}
-
 function requireTripPermission(req: AuthRequest, res: Response, key: string): boolean {
   if (!req.user) {
     res.status(401).json({ error: 'Authentication required' });
@@ -137,6 +111,89 @@ export const getAllTrips = async (req: AuthRequest, res: Response): Promise<void
     res.json(list);
   } catch (error) {
     console.error('Get all trips error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+/** Viajes visibles para la empresa (mismos ids que GET /trips). */
+async function tripIdsForCompany(companyId: string): Promise<string[]> {
+  const rows = await TripCompany.findAll({
+    where: { companyId },
+    attributes: ['tripId'],
+    raw: true,
+  });
+  return rows.map((r: any) => r.tripId).filter(Boolean);
+}
+
+export const getTripStats = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    if (!requireTripPermission(req, res, 'trips.view')) return;
+    const companyId = req.user?.companyId;
+    if (!companyId) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+    const tripIds = await tripIdsForCompany(companyId);
+    if (tripIds.length === 0) {
+      res.json({
+        upcomingTrips: 0,
+        departingIn30Days: 0,
+        totalSeatsUpcoming: 0,
+        participantCountUpcoming: 0,
+        occupancyRate: 0,
+      });
+      return;
+    }
+
+    const today = new Date();
+    const todayStr = today.toISOString().slice(0, 10);
+    const end30 = new Date(today);
+    end30.setDate(end30.getDate() + 30);
+    const end30Str = end30.toISOString().slice(0, 10);
+
+    const baseWhere = { id: { [Op.in]: tripIds } };
+
+    const upcomingTrips = await Trip.count({
+      where: { ...baseWhere, returnDate: { [Op.gte]: todayStr } },
+    });
+
+    const departingIn30Days = await Trip.count({
+      where: {
+        ...baseWhere,
+        departureDate: { [Op.between]: [todayStr, end30Str] },
+      },
+    });
+
+    const upcomingRows = await Trip.findAll({
+      where: { ...baseWhere, returnDate: { [Op.gte]: todayStr } },
+      attributes: ['id', 'totalSeats'],
+      raw: true,
+    });
+    const upcomingTripIds = upcomingRows.map((r: any) => r.id);
+    const totalSeatsUpcoming = upcomingRows.reduce(
+      (s, r: any) => s + (Number(r.total_seats ?? r.totalSeats) || 0),
+      0
+    );
+
+    const participantCountUpcoming =
+      upcomingTripIds.length === 0
+        ? 0
+        : await TripParticipant.count({
+            where: { tripId: { [Op.in]: upcomingTripIds } },
+          });
+
+    const occupancyRate =
+      totalSeatsUpcoming > 0 ? Math.round((participantCountUpcoming / totalSeatsUpcoming) * 100) : 0;
+
+    res.json({
+      upcomingTrips,
+      departingIn30Days,
+      totalSeatsUpcoming,
+      participantCountUpcoming,
+      occupancyRate,
+    });
+  } catch (error) {
+    console.error('Get trip stats error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -315,52 +372,16 @@ export const createTrip = [
         return;
       }
       const companyId = req.user!.companyId;
-      const {
-        title,
-        totalSeats,
-        destination,
-        notes,
-        busTemplateId,
-        invitedCompanyIds,
-        isVisaTrip: isVisaTripBody,
-        casDepartureDate,
-        casReturnDate,
-        consulateDepartureDate,
-        consulateReturnDate,
-      } = req.body;
-      const isVisa = parseBoolVisa(isVisaTripBody);
-      let departureDate: string = req.body.departureDate;
-      let returnDate: string = req.body.returnDate;
-      let casDep: string | null = null;
-      let casRet: string | null = null;
-      let conDep: string | null = null;
-      let conRet: string | null = null;
-      if (isVisa) {
-        casDep = casDepartureDate;
-        casRet = casReturnDate;
-        conDep = consulateDepartureDate;
-        conRet = consulateReturnDate;
-        const visaErr = validateVisaTripDates({
-          casDepartureDate: casDep,
-          casReturnDate: casRet,
-          consulateDepartureDate: conDep,
-          consulateReturnDate: conRet,
-        });
-        if (visaErr) {
-          res.status(400).json({ error: visaErr });
-          return;
-        }
-        departureDate = casDep!;
-        returnDate = conRet!;
-      } else {
-        if (!departureDate || !returnDate) {
-          res.status(400).json({ error: 'Fechas de partida y regreso son obligatorias' });
-          return;
-        }
-        if (returnDate < departureDate) {
-          res.status(400).json({ error: 'La fecha de regreso debe ser posterior o igual a la de partida' });
-          return;
-        }
+      const { title, totalSeats, destination, notes, busTemplateId, invitedCompanyIds } = req.body;
+      const departureDate: string = req.body.departureDate;
+      const returnDate: string = req.body.returnDate;
+      if (!departureDate || !returnDate) {
+        res.status(400).json({ error: 'Fechas de partida y regreso son obligatorias' });
+        return;
+      }
+      if (returnDate < departureDate) {
+        res.status(400).json({ error: 'La fecha de regreso debe ser posterior o igual a la de partida' });
+        return;
       }
       let busTemplateIdToSet: string | null = null;
       if (busTemplateId) {
@@ -376,11 +397,6 @@ export const createTrip = [
         title,
         departureDate,
         returnDate,
-        isVisaTrip: isVisa,
-        casDepartureDate: isVisa ? casDep : null,
-        casReturnDate: isVisa ? casRet : null,
-        consulateDepartureDate: isVisa ? conDep : null,
-        consulateReturnDate: isVisa ? conRet : null,
         totalSeats: Number(totalSeats),
         destination: destination || null,
         notes: notes || null,
@@ -409,11 +425,6 @@ export const createTrip = [
           departureDate,
           returnDate,
           totalSeats,
-          isVisaTrip: isVisa,
-          casDepartureDate: casDep,
-          casReturnDate: casRet,
-          consulateDepartureDate: conDep,
-          consulateReturnDate: conRet,
         }),
       });
       for (const cid of validIds) {
@@ -468,8 +479,6 @@ export const updateTrip = [
         return;
       }
       const t = trip as any;
-      const finalIsVisa =
-        req.body.isVisaTrip !== undefined ? parseBoolVisa(req.body.isVisaTrip) : Boolean(t.isVisaTrip);
 
       const updates: Record<string, any> = {};
       const fieldsNoDates = ['title', 'totalSeats', 'destination', 'notes'] as const;
@@ -488,89 +497,32 @@ export const updateTrip = [
         }
       }
 
-      if (finalIsVisa) {
-        const casD = req.body.casDepartureDate !== undefined ? req.body.casDepartureDate : t.casDepartureDate;
-        const casR = req.body.casReturnDate !== undefined ? req.body.casReturnDate : t.casReturnDate;
-        const conD = req.body.consulateDepartureDate !== undefined ? req.body.consulateDepartureDate : t.consulateDepartureDate;
-        const conR = req.body.consulateReturnDate !== undefined ? req.body.consulateReturnDate : t.consulateReturnDate;
-        const visaErr = validateVisaTripDates({
-          casDepartureDate: casD,
-          casReturnDate: casR,
-          consulateDepartureDate: conD,
-          consulateReturnDate: conR,
-        });
-        if (visaErr) {
-          res.status(400).json({ error: visaErr });
+      const dep = req.body.departureDate !== undefined ? req.body.departureDate : t.departureDate;
+      const ret = req.body.returnDate !== undefined ? req.body.returnDate : t.returnDate;
+      if (req.body.departureDate !== undefined || req.body.returnDate !== undefined) {
+        if (!dep || !ret) {
+          res.status(400).json({ error: 'Fechas de partida y regreso son obligatorias' });
           return;
         }
-        const visaPatch = {
-          isVisaTrip: true,
-          casDepartureDate: casD,
-          casReturnDate: casR,
-          consulateDepartureDate: conD,
-          consulateReturnDate: conR,
-          departureDate: casD,
-          returnDate: conR,
-        };
-        for (const [key, newVal] of Object.entries(visaPatch)) {
-          const oldVal = t[key];
-          if (oldVal !== newVal && (oldVal != null || newVal != null)) {
-            await logTripChange(id, req.user!.id, 'trip_updated', {
-              fieldName: key,
-              oldValue: oldVal != null ? String(oldVal) : null,
-              newValue: newVal != null ? String(newVal) : null,
-            });
-          }
-          (updates as any)[key] = newVal;
+        if (ret < dep) {
+          res.status(400).json({ error: 'La fecha de regreso debe ser posterior o igual a la de partida' });
+          return;
         }
-      } else {
-        if (req.body.isVisaTrip !== undefined && !parseBoolVisa(req.body.isVisaTrip)) {
-          for (const key of ['casDepartureDate', 'casReturnDate', 'consulateDepartureDate', 'consulateReturnDate'] as const) {
-            if (t[key] != null) {
-              await logTripChange(id, req.user!.id, 'trip_updated', {
-                fieldName: key,
-                oldValue: String(t[key]),
-                newValue: '',
-              });
-            }
-          }
-          updates.isVisaTrip = false;
-          updates.casDepartureDate = null;
-          updates.casReturnDate = null;
-          updates.consulateDepartureDate = null;
-          updates.consulateReturnDate = null;
+        if (req.body.departureDate !== undefined && String(t.departureDate) !== String(dep)) {
+          await logTripChange(id, req.user!.id, 'trip_updated', {
+            fieldName: 'departureDate',
+            oldValue: t.departureDate != null ? String(t.departureDate) : null,
+            newValue: String(dep),
+          });
+          updates.departureDate = dep;
         }
-        const dep = req.body.departureDate !== undefined ? req.body.departureDate : t.departureDate;
-        const ret = req.body.returnDate !== undefined ? req.body.returnDate : t.returnDate;
-        if (req.body.departureDate !== undefined || req.body.returnDate !== undefined || (req.body.isVisaTrip !== undefined && !finalIsVisa)) {
-          if (!dep || !ret) {
-            res.status(400).json({ error: 'Fechas de partida y regreso son obligatorias' });
-            return;
-          }
-          if (ret < dep) {
-            res.status(400).json({ error: 'La fecha de regreso debe ser posterior o igual a la de partida' });
-            return;
-          }
-          if (req.body.departureDate !== undefined && String(t.departureDate) !== String(dep)) {
-            await logTripChange(id, req.user!.id, 'trip_updated', {
-              fieldName: 'departureDate',
-              oldValue: t.departureDate != null ? String(t.departureDate) : null,
-              newValue: String(dep),
-            });
-            updates.departureDate = dep;
-          }
-          if (req.body.returnDate !== undefined && String(t.returnDate) !== String(ret)) {
-            await logTripChange(id, req.user!.id, 'trip_updated', {
-              fieldName: 'returnDate',
-              oldValue: t.returnDate != null ? String(t.returnDate) : null,
-              newValue: String(ret),
-            });
-            updates.returnDate = ret;
-          }
-          if (req.body.isVisaTrip !== undefined && !finalIsVisa && req.body.departureDate === undefined && req.body.returnDate === undefined) {
-            updates.departureDate = dep;
-            updates.returnDate = ret;
-          }
+        if (req.body.returnDate !== undefined && String(t.returnDate) !== String(ret)) {
+          await logTripChange(id, req.user!.id, 'trip_updated', {
+            fieldName: 'returnDate',
+            oldValue: t.returnDate != null ? String(t.returnDate) : null,
+            newValue: String(ret),
+          });
+          updates.returnDate = ret;
         }
       }
       if (req.body.totalSeats !== undefined) {
@@ -1153,19 +1105,7 @@ export const getTripInvitations = async (req: AuthRequest, res: Response): Promi
         {
           model: Trip,
           as: 'trip',
-          attributes: [
-            'id',
-            'title',
-            'destination',
-            'departureDate',
-            'returnDate',
-            'totalSeats',
-            'isVisaTrip',
-            'casDepartureDate',
-            'casReturnDate',
-            'consulateDepartureDate',
-            'consulateReturnDate',
-          ],
+          attributes: ['id', 'title', 'destination', 'departureDate', 'returnDate', 'totalSeats'],
         },
         { model: User, as: 'invitedByUser', attributes: ['id', 'name', 'email'] },
       ],

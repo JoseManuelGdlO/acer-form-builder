@@ -40,8 +40,7 @@ function mapParticipant(p: any) {
     phone: client.phone,
     address: client.address,
     notes: client.notes,
-    visaStatusTemplateId: client.visa_status_template_id ?? client.visaStatusTemplateId ?? '',
-    visaStatusTemplate: client.visa_status_template ?? client.visaStatusTemplate ?? null,
+    status: (client.status as TripParticipantClient['status']) ?? 'pending',
     formsCompleted: client.forms_completed ?? client.formsCompleted ?? 0,
     assignedUserId: client.assigned_user_id ?? client.assignedUserId,
     parentClientId: client.parent_client_id ?? client.parentClientId ?? null,
@@ -164,11 +163,6 @@ function mapTrip(raw: any): Trip {
     destination: raw.destination ?? null,
     departureDate: raw.departure_date ?? raw.departureDate,
     returnDate: raw.return_date ?? raw.returnDate,
-    isVisaTrip: Boolean(raw.is_visa_trip ?? raw.isVisaTrip),
-    casDepartureDate: raw.cas_departure_date ?? raw.casDepartureDate ?? null,
-    casReturnDate: raw.cas_return_date ?? raw.casReturnDate ?? null,
-    consulateDepartureDate: raw.consulate_departure_date ?? raw.consulateDepartureDate ?? null,
-    consulateReturnDate: raw.consulate_return_date ?? raw.consulateReturnDate ?? null,
     notes: raw.notes ?? null,
     totalSeats: raw.total_seats ?? raw.totalSeats,
     companyId: raw.company_id ?? raw.companyId,
@@ -198,11 +192,6 @@ function mapInvitation(raw: any): TripInvitation {
           departureDate: trip.departure_date ?? trip.departureDate,
           returnDate: trip.return_date ?? trip.returnDate,
           totalSeats: trip.total_seats ?? trip.totalSeats,
-          isVisaTrip: Boolean(trip.is_visa_trip ?? trip.isVisaTrip),
-          casDepartureDate: trip.cas_departure_date ?? trip.casDepartureDate ?? null,
-          casReturnDate: trip.cas_return_date ?? trip.casReturnDate ?? null,
-          consulateDepartureDate: trip.consulate_departure_date ?? trip.consulateDepartureDate ?? null,
-          consulateReturnDate: trip.consulate_return_date ?? trip.consulateReturnDate ?? null,
         }
       : undefined,
     invitedCompanyId: raw.invited_company_id ?? raw.invitedCompanyId,
@@ -346,11 +335,6 @@ export const useTripStore = () => {
         notes?: string;
         busTemplateId?: string | null;
         invitedCompanyIds?: string[];
-        isVisaTrip?: boolean;
-        casDepartureDate?: string;
-        casReturnDate?: string;
-        consulateDepartureDate?: string;
-        consulateReturnDate?: string;
       }
     ) => {
       const created = await api.createTrip(data, token);
@@ -374,11 +358,6 @@ export const useTripStore = () => {
         notes?: string;
         busTemplateId?: string | null;
         invitedCompanyIds?: string[];
-        isVisaTrip?: boolean;
-        casDepartureDate?: string | null;
-        casReturnDate?: string | null;
-        consulateDepartureDate?: string | null;
-        consulateReturnDate?: string | null;
       }
     ) => {
       const updated = await api.updateTrip(tripId, data, token);

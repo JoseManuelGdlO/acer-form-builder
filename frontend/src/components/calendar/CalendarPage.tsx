@@ -115,7 +115,7 @@ export const CalendarPage = () => {
             <div>
               <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">Calendario</h1>
               <p className="text-muted-foreground mt-1 max-w-xl">
-                Citas internas, CAS, Consulado y viajes. Filtra por sucursal; en oficina el distintivo muestra la
+                Citas internas y fechas de viajes. Filtra por sucursal; en oficina el distintivo muestra la
                 sucursal y el nombre del cliente va en el título.
               </p>
             </div>

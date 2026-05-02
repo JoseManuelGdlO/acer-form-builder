@@ -2,7 +2,6 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { Client } from '@/types/form';
 import { User } from '@/types/user';
 import { Product } from '@/types/product';
-import { VisaStatusTemplate } from '@/types/settings';
 import { ClientCard } from './ClientCard';
 import { ClientFormModal } from './ClientFormModal';
 import { ClientProfileView } from './ClientProfileView';
@@ -33,11 +32,12 @@ import { api } from '@/lib/api';
 interface ClientListProps {
   clients: Client[];
   products?: Product[];
-  visaStatusTemplates?: VisaStatusTemplate[];
-  /** Conteos reales por plantilla (GET /clients/stats); si falta, los chips usan solo la página actual */
-  visaStatusCountsByTemplateId?: Record<string, number>;
   stats: {
     total: number;
+    /** Conteos del alcance actual (GET /clients/stats), para pastillas aunque la lista vaya paginada */
+    active?: number;
+    inactive?: number;
+    pending?: number;
   };
   onDelete: (clientId: string) => Promise<void>;
   onCreate: (clientData: Omit<Client, 'id' | 'createdAt' | 'updatedAt' | 'formsCompleted'>) => Promise<void>;
@@ -53,7 +53,7 @@ interface ClientListProps {
   };
   initialQuery?: {
     q?: string;
-    visaStatusTemplateId?: string;
+    status?: 'active' | 'inactive' | 'pending';
     checklistTemplateId?: string;
     checklistMode?: 'completed' | 'not_completed';
     productId?: string;
@@ -62,7 +62,7 @@ interface ClientListProps {
   };
   onFiltersChange: (filters: {
     q?: string;
-    visaStatusTemplateId?: string;
+    status?: 'active' | 'inactive' | 'pending';
     checklistTemplateId?: string;
     checklistMode?: 'completed' | 'not_completed';
     productId?: string;
@@ -75,15 +75,13 @@ interface ClientListProps {
 type ChecklistFilterType = 'all' | string; // 'all' or templateId
 type ChecklistMode = 'completed' | 'not_completed';
 type ProductFilterType = 'all' | string;
-type VisaStatusFilterType = 'all' | string;
+type ClientStatusFilterType = 'all' | 'active' | 'inactive' | 'pending';
 type BranchFilterType = 'all' | string;
 type AdvisorFilterType = 'all' | string;
 
 export const ClientList = ({
   clients,
   products = [],
-  visaStatusTemplates = [],
-  visaStatusCountsByTemplateId,
   stats,
   onDelete,
   onCreate,
@@ -97,7 +95,9 @@ export const ClientList = ({
   onPageChange,
 }: ClientListProps) => {
   const [searchQuery, setSearchQuery] = useState(initialQuery?.q || '');
-  const [visaStatusFilter, setVisaStatusFilter] = useState<VisaStatusFilterType>(initialQuery?.visaStatusTemplateId || 'all');
+  const [clientStatusFilter, setClientStatusFilter] = useState<ClientStatusFilterType>(
+    initialQuery?.status || 'all'
+  );
   const [checklistFilter, setChecklistFilter] = useState<ChecklistFilterType>(initialQuery?.checklistTemplateId || 'all');
   const [checklistMode, setChecklistMode] = useState<ChecklistMode>(initialQuery?.checklistMode || 'completed');
   const [productFilter, setProductFilter] = useState<ProductFilterType>(initialQuery?.productId || 'all');
@@ -249,7 +249,7 @@ export const ClientList = ({
     const timeout = window.setTimeout(() => {
       onFiltersChange({
         q: searchQuery.trim() || undefined,
-        visaStatusTemplateId: visaStatusFilter === 'all' ? undefined : visaStatusFilter,
+        status: clientStatusFilter === 'all' ? undefined : clientStatusFilter,
         checklistTemplateId: checklistFilter === 'all' ? undefined : checklistFilter,
         checklistMode: checklistFilter === 'all' ? undefined : checklistMode,
         productId: productFilter === 'all' ? undefined : productFilter,
@@ -264,7 +264,7 @@ export const ClientList = ({
     return () => window.clearTimeout(timeout);
   }, [
     searchQuery,
-    visaStatusFilter,
+    clientStatusFilter,
     checklistFilter,
     checklistMode,
     productFilter,
@@ -350,12 +350,7 @@ export const ClientList = ({
     birthDate: raw.birth_date ?? raw.birthDate ?? null,
     relationshipToHolder: raw.relationship_to_holder ?? raw.relationshipToHolder ?? null,
     notes: raw.notes ?? '',
-    visaCasAppointmentDate: raw.visa_cas_appointment_date ?? raw.visaCasAppointmentDate ?? null,
-    visaCasAppointmentLocation: raw.visa_cas_appointment_location ?? raw.visaCasAppointmentLocation ?? null,
-    visaConsularAppointmentDate: raw.visa_consular_appointment_date ?? raw.visaConsularAppointmentDate ?? null,
-    visaConsularAppointmentLocation: raw.visa_consular_appointment_location ?? raw.visaConsularAppointmentLocation ?? null,
-    visaStatusTemplateId: raw.visa_status_template_id ?? raw.visaStatusTemplateId ?? '',
-    visaStatusTemplate: raw.visa_status_template ?? raw.visaStatusTemplate ?? null,
+    status: (raw.status as Client['status']) ?? 'pending',
     formsCompleted: raw.forms_completed ?? raw.formsCompleted ?? 0,
     assignedUserId: raw.assigned_user_id ?? raw.assignedUserId,
     assignedUser: raw.assigned_user ?? raw.assignedUser ?? null,
@@ -389,50 +384,30 @@ export const ClientList = ({
     nextOfficeAppointment: raw.nextOfficeAppointment || raw.next_office_appointment || null,
   });
 
-  const visaStatusFilterButtons = useMemo(() => {
-    const countsMap = visaStatusCountsByTemplateId ?? {};
-    const hasServerVisaCounts = Object.keys(countsMap).length > 0;
-    const useServerVisaCounts =
-      hasServerVisaCounts &&
-      visaStatusFilter === 'all' &&
-      !searchQuery.trim() &&
-      checklistFilter === 'all' &&
-      productFilter === 'all' &&
-      branchFilter === 'all' &&
-      advisorFilter === 'all';
-
-    const buttons: { key: VisaStatusFilterType; label: string; icon: React.ReactNode; count: number }[] = [
-      { key: 'all', label: 'Todos', icon: <Users className="w-4 h-4" />, count: stats.total },
-    ];
-    visaStatusTemplates.forEach((template) => {
-      const count = useServerVisaCounts
-        ? (countsMap[template.id] ?? 0)
-        : clients.filter((client) => client.visaStatusTemplateId === template.id).length;
-      buttons.push({
-        key: template.id,
-        label: template.label,
-        icon: (
-          <CheckCircle2
-            className="w-4 h-4"
-            style={template.color ? { color: template.color } : undefined}
-          />
-        ),
-        count,
-      });
-    });
-    return buttons;
-  }, [
-    clients,
-    stats.total,
-    visaStatusTemplates,
-    visaStatusCountsByTemplateId,
-    searchQuery,
-    visaStatusFilter,
-    checklistFilter,
-    productFilter,
-    branchFilter,
-    advisorFilter,
-  ]);
+  const clientStatusFilterButtons = useMemo(() => {
+    const keys: ClientStatusFilterType[] = ['all', 'active', 'inactive', 'pending'];
+    const labels: Record<ClientStatusFilterType, string> = {
+      all: 'Todos',
+      active: 'Activos',
+      inactive: 'Inactivos',
+      pending: 'Pendientes',
+    };
+    return keys.map((key) => ({
+      key,
+      label: labels[key],
+      icon: <CheckCircle2 className="w-4 h-4" />,
+      count:
+        key === 'all'
+          ? stats.total
+          : key === 'active' && typeof stats.active === 'number'
+            ? stats.active
+            : key === 'inactive' && typeof stats.inactive === 'number'
+              ? stats.inactive
+              : key === 'pending' && typeof stats.pending === 'number'
+                ? stats.pending
+                : clients.filter((c) => c.status === key).length,
+    }));
+  }, [clients, stats.total, stats.active, stats.inactive, stats.pending]);
 
   const checklistFilterButtons = useMemo(() => {
     const buttons: { key: ChecklistFilterType; label: string; icon: React.ReactNode; count: number; color: string }[] = [
@@ -480,16 +455,16 @@ export const ClientList = ({
 
   const hasActiveFilters = useMemo(() => {
     return (
-      visaStatusFilter !== 'all' ||
+      clientStatusFilter !== 'all' ||
       checklistFilter !== 'all' ||
       productFilter !== 'all' ||
       (isAdmin && branchFilter !== 'all') ||
       (isAdmin && advisorFilter !== 'all')
     );
-  }, [visaStatusFilter, checklistFilter, productFilter, isAdmin, branchFilter, advisorFilter]);
+  }, [clientStatusFilter, checklistFilter, productFilter, isAdmin, branchFilter, advisorFilter]);
 
   const clearFilters = () => {
-    setVisaStatusFilter('all');
+    setClientStatusFilter('all');
     setChecklistFilter('all');
     setChecklistMode('completed');
     setProductFilter('all');
@@ -537,7 +512,6 @@ export const ClientList = ({
           availableClients={clients}
           hideParentSelector={!editingClient}
           products={products}
-          visaStatusTemplates={visaStatusTemplates}
           users={users}
           isAdmin={isAdmin}
           defaultAssignedUserId={familyFormParent?.assignedUserId ?? null}
@@ -633,7 +607,7 @@ export const ClientList = ({
             </h3>
             <p className="text-muted-foreground mb-4">
               {searchQuery ||
-              visaStatusFilter !== 'all' ||
+              clientStatusFilter !== 'all' ||
               checklistFilter !== 'all' ||
               productFilter !== 'all' ||
               (isAdmin && branchFilter !== 'all') ||
@@ -642,7 +616,7 @@ export const ClientList = ({
                 : 'Comienza agregando tu primer cliente'}
             </p>
             {!searchQuery &&
-              visaStatusFilter === 'all' &&
+              clientStatusFilter === 'all' &&
               checklistFilter === 'all' &&
               productFilter === 'all' &&
               (!isAdmin || (branchFilter === 'all' && advisorFilter === 'all')) && (
@@ -700,7 +674,6 @@ export const ClientList = ({
           availableClients={clients}
           hideParentSelector={!editingClient}
           products={products}
-          visaStatusTemplates={visaStatusTemplates}
           users={users}
           isAdmin={isAdmin}
           defaultAssignedUserId={familyFormParent?.assignedUserId ?? null}
@@ -726,14 +699,14 @@ export const ClientList = ({
 
             <div className="space-y-6">
               <div>
-                <h3 className="text-xs font-medium text-muted-foreground mb-2">Filtro por Estado de Visa</h3>
+                <h3 className="text-xs font-medium text-muted-foreground mb-2">Estado del cliente</h3>
                 <div className="flex flex-wrap gap-2">
-                  {visaStatusFilterButtons.map(filter => (
+                  {clientStatusFilterButtons.map(filter => (
                     <button
                       key={filter.key}
-                      onClick={() => setVisaStatusFilter(filter.key)}
+                      onClick={() => setClientStatusFilter(filter.key)}
                       className={`px-3 py-1.5 rounded-lg border transition-all duration-200 flex items-center gap-2 ${
-                        visaStatusFilter === filter.key
+                        clientStatusFilter === filter.key
                           ? 'border-primary bg-primary/5 shadow-sm'
                           : 'border-border/50 hover:border-primary/30 hover:bg-muted/30'
                       }`}

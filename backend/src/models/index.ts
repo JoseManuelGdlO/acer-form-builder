@@ -37,7 +37,6 @@ import { NotificationRecipient } from './NotificationRecipient';
 import { Product } from './Product';
 import { ProductCategory } from './ProductCategory';
 import { Category } from './Category';
-import { VisaStatusTemplate } from './VisaStatusTemplate';
 import { PushSubscription } from './PushSubscription';
 import { InternalAppointment } from './InternalAppointment';
 import { InternalAppointmentHistory } from './InternalAppointmentHistory';
@@ -86,8 +85,6 @@ Company.hasMany(BotBehavior, { foreignKey: 'companyId', as: 'botBehaviors' });
 BotBehavior.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
 Company.hasMany(Product, { foreignKey: 'companyId', as: 'products' });
 Product.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
-Company.hasMany(VisaStatusTemplate, { foreignKey: 'companyId', as: 'visaStatusTemplates' });
-VisaStatusTemplate.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
 Company.hasMany(Conversations, { foreignKey: 'companyId', as: 'conversations' });
 Conversations.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
 Company.hasOne(WhatsappIntegration, { foreignKey: 'companyId', as: 'whatsappIntegration' });
@@ -141,9 +138,6 @@ Product.hasMany(ProductCategory, { foreignKey: 'productId', as: 'categories' });
 ProductCategory.belongsTo(Product, { foreignKey: 'productId', as: 'product' });
 Product.hasMany(Client, { foreignKey: 'productId', as: 'clients' });
 Client.belongsTo(Product, { foreignKey: 'productId', as: 'product' });
-VisaStatusTemplate.hasMany(Client, { foreignKey: 'visaStatusTemplateId', as: 'clients' });
-Client.belongsTo(VisaStatusTemplate, { foreignKey: 'visaStatusTemplateId', as: 'visaStatusTemplate' });
-
 // Roles & permissions (RBAC)
 Company.hasMany(Role, { foreignKey: 'companyId', as: 'roles' });
 Role.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
@@ -343,7 +337,6 @@ export {
   Product,
   ProductCategory,
   Category,
-  VisaStatusTemplate,
   PushSubscription,
   InternalAppointment,
   InternalAppointmentHistory,

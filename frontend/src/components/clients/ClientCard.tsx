@@ -3,8 +3,8 @@ import { User as UserType } from '@/types/user';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ClientStatusBadge } from './ClientStatusBadge';
-import { Badge } from '@/components/ui/badge';
 import { APPOINTMENT_BADGE_CLASSES } from '@/lib/appointmentColors';
+import { Badge } from '@/components/ui/badge';
 import {
   Select,
   SelectContent,
@@ -19,7 +19,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Eye, Trash2, User, Mail, Phone, FileText, Edit2, DollarSign, UserCircle, MapPin, Calendar, Package } from 'lucide-react';
+import { MoreHorizontal, Eye, Trash2, User, Mail, Phone, FileText, Edit2, DollarSign, UserCircle, MapPin, Package } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { formatPhoneNumberDisplay } from '@/lib/phone';
@@ -43,6 +43,12 @@ export const ClientCard = ({
   users = [],
   isAdmin = false,
 }: ClientCardProps) => {
+  const accountStatus =
+    client.status === 'active'
+      ? { label: 'Activo', color: '#16a34a' }
+      : client.status === 'inactive'
+        ? { label: 'Inactivo', color: '#64748b' }
+        : { label: 'Pendiente', color: '#ca8a04' };
   const nextOfficeAppointmentDate = client.nextOfficeAppointment?.appointmentDate
     ? new Date(`${client.nextOfficeAppointment.appointmentDate}T00:00:00`)
     : null;
@@ -79,7 +85,7 @@ export const ClientCard = ({
                   </div>
                 </div>
               </div>
-              <ClientStatusBadge label={client.visaStatusTemplate?.label} color={client.visaStatusTemplate?.color} />
+              <ClientStatusBadge label={accountStatus.label} color={accountStatus.color} />
             </div>
 
             <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
@@ -158,30 +164,6 @@ export const ClientCard = ({
                 <span className="flex items-center gap-1.5 min-w-0">
                   <MapPin className="w-3.5 h-3.5 shrink-0" />
                   <span>{client.assignedTrips.map(t => t.title).join(', ')}</span>
-                </span>
-              </div>
-            )}
-            {client.visaCasAppointmentDate && (
-              <div className="flex items-start gap-2 text-sm flex-wrap">
-                <Badge className={`inline-flex items-center gap-1 ${APPOINTMENT_BADGE_CLASSES.cas}`}>
-                  <Calendar className="w-3 h-3 shrink-0" />
-                  CAS
-                </Badge>
-                <span className="text-muted-foreground pt-0.5">
-                  {format(new Date(`${client.visaCasAppointmentDate.slice(0, 10)}T00:00:00`), "d MMM yyyy", { locale: es })}
-                  {client.visaCasAppointmentLocation ? ` · ${client.visaCasAppointmentLocation}` : ''}
-                </span>
-              </div>
-            )}
-            {client.visaConsularAppointmentDate && (
-              <div className="flex items-start gap-2 text-sm flex-wrap">
-                <Badge className={`inline-flex items-center gap-1 ${APPOINTMENT_BADGE_CLASSES.consular}`}>
-                  <Calendar className="w-3 h-3 shrink-0" />
-                  Consulado
-                </Badge>
-                <span className="text-muted-foreground pt-0.5">
-                  {format(new Date(`${client.visaConsularAppointmentDate.slice(0, 10)}T00:00:00`), "d MMM yyyy", { locale: es })}
-                  {client.visaConsularAppointmentLocation ? ` · ${client.visaConsularAppointmentLocation}` : ''}
                 </span>
               </div>
             )}
