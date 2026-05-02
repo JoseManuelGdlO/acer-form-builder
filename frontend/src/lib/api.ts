@@ -761,6 +761,20 @@ class ApiClient {
     });
   }
 
+  async updateTripParticipantPickup(
+    tripId: string,
+    participantId: string,
+    data: { pickupLocation: string | null },
+    token?: string | null
+  ) {
+    return this.request<{ id: string; pickupLocation: string | null }>(`/trips/${tripId}/participants/${participantId}`, {
+      method: 'PATCH',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+      body: JSON.stringify(data),
+    });
+  }
+
   async setTripSeatAssignment(
     tripId: string,
     data: { participantId?: string; clientId?: string; seatNumber?: number; seatId?: string },

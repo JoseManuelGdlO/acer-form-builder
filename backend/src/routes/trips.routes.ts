@@ -16,6 +16,7 @@ router.post('/', tripsController.createTrip);
 router.put('/:id', tripsController.updateTrip);
 router.delete('/:id', tripsController.deleteTrip);
 router.post('/:id/participants', tripsController.addParticipants);
+router.patch('/:id/participants/:participantId', tripsController.updateParticipantPickup);
 router.delete('/:id/participants/:participantId', tripsController.removeParticipant);
 router.post('/:id/seat-assignments', tripsController.setSeatAssignment);
 router.delete('/:id/seat-assignments', tripsController.resetSeatAssignments);

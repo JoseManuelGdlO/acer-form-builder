@@ -226,6 +226,7 @@ const Index = () => {
     deleteTrip,
     addParticipants,
     removeParticipant,
+    updateParticipantPickup,
     setSeatAssignment,
     clearSeatAssignment,
     resetSeatAssignments,
@@ -1318,6 +1319,9 @@ const Index = () => {
             onDelete={async (tripId) => { await deleteTrip(token!, tripId); }}
             onAddParticipants={async (tripId, payload) => { await addParticipants(token!, tripId, payload); await fetchTrip(tripId, token!); }}
             onRemoveParticipant={async (tripId, participantId) => { await removeParticipant(token!, tripId, participantId); await fetchTrip(tripId, token!); }}
+            onUpdateParticipantPickup={async (tripId, participantId, pickupLocation) => {
+              await updateParticipantPickup(token!, tripId, participantId, pickupLocation);
+            }}
             onAcceptInvitation={async (invitationId) => { await acceptInvitation(invitationId, token!); await fetchTrips(token!); await fetchInvitations(token!); }}
             onRejectInvitation={async (invitationId) => { await rejectInvitation(invitationId, token!); await fetchInvitations(token!); }}
             onResetSeatAssignments={async (tripId) => { await resetSeatAssignments(token!, tripId); await fetchTrip(tripId, token!); }}

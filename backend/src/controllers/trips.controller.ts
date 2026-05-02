@@ -201,7 +201,16 @@ export const getTripById = async (req: AuthRequest, res: Response): Promise<void
             {
               model: TripParticipant,
               as: 'participant',
-              attributes: ['id', 'participantType', 'name', 'phone', 'role', 'clientId', 'staffMemberId'],
+              attributes: [
+                'id',
+                'participantType',
+                'name',
+                'phone',
+                'role',
+                'clientId',
+                'staffMemberId',
+                'pickupLocation',
+              ],
             },
           ],
         },
@@ -829,6 +838,60 @@ export const addParticipants = [
     }
   },
 ];
+
+export const updateParticipantPickup = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    if (!requireTripPermission(req, res, 'trips.participants_manage')) return;
+    const { id, participantId } = req.params;
+    const companyId = req.user!.companyId;
+    if (!companyId) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+    const inTrip = await ensureUserCompanyInTrip(req, id);
+    if (!inTrip) {
+      res.status(404).json({ error: 'Trip not found' });
+      return;
+    }
+    let participant = await TripParticipant.findOne({ where: { tripId: id, id: participantId } });
+    if (!participant) {
+      participant = await TripParticipant.findOne({ where: { tripId: id, clientId: participantId } });
+    }
+    if (!participant || participant.participantType !== 'client' || !participant.clientId) {
+      res.status(400).json({ error: 'Solo se puede indicar recogida para participantes tipo cliente' });
+      return;
+    }
+    const client = await Client.findByPk(participant.clientId, { attributes: ['id', 'companyId'] });
+    if (!client || (client as any).companyId !== companyId) {
+      res.status(403).json({ error: 'Solo puedes editar la recogida de clientes de tu compañía' });
+      return;
+    }
+    const raw = req.body?.pickupLocation;
+    if (raw === undefined) {
+      res.status(400).json({ error: 'Indica pickupLocation (texto o null para borrar)' });
+      return;
+    }
+    const normalized =
+      raw === null || (typeof raw === 'string' && raw.trim() === '') ? null : String(raw).trim();
+    if (normalized && normalized.length > 500) {
+      res.status(400).json({ error: 'Máximo 500 caracteres' });
+      return;
+    }
+    const oldVal = participant.pickupLocation ?? null;
+    await participant.update({ pickupLocation: normalized });
+    await logTripChange(id, req.user!.id, 'participant_pickup_updated', {
+      entityType: 'trip_participant',
+      entityId: participant.id,
+      fieldName: 'pickupLocation',
+      oldValue: oldVal,
+      newValue: normalized,
+    });
+    res.json({ id: participant.id, pickupLocation: normalized });
+  } catch (error) {
+    console.error('Update participant pickup error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
 
 export const removeParticipant = async (req: AuthRequest, res: Response): Promise<void> => {
   try {

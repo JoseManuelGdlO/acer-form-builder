@@ -89,6 +89,12 @@ function mapParticipant(p: any) {
           }
         : undefined,
     client: participantType === 'client' ? tripClient : null,
+    pickupLocation:
+      p.pickup_location !== undefined
+        ? p.pickup_location
+        : p.pickupLocation !== undefined
+          ? p.pickupLocation
+          : null,
   };
 }
 
@@ -111,6 +117,12 @@ function mapSeatAssignment(s: any): TripSeatAssignmentEntry {
       role: participant.role ?? null,
       clientId: participant.client_id ?? participant.clientId ?? null,
       staffMemberId: participant.staff_member_id ?? participant.staffMemberId ?? null,
+      pickupLocation:
+        participant.pickup_location !== undefined
+          ? participant.pickup_location
+          : participant.pickupLocation !== undefined
+            ? participant.pickupLocation
+            : null,
     };
   }
   if (client.id) {
@@ -407,6 +419,17 @@ export const useTripStore = () => {
     if (currentTrip?.id === tripId) setCurrentTrip(mapped);
   }, [currentTrip?.id]);
 
+  const updateParticipantPickup = useCallback(
+    async (token: string, tripId: string, participantId: string, pickupLocation: string | null) => {
+      await api.updateTripParticipantPickup(tripId, participantId, { pickupLocation }, token);
+      const trip = await api.getTrip(tripId, token);
+      const mapped = mapTrip(trip);
+      setTrips(prev => prev.map(t => (t.id === tripId ? mapped : t)));
+      if (currentTrip?.id === tripId) setCurrentTrip(mapped);
+    },
+    [currentTrip?.id]
+  );
+
   const setSeatAssignment = useCallback(
     async (
       token: string,
@@ -509,6 +532,7 @@ export const useTripStore = () => {
     deleteTrip,
     addParticipants,
     removeParticipant,
+    updateParticipantPickup,
     setSeatAssignment,
     resetSeatAssignments,
     clearSeatAssignment,

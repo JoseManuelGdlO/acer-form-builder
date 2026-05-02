@@ -30,6 +30,7 @@ interface TripListProps {
   onDelete: (tripId: string) => Promise<void>;
   onAddParticipants: (tripId: string, data: { clientIds?: string[]; staffMemberIds?: string[]; companions?: { name: string; phone?: string }[] }) => Promise<void>;
   onRemoveParticipant: (tripId: string, participantId: string) => Promise<void>;
+  onUpdateParticipantPickup?: (tripId: string, participantId: string, pickupLocation: string | null) => Promise<void>;
   onAcceptInvitation: (invitationId: string) => Promise<void>;
   onRejectInvitation: (invitationId: string) => Promise<void>;
   onResetSeatAssignments: (tripId: string) => Promise<void>;
@@ -71,6 +72,7 @@ export const TripList = ({
   onDelete,
   onAddParticipants,
   onRemoveParticipant,
+  onUpdateParticipantPickup,
   onAcceptInvitation,
   onRejectInvitation,
   onResetSeatAssignments,
@@ -264,6 +266,13 @@ export const TripList = ({
           onRemoveParticipant={async participantId => {
             await onRemoveParticipant(viewingTrip.id, participantId);
           }}
+          onUpdateParticipantPickup={
+            onUpdateParticipantPickup && !reviewerMode
+              ? async (participantId, pickupLocation) => {
+                  await onUpdateParticipantPickup(viewingTrip.id, participantId, pickupLocation);
+                }
+              : undefined
+          }
           onOpenSeatPicker={() => setSeatPickerTrip(viewingTrip)}
           onResetSeatAssignments={async () => await onResetSeatAssignments(viewingTrip.id)}
           onLoadChangeLog={() => onLoadChangeLog(viewingTrip.id)}

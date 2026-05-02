@@ -57,6 +57,7 @@ const ACTION_LABELS: Record<string, string> = {
   trip_updated: 'Viaje actualizado',
   participant_added: 'Participante(s) agregado(s)',
   participant_removed: 'Participante quitado',
+  participant_pickup_updated: 'Lugar de recogida actualizado',
   seat_assigned: 'Asiento asignado',
   seat_cleared: 'Asiento liberado',
   seat_assignments_reset: 'Asignaciones reiniciadas',
@@ -76,6 +77,7 @@ interface TripDetailViewProps {
   onDelete: (tripId: string) => Promise<void>;
   onAddParticipants: (data: { clientIds?: string[]; staffMemberIds?: string[]; companions?: { name: string; phone?: string }[] }) => Promise<void>;
   onRemoveParticipant: (participantId: string) => Promise<void>;
+  onUpdateParticipantPickup?: (participantId: string, pickupLocation: string | null) => Promise<void>;
   onOpenSeatPicker: () => void;
   onResetSeatAssignments: () => Promise<void>;
   onLoadChangeLog: () => void;
@@ -102,6 +104,7 @@ export const TripDetailView = ({
   onDelete,
   onAddParticipants,
   onRemoveParticipant,
+  onUpdateParticipantPickup,
   onOpenSeatPicker,
   onResetSeatAssignments,
   onLoadChangeLog,
@@ -131,6 +134,8 @@ export const TripDetailView = ({
     note: '',
   });
   const [isCreatingExpense, setIsCreatingExpense] = useState(false);
+  const [pickupDrafts, setPickupDrafts] = useState<Record<string, string>>({});
+  const [pickupSavingId, setPickupSavingId] = useState<string | null>(null);
 
   const sharedIds = (trip.sharedCompanies ?? []).map(c => c.id);
   const companiesAvailableToInvite = companiesForInvite.filter(c => !sharedIds.includes(c.id));
@@ -141,6 +146,10 @@ export const TripDetailView = ({
     onLoadChangeLog();
     onLoadTripFinance();
   }, [trip.id, reviewerMode]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    setPickupDrafts({});
+  }, [trip.id]);
 
   useEffect(() => {
     if (reviewerMode) return;
@@ -207,7 +216,8 @@ export const TripDetailView = ({
           (c.phone && c.phone.includes(memberSearch)) ||
           (c.company?.name && c.company.name.toLowerCase().includes(q)) ||
           branchName.toLowerCase().includes(q) ||
-          advisorName.toLowerCase().includes(q)
+          advisorName.toLowerCase().includes(q) ||
+          (p.pickupLocation && p.pickupLocation.toLowerCase().includes(q))
         );
       })
     : participants;
@@ -502,6 +512,9 @@ export const TripDetailView = ({
           const staffPhone = p.staffMember?.phone?.trim();
           if (phone || companionPhone || staffPhone) {
             writeLine(`Tel.: ${phone ?? companionPhone ?? staffPhone}`, { indent: 24 });
+          }
+          if (!isCompanion && !isStaff && p.pickupLocation?.trim()) {
+            writeLine(`Recogida: ${p.pickupLocation.trim()}`, { indent: 24 });
           }
         });
       }
@@ -1016,6 +1029,75 @@ export const TripDetailView = ({
                           {isStaff && p.staffMember?.role?.trim() && (
                             <div className="text-xs text-muted-foreground mt-0.5">
                               Rol: {p.staffMember.role.trim()}
+                            </div>
+                          )}
+                          {!isCompanion && !isStaff && c && (
+                            <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:flex-wrap">
+                              <span className="flex items-center gap-1 text-xs font-medium text-muted-foreground shrink-0">
+                                <MapPin className="w-3.5 h-3.5" />
+                                Recogida en este viaje
+                              </span>
+                              {reviewerMode || !onUpdateParticipantPickup ? (
+                                <span className="text-sm text-muted-foreground">
+                                  {p.pickupLocation?.trim() ? p.pickupLocation.trim() : 'Sin indicar'}
+                                </span>
+                              ) : (
+                                <>
+                                  <Input
+                                    placeholder="Ej. Esquina Juárez y Reforma, 7:00"
+                                    maxLength={500}
+                                    value={
+                                      pickupDrafts[p.id] !== undefined
+                                        ? pickupDrafts[p.id]
+                                        : (p.pickupLocation ?? '')
+                                    }
+                                    onChange={(e) =>
+                                      setPickupDrafts((prev) => ({ ...prev, [p.id]: e.target.value }))
+                                    }
+                                    className="max-w-xl flex-1 min-w-[200px]"
+                                  />
+                                  <Button
+                                    type="button"
+                                    variant="secondary"
+                                    size="sm"
+                                    className="shrink-0"
+                                    disabled={
+                                      (() => {
+                                        const server = (p.pickupLocation ?? '').trim();
+                                        const cur = (
+                                          pickupDrafts[p.id] !== undefined
+                                            ? pickupDrafts[p.id]
+                                            : (p.pickupLocation ?? '')
+                                        ).trim();
+                                        return cur === server || pickupSavingId === p.id;
+                                      })()
+                                    }
+                                    onClick={async () => {
+                                      const raw =
+                                        pickupDrafts[p.id] !== undefined
+                                          ? pickupDrafts[p.id]
+                                          : (p.pickupLocation ?? '');
+                                      const normalized = raw.trim() === '' ? null : raw.trim();
+                                      setPickupSavingId(p.id);
+                                      try {
+                                        await onUpdateParticipantPickup(p.id, normalized);
+                                        setPickupDrafts((prev) => {
+                                          const next = { ...prev };
+                                          delete next[p.id];
+                                          return next;
+                                        });
+                                        toast.success('Lugar de recogida guardado');
+                                      } catch (err: any) {
+                                        toast.error(err.message || 'No se pudo guardar');
+                                      } finally {
+                                        setPickupSavingId(null);
+                                      }
+                                    }}
+                                  >
+                                    {pickupSavingId === p.id ? 'Guardando…' : 'Guardar'}
+                                  </Button>
+                                </>
+                              )}
                             </div>
                           )}
                         </div>

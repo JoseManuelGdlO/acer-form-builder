@@ -382,6 +382,7 @@ export interface TripSeatAssignmentEntry {
     role?: string | null;
     clientId?: string | null;
     staffMemberId?: string | null;
+    pickupLocation?: string | null;
   };
   client?: Client & { company?: { id: string; name: string } };
 }
@@ -461,6 +462,8 @@ export interface Trip {
     staffMemberId?: string | null;
     staffMember?: StaffMember | null;
     client?: TripParticipantClient | null;
+    /** Lugar de recogida en este viaje (solo participantes tipo cliente) */
+    pickupLocation?: string | null;
   }[];
   seatAssignments?: TripSeatAssignmentEntry[];
   participantCount?: number;
