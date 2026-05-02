@@ -43,6 +43,10 @@ import { InternalAppointmentHistory } from './InternalAppointmentHistory';
 import { WhatsappIntegration } from './WhatsappIntegration';
 import { StaffMember } from './StaffMember';
 import { PdfTemplate } from './PdfTemplate';
+import { Hotel } from './Hotel';
+import { TripHotel } from './TripHotel';
+import { TripHotelRoom } from './TripHotelRoom';
+import { TripHotelRoomAssignment } from './TripHotelRoomAssignment';
 
 // Company relationships (multi-tenant)
 Company.hasMany(User, { foreignKey: 'companyId', as: 'users' });
@@ -91,6 +95,8 @@ Company.hasOne(WhatsappIntegration, { foreignKey: 'companyId', as: 'whatsappInte
 WhatsappIntegration.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
 Company.hasMany(StaffMember, { foreignKey: 'companyId', as: 'staffMembers' });
 StaffMember.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+Company.hasMany(Hotel, { foreignKey: 'companyId', as: 'hotels' });
+Hotel.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
 
 // Notifications relationships (multi-tenant)
 Company.hasMany(Notification, { foreignKey: 'companyId', as: 'notifications' });
@@ -259,6 +265,19 @@ Client.hasMany(TripSeatAssignment, { foreignKey: 'clientId', as: 'tripSeatAssign
 TripSeatAssignment.belongsTo(TripParticipant, { foreignKey: 'participantId', as: 'participant' });
 TripParticipant.hasMany(TripSeatAssignment, { foreignKey: 'participantId', as: 'seatAssignments' });
 
+Trip.hasMany(TripHotel, { foreignKey: 'tripId', as: 'hotels' });
+TripHotel.belongsTo(Trip, { foreignKey: 'tripId', as: 'trip' });
+TripHotel.belongsTo(Hotel, { foreignKey: 'hotelId', as: 'hotel' });
+Hotel.hasMany(TripHotel, { foreignKey: 'hotelId', as: 'tripHotels' });
+
+TripHotel.hasMany(TripHotelRoom, { foreignKey: 'tripHotelId', as: 'rooms' });
+TripHotelRoom.belongsTo(TripHotel, { foreignKey: 'tripHotelId', as: 'tripHotel' });
+
+TripHotelRoom.hasMany(TripHotelRoomAssignment, { foreignKey: 'tripHotelRoomId', as: 'assignments' });
+TripHotelRoomAssignment.belongsTo(TripHotelRoom, { foreignKey: 'tripHotelRoomId', as: 'tripHotelRoom' });
+TripHotelRoomAssignment.belongsTo(TripParticipant, { foreignKey: 'participantId', as: 'participant' });
+TripParticipant.hasMany(TripHotelRoomAssignment, { foreignKey: 'participantId', as: 'hotelRoomAssignments' });
+
 Trip.hasMany(TripChangeLog, { foreignKey: 'tripId', as: 'changeLog' });
 TripChangeLog.belongsTo(Trip, { foreignKey: 'tripId', as: 'trip' });
 TripChangeLog.belongsTo(User, { foreignKey: 'userId', as: 'user' });
@@ -343,4 +362,8 @@ export {
   WhatsappIntegration,
   StaffMember,
   PdfTemplate,
+  Hotel,
+  TripHotel,
+  TripHotelRoom,
+  TripHotelRoomAssignment,
 };

@@ -17,7 +17,12 @@ import {
   Company,
   User,
   Branch,
+  Hotel,
+  TripHotel,
+  TripHotelRoom,
+  TripHotelRoomAssignment,
 } from '../models';
+import { createRoomsForNewTripHotel, roomCapacity, syncTripHotelReservedRooms } from '../utils/tripHotelRooms';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { hasPermission } from '../authorization/policies';
 
@@ -267,6 +272,55 @@ export const getTripById = async (req: AuthRequest, res: Response): Promise<void
                 'clientId',
                 'staffMemberId',
                 'pickupLocation',
+              ],
+            },
+          ],
+        },
+        {
+          model: TripHotel,
+          as: 'hotels',
+          include: [
+            { model: Hotel, as: 'hotel' },
+            {
+              model: TripHotelRoom,
+              as: 'rooms',
+              separate: true,
+              order: [['sort_order', 'ASC']],
+              include: [
+                {
+                  model: TripHotelRoomAssignment,
+                  as: 'assignments',
+                  include: [
+                    {
+                      model: TripParticipant,
+                      as: 'participant',
+                      attributes: [
+                        'id',
+                        'participantType',
+                        'name',
+                        'phone',
+                        'role',
+                        'clientId',
+                        'staffMemberId',
+                        'pickupLocation',
+                      ],
+                      include: [
+                        {
+                          model: Client,
+                          as: 'client',
+                          required: false,
+                          attributes: ['id', 'name', 'email', 'phone', 'companyId'],
+                        },
+                        {
+                          model: StaffMember,
+                          as: 'staffMember',
+                          required: false,
+                          attributes: ['id', 'name', 'phone', 'role'],
+                        },
+                      ],
+                    },
+                  ],
+                },
               ],
             },
           ],
@@ -1199,6 +1253,479 @@ export const getTripChangeLog = async (req: AuthRequest, res: Response): Promise
     res.json(list);
   } catch (error) {
     console.error('Get trip change log error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+export const attachHotelToTrip = [
+  body('hotelId').isUUID().withMessage('hotelId must be a UUID'),
+  body('checkInDate').notEmpty().withMessage('checkInDate is required'),
+  body('checkOutDate').notEmpty().withMessage('checkOutDate is required'),
+  body('reservedSingles').optional().isInt({ min: 0 }),
+  body('reservedDoubles').optional().isInt({ min: 0 }),
+  body('reservedTriples').optional().isInt({ min: 0 }),
+  body('notes').optional().trim(),
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+      if (!requireTripPermission(req, res, 'trips.participants_manage')) return;
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        res.status(400).json({ errors: errors.array() });
+        return;
+      }
+      const { id } = req.params;
+      const companyId = req.user?.companyId;
+      if (!companyId) {
+        res.status(401).json({ error: 'Authentication required' });
+        return;
+      }
+      const inTrip = await ensureUserCompanyInTrip(req, id);
+      if (!inTrip) {
+        res.status(404).json({ error: 'Trip not found' });
+        return;
+      }
+      const {
+        hotelId,
+        checkInDate,
+        checkOutDate,
+        notes,
+      } = req.body;
+      const reservedSingles = Number(req.body.reservedSingles ?? 0);
+      const reservedDoubles = Number(req.body.reservedDoubles ?? 0);
+      const reservedTriples = Number(req.body.reservedTriples ?? 0);
+
+      if (reservedSingles + reservedDoubles + reservedTriples < 1) {
+        res.status(400).json({ error: 'Reserve at least one room' });
+        return;
+      }
+      const cin = String(checkInDate).slice(0, 10);
+      const cout = String(checkOutDate).slice(0, 10);
+      if (cin > cout) {
+        res.status(400).json({ error: 'checkInDate must be on or before checkOutDate' });
+        return;
+      }
+
+      const hotel = await Hotel.findOne({ where: { id: hotelId, companyId } });
+      if (!hotel) {
+        res.status(404).json({ error: 'Hotel not found' });
+        return;
+      }
+      if (
+        reservedSingles > hotel.totalSingleRooms ||
+        reservedDoubles > hotel.totalDoubleRooms ||
+        reservedTriples > hotel.totalTripleRooms
+      ) {
+        res.status(400).json({ error: 'Reserved rooms exceed hotel capacity for one or more room types' });
+        return;
+      }
+
+      const tripHotel = await TripHotel.create({
+        tripId: id,
+        hotelId,
+        checkInDate: cin,
+        checkOutDate: cout,
+        reservedSingles,
+        reservedDoubles,
+        reservedTriples,
+        notes: notes ?? null,
+      });
+      await createRoomsForNewTripHotel(tripHotel.id, reservedSingles, reservedDoubles, reservedTriples);
+      await logTripChange(id, req.user!.id, 'trip_hotel_attached', { entityId: tripHotel.id, newValue: hotel.name });
+
+      const full = await TripHotel.findByPk(tripHotel.id, {
+        include: [
+          { model: Hotel, as: 'hotel' },
+          {
+            model: TripHotelRoom,
+            as: 'rooms',
+            separate: true,
+            order: [['sort_order', 'ASC']],
+            include: [
+              {
+                model: TripHotelRoomAssignment,
+                as: 'assignments',
+                include: [
+                  {
+                    model: TripParticipant,
+                    as: 'participant',
+                    attributes: [
+                      'id',
+                      'participantType',
+                      'name',
+                      'phone',
+                      'role',
+                      'clientId',
+                      'staffMemberId',
+                      'pickupLocation',
+                    ],
+                    include: [
+                      { model: Client, as: 'client', required: false, attributes: ['id', 'name', 'email', 'phone', 'companyId'] },
+                      { model: StaffMember, as: 'staffMember', required: false, attributes: ['id', 'name', 'phone', 'role'] },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      });
+      res.status(201).json(full?.toJSON() ?? null);
+    } catch (error) {
+      console.error('Attach hotel to trip error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  },
+];
+
+export const updateTripHotel = [
+  body('checkInDate').optional().notEmpty(),
+  body('checkOutDate').optional().notEmpty(),
+  body('reservedSingles').optional().isInt({ min: 0 }),
+  body('reservedDoubles').optional().isInt({ min: 0 }),
+  body('reservedTriples').optional().isInt({ min: 0 }),
+  body('notes').optional(),
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+      if (!requireTripPermission(req, res, 'trips.participants_manage')) return;
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        res.status(400).json({ errors: errors.array() });
+        return;
+      }
+      const { id, tripHotelId } = req.params;
+      const companyId = req.user?.companyId;
+      if (!companyId) {
+        res.status(401).json({ error: 'Authentication required' });
+        return;
+      }
+      const inTrip = await ensureUserCompanyInTrip(req, id);
+      if (!inTrip) {
+        res.status(404).json({ error: 'Trip not found' });
+        return;
+      }
+
+      const tripHotel = await TripHotel.findOne({
+        where: { id: tripHotelId, tripId: id },
+        include: [{ model: Hotel, as: 'hotel' }],
+      });
+      if (!tripHotel) {
+        res.status(404).json({ error: 'Trip hotel not found' });
+        return;
+      }
+      const hotel = (tripHotel as any).hotel as Hotel;
+      if (!hotel || hotel.companyId !== companyId) {
+        res.status(404).json({ error: 'Hotel not found' });
+        return;
+      }
+
+      const prevSingles = tripHotel.reservedSingles;
+      const prevDoubles = tripHotel.reservedDoubles;
+      const prevTriples = tripHotel.reservedTriples;
+
+      const patch: Record<string, unknown> = {};
+      if (req.body.checkInDate != null) patch.checkInDate = String(req.body.checkInDate).slice(0, 10);
+      if (req.body.checkOutDate != null) patch.checkOutDate = String(req.body.checkOutDate).slice(0, 10);
+      if (req.body.notes !== undefined) patch.notes = req.body.notes === '' ? null : req.body.notes;
+
+      let newSingles = tripHotel.reservedSingles;
+      let newDoubles = tripHotel.reservedDoubles;
+      let newTriples = tripHotel.reservedTriples;
+      if (req.body.reservedSingles != null) newSingles = Number(req.body.reservedSingles);
+      if (req.body.reservedDoubles != null) newDoubles = Number(req.body.reservedDoubles);
+      if (req.body.reservedTriples != null) newTriples = Number(req.body.reservedTriples);
+
+      if (newSingles + newDoubles + newTriples < 1) {
+        res.status(400).json({ error: 'Reserve at least one room' });
+        return;
+      }
+      if (
+        newSingles > hotel.totalSingleRooms ||
+        newDoubles > hotel.totalDoubleRooms ||
+        newTriples > hotel.totalTripleRooms
+      ) {
+        res.status(400).json({ error: 'Reserved rooms exceed hotel capacity for one or more room types' });
+        return;
+      }
+
+      const cin = (patch.checkInDate as string) ?? String(tripHotel.checkInDate).slice(0, 10);
+      const cout = (patch.checkOutDate as string) ?? String(tripHotel.checkOutDate).slice(0, 10);
+      if (cin > cout) {
+        res.status(400).json({ error: 'checkInDate must be on or before checkOutDate' });
+        return;
+      }
+
+      await tripHotel.update({
+        ...patch,
+        reservedSingles: newSingles,
+        reservedDoubles: newDoubles,
+        reservedTriples: newTriples,
+      });
+
+      const countsChanged =
+        newSingles !== prevSingles || newDoubles !== prevDoubles || newTriples !== prevTriples;
+      if (countsChanged) {
+        const sync = await syncTripHotelReservedRooms(tripHotel.id, {
+          single: newSingles,
+          double: newDoubles,
+          triple: newTriples,
+        });
+        if (!sync.ok) {
+          res.status(400).json({ error: sync.error });
+          return;
+        }
+      }
+
+      await logTripChange(id, req.user!.id, 'trip_hotel_updated', { entityId: tripHotel.id });
+
+      const full = await TripHotel.findByPk(tripHotel.id, {
+        include: [
+          { model: Hotel, as: 'hotel' },
+          {
+            model: TripHotelRoom,
+            as: 'rooms',
+            separate: true,
+            order: [['sort_order', 'ASC']],
+            include: [
+              {
+                model: TripHotelRoomAssignment,
+                as: 'assignments',
+                include: [
+                  {
+                    model: TripParticipant,
+                    as: 'participant',
+                    attributes: [
+                      'id',
+                      'participantType',
+                      'name',
+                      'phone',
+                      'role',
+                      'clientId',
+                      'staffMemberId',
+                      'pickupLocation',
+                    ],
+                    include: [
+                      { model: Client, as: 'client', required: false, attributes: ['id', 'name', 'email', 'phone', 'companyId'] },
+                      { model: StaffMember, as: 'staffMember', required: false, attributes: ['id', 'name', 'phone', 'role'] },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      });
+      res.json(full?.toJSON() ?? null);
+    } catch (error) {
+      console.error('Update trip hotel error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  },
+];
+
+export const detachHotelFromTrip = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    if (!requireTripPermission(req, res, 'trips.participants_manage')) return;
+    const { id, tripHotelId } = req.params;
+    const companyId = req.user?.companyId;
+    if (!companyId) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+    const inTrip = await ensureUserCompanyInTrip(req, id);
+    if (!inTrip) {
+      res.status(404).json({ error: 'Trip not found' });
+      return;
+    }
+    const tripHotel = await TripHotel.findOne({
+      where: { id: tripHotelId, tripId: id },
+      include: [{ model: Hotel, as: 'hotel' }],
+    });
+    if (!tripHotel) {
+      res.status(404).json({ error: 'Trip hotel not found' });
+      return;
+    }
+    const hotel = (tripHotel as any).hotel as Hotel;
+    if (!hotel || hotel.companyId !== companyId) {
+      res.status(404).json({ error: 'Hotel not found' });
+      return;
+    }
+    await tripHotel.destroy();
+    await logTripChange(id, req.user!.id, 'trip_hotel_detached', { entityId: tripHotelId });
+    res.json({ message: 'Trip hotel removed' });
+  } catch (error) {
+    console.error('Detach hotel from trip error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+export const setTripHotelRoomAssignment = [
+  body('participantId').isUUID().withMessage('participantId is required'),
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+      if (!requireTripPermission(req, res, 'trips.participants_manage')) return;
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        res.status(400).json({ errors: errors.array() });
+        return;
+      }
+      const { id, tripHotelId, roomId } = req.params;
+      const { participantId } = req.body;
+      const companyId = req.user?.companyId;
+      if (!companyId) {
+        res.status(401).json({ error: 'Authentication required' });
+        return;
+      }
+      const inTrip = await ensureUserCompanyInTrip(req, id);
+      if (!inTrip) {
+        res.status(404).json({ error: 'Trip not found' });
+        return;
+      }
+
+      const tripHotel = await TripHotel.findOne({
+        where: { id: tripHotelId, tripId: id },
+        include: [{ model: Hotel, as: 'hotel' }],
+      });
+      if (!tripHotel) {
+        res.status(404).json({ error: 'Trip hotel not found' });
+        return;
+      }
+      const hotel = (tripHotel as any).hotel as Hotel;
+      if (!hotel || hotel.companyId !== companyId) {
+        res.status(404).json({ error: 'Hotel not found' });
+        return;
+      }
+
+      const room = await TripHotelRoom.findOne({
+        where: { id: roomId, tripHotelId: tripHotel.id },
+        include: [{ model: TripHotelRoomAssignment, as: 'assignments', required: false }],
+      });
+      if (!room) {
+        res.status(404).json({ error: 'Room not found' });
+        return;
+      }
+
+      const participant = await TripParticipant.findOne({
+        where: { id: participantId, tripId: id },
+      });
+      if (!participant) {
+        res.status(400).json({ error: 'Participant is not on this trip' });
+        return;
+      }
+
+      const cap = roomCapacity(room.roomType);
+      const currentCount = (room as any).assignments?.length ?? 0;
+      const alreadyInRoom = (room as any).assignments?.some((a: any) => a.participantId === participantId);
+      if (alreadyInRoom) {
+        res.json({ message: 'Already assigned', room: room.toJSON() });
+        return;
+      }
+      if (currentCount >= cap) {
+        res.status(400).json({ error: 'Room is full' });
+        return;
+      }
+
+      const otherRooms = await TripHotelRoom.findAll({
+        where: { tripHotelId: tripHotel.id },
+        attributes: ['id'],
+      });
+      const roomIds = otherRooms.map((r) => r.id);
+      await TripHotelRoomAssignment.destroy({
+        where: {
+          tripHotelRoomId: { [Op.in]: roomIds },
+          participantId,
+        },
+      });
+
+      await TripHotelRoomAssignment.create({
+        tripHotelRoomId: room.id,
+        participantId,
+      });
+
+      await logTripChange(id, req.user!.id, 'trip_hotel_room_assigned', {
+        entityId: room.id,
+        newValue: participantId,
+      });
+
+      const updated = await TripHotelRoom.findByPk(room.id, {
+        include: [
+          {
+            model: TripHotelRoomAssignment,
+            as: 'assignments',
+            include: [
+              {
+                model: TripParticipant,
+                as: 'participant',
+                attributes: [
+                  'id',
+                  'participantType',
+                  'name',
+                  'phone',
+                  'role',
+                  'clientId',
+                  'staffMemberId',
+                  'pickupLocation',
+                ],
+                include: [
+                  { model: Client, as: 'client', required: false, attributes: ['id', 'name', 'email', 'phone', 'companyId'] },
+                  { model: StaffMember, as: 'staffMember', required: false, attributes: ['id', 'name', 'phone', 'role'] },
+                ],
+              },
+            ],
+          },
+        ],
+      });
+      res.json(updated?.toJSON() ?? null);
+    } catch (error) {
+      console.error('Set trip hotel room assignment error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  },
+];
+
+export const clearTripHotelRoomAssignment = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    if (!requireTripPermission(req, res, 'trips.participants_manage')) return;
+    const { id, tripHotelId, roomId, participantId } = req.params;
+    const companyId = req.user?.companyId;
+    if (!companyId) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+    const inTrip = await ensureUserCompanyInTrip(req, id);
+    if (!inTrip) {
+      res.status(404).json({ error: 'Trip not found' });
+      return;
+    }
+
+    const tripHotel = await TripHotel.findOne({
+      where: { id: tripHotelId, tripId: id },
+      include: [{ model: Hotel, as: 'hotel' }],
+    });
+    if (!tripHotel) {
+      res.status(404).json({ error: 'Trip hotel not found' });
+      return;
+    }
+    const hotel = (tripHotel as any).hotel as Hotel;
+    if (!hotel || hotel.companyId !== companyId) {
+      res.status(404).json({ error: 'Hotel not found' });
+      return;
+    }
+
+    const room = await TripHotelRoom.findOne({
+      where: { id: roomId, tripHotelId: tripHotel.id },
+    });
+    if (!room) {
+      res.status(404).json({ error: 'Room not found' });
+      return;
+    }
+
+    await TripHotelRoomAssignment.destroy({
+      where: { tripHotelRoomId: room.id, participantId },
+    });
+    await logTripChange(id, req.user!.id, 'trip_hotel_room_unassigned', { entityId: room.id, oldValue: participantId });
+    res.json({ message: 'Assignment removed' });
+  } catch (error) {
+    console.error('Clear trip hotel room assignment error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };

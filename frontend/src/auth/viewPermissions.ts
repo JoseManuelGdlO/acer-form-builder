@@ -4,6 +4,7 @@ export type ShellView =
   | 'forms'
   | 'clients'
   | 'products'
+  | 'hotels'
   | 'calendar'
   | 'finance'
   | 'paymentLogs'
@@ -20,6 +21,7 @@ export const VIEW_ENTRY_PERMISSIONS: Record<ShellView, string[]> = {
   forms: ['nav.forms.view'],
   clients: ['nav.clients.view'],
   products: ['nav.products.view'],
+  hotels: ['nav.hotels.view'],
   calendar: ['nav.calendar.view'],
   finance: ['nav.finance.view'],
   paymentLogs: ['nav.payment_logs.view'],

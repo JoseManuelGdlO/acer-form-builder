@@ -26,6 +26,7 @@ import internalAppointmentsRoutes from './internal-appointments.routes';
 import calendarRoutes from './calendar.routes';
 import rolesRoutes from './roles.routes';
 import staffRoutes from './staff.routes';
+import hotelsRoutes from './hotels.routes';
 
 const router = Router();
 
@@ -48,6 +49,7 @@ router.use('/faqs', faqsRoutes);
 router.use('/bot', botRoutes);
 router.use('/addChat', conversacionesChatRoutes);
 router.use('/products', productsRoutes);
+router.use('/hotels', hotelsRoutes);
 router.use('/categories', categoriesRoutes);
 router.use('/notifications', notificationsRoutes);
 router.use('/finance', financeRoutes);

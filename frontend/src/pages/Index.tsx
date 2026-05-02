@@ -4,6 +4,7 @@ import { useSubmissionStore } from '@/hooks/useSubmissionStore';
 import { useClientStore } from '@/hooks/useClientStore';
 import { useGroupStore } from '@/hooks/useGroupStore';
 import { useProductStore } from '@/hooks/useProductStore';
+import { useHotelStore } from '@/hooks/useHotelStore';
 import { useTripStore } from '@/hooks/useTripStore';
 import { useStaffStore } from '@/hooks/useStaffStore';
 import { useBusTemplateStore } from '@/hooks/useBusTemplateStore';
@@ -19,6 +20,8 @@ import { ChatbotSettings } from '@/components/chatbot/ChatbotSettings';
 import { SettingsPage } from '@/components/settings/SettingsPage';
 import { PaymentLogsPage } from '@/components/payments/PaymentLogsPage';
 import { ProductsList } from '@/components/products/ProductsList';
+import { HotelList } from '@/components/hotels/HotelList';
+import { HotelFormModal, type HotelFormSaveData } from '@/components/hotels/HotelFormModal';
 import { FinanceDashboard } from '@/components/finance/FinanceDashboard';
 import { CalendarPage } from '@/components/calendar/CalendarPage';
 import { ProductFormModal } from '@/components/products/ProductFormModal';
@@ -39,10 +42,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { LayoutDashboard, FileText, Users, UserCog, Bot, Settings, Receipt, ChevronDown, ShoppingBag, MapPin, ChartNoAxesCombined, Calendar, Boxes, Shield } from 'lucide-react';
+import { LayoutDashboard, FileText, Users, UserCog, Bot, Settings, Receipt, ChevronDown, ShoppingBag, MapPin, ChartNoAxesCombined, Calendar, Boxes, Shield, Building2 } from 'lucide-react';
 import { User } from '@/types/user';
 import { Client } from '@/types/form';
 import { Product } from '@/types/product';
+import type { Hotel } from '@/types/hotel';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
 
@@ -62,6 +66,7 @@ const parseInitialClientNavigation = (): { initialView: View; initialClientId: s
     'forms',
     'clients',
     'products',
+    'hotels',
     'calendar',
     'finance',
     'paymentLogs',
@@ -167,6 +172,13 @@ const Index = () => {
     replaceProducts,
   } = useProductStore();
   const {
+    hotels,
+    fetchHotels,
+    createHotel,
+    updateHotel,
+    deleteHotel,
+  } = useHotelStore();
+  const {
     trips,
     invitations,
     changeLog,
@@ -192,6 +204,11 @@ const Index = () => {
     deleteTripIncome,
     createTripExpense,
     deleteTripExpense,
+    attachTripHotel,
+    updateTripHotelBooking,
+    detachTripHotel,
+    assignTripHotelRoom,
+    clearTripHotelRoomAssignment,
   } = useTripStore();
   const {
     staffMembers,
@@ -212,6 +229,8 @@ const Index = () => {
   const { users, fetchUsers } = useUserStore();
   const [productModalOpen, setProductModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [hotelModalOpen, setHotelModalOpen] = useState(false);
+  const [editingHotel, setEditingHotel] = useState<Hotel | null>(null);
   const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
   const [selectedFilterCategories, setSelectedFilterCategories] = useState<string[]>([]);
   const [clientListQuery, setClientListQuery] = useState<{
@@ -507,6 +526,19 @@ const Index = () => {
     }
   }, [activeView, token]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    if (token && activeView === 'hotels' && can('hotels.view')) {
+      fetchHotels(token).catch((error) => {
+        console.error('Failed to fetch hotels:', error);
+      });
+    }
+  }, [activeView, token, can, fetchHotels]);
+
+  useEffect(() => {
+    if (!token || activeView !== 'trips' || !can('hotels.view')) return;
+    fetchHotels(token).catch(() => {});
+  }, [activeView, token, can, fetchHotels]);
+
   // Load groups when switching to groups view
   useEffect(() => {
     if (token && activeView === 'groups') {
@@ -765,6 +797,17 @@ const Index = () => {
           >
             <ShoppingBag className="w-4 h-4 shrink-0" />
             <span className="hidden sm:inline">Productos</span>
+          </Button>
+        )}
+        {canAny(VIEW_ENTRY_PERMISSIONS.hotels) && (
+          <Button
+            variant={current === 'hotels' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => handleNavigate('hotels')}
+            className="h-8 gap-1.5 px-2 text-xs sm:text-sm"
+          >
+            <Building2 className="w-4 h-4 shrink-0" />
+            <span className="hidden sm:inline">Hoteles</span>
           </Button>
         )}
         {canAny(VIEW_ENTRY_PERMISSIONS.groups) && (
@@ -1154,6 +1197,62 @@ const Index = () => {
     );
   }
 
+  if (activeView === 'hotels') {
+    const handleCreateHotel = () => {
+      setEditingHotel(null);
+      setHotelModalOpen(true);
+    };
+    const handleEditHotel = (h: Hotel) => {
+      setEditingHotel(h);
+      setHotelModalOpen(true);
+    };
+    const handleDeleteHotel = async (h: Hotel) => {
+      if (!token) throw new Error('No token available');
+      const confirmed = window.confirm(`¿Eliminar el hotel "${h.name}"?`);
+      if (!confirmed) return;
+      await deleteHotel(token, h.id);
+    };
+    const handleSubmitHotel = async (data: HotelFormSaveData) => {
+      if (!token) throw new Error('No token available');
+      try {
+        if (editingHotel) {
+          await updateHotel(token, editingHotel.id, data);
+        } else {
+          await createHotel(token, data);
+        }
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Error al guardar el hotel');
+        throw err;
+      }
+    };
+
+    return (
+      <>
+        <FloatingViewAs />
+        <div className={viewingAs ? 'pt-10' : ''}>
+          <AppHeader>
+            <NavigationButtons current="hotels" />
+          </AppHeader>
+          <HotelList
+            hotels={hotels}
+            readOnly={!canAny(['hotels.create', 'hotels.update', 'hotels.delete'])}
+            onCreate={handleCreateHotel}
+            onEdit={handleEditHotel}
+            onDelete={handleDeleteHotel}
+          />
+          {canAny(['hotels.create', 'hotels.update']) && (
+            <HotelFormModal
+              open={hotelModalOpen}
+              hotel={editingHotel}
+              onClose={() => setHotelModalOpen(false)}
+              onSubmit={handleSubmitHotel}
+            />
+          )}
+        </div>
+      </>
+    );
+  }
+
   if (activeView === 'calendar') {
     return (
       <>
@@ -1323,6 +1422,44 @@ const Index = () => {
             onUpdateBusTemplate={async (id, data) => { await updateBusTemplateStore(token!, id, data); }}
             onDeleteBusTemplate={async (id) => { await deleteBusTemplateStore(token!, id); }}
             changeLog={changeLog}
+            catalogHotels={can('hotels.view') ? hotels : []}
+            onRefreshHotelCatalog={token && can('hotels.view') ? () => fetchHotels(token) : undefined}
+            canManageTripHotels={can('trips.participants_manage') && !tripReviewerMode}
+            onAttachTripHotel={
+              token && can('trips.participants_manage')
+                ? async (tripId, data) => {
+                    await attachTripHotel(token, tripId, data);
+                  }
+                : undefined
+            }
+            onUpdateTripHotel={
+              token && can('trips.participants_manage')
+                ? async (tripId, tripHotelId, data) => {
+                    await updateTripHotelBooking(token, tripId, tripHotelId, data);
+                  }
+                : undefined
+            }
+            onDetachTripHotel={
+              token && can('trips.participants_manage')
+                ? async (tripId, tripHotelId) => {
+                    await detachTripHotel(token, tripId, tripHotelId);
+                  }
+                : undefined
+            }
+            onAssignTripHotelRoom={
+              token && can('trips.participants_manage')
+                ? async (tripId, tripHotelId, roomId, participantId) => {
+                    await assignTripHotelRoom(token, tripId, tripHotelId, roomId, participantId);
+                  }
+                : undefined
+            }
+            onClearTripHotelRoomAssignment={
+              token && can('trips.participants_manage')
+                ? async (tripId, tripHotelId, roomId, participantId) => {
+                    await clearTripHotelRoomAssignment(token, tripId, tripHotelId, roomId, participantId);
+                  }
+                : undefined
+            }
           />
         </div>
       </>

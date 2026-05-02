@@ -24,4 +24,10 @@ router.delete('/:id/seat-assignments', tripsController.resetSeatAssignments);
 router.delete('/:id/seat-assignments/by-seat', tripsController.clearSeatAssignment);
 router.delete('/:id/seat-assignments/:participantId', tripsController.clearSeatAssignment);
 
+router.post('/:id/hotels', tripsController.attachHotelToTrip);
+router.patch('/:id/hotels/:tripHotelId', tripsController.updateTripHotel);
+router.delete('/:id/hotels/:tripHotelId', tripsController.detachHotelFromTrip);
+router.post('/:id/hotels/:tripHotelId/rooms/:roomId/assign', tripsController.setTripHotelRoomAssignment);
+router.delete('/:id/hotels/:tripHotelId/rooms/:roomId/assign/:participantId', tripsController.clearTripHotelRoomAssignment);
+
 export default router;

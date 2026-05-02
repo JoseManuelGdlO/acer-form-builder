@@ -51,6 +51,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { isParticipantChildInTrip, sortTripParticipantsByFamily } from '@/lib/tripParticipantsOrder';
 import { buildTripCompanyColorMap } from '@/lib/tripCompanyColors';
+import type { Hotel } from '@/types/hotel';
+import { TripHotelsSection } from '@/components/trips/TripHotelsSection';
 
 const ACTION_LABELS: Record<string, string> = {
   trip_created: 'Viaje creado',
@@ -91,6 +93,34 @@ interface TripDetailViewProps {
   onInviteCompanies: (invitedCompanyIds: string[]) => Promise<void>;
   /** Revisor: solo ver, participantes y asientos; sin finanzas, invitaciones, edición */
   reviewerMode?: boolean;
+  /** Catálogo de hoteles (permiso hotels.view); vacío si no aplica */
+  catalogHotels?: Hotel[];
+  onRefreshHotelCatalog?: () => Promise<void>;
+  /** trips.participants_manage y callbacks definidos */
+  canManageTripHotels?: boolean;
+  onAttachTripHotel?: (data: {
+    hotelId: string;
+    checkInDate: string;
+    checkOutDate: string;
+    reservedSingles: number;
+    reservedDoubles: number;
+    reservedTriples: number;
+    notes?: string | null;
+  }) => Promise<void>;
+  onUpdateTripHotel?: (
+    tripHotelId: string,
+    data: {
+      checkInDate?: string;
+      checkOutDate?: string;
+      reservedSingles?: number;
+      reservedDoubles?: number;
+      reservedTriples?: number;
+      notes?: string | null;
+    }
+  ) => Promise<void>;
+  onDetachTripHotel?: (tripHotelId: string) => Promise<void>;
+  onAssignTripHotelRoom?: (tripHotelId: string, roomId: string, participantId: string) => Promise<void>;
+  onClearTripHotelRoomAssignment?: (tripHotelId: string, roomId: string, participantId: string) => Promise<void>;
 }
 
 export const TripDetailView = ({
@@ -117,6 +147,14 @@ export const TripDetailView = ({
   tripExpenses,
   onInviteCompanies,
   reviewerMode = false,
+  catalogHotels = [],
+  onRefreshHotelCatalog,
+  canManageTripHotels = false,
+  onAttachTripHotel,
+  onUpdateTripHotel,
+  onDetachTripHotel,
+  onAssignTripHotelRoom,
+  onClearTripHotelRoomAssignment,
 }: TripDetailViewProps) => {
   const [memberSearch, setMemberSearch] = useState('');
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -1081,6 +1119,18 @@ export const TripDetailView = ({
             )}
           </CardContent>
         </Card>
+
+        <TripHotelsSection
+          trip={trip}
+          catalogHotels={catalogHotels}
+          canManage={!!canManageTripHotels}
+          onRefreshCatalog={onRefreshHotelCatalog}
+          onAttach={onAttachTripHotel}
+          onUpdate={onUpdateTripHotel}
+          onDetach={onDetachTripHotel}
+          onAssignRoom={onAssignTripHotelRoom}
+          onClearRoom={onClearTripHotelRoomAssignment}
+        />
 
         {!reviewerMode && (
           <Card>

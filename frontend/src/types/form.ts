@@ -1,3 +1,5 @@
+import type { TripHotelBooking } from './hotel';
+
 export type QuestionType = 
   | 'short_text'
   | 'long_text'
@@ -447,6 +449,8 @@ export interface Trip {
     pickupLocation?: string | null;
   }[];
   seatAssignments?: TripSeatAssignmentEntry[];
+  /** Hoteles adjuntos al viaje (backend: `hotels`) */
+  tripHotels?: TripHotelBooking[];
   participantCount?: number;
   createdAt?: string;
   updatedAt?: string;

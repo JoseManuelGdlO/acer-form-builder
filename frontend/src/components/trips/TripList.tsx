@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Trip, TripInvitation, Client, StaffMember, BusTemplate, TripIncome, TripExpense, TripFinanceSummary } from '@/types/form';
+import type { Hotel } from '@/types/hotel';
 import { TripCard } from './TripCard';
 import { TripDetailView } from './TripDetailView';
 import { TripFormModal, type TripFormSaveData } from './TripFormModal';
@@ -59,6 +60,33 @@ interface TripListProps {
   changeLog: { id: string; tripId: string; userId: string; user?: { id: string; name: string }; action: string; fieldName?: string | null; oldValue?: string | null; newValue?: string | null; createdAt: string }[];
   /** Revisor: sin camiones, crear/editar viaje, invitaciones, finanzas */
   reviewerMode?: boolean;
+  catalogHotels?: Hotel[];
+  onRefreshHotelCatalog?: () => Promise<void>;
+  canManageTripHotels?: boolean;
+  onAttachTripHotel?: (tripId: string, data: {
+    hotelId: string;
+    checkInDate: string;
+    checkOutDate: string;
+    reservedSingles: number;
+    reservedDoubles: number;
+    reservedTriples: number;
+    notes?: string | null;
+  }) => Promise<void>;
+  onUpdateTripHotel?: (
+    tripId: string,
+    tripHotelId: string,
+    data: {
+      checkInDate?: string;
+      checkOutDate?: string;
+      reservedSingles?: number;
+      reservedDoubles?: number;
+      reservedTriples?: number;
+      notes?: string | null;
+    }
+  ) => Promise<void>;
+  onDetachTripHotel?: (tripId: string, tripHotelId: string) => Promise<void>;
+  onAssignTripHotelRoom?: (tripId: string, tripHotelId: string, roomId: string, participantId: string) => Promise<void>;
+  onClearTripHotelRoomAssignment?: (tripId: string, tripHotelId: string, roomId: string, participantId: string) => Promise<void>;
 }
 
 export const TripList = ({
@@ -97,6 +125,14 @@ export const TripList = ({
   onDeleteBusTemplate,
   changeLog,
   reviewerMode = false,
+  catalogHotels = [],
+  onRefreshHotelCatalog,
+  canManageTripHotels = false,
+  onAttachTripHotel,
+  onUpdateTripHotel,
+  onDetachTripHotel,
+  onAssignTripHotelRoom,
+  onClearTripHotelRoomAssignment,
 }: TripListProps) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -254,6 +290,49 @@ export const TripList = ({
             await onUpdate(viewingTrip.id, { invitedCompanyIds });
             onFetchTrip?.(viewingTrip.id);
           }}
+          catalogHotels={catalogHotels}
+          onRefreshHotelCatalog={onRefreshHotelCatalog}
+          canManageTripHotels={canManageTripHotels}
+          onAttachTripHotel={
+            onAttachTripHotel
+              ? async (data) => {
+                  await onAttachTripHotel(viewingTrip.id, data);
+                  onFetchTrip?.(viewingTrip.id);
+                }
+              : undefined
+          }
+          onUpdateTripHotel={
+            onUpdateTripHotel
+              ? async (tripHotelId, data) => {
+                  await onUpdateTripHotel(viewingTrip.id, tripHotelId, data);
+                  onFetchTrip?.(viewingTrip.id);
+                }
+              : undefined
+          }
+          onDetachTripHotel={
+            onDetachTripHotel
+              ? async (tripHotelId) => {
+                  await onDetachTripHotel(viewingTrip.id, tripHotelId);
+                  onFetchTrip?.(viewingTrip.id);
+                }
+              : undefined
+          }
+          onAssignTripHotelRoom={
+            onAssignTripHotelRoom
+              ? async (tripHotelId, roomId, participantId) => {
+                  await onAssignTripHotelRoom(viewingTrip.id, tripHotelId, roomId, participantId);
+                  onFetchTrip?.(viewingTrip.id);
+                }
+              : undefined
+          }
+          onClearTripHotelRoomAssignment={
+            onClearTripHotelRoomAssignment
+              ? async (tripHotelId, roomId, participantId) => {
+                  await onClearTripHotelRoomAssignment(viewingTrip.id, tripHotelId, roomId, participantId);
+                  onFetchTrip?.(viewingTrip.id);
+                }
+              : undefined
+          }
         />
         {seatPickerTrip && (
           <SeatPickerModal

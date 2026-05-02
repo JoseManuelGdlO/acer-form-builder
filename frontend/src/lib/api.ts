@@ -825,6 +825,160 @@ class ApiClient {
     });
   }
 
+  async attachHotelToTrip(
+    tripId: string,
+    data: {
+      hotelId: string;
+      checkInDate: string;
+      checkOutDate: string;
+      reservedSingles: number;
+      reservedDoubles: number;
+      reservedTriples: number;
+      notes?: string | null;
+    },
+    token?: string | null
+  ) {
+    return this.request<any>(`/trips/${tripId}/hotels`, {
+      method: 'POST',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateTripHotel(
+    tripId: string,
+    tripHotelId: string,
+    data: {
+      checkInDate?: string;
+      checkOutDate?: string;
+      reservedSingles?: number;
+      reservedDoubles?: number;
+      reservedTriples?: number;
+      notes?: string | null;
+    },
+    token?: string | null
+  ) {
+    return this.request<any>(`/trips/${tripId}/hotels/${tripHotelId}`, {
+      method: 'PATCH',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+      body: JSON.stringify(data),
+    });
+  }
+
+  async detachTripHotel(tripId: string, tripHotelId: string, token?: string | null) {
+    return this.request<{ message: string }>(`/trips/${tripId}/hotels/${tripHotelId}`, {
+      method: 'DELETE',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async assignTripHotelRoom(
+    tripId: string,
+    tripHotelId: string,
+    roomId: string,
+    data: { participantId: string },
+    token?: string | null
+  ) {
+    return this.request<any>(`/trips/${tripId}/hotels/${tripHotelId}/rooms/${roomId}/assign`, {
+      method: 'POST',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+      body: JSON.stringify(data),
+    });
+  }
+
+  async clearTripHotelRoomAssignment(
+    tripId: string,
+    tripHotelId: string,
+    roomId: string,
+    participantId: string,
+    token?: string | null
+  ) {
+    return this.request<{ message: string }>(
+      `/trips/${tripId}/hotels/${tripHotelId}/rooms/${roomId}/assign/${participantId}`,
+      {
+        method: 'DELETE',
+        token: token ?? this.getToken(),
+        requireAuth: true,
+      }
+    );
+  }
+
+  // Hotels catalog
+  async getHotels(token?: string | null) {
+    return this.request<any[]>('/hotels', {
+      method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async getHotel(id: string, token?: string | null) {
+    return this.request<any>(`/hotels/${id}`, {
+      method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async createHotel(
+    data: {
+      name: string;
+      address?: string | null;
+      city?: string | null;
+      country?: string | null;
+      phone?: string | null;
+      email?: string | null;
+      notes?: string | null;
+      totalSingleRooms?: number;
+      totalDoubleRooms?: number;
+      totalTripleRooms?: number;
+    },
+    token?: string | null
+  ) {
+    return this.request<any>('/hotels', {
+      method: 'POST',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateHotel(
+    id: string,
+    data: {
+      name?: string;
+      address?: string | null;
+      city?: string | null;
+      country?: string | null;
+      phone?: string | null;
+      email?: string | null;
+      notes?: string | null;
+      totalSingleRooms?: number;
+      totalDoubleRooms?: number;
+      totalTripleRooms?: number;
+    },
+    token?: string | null
+  ) {
+    return this.request<any>(`/hotels/${id}`, {
+      method: 'PUT',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteHotel(id: string, token?: string | null) {
+    return this.request<{ message: string }>(`/hotels/${id}`, {
+      method: 'DELETE',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
   // Staff members catalog
   async getStaffMembers(token?: string | null) {
     return this.request<any[]>('/staff-members', {
