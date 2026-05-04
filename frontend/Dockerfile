@@ -22,6 +22,8 @@ RUN npm run build
 # Production stage with nginx
 FROM nginx:alpine AS production
 
+# Only substitute ${BACKEND_PORT}; leave nginx vars ($uri, $host, …) untouched (see docker-nginx 20-envsubst-on-templates.sh)
+ENV NGINX_ENVSUBST_FILTER=^BACKEND_PORT$
 # Must match backend PORT (compose passes BACKEND_PORT=${PORT:-3001})
 ENV BACKEND_PORT=3001
 
