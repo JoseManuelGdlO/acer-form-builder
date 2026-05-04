@@ -1,7 +1,6 @@
 import { Trip } from '@/types/form';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,12 +26,6 @@ export const TripCard = ({ trip, onView, onEdit, onDelete, readOnly = false }: T
     d ? format(parseISO(d), 'd MMM yyyy', { locale: es }) : '';
   const departure = fmtShort(trip.departureDate);
   const returnDate = fmtShort(trip.returnDate);
-  const visa =
-    trip.isVisaTrip &&
-    trip.casDepartureDate &&
-    trip.casReturnDate &&
-    trip.consulateDepartureDate &&
-    trip.consulateReturnDate;
 
   return (
     <Card
@@ -49,11 +42,6 @@ export const TripCard = ({ trip, onView, onEdit, onDelete, readOnly = false }: T
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="font-semibold text-foreground text-lg">{trip.title}</h3>
-                  {visa && (
-                    <Badge variant="secondary" className="text-xs font-normal">
-                      Visas
-                    </Badge>
-                  )}
                 </div>
                 {trip.destination && (
                   <p className="text-sm text-muted-foreground flex items-center gap-1">
@@ -61,23 +49,10 @@ export const TripCard = ({ trip, onView, onEdit, onDelete, readOnly = false }: T
                     {trip.destination}
                   </p>
                 )}
-                {visa ? (
-                  <div className="text-sm text-muted-foreground space-y-0.5 mt-0.5">
-                    <p className="flex items-center gap-1">
-                      <Calendar className="w-3.5 h-3.5 shrink-0" />
-                      CAS: {fmtShort(trip.casDepartureDate)} – {fmtShort(trip.casReturnDate)}
-                    </p>
-                    <p className="flex items-center gap-1 pl-5">
-                      Consulado: {fmtShort(trip.consulateDepartureDate)} –{' '}
-                      {fmtShort(trip.consulateReturnDate)}
-                    </p>
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5">
-                    <Calendar className="w-3.5 h-3.5" />
-                    {departure} – {returnDate}
-                  </p>
-                )}
+                <p className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5">
+                  <Calendar className="w-3.5 h-3.5" />
+                  {departure} – {returnDate}
+                </p>
                 <p className="text-sm text-muted-foreground mt-0.5">
                   {count}/{trip.totalSeats} plazas
                 </p>

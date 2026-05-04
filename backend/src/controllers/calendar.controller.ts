@@ -10,16 +10,7 @@ const formatDateOnly = (value: string | Date | null | undefined): string | null 
 };
 
 const makeEvent = (payload: {
-  type:
-    | 'office'
-    | 'cas'
-    | 'consular'
-    | 'trip_departure'
-    | 'trip_return'
-    | 'trip_visa_cas_dep'
-    | 'trip_visa_cas_ret'
-    | 'trip_visa_con_dep'
-    | 'trip_visa_con_ret';
+  type: 'office' | 'trip_departure' | 'trip_return';
   date: string;
   title: string;
   /** HH:mm — citas internas; el resto usa orden por defecto */
@@ -29,9 +20,7 @@ const makeEvent = (payload: {
   tripId?: string;
   note?: string;
   status?: string;
-  /** Sucursal (asesor del cliente / del viaje) para agrupar y filtrar en el calendario */
   branchName?: string;
-  /** Cita oficina: asesor asignado al cliente (o quien agendó si no hay asignado) */
   advisorName?: string;
 }) => payload;
 
@@ -40,7 +29,6 @@ function branchNameFromAssignedUser(assigned: { branch?: { name?: string } } | n
   return typeof n === 'string' && n.trim() ? n.trim() : undefined;
 }
 
-/** Prioridad: primer usuario con sucursal (ej. asesor del cliente → quien agenda la cita). */
 function branchNameFromUsers(
   ...users: ({ branch?: { name?: string } } | null | undefined)[]
 ): string | undefined {
@@ -51,7 +39,6 @@ function branchNameFromUsers(
   return undefined;
 }
 
-/** Minutos desde medianoche para ordenar eventos del mismo día */
 function sortMinutesForEvent(e: { type: string; startTime?: string | null }): number {
   const t = e.startTime;
   if (t && /^\d{2}:\d{2}$/.test(t)) {
@@ -65,18 +52,6 @@ function sortMinutesForEvent(e: { type: string; startTime?: string | null }): nu
       return 6 * 60;
     case 'trip_return':
       return 22 * 60;
-    case 'trip_visa_cas_dep':
-      return 6 * 60;
-    case 'trip_visa_cas_ret':
-      return 6 * 60 + 15;
-    case 'trip_visa_con_dep':
-      return 6 * 60 + 30;
-    case 'trip_visa_con_ret':
-      return 6 * 60 + 45;
-    case 'cas':
-      return 10 * 60;
-    case 'consular':
-      return 11 * 60;
     default:
       return 12 * 60;
   }
@@ -95,26 +70,6 @@ export const getCalendarEvents = async (req: AuthRequest, res: Response): Promis
       res.status(400).json({ error: 'from and to are required (YYYY-MM-DD)' });
       return;
     }
-
-    const clients = await Client.findAll({
-      where: { companyId },
-      attributes: [
-        'id',
-        'name',
-        'visaCasAppointmentDate',
-        'visaCasAppointmentLocation',
-        'visaConsularAppointmentDate',
-        'visaConsularAppointmentLocation',
-      ],
-      include: [
-        {
-          model: User,
-          as: 'assignedUser',
-          attributes: ['id', 'name'],
-          include: [{ model: Branch, as: 'branch', attributes: ['id', 'name'] }],
-        },
-      ],
-    });
 
     const officeAppointments = await InternalAppointment.findAll({
       where: {
@@ -151,23 +106,9 @@ export const getCalendarEvents = async (req: AuthRequest, res: Response): Promis
         [Op.or]: [
           { departureDate: { [Op.between]: [from, to] } },
           { returnDate: { [Op.between]: [from, to] } },
-          { casDepartureDate: { [Op.between]: [from, to] } },
-          { casReturnDate: { [Op.between]: [from, to] } },
-          { consulateDepartureDate: { [Op.between]: [from, to] } },
-          { consulateReturnDate: { [Op.between]: [from, to] } },
         ],
       },
-      attributes: [
-        'id',
-        'title',
-        'departureDate',
-        'returnDate',
-        'isVisaTrip',
-        'casDepartureDate',
-        'casReturnDate',
-        'consulateDepartureDate',
-        'consulateReturnDate',
-      ],
+      attributes: ['id', 'title', 'departureDate', 'returnDate'],
       include: [
         {
           model: User,
@@ -179,38 +120,7 @@ export const getCalendarEvents = async (req: AuthRequest, res: Response): Promis
       order: [['departure_date', 'ASC']],
     });
 
-    const events: any[] = [];
-    for (const client of clients as any[]) {
-      const branchName = branchNameFromAssignedUser(client.assignedUser);
-      const casDate = formatDateOnly(client.visaCasAppointmentDate);
-      if (casDate && casDate >= from && casDate <= to) {
-        events.push(
-          makeEvent({
-            type: 'cas',
-            date: casDate,
-            title: client.name,
-            clientId: client.id,
-            clientName: client.name,
-            note: client.visaCasAppointmentLocation || undefined,
-            branchName,
-          })
-        );
-      }
-      const consularDate = formatDateOnly(client.visaConsularAppointmentDate);
-      if (consularDate && consularDate >= from && consularDate <= to) {
-        events.push(
-          makeEvent({
-            type: 'consular',
-            date: consularDate,
-            title: client.name,
-            clientId: client.id,
-            clientName: client.name,
-            note: client.visaConsularAppointmentLocation || undefined,
-            branchName,
-          })
-        );
-      }
-    }
+    const events: ReturnType<typeof makeEvent>[] = [];
 
     for (const appointment of officeAppointments as any[]) {
       const client = appointment.client;
@@ -245,80 +155,29 @@ export const getCalendarEvents = async (req: AuthRequest, res: Response): Promis
     for (const trip of trips) {
       const tr = trip as any;
       const tripBranch = branchNameFromAssignedUser(tr.assignedUser);
-      if (tr.isVisaTrip) {
-        const casD = formatDateOnly(tr.casDepartureDate);
-        if (casD && casD >= from && casD <= to) {
-          events.push(
-            makeEvent({
-              type: 'trip_visa_cas_dep',
-              date: casD,
-              title: `Viaje (CAS salida) - ${trip.title}`,
-              tripId: trip.id,
-              branchName: tripBranch,
-            })
-          );
-        }
-        const casR = formatDateOnly(tr.casReturnDate);
-        if (casR && casR >= from && casR <= to) {
-          events.push(
-            makeEvent({
-              type: 'trip_visa_cas_ret',
-              date: casR,
-              title: `Viaje (CAS regreso) - ${trip.title}`,
-              tripId: trip.id,
-              branchName: tripBranch,
-            })
-          );
-        }
-        const conD = formatDateOnly(tr.consulateDepartureDate);
-        if (conD && conD >= from && conD <= to) {
-          events.push(
-            makeEvent({
-              type: 'trip_visa_con_dep',
-              date: conD,
-              title: `Viaje (consulado salida) - ${trip.title}`,
-              tripId: trip.id,
-              branchName: tripBranch,
-            })
-          );
-        }
-        const conR = formatDateOnly(tr.consulateReturnDate);
-        if (conR && conR >= from && conR <= to) {
-          events.push(
-            makeEvent({
-              type: 'trip_visa_con_ret',
-              date: conR,
-              title: `Viaje (consulado regreso) - ${trip.title}`,
-              tripId: trip.id,
-              branchName: tripBranch,
-            })
-          );
-        }
-      } else {
-        const departure = formatDateOnly(trip.departureDate);
-        if (departure && departure >= from && departure <= to) {
-          events.push(
-            makeEvent({
-              type: 'trip_departure',
-              date: departure,
-              title: `Salida viaje - ${trip.title}`,
-              tripId: trip.id,
-              branchName: tripBranch,
-            })
-          );
-        }
-        const returnDate = formatDateOnly(trip.returnDate);
-        if (returnDate && returnDate >= from && returnDate <= to) {
-          events.push(
-            makeEvent({
-              type: 'trip_return',
-              date: returnDate,
-              title: `Regreso viaje - ${trip.title}`,
-              tripId: trip.id,
-              branchName: tripBranch,
-            })
-          );
-        }
+      const departure = formatDateOnly(trip.departureDate);
+      if (departure && departure >= from && departure <= to) {
+        events.push(
+          makeEvent({
+            type: 'trip_departure',
+            date: departure,
+            title: `Salida viaje - ${trip.title}`,
+            tripId: trip.id,
+            branchName: tripBranch,
+          })
+        );
+      }
+      const returnDate = formatDateOnly(trip.returnDate);
+      if (returnDate && returnDate >= from && returnDate <= to) {
+        events.push(
+          makeEvent({
+            type: 'trip_return',
+            date: returnDate,
+            title: `Regreso viaje - ${trip.title}`,
+            tripId: trip.id,
+            branchName: tripBranch,
+          })
+        );
       }
     }
 

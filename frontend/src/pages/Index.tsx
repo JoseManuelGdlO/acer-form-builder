@@ -4,6 +4,7 @@ import { useSubmissionStore } from '@/hooks/useSubmissionStore';
 import { useClientStore } from '@/hooks/useClientStore';
 import { useGroupStore } from '@/hooks/useGroupStore';
 import { useProductStore } from '@/hooks/useProductStore';
+import { useHotelStore } from '@/hooks/useHotelStore';
 import { useTripStore } from '@/hooks/useTripStore';
 import { useStaffStore } from '@/hooks/useStaffStore';
 import { useBusTemplateStore } from '@/hooks/useBusTemplateStore';
@@ -19,6 +20,8 @@ import { ChatbotSettings } from '@/components/chatbot/ChatbotSettings';
 import { SettingsPage } from '@/components/settings/SettingsPage';
 import { PaymentLogsPage } from '@/components/payments/PaymentLogsPage';
 import { ProductsList } from '@/components/products/ProductsList';
+import { HotelList } from '@/components/hotels/HotelList';
+import { HotelFormModal, type HotelFormSaveData } from '@/components/hotels/HotelFormModal';
 import { FinanceDashboard } from '@/components/finance/FinanceDashboard';
 import { CalendarPage } from '@/components/calendar/CalendarPage';
 import { ProductFormModal } from '@/components/products/ProductFormModal';
@@ -39,10 +42,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { LayoutDashboard, FileText, Users, UserCog, Bot, Settings, Receipt, ChevronDown, ShoppingBag, MapPin, ChartNoAxesCombined, Calendar, Boxes, Shield } from 'lucide-react';
+import { LayoutDashboard, FileText, Users, UserCog, Bot, Settings, Receipt, ChevronDown, ShoppingBag, MapPin, ChartNoAxesCombined, Calendar, Boxes, Shield, Building2 } from 'lucide-react';
 import { User } from '@/types/user';
 import { Client } from '@/types/form';
 import { Product } from '@/types/product';
+import type { Hotel } from '@/types/hotel';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
 
@@ -62,6 +66,7 @@ const parseInitialClientNavigation = (): { initialView: View; initialClientId: s
     'forms',
     'clients',
     'products',
+    'hotels',
     'calendar',
     'finance',
     'paymentLogs',
@@ -94,64 +99,20 @@ const isWhatsappReplyEvent = (eventData: NotificationSyncEventData | null | unde
   return eventData.notificationData?.type === 'whatsapp_reply';
 };
 
-/**
- * GET /clients/stats — mismas reglas que el filtro "Estado de Visa" en clientes:
- * solo plantillas activas del catálogo; conteos por id desde visaStatusCounts;
- * aprobada/negada por etiqueta (aprob / negad) como en el resto del producto.
- */
-function mapServerClientStatsPayload(data: {
-  total?: number;
-  visaStatusCounts?: Array<{ id?: string; label?: string; count?: number }>;
-  visaStatusTemplates?: Array<{ id?: string; label?: string }>;
-}): { total: number; active: number; inactive: number; pending: number } {
-  const total = typeof data.total === 'number' ? data.total : 0;
-  const normalize = (s?: string | null) => (s || '').trim().toLowerCase();
-
-  const countsById = new Map<string, number>();
-  for (const row of data.visaStatusCounts || []) {
-    const id = row.id;
-    if (!id) continue;
-    countsById.set(id, typeof row.count === 'number' ? row.count : 0);
-  }
-
-  const catalog =
-    Array.isArray(data.visaStatusTemplates) && data.visaStatusTemplates.length > 0
-      ? data.visaStatusTemplates.filter((t): t is { id: string; label?: string } => typeof t.id === 'string')
-      : null;
-
-  let active = 0;
-  let inactive = 0;
-
-  if (catalog) {
-    for (const t of catalog) {
-      const count = countsById.get(t.id) ?? 0;
-      const label = normalize(t.label);
-      if (label.includes('aprob')) active += count;
-      else if (label.includes('negad')) inactive += count;
-    }
-  } else {
-    for (const row of data.visaStatusCounts || []) {
-      const label = normalize(row.label);
-      const c = typeof row.count === 'number' ? row.count : 0;
-      if (label.includes('aprob')) active += c;
-      else if (label.includes('negad')) inactive += c;
-    }
-  }
-
-  const pending = Math.max(0, total - active - inactive);
-  return { total, active, inactive, pending };
-}
-
-function visaStatusCountsFromStatsRaw(raw: unknown): Record<string, number> {
-  if (!raw || typeof raw !== 'object') return {};
-  const rows = (raw as { visaStatusCounts?: Array<{ id?: string; count?: number }> }).visaStatusCounts;
-  const out: Record<string, number> = {};
-  for (const row of Array.isArray(rows) ? rows : []) {
-    const id = row.id;
-    if (!id) continue;
-    out[id] = typeof row.count === 'number' ? row.count : 0;
-  }
-  return out;
+/** Normaliza GET /clients/stats (conteos por status real del cliente). */
+function normalizeClientStatsPayload(raw: unknown): {
+  total: number;
+  active: number;
+  inactive: number;
+  pending: number;
+} {
+  const r = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+  return {
+    total: typeof r.total === 'number' ? r.total : 0,
+    active: typeof r.active === 'number' ? r.active : 0,
+    inactive: typeof r.inactive === 'number' ? r.inactive : 0,
+    pending: typeof r.pending === 'number' ? r.pending : 0,
+  };
 }
 
 const Index = () => {
@@ -186,7 +147,6 @@ const Index = () => {
     clients,
     pickerClients,
     checklistTemplates,
-    visaStatusTemplates,
     pagination: clientPagination,
     fetchClients,
     fetchClientsForPickers,
@@ -212,6 +172,13 @@ const Index = () => {
     replaceProducts,
   } = useProductStore();
   const {
+    hotels,
+    fetchHotels,
+    createHotel,
+    updateHotel,
+    deleteHotel,
+  } = useHotelStore();
+  const {
     trips,
     invitations,
     changeLog,
@@ -226,6 +193,7 @@ const Index = () => {
     deleteTrip,
     addParticipants,
     removeParticipant,
+    updateParticipantPickup,
     setSeatAssignment,
     clearSeatAssignment,
     resetSeatAssignments,
@@ -236,6 +204,11 @@ const Index = () => {
     deleteTripIncome,
     createTripExpense,
     deleteTripExpense,
+    attachTripHotel,
+    updateTripHotelBooking,
+    detachTripHotel,
+    assignTripHotelRoom,
+    clearTripHotelRoomAssignment,
   } = useTripStore();
   const {
     staffMembers,
@@ -256,11 +229,13 @@ const Index = () => {
   const { users, fetchUsers } = useUserStore();
   const [productModalOpen, setProductModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [hotelModalOpen, setHotelModalOpen] = useState(false);
+  const [editingHotel, setEditingHotel] = useState<Hotel | null>(null);
   const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
   const [selectedFilterCategories, setSelectedFilterCategories] = useState<string[]>([]);
   const [clientListQuery, setClientListQuery] = useState<{
     q?: string;
-    visaStatusTemplateId?: string;
+    status?: 'active' | 'inactive' | 'pending';
     checklistTemplateId?: string;
     checklistMode?: 'completed' | 'not_completed';
     productId?: string;
@@ -275,16 +250,27 @@ const Index = () => {
     inactive: number;
     pending: number;
   } | null>(null);
-  /** Total de clientes del alcance actual (empresa o asesor en "Ver como"), sin filtros del listado — nav y resumen de clientes */
-  const [clientsScopeTotal, setClientsScopeTotal] = useState<number | null>(null);
-  /** Conteos por plantilla de estado (GET /clients/stats); alinea pastillas del filtro con el total real, no solo la página */
-  const [clientVisaStatusCounts, setClientVisaStatusCounts] = useState<Record<string, number>>({});
+  /** Totales del alcance actual (GET /clients/stats), para nav y pastillas de estado en clientes */
+  const [scopeClientStats, setScopeClientStats] = useState<{
+    total: number;
+    active: number;
+    inactive: number;
+    pending: number;
+  } | null>(null);
+
+  const [tripStats, setTripStats] = useState<{
+    upcomingTrips: number;
+    departingIn30Days: number;
+    totalSeatsUpcoming: number;
+    participantCountUpcoming: number;
+    occupancyRate: number;
+  } | null>(null);
   const { categories, fetchCategories, createCategory, updateCategory, deleteCategory } = useCategoryStore();
 
   const areClientQueriesEqual = (
     a: {
       q?: string;
-      visaStatusTemplateId?: string;
+      status?: 'active' | 'inactive' | 'pending';
       checklistTemplateId?: string;
       checklistMode?: 'completed' | 'not_completed';
       productId?: string;
@@ -295,7 +281,7 @@ const Index = () => {
     },
     b: {
       q?: string;
-      visaStatusTemplateId?: string;
+      status?: 'active' | 'inactive' | 'pending';
       checklistTemplateId?: string;
       checklistMode?: 'completed' | 'not_completed';
       productId?: string;
@@ -306,7 +292,7 @@ const Index = () => {
     }
   ) =>
     a.q === b.q &&
-    a.visaStatusTemplateId === b.visaStatusTemplateId &&
+    a.status === b.status &&
     a.checklistTemplateId === b.checklistTemplateId &&
     a.checklistMode === b.checklistMode &&
     a.productId === b.productId &&
@@ -384,7 +370,7 @@ const Index = () => {
         });
       }
 
-      // Load products (visas)
+      // Load products
       if (products.length === 0) {
         fetchProducts(token).catch((error) => {
           console.error('Failed to fetch products:', error);
@@ -429,8 +415,7 @@ const Index = () => {
             : undefined;
       getClientStats(token, aid ? { assignedUserId: aid } : undefined)
         .then((raw) => {
-          if (typeof raw.total === 'number') setClientsScopeTotal(raw.total);
-          setClientVisaStatusCounts(visaStatusCountsFromStatsRaw(raw));
+          setScopeClientStats(normalizeClientStatsPayload(raw));
         })
         .catch(() => {});
     };
@@ -457,8 +442,7 @@ const Index = () => {
             : undefined;
       getClientStats(token, aid ? { assignedUserId: aid } : undefined)
         .then((raw) => {
-          if (typeof raw.total === 'number') setClientsScopeTotal(raw.total);
-          setClientVisaStatusCounts(visaStatusCountsFromStatsRaw(raw));
+          setScopeClientStats(normalizeClientStatsPayload(raw));
         })
         .catch(() => {});
     }, 60000);
@@ -475,7 +459,7 @@ const Index = () => {
     getClientStats(token, assignedUserId ? { assignedUserId } : undefined)
       .then((raw) => {
         if (cancelled) return;
-        setDashboardClientStats(mapServerClientStatsPayload(raw));
+        setDashboardClientStats(normalizeClientStatsPayload(raw));
       })
       .catch(() => {
         if (!cancelled) setDashboardClientStats(null);
@@ -484,6 +468,26 @@ const Index = () => {
       cancelled = true;
     };
   }, [token, activeView, viewingAs, getClientStats]);
+
+  useEffect(() => {
+    if (!token || activeView !== 'dashboard') return;
+    if (!can('trips.view')) {
+      setTripStats(null);
+      return;
+    }
+    let cancelled = false;
+    api
+      .getTripStats(token)
+      .then((data) => {
+        if (!cancelled) setTripStats(data);
+      })
+      .catch(() => {
+        if (!cancelled) setTripStats(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, activeView, can]);
 
   useEffect(() => {
     if (!token) return;
@@ -497,14 +501,10 @@ const Index = () => {
     getClientStats(token, assignedUserIdForStats ? { assignedUserId: assignedUserIdForStats } : undefined)
       .then((raw) => {
         if (cancelled) return;
-        setClientsScopeTotal(typeof raw.total === 'number' ? raw.total : null);
-        setClientVisaStatusCounts(visaStatusCountsFromStatsRaw(raw));
+        setScopeClientStats(normalizeClientStatsPayload(raw));
       })
       .catch(() => {
-        if (!cancelled) {
-          setClientsScopeTotal(null);
-          setClientVisaStatusCounts({});
-        }
+        if (!cancelled) setScopeClientStats(null);
       });
     return () => {
       cancelled = true;
@@ -534,6 +534,19 @@ const Index = () => {
       });
     }
   }, [activeView, token]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (token && activeView === 'hotels' && can('hotels.view')) {
+      fetchHotels(token).catch((error) => {
+        console.error('Failed to fetch hotels:', error);
+      });
+    }
+  }, [activeView, token, can, fetchHotels]);
+
+  useEffect(() => {
+    if (!token || activeView !== 'trips' || !can('hotels.view')) return;
+    fetchHotels(token).catch(() => {});
+  }, [activeView, token, can, fetchHotels]);
 
   // Load groups when switching to groups view
   useEffect(() => {
@@ -589,8 +602,7 @@ const Index = () => {
     const aid = assignedUserIdForClientStats();
     getClientStats(token, aid ? { assignedUserId: aid } : undefined)
       .then((raw) => {
-        if (typeof raw.total === 'number') setClientsScopeTotal(raw.total);
-        setClientVisaStatusCounts(visaStatusCountsFromStatsRaw(raw));
+        setScopeClientStats(normalizeClientStatsPayload(raw));
       })
       .catch(() => {});
     return created;
@@ -604,8 +616,7 @@ const Index = () => {
     const aid = assignedUserIdForClientStats();
     getClientStats(token, aid ? { assignedUserId: aid } : undefined)
       .then((raw) => {
-        if (typeof raw.total === 'number') setClientsScopeTotal(raw.total);
-        setClientVisaStatusCounts(visaStatusCountsFromStatsRaw(raw));
+        setScopeClientStats(normalizeClientStatsPayload(raw));
       })
       .catch(() => {});
     return result;
@@ -619,8 +630,7 @@ const Index = () => {
     const aid = assignedUserIdForClientStats();
     getClientStats(token, aid ? { assignedUserId: aid } : undefined)
       .then((raw) => {
-        if (typeof raw.total === 'number') setClientsScopeTotal(raw.total);
-        setClientVisaStatusCounts(visaStatusCountsFromStatsRaw(raw));
+        setScopeClientStats(normalizeClientStatsPayload(raw));
       })
       .catch(() => {});
   };
@@ -653,33 +663,25 @@ const Index = () => {
   }, [pickerClients, viewingAs]);
 
   const filteredClientStats = useMemo(() => {
-    const normalize = (s?: string | null) => (s || '').trim().toLowerCase();
-    const activeIds = new Set(visaStatusTemplates.map((t) => t.id));
-    let approved = 0;
-    let denied = 0;
-    let other = 0;
+    let active = 0;
+    let inactive = 0;
+    let pending = 0;
     for (const c of filteredClients) {
-      const tid = c.visaStatusTemplateId;
-      if (!tid || !activeIds.has(tid)) {
-        other++;
-        continue;
-      }
-      const label = normalize(c.visaStatusTemplate?.label);
-      if (label.includes('aprob')) approved++;
-      else if (label.includes('negad')) denied++;
-      else other++;
+      if (c.status === 'active') active++;
+      else if (c.status === 'inactive') inactive++;
+      else pending++;
     }
     return {
       total: filteredClients.length,
-      active: approved,
-      inactive: denied,
-      pending: other,
+      active,
+      inactive,
+      pending,
     };
-  }, [filteredClients, visaStatusTemplates]);
+  }, [filteredClients]);
 
   const handleClientFiltersChange = useCallback((filters: {
     q?: string;
-    visaStatusTemplateId?: string;
+    status?: 'active' | 'inactive' | 'pending';
     checklistTemplateId?: string;
     checklistMode?: 'completed' | 'not_completed';
     productId?: string;
@@ -755,9 +757,9 @@ const Index = () => {
           >
             <Users className="w-4 h-4 shrink-0" />
             <span className="hidden sm:inline">Clientes</span>
-            {clientsScopeTotal !== null && clientsScopeTotal > 0 && (
+            {scopeClientStats !== null && scopeClientStats.total > 0 && (
               <span className="px-1.5 py-0.5 text-xs rounded-full bg-secondary/20 text-secondary">
-                {clientsScopeTotal}
+                {scopeClientStats.total}
               </span>
             )}
           </Button>
@@ -804,6 +806,17 @@ const Index = () => {
           >
             <ShoppingBag className="w-4 h-4 shrink-0" />
             <span className="hidden sm:inline">Productos</span>
+          </Button>
+        )}
+        {canAny(VIEW_ENTRY_PERMISSIONS.hotels) && (
+          <Button
+            variant={current === 'hotels' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => handleNavigate('hotels')}
+            className="h-8 gap-1.5 px-2 text-xs sm:text-sm"
+          >
+            <Building2 className="w-4 h-4 shrink-0" />
+            <span className="hidden sm:inline">Hoteles</span>
           </Button>
         )}
         {canAny(VIEW_ENTRY_PERMISSIONS.groups) && (
@@ -948,9 +961,16 @@ const Index = () => {
           <ClientList
             clients={filteredClients}
             products={products}
-            visaStatusTemplates={visaStatusTemplates}
-            visaStatusCountsByTemplateId={clientVisaStatusCounts}
-            stats={{ total: clientsScopeTotal ?? clientPagination.total }}
+            stats={{
+              total: scopeClientStats?.total ?? clientPagination.total,
+              ...(scopeClientStats
+                ? {
+                    active: scopeClientStats.active,
+                    inactive: scopeClientStats.inactive,
+                    pending: scopeClientStats.pending,
+                  }
+                : {}),
+            }}
             initialClientId={initialNavigation.initialClientId}
             onDelete={deleteClient}
             onCreate={async (data) => { await createClient(data); }}
@@ -967,7 +987,7 @@ const Index = () => {
     );
   }
 
-  // Vista de productos (visas)
+  // Vista de productos
   if (activeView === 'products') {
     const mapApiProductsToUi = (list: any[]): Product[] => {
       return (Array.isArray(list) ? list : []).map((p: any) => ({
@@ -1186,6 +1206,62 @@ const Index = () => {
     );
   }
 
+  if (activeView === 'hotels') {
+    const handleCreateHotel = () => {
+      setEditingHotel(null);
+      setHotelModalOpen(true);
+    };
+    const handleEditHotel = (h: Hotel) => {
+      setEditingHotel(h);
+      setHotelModalOpen(true);
+    };
+    const handleDeleteHotel = async (h: Hotel) => {
+      if (!token) throw new Error('No token available');
+      const confirmed = window.confirm(`¿Eliminar el hotel "${h.name}"?`);
+      if (!confirmed) return;
+      await deleteHotel(token, h.id);
+    };
+    const handleSubmitHotel = async (data: HotelFormSaveData) => {
+      if (!token) throw new Error('No token available');
+      try {
+        if (editingHotel) {
+          await updateHotel(token, editingHotel.id, data);
+        } else {
+          await createHotel(token, data);
+        }
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Error al guardar el hotel');
+        throw err;
+      }
+    };
+
+    return (
+      <>
+        <FloatingViewAs />
+        <div className={viewingAs ? 'pt-10' : ''}>
+          <AppHeader>
+            <NavigationButtons current="hotels" />
+          </AppHeader>
+          <HotelList
+            hotels={hotels}
+            readOnly={!canAny(['hotels.create', 'hotels.update', 'hotels.delete'])}
+            onCreate={handleCreateHotel}
+            onEdit={handleEditHotel}
+            onDelete={handleDeleteHotel}
+          />
+          {canAny(['hotels.create', 'hotels.update']) && (
+            <HotelFormModal
+              open={hotelModalOpen}
+              hotel={editingHotel}
+              onClose={() => setHotelModalOpen(false)}
+              onSubmit={handleSubmitHotel}
+            />
+          )}
+        </div>
+      </>
+    );
+  }
+
   if (activeView === 'calendar') {
     return (
       <>
@@ -1300,7 +1376,6 @@ const Index = () => {
               await createTrip(token!, data);
             }}
             onUpdate={async (tripId, data) => {
-              const visa = data.isVisaTrip === true;
               await updateTrip(token!, tripId, {
                 title: data.title,
                 destination: data.destination,
@@ -1308,25 +1383,17 @@ const Index = () => {
                 totalSeats: data.totalSeats,
                 busTemplateId: data.busTemplateId,
                 invitedCompanyIds: data.invitedCompanyIds,
-                ...(visa
-                  ? {
-                      isVisaTrip: true,
-                      casDepartureDate: data.casDepartureDate ?? null,
-                      casReturnDate: data.casReturnDate ?? null,
-                      consulateDepartureDate: data.consulateDepartureDate ?? null,
-                      consulateReturnDate: data.consulateReturnDate ?? null,
-                    }
-                  : {
-                      isVisaTrip: false,
-                      departureDate: data.departureDate,
-                      returnDate: data.returnDate,
-                    }),
+                departureDate: data.departureDate,
+                returnDate: data.returnDate,
               });
               await fetchTrip(tripId, token!);
             }}
             onDelete={async (tripId) => { await deleteTrip(token!, tripId); }}
             onAddParticipants={async (tripId, payload) => { await addParticipants(token!, tripId, payload); await fetchTrip(tripId, token!); }}
             onRemoveParticipant={async (tripId, participantId) => { await removeParticipant(token!, tripId, participantId); await fetchTrip(tripId, token!); }}
+            onUpdateParticipantPickup={async (tripId, participantId, pickupLocation) => {
+              await updateParticipantPickup(token!, tripId, participantId, pickupLocation);
+            }}
             onAcceptInvitation={async (invitationId) => { await acceptInvitation(invitationId, token!); await fetchTrips(token!); await fetchInvitations(token!); }}
             onRejectInvitation={async (invitationId) => { await rejectInvitation(invitationId, token!); await fetchInvitations(token!); }}
             onResetSeatAssignments={async (tripId) => { await resetSeatAssignments(token!, tripId); await fetchTrip(tripId, token!); }}
@@ -1364,6 +1431,44 @@ const Index = () => {
             onUpdateBusTemplate={async (id, data) => { await updateBusTemplateStore(token!, id, data); }}
             onDeleteBusTemplate={async (id) => { await deleteBusTemplateStore(token!, id); }}
             changeLog={changeLog}
+            catalogHotels={can('hotels.view') ? hotels : []}
+            onRefreshHotelCatalog={token && can('hotels.view') ? () => fetchHotels(token) : undefined}
+            canManageTripHotels={can('trips.participants_manage') && !tripReviewerMode}
+            onAttachTripHotel={
+              token && can('trips.participants_manage')
+                ? async (tripId, data) => {
+                    await attachTripHotel(token, tripId, data);
+                  }
+                : undefined
+            }
+            onUpdateTripHotel={
+              token && can('trips.participants_manage')
+                ? async (tripId, tripHotelId, data) => {
+                    await updateTripHotelBooking(token, tripId, tripHotelId, data);
+                  }
+                : undefined
+            }
+            onDetachTripHotel={
+              token && can('trips.participants_manage')
+                ? async (tripId, tripHotelId) => {
+                    await detachTripHotel(token, tripId, tripHotelId);
+                  }
+                : undefined
+            }
+            onAssignTripHotelRoom={
+              token && can('trips.participants_manage')
+                ? async (tripId, tripHotelId, roomId, participantId) => {
+                    await assignTripHotelRoom(token, tripId, tripHotelId, roomId, participantId);
+                  }
+                : undefined
+            }
+            onClearTripHotelRoomAssignment={
+              token && can('trips.participants_manage')
+                ? async (tripId, tripHotelId, roomId, participantId) => {
+                    await clearTripHotelRoomAssignment(token, tripId, tripHotelId, roomId, participantId);
+                  }
+                : undefined
+            }
           />
         </div>
       </>
@@ -1454,7 +1559,6 @@ const Index = () => {
           'nav.settings.view',
           'company_branding.view',
           'branches.view',
-          'visa_status_templates.view',
           'checklist_templates.view',
           'faqs.view',
         ]}
@@ -1502,6 +1606,7 @@ const Index = () => {
                 completed: submissionStats.completed,
               }}
               clientStats={dashboardClientStats ?? filteredClientStats}
+              tripStats={can('trips.view') ? tripStats : null}
             />
           </div>
         </div>

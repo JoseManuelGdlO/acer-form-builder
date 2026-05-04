@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Trip, TripInvitation, Client, StaffMember, BusTemplate, TripIncome, TripExpense, TripFinanceSummary } from '@/types/form';
+import type { Hotel } from '@/types/hotel';
 import { TripCard } from './TripCard';
 import { TripDetailView } from './TripDetailView';
 import { TripFormModal, type TripFormSaveData } from './TripFormModal';
@@ -30,6 +31,7 @@ interface TripListProps {
   onDelete: (tripId: string) => Promise<void>;
   onAddParticipants: (tripId: string, data: { clientIds?: string[]; staffMemberIds?: string[]; companions?: { name: string; phone?: string }[] }) => Promise<void>;
   onRemoveParticipant: (tripId: string, participantId: string) => Promise<void>;
+  onUpdateParticipantPickup?: (tripId: string, participantId: string, pickupLocation: string | null) => Promise<void>;
   onAcceptInvitation: (invitationId: string) => Promise<void>;
   onRejectInvitation: (invitationId: string) => Promise<void>;
   onResetSeatAssignments: (tripId: string) => Promise<void>;
@@ -58,6 +60,33 @@ interface TripListProps {
   changeLog: { id: string; tripId: string; userId: string; user?: { id: string; name: string }; action: string; fieldName?: string | null; oldValue?: string | null; newValue?: string | null; createdAt: string }[];
   /** Revisor: sin camiones, crear/editar viaje, invitaciones, finanzas */
   reviewerMode?: boolean;
+  catalogHotels?: Hotel[];
+  onRefreshHotelCatalog?: () => Promise<void>;
+  canManageTripHotels?: boolean;
+  onAttachTripHotel?: (tripId: string, data: {
+    hotelId: string;
+    checkInDate: string;
+    checkOutDate: string;
+    reservedSingles: number;
+    reservedDoubles: number;
+    reservedTriples: number;
+    notes?: string | null;
+  }) => Promise<void>;
+  onUpdateTripHotel?: (
+    tripId: string,
+    tripHotelId: string,
+    data: {
+      checkInDate?: string;
+      checkOutDate?: string;
+      reservedSingles?: number;
+      reservedDoubles?: number;
+      reservedTriples?: number;
+      notes?: string | null;
+    }
+  ) => Promise<void>;
+  onDetachTripHotel?: (tripId: string, tripHotelId: string) => Promise<void>;
+  onAssignTripHotelRoom?: (tripId: string, tripHotelId: string, roomId: string, participantId: string) => Promise<void>;
+  onClearTripHotelRoomAssignment?: (tripId: string, tripHotelId: string, roomId: string, participantId: string) => Promise<void>;
 }
 
 export const TripList = ({
@@ -71,6 +100,7 @@ export const TripList = ({
   onDelete,
   onAddParticipants,
   onRemoveParticipant,
+  onUpdateParticipantPickup,
   onAcceptInvitation,
   onRejectInvitation,
   onResetSeatAssignments,
@@ -95,6 +125,14 @@ export const TripList = ({
   onDeleteBusTemplate,
   changeLog,
   reviewerMode = false,
+  catalogHotels = [],
+  onRefreshHotelCatalog,
+  canManageTripHotels = false,
+  onAttachTripHotel,
+  onUpdateTripHotel,
+  onDetachTripHotel,
+  onAssignTripHotelRoom,
+  onClearTripHotelRoomAssignment,
 }: TripListProps) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -124,36 +162,13 @@ export const TripList = ({
     const out: Event<Trip>[] = [];
     for (const trip of filteredTrips) {
       const titleBase = trip.destination ? `${trip.title} — ${trip.destination}` : trip.title;
-      if (
-        trip.isVisaTrip &&
-        trip.casDepartureDate &&
-        trip.casReturnDate &&
-        trip.consulateDepartureDate &&
-        trip.consulateReturnDate
-      ) {
-        out.push({
-          id: `${trip.id}-cas`,
-          title: `${titleBase} (CAS)`,
-          start: parseISO(trip.casDepartureDate),
-          end: endOfDay(parseISO(trip.casReturnDate)),
-          resource: trip,
-        });
-        out.push({
-          id: `${trip.id}-cons`,
-          title: `${titleBase} (Consulado)`,
-          start: parseISO(trip.consulateDepartureDate),
-          end: endOfDay(parseISO(trip.consulateReturnDate)),
-          resource: trip,
-        });
-      } else {
-        out.push({
-          id: trip.id,
-          title: titleBase,
-          start: parseISO(trip.departureDate),
-          end: endOfDay(parseISO(trip.returnDate)),
-          resource: trip,
-        });
-      }
+      out.push({
+        id: trip.id,
+        title: titleBase,
+        start: parseISO(trip.departureDate),
+        end: endOfDay(parseISO(trip.returnDate)),
+        resource: trip,
+      });
     }
     return out;
   }, [filteredTrips]);
@@ -167,18 +182,8 @@ export const TripList = ({
           notes: data.notes,
           totalSeats: data.totalSeats,
           busTemplateId: data.busTemplateId ?? undefined,
-          isVisaTrip: data.isVisaTrip,
-          ...(data.isVisaTrip
-            ? {
-                casDepartureDate: data.casDepartureDate,
-                casReturnDate: data.casReturnDate,
-                consulateDepartureDate: data.consulateDepartureDate,
-                consulateReturnDate: data.consulateReturnDate,
-              }
-            : {
-                departureDate: data.departureDate,
-                returnDate: data.returnDate,
-              }),
+          departureDate: data.departureDate,
+          returnDate: data.returnDate,
           sharedCompanies: data.invitedCompanyIds?.map(id => {
             const c = companiesForInvite.find(x => x.id === id);
             return c ? { id: c.id, name: c.name } : { id, name: '' };
@@ -264,6 +269,13 @@ export const TripList = ({
           onRemoveParticipant={async participantId => {
             await onRemoveParticipant(viewingTrip.id, participantId);
           }}
+          onUpdateParticipantPickup={
+            onUpdateParticipantPickup && !reviewerMode
+              ? async (participantId, pickupLocation) => {
+                  await onUpdateParticipantPickup(viewingTrip.id, participantId, pickupLocation);
+                }
+              : undefined
+          }
           onOpenSeatPicker={() => setSeatPickerTrip(viewingTrip)}
           onResetSeatAssignments={async () => await onResetSeatAssignments(viewingTrip.id)}
           onLoadChangeLog={() => onLoadChangeLog(viewingTrip.id)}
@@ -278,6 +290,49 @@ export const TripList = ({
             await onUpdate(viewingTrip.id, { invitedCompanyIds });
             onFetchTrip?.(viewingTrip.id);
           }}
+          catalogHotels={catalogHotels}
+          onRefreshHotelCatalog={onRefreshHotelCatalog}
+          canManageTripHotels={canManageTripHotels}
+          onAttachTripHotel={
+            onAttachTripHotel
+              ? async (data) => {
+                  await onAttachTripHotel(viewingTrip.id, data);
+                  onFetchTrip?.(viewingTrip.id);
+                }
+              : undefined
+          }
+          onUpdateTripHotel={
+            onUpdateTripHotel
+              ? async (tripHotelId, data) => {
+                  await onUpdateTripHotel(viewingTrip.id, tripHotelId, data);
+                  onFetchTrip?.(viewingTrip.id);
+                }
+              : undefined
+          }
+          onDetachTripHotel={
+            onDetachTripHotel
+              ? async (tripHotelId) => {
+                  await onDetachTripHotel(viewingTrip.id, tripHotelId);
+                  onFetchTrip?.(viewingTrip.id);
+                }
+              : undefined
+          }
+          onAssignTripHotelRoom={
+            onAssignTripHotelRoom
+              ? async (tripHotelId, roomId, participantId) => {
+                  await onAssignTripHotelRoom(viewingTrip.id, tripHotelId, roomId, participantId);
+                  onFetchTrip?.(viewingTrip.id);
+                }
+              : undefined
+          }
+          onClearTripHotelRoomAssignment={
+            onClearTripHotelRoomAssignment
+              ? async (tripHotelId, roomId, participantId) => {
+                  await onClearTripHotelRoomAssignment(viewingTrip.id, tripHotelId, roomId, participantId);
+                  onFetchTrip?.(viewingTrip.id);
+                }
+              : undefined
+          }
         />
         {seatPickerTrip && (
           <SeatPickerModal
@@ -349,34 +404,14 @@ export const TripList = ({
                           {inv.trip.destination}
                         </p>
                       )}
-                      {inv.trip?.isVisaTrip &&
-                      inv.trip.casDepartureDate &&
-                      inv.trip.casReturnDate &&
-                      inv.trip.consulateDepartureDate &&
-                      inv.trip.consulateReturnDate ? (
-                        <div className="text-sm text-muted-foreground space-y-0.5 mt-1">
-                          <p className="flex items-center gap-1">
-                            <CalendarIcon className="w-3.5 h-3.5 shrink-0" />
-                            CAS:{' '}
-                            {format(parseISO(inv.trip.casDepartureDate), 'd MMM yyyy', { locale: es })} –{' '}
-                            {format(parseISO(inv.trip.casReturnDate), 'd MMM yyyy', { locale: es })}
-                          </p>
-                          <p className="flex items-center gap-1 pl-5">
-                            Consulado:{' '}
-                            {format(parseISO(inv.trip.consulateDepartureDate), 'd MMM yyyy', { locale: es })} –{' '}
-                            {format(parseISO(inv.trip.consulateReturnDate), 'd MMM yyyy', { locale: es })}
-                          </p>
-                        </div>
-                      ) : (
-                        inv.trip?.departureDate &&
+                      {inv.trip?.departureDate &&
                         inv.trip?.returnDate && (
-                          <p className="text-sm text-muted-foreground flex items-center gap-1">
+                          <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
                             <CalendarIcon className="w-3.5 h-3.5" />
                             {format(parseISO(inv.trip.departureDate), 'd MMM yyyy', { locale: es })} –{' '}
                             {format(parseISO(inv.trip.returnDate), 'd MMM yyyy', { locale: es })}
                           </p>
-                        )
-                      )}
+                        )}
                       {inv.invitedBy && (
                         <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
                           <Mail className="w-3.5 h-3.5" />

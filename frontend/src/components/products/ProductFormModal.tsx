@@ -128,7 +128,7 @@ export const ProductFormModal = ({
             <Input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Ej. Visa de turista USA"
+              placeholder="Ej. Paquete Chiapas 7 días"
               required
             />
           </div>
@@ -139,7 +139,7 @@ export const ProductFormModal = ({
             <Textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Descripción general del servicio de visa..."
+              placeholder="Descripción general del producto o servicio..."
               rows={3}
             />
           </div>

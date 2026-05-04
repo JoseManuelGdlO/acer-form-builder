@@ -1,19 +1,9 @@
 import { Request, Response } from 'express';
 import { body, validationResult } from 'express-validator';
-import { FormSubmission, Form, Client, FormSession, VisaStatusTemplate } from '../models';
+import { FormSubmission, Form, Client, FormSession } from '../models';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { canViewAllSubmissions, canAccessSubmissionForClientSync, hasPermission } from '../authorization/policies';
 import { Op } from 'sequelize';
-
-const getDefaultVisaStatusTemplateId = async (companyId: string): Promise<string | null> => {
-  const templates = await VisaStatusTemplate.findAll({
-    where: { companyId, isActive: true },
-    order: [['order', 'ASC']],
-  });
-  if (templates.length === 0) return null;
-  const inProgress = templates.find((t) => t.label.toLowerCase().includes('proceso'));
-  return (inProgress || templates[0]).id;
-};
 
 const normalizePhoneDigits = (phone: unknown): string | undefined => {
   if (typeof phone !== 'string') return undefined;
@@ -191,11 +181,6 @@ export const createSubmission = [
       // Try to find or create client by email
       let finalClientId = clientId;
       if (!finalClientId && respondentEmail) {
-        const defaultVisaStatusTemplateId = await getDefaultVisaStatusTemplateId(companyId);
-        if (!defaultVisaStatusTemplateId) {
-          res.status(400).json({ error: 'No visa status templates configured' });
-          return;
-        }
         let client = await Client.findOne({ where: { email: respondentEmail, companyId } });
         if (!client) {
           client = await Client.create({
@@ -205,7 +190,6 @@ export const createSubmission = [
             phone: respondentPhone || undefined,
             address: address || undefined,
             status: 'pending',
-            visaStatusTemplateId: defaultVisaStatusTemplateId,
           });
         } else {
           // Update existing client with new information
@@ -474,12 +458,6 @@ export const createSubmissionFromSession = [
           res.status(400).json({ error: 'Client info is required for legacy session links' });
           return;
         }
-        const defaultVisaStatusTemplateId = await getDefaultVisaStatusTemplateId(companyId);
-        if (!defaultVisaStatusTemplateId) {
-          res.status(400).json({ error: 'No visa status templates configured' });
-          return;
-        }
-
         // Email is optional - don't use placeholder
         email = clientInfo.email;
         if (email && typeof email === 'string') {
@@ -504,7 +482,6 @@ export const createSubmissionFromSession = [
               email: email,
               phone: normalizedPhone || undefined,
               status: 'pending',
-              visaStatusTemplateId: defaultVisaStatusTemplateId,
               assignedUserId,
             });
           } else {
@@ -529,7 +506,6 @@ export const createSubmissionFromSession = [
               email: undefined,
               phone: normalizedPhone || undefined,
               status: 'pending',
-              visaStatusTemplateId: defaultVisaStatusTemplateId,
               assignedUserId,
             });
           } else {

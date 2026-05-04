@@ -111,7 +111,7 @@ export const GroupList = ({
           <div>
             <h1 className="text-3xl font-bold text-foreground">Grupos</h1>
             <p className="text-muted-foreground mt-1">
-              Agrupa clientes (por ejemplo, familias para trámites de visa)
+              Agrupa clientes (por ejemplo, familias que viajan juntas)
             </p>
           </div>
           <Button onClick={openNew} className="gap-2">

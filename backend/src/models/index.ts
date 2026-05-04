@@ -37,13 +37,16 @@ import { NotificationRecipient } from './NotificationRecipient';
 import { Product } from './Product';
 import { ProductCategory } from './ProductCategory';
 import { Category } from './Category';
-import { VisaStatusTemplate } from './VisaStatusTemplate';
 import { PushSubscription } from './PushSubscription';
 import { InternalAppointment } from './InternalAppointment';
 import { InternalAppointmentHistory } from './InternalAppointmentHistory';
 import { WhatsappIntegration } from './WhatsappIntegration';
 import { StaffMember } from './StaffMember';
 import { PdfTemplate } from './PdfTemplate';
+import { Hotel } from './Hotel';
+import { TripHotel } from './TripHotel';
+import { TripHotelRoom } from './TripHotelRoom';
+import { TripHotelRoomAssignment } from './TripHotelRoomAssignment';
 
 // Company relationships (multi-tenant)
 Company.hasMany(User, { foreignKey: 'companyId', as: 'users' });
@@ -86,14 +89,14 @@ Company.hasMany(BotBehavior, { foreignKey: 'companyId', as: 'botBehaviors' });
 BotBehavior.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
 Company.hasMany(Product, { foreignKey: 'companyId', as: 'products' });
 Product.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
-Company.hasMany(VisaStatusTemplate, { foreignKey: 'companyId', as: 'visaStatusTemplates' });
-VisaStatusTemplate.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
 Company.hasMany(Conversations, { foreignKey: 'companyId', as: 'conversations' });
 Conversations.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
 Company.hasOne(WhatsappIntegration, { foreignKey: 'companyId', as: 'whatsappIntegration' });
 WhatsappIntegration.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
 Company.hasMany(StaffMember, { foreignKey: 'companyId', as: 'staffMembers' });
 StaffMember.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+Company.hasMany(Hotel, { foreignKey: 'companyId', as: 'hotels' });
+Hotel.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
 
 // Notifications relationships (multi-tenant)
 Company.hasMany(Notification, { foreignKey: 'companyId', as: 'notifications' });
@@ -141,9 +144,6 @@ Product.hasMany(ProductCategory, { foreignKey: 'productId', as: 'categories' });
 ProductCategory.belongsTo(Product, { foreignKey: 'productId', as: 'product' });
 Product.hasMany(Client, { foreignKey: 'productId', as: 'clients' });
 Client.belongsTo(Product, { foreignKey: 'productId', as: 'product' });
-VisaStatusTemplate.hasMany(Client, { foreignKey: 'visaStatusTemplateId', as: 'clients' });
-Client.belongsTo(VisaStatusTemplate, { foreignKey: 'visaStatusTemplateId', as: 'visaStatusTemplate' });
-
 // Roles & permissions (RBAC)
 Company.hasMany(Role, { foreignKey: 'companyId', as: 'roles' });
 Role.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
@@ -265,6 +265,19 @@ Client.hasMany(TripSeatAssignment, { foreignKey: 'clientId', as: 'tripSeatAssign
 TripSeatAssignment.belongsTo(TripParticipant, { foreignKey: 'participantId', as: 'participant' });
 TripParticipant.hasMany(TripSeatAssignment, { foreignKey: 'participantId', as: 'seatAssignments' });
 
+Trip.hasMany(TripHotel, { foreignKey: 'tripId', as: 'hotels' });
+TripHotel.belongsTo(Trip, { foreignKey: 'tripId', as: 'trip' });
+TripHotel.belongsTo(Hotel, { foreignKey: 'hotelId', as: 'hotel' });
+Hotel.hasMany(TripHotel, { foreignKey: 'hotelId', as: 'tripHotels' });
+
+TripHotel.hasMany(TripHotelRoom, { foreignKey: 'tripHotelId', as: 'rooms' });
+TripHotelRoom.belongsTo(TripHotel, { foreignKey: 'tripHotelId', as: 'tripHotel' });
+
+TripHotelRoom.hasMany(TripHotelRoomAssignment, { foreignKey: 'tripHotelRoomId', as: 'assignments' });
+TripHotelRoomAssignment.belongsTo(TripHotelRoom, { foreignKey: 'tripHotelRoomId', as: 'tripHotelRoom' });
+TripHotelRoomAssignment.belongsTo(TripParticipant, { foreignKey: 'participantId', as: 'participant' });
+TripParticipant.hasMany(TripHotelRoomAssignment, { foreignKey: 'participantId', as: 'hotelRoomAssignments' });
+
 Trip.hasMany(TripChangeLog, { foreignKey: 'tripId', as: 'changeLog' });
 TripChangeLog.belongsTo(Trip, { foreignKey: 'tripId', as: 'trip' });
 TripChangeLog.belongsTo(User, { foreignKey: 'userId', as: 'user' });
@@ -343,11 +356,14 @@ export {
   Product,
   ProductCategory,
   Category,
-  VisaStatusTemplate,
   PushSubscription,
   InternalAppointment,
   InternalAppointmentHistory,
   WhatsappIntegration,
   StaffMember,
   PdfTemplate,
+  Hotel,
+  TripHotel,
+  TripHotelRoom,
+  TripHotelRoomAssignment,
 };

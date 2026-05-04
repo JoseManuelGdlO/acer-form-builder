@@ -222,19 +222,13 @@ export const ClientProfileView = ({
           : (freshClientData.totalAmountDue != null ? Number(freshClientData.totalAmountDue) : undefined);
         const assignedUser = freshClientData.assigned_user || freshClientData.assignedUser;
         const productRaw = freshClientData.product;
-        const visaTplRaw =
-          freshClientData.visaStatusTemplate ??
-          (freshClientData as { visa_status_template?: Client['visaStatusTemplate'] }).visa_status_template;
         setClientSnapshot({
           ...client,
           ...freshClientData,
           postalCode: freshClientData.postal_code ?? freshClientData.postalCode ?? null,
           birthDate: freshClientData.birth_date ?? freshClientData.birthDate ?? null,
           relationshipToHolder: freshClientData.relationship_to_holder ?? freshClientData.relationshipToHolder ?? null,
-          visaCasAppointmentDate: freshClientData.visa_cas_appointment_date ?? freshClientData.visaCasAppointmentDate ?? null,
-          visaCasAppointmentLocation: freshClientData.visa_cas_appointment_location ?? freshClientData.visaCasAppointmentLocation ?? null,
-          visaConsularAppointmentDate: freshClientData.visa_consular_appointment_date ?? freshClientData.visaConsularAppointmentDate ?? null,
-          visaConsularAppointmentLocation: freshClientData.visa_consular_appointment_location ?? freshClientData.visaConsularAppointmentLocation ?? null,
+          status: (freshClientData.status as Client['status']) ?? client.status,
           totalAmountDue: totalDue,
           assignedUserId: freshClientData.assigned_user_id ?? freshClientData.assignedUserId,
           assignedUser: assignedUser ? { id: assignedUser.id, name: assignedUser.name, email: assignedUser.email } : null,
@@ -243,18 +237,6 @@ export const ClientProfileView = ({
             : productRaw === null
               ? null
               : client.product ?? null,
-          visaStatusTemplate:
-            visaTplRaw && typeof visaTplRaw === 'object' && 'label' in visaTplRaw
-              ? {
-                  id: String(visaTplRaw.id),
-                  label: String(visaTplRaw.label),
-                  order: typeof visaTplRaw.order === 'number' ? visaTplRaw.order : undefined,
-                  isActive: typeof visaTplRaw.isActive === 'boolean' ? visaTplRaw.isActive : undefined,
-                  color: visaTplRaw.color != null ? String(visaTplRaw.color) : null,
-                }
-              : visaTplRaw === null
-                ? null
-                : client.visaStatusTemplate ?? null,
           parentClientId: freshClientData.parent_client_id ?? freshClientData.parentClientId ?? null,
           parent: freshClientData.parent
             ? {
@@ -844,21 +826,22 @@ export const ClientProfileView = ({
   };
 
   const displayClient = clientSnapshot ?? client;
-  const formatVisaAppointmentDate = (value?: string | null) => {
+  const accountStatusStyle =
+    displayClient.status === 'active'
+      ? { label: 'Activo', bg: '#16a34a' }
+      : displayClient.status === 'inactive'
+        ? { label: 'Inactivo', bg: '#64748b' }
+        : { label: 'Pendiente', bg: '#ca8a04' };
+  const formatYmdDate = (value?: string | null) => {
     if (!value) return 'Sin fecha';
     const normalized = value.length >= 10 ? value.slice(0, 10) : value;
     const parsedDate = new Date(`${normalized}T00:00:00`);
     if (Number.isNaN(parsedDate.getTime())) return normalized;
     return format(parsedDate, "d MMM yyyy", { locale: es });
   };
-  const formatAppointmentLabel = (date?: string | null, location?: string | null) => {
-    const dateText = formatVisaAppointmentDate(date);
-    const locationText = location?.trim() ? ` - ${location.trim()}` : '';
-    return `${dateText}${locationText}`;
-  };
   const formatBirthDate = (value?: string | null) => {
     if (!value) return 'No registrada';
-    return formatVisaAppointmentDate(value);
+    return formatYmdDate(value);
   };
   const formatInternalAppointmentDate = (value: string) => {
     const parsedDate = new Date(`${value.slice(0, 10)}T00:00:00`);
@@ -958,36 +941,18 @@ export const ClientProfileView = ({
                 <Badge
                   variant="secondary"
                   className="gap-1.5 border-transparent"
-                  style={
-                    displayClient.visaStatusTemplate?.color
-                      ? {
-                          backgroundColor: displayClient.visaStatusTemplate.color,
-                          color: contrastTextColor(displayClient.visaStatusTemplate.color),
-                        }
-                      : undefined
-                  }
+                  style={{
+                    backgroundColor: accountStatusStyle.bg,
+                    color: contrastTextColor(accountStatusStyle.bg),
+                  }}
                 >
-                  {displayClient.visaStatusTemplate?.label || 'Sin estado'}
+                  {accountStatusStyle.label}
                 </Badge>
                 {displayClient.parentClientId && (
                   <p className="text-sm text-muted-foreground mt-2">
                     Estas viendo un cliente hijo, no el cliente principal.
                   </p>
                 )}
-                <div className="flex flex-wrap gap-2 mt-2">
-                  <Badge className={cn('inline-flex items-center gap-1', APPOINTMENT_BADGE_CLASSES.cas)}>
-                    <Calendar className="w-3.5 h-3.5 shrink-0" />
-                    CAS: {formatAppointmentLabel(displayClient.visaCasAppointmentDate, displayClient.visaCasAppointmentLocation)}
-                  </Badge>
-                  <Badge className={cn('inline-flex items-center gap-1', APPOINTMENT_BADGE_CLASSES.consular)}>
-                    <Calendar className="w-3.5 h-3.5 shrink-0" />
-                    Consulado:{' '}
-                    {formatAppointmentLabel(
-                      displayClient.visaConsularAppointmentDate,
-                      displayClient.visaConsularAppointmentLocation
-                    )}
-                  </Badge>
-                </div>
               </div>
             </div>
           </div>

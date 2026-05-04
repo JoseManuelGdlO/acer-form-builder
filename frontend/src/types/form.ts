@@ -1,3 +1,5 @@
+import type { TripHotelBooking } from './hotel';
+
 export type QuestionType = 
   | 'short_text'
   | 'long_text'
@@ -196,12 +198,7 @@ export interface Client {
   birthDate?: string | null;
   relationshipToHolder?: string | null;
   notes?: string;
-  visaCasAppointmentDate?: string | null;
-  visaCasAppointmentLocation?: string | null;
-  visaConsularAppointmentDate?: string | null;
-  visaConsularAppointmentLocation?: string | null;
-  visaStatusTemplateId: string;
-  visaStatusTemplate?: { id: string; label: string; order?: number; isActive?: boolean; color?: string | null } | null;
+  status: 'active' | 'inactive' | 'pending';
   formsCompleted: number;
   assignedUserId?: string;
   assignedUser?: ClientAssignedUser | null;
@@ -244,16 +241,7 @@ export interface InternalAppointment {
 }
 
 export interface CalendarEvent {
-  type:
-    | 'office'
-    | 'cas'
-    | 'consular'
-    | 'trip_departure'
-    | 'trip_return'
-    | 'trip_visa_cas_dep'
-    | 'trip_visa_cas_ret'
-    | 'trip_visa_con_dep'
-    | 'trip_visa_con_ret';
+  type: 'office' | 'trip_departure' | 'trip_return';
   date: string;
   title: string;
   /** HH:mm (principalmente citas internas) */
@@ -382,6 +370,7 @@ export interface TripSeatAssignmentEntry {
     role?: string | null;
     clientId?: string | null;
     staffMemberId?: string | null;
+    pickupLocation?: string | null;
   };
   client?: Client & { company?: { id: string; name: string } };
 }
@@ -441,11 +430,6 @@ export interface Trip {
   destination?: string | null;
   departureDate: string;
   returnDate: string;
-  isVisaTrip?: boolean;
-  casDepartureDate?: string | null;
-  casReturnDate?: string | null;
-  consulateDepartureDate?: string | null;
-  consulateReturnDate?: string | null;
   notes?: string | null;
   totalSeats: number;
   companyId?: string;
@@ -461,8 +445,12 @@ export interface Trip {
     staffMemberId?: string | null;
     staffMember?: StaffMember | null;
     client?: TripParticipantClient | null;
+    /** Lugar de recogida en este viaje (solo participantes tipo cliente) */
+    pickupLocation?: string | null;
   }[];
   seatAssignments?: TripSeatAssignmentEntry[];
+  /** Hoteles adjuntos al viaje (backend: `hotels`) */
+  tripHotels?: TripHotelBooking[];
   participantCount?: number;
   createdAt?: string;
   updatedAt?: string;
@@ -478,11 +466,6 @@ export interface TripInvitation {
     departureDate: string;
     returnDate: string;
     totalSeats: number;
-    isVisaTrip?: boolean;
-    casDepartureDate?: string | null;
-    casReturnDate?: string | null;
-    consulateDepartureDate?: string | null;
-    consulateReturnDate?: string | null;
   };
   invitedCompanyId: string;
   invitedBy?: { id: string; name: string; email?: string };

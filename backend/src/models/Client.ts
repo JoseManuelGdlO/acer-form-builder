@@ -2,7 +2,6 @@ import { DataTypes, Model, Optional } from 'sequelize';
 import sequelize from '../config/database';
 import { User } from './User';
 import { Product } from './Product';
-import { VisaStatusTemplate } from './VisaStatusTemplate';
 
 interface ClientAttributes {
   id: string;
@@ -16,14 +15,9 @@ interface ClientAttributes {
   birthDate?: string;
   relationshipToHolder?: string;
   notes?: string;
-  visaCasAppointmentDate?: string;
-  visaCasAppointmentLocation?: string;
-  visaConsularAppointmentDate?: string;
-  visaConsularAppointmentLocation?: string;
   status: 'active' | 'inactive' | 'pending';
   formsCompleted: number;
   assignedUserId?: string;
-  visaStatusTemplateId: string;
   productId?: string;
   totalAmountDue?: number;
   createdAt?: Date;
@@ -44,14 +38,9 @@ export class Client extends Model<ClientAttributes, ClientCreationAttributes> im
   public birthDate?: string;
   public relationshipToHolder?: string;
   public notes?: string;
-  public visaCasAppointmentDate?: string;
-  public visaCasAppointmentLocation?: string;
-  public visaConsularAppointmentDate?: string;
-  public visaConsularAppointmentLocation?: string;
   public status!: 'active' | 'inactive' | 'pending';
   public formsCompleted!: number;
   public assignedUserId?: string;
-  public visaStatusTemplateId!: string;
   public productId?: string;
   public totalAmountDue?: number;
   public readonly createdAt!: Date;
@@ -123,22 +112,6 @@ Client.init(
       type: DataTypes.TEXT,
       allowNull: true,
     },
-    visaCasAppointmentDate: {
-      type: DataTypes.DATEONLY,
-      allowNull: true,
-    },
-    visaCasAppointmentLocation: {
-      type: DataTypes.STRING(255),
-      allowNull: true,
-    },
-    visaConsularAppointmentDate: {
-      type: DataTypes.DATEONLY,
-      allowNull: true,
-    },
-    visaConsularAppointmentLocation: {
-      type: DataTypes.STRING(255),
-      allowNull: true,
-    },
     status: {
       type: DataTypes.ENUM('active', 'inactive', 'pending'),
       defaultValue: 'pending',
@@ -157,15 +130,6 @@ Client.init(
         key: 'id',
       },
       onDelete: 'SET NULL',
-    },
-    visaStatusTemplateId: {
-      type: DataTypes.UUID,
-      allowNull: false,
-      references: {
-        model: VisaStatusTemplate,
-        key: 'id',
-      },
-      onDelete: 'RESTRICT',
     },
     productId: {
       type: DataTypes.UUID,

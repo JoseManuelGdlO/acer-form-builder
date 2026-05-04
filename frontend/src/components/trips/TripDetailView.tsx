@@ -51,12 +51,15 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { isParticipantChildInTrip, sortTripParticipantsByFamily } from '@/lib/tripParticipantsOrder';
 import { buildTripCompanyColorMap } from '@/lib/tripCompanyColors';
+import type { Hotel } from '@/types/hotel';
+import { TripHotelsSection } from '@/components/trips/TripHotelsSection';
 
 const ACTION_LABELS: Record<string, string> = {
   trip_created: 'Viaje creado',
   trip_updated: 'Viaje actualizado',
   participant_added: 'Participante(s) agregado(s)',
   participant_removed: 'Participante quitado',
+  participant_pickup_updated: 'Lugar de recogida actualizado',
   seat_assigned: 'Asiento asignado',
   seat_cleared: 'Asiento liberado',
   seat_assignments_reset: 'Asignaciones reiniciadas',
@@ -76,6 +79,7 @@ interface TripDetailViewProps {
   onDelete: (tripId: string) => Promise<void>;
   onAddParticipants: (data: { clientIds?: string[]; staffMemberIds?: string[]; companions?: { name: string; phone?: string }[] }) => Promise<void>;
   onRemoveParticipant: (participantId: string) => Promise<void>;
+  onUpdateParticipantPickup?: (participantId: string, pickupLocation: string | null) => Promise<void>;
   onOpenSeatPicker: () => void;
   onResetSeatAssignments: () => Promise<void>;
   onLoadChangeLog: () => void;
@@ -89,6 +93,34 @@ interface TripDetailViewProps {
   onInviteCompanies: (invitedCompanyIds: string[]) => Promise<void>;
   /** Revisor: solo ver, participantes y asientos; sin finanzas, invitaciones, edición */
   reviewerMode?: boolean;
+  /** Catálogo de hoteles (permiso hotels.view); vacío si no aplica */
+  catalogHotels?: Hotel[];
+  onRefreshHotelCatalog?: () => Promise<void>;
+  /** trips.participants_manage y callbacks definidos */
+  canManageTripHotels?: boolean;
+  onAttachTripHotel?: (data: {
+    hotelId: string;
+    checkInDate: string;
+    checkOutDate: string;
+    reservedSingles: number;
+    reservedDoubles: number;
+    reservedTriples: number;
+    notes?: string | null;
+  }) => Promise<void>;
+  onUpdateTripHotel?: (
+    tripHotelId: string,
+    data: {
+      checkInDate?: string;
+      checkOutDate?: string;
+      reservedSingles?: number;
+      reservedDoubles?: number;
+      reservedTriples?: number;
+      notes?: string | null;
+    }
+  ) => Promise<void>;
+  onDetachTripHotel?: (tripHotelId: string) => Promise<void>;
+  onAssignTripHotelRoom?: (tripHotelId: string, roomId: string, participantId: string) => Promise<void>;
+  onClearTripHotelRoomAssignment?: (tripHotelId: string, roomId: string, participantId: string) => Promise<void>;
 }
 
 export const TripDetailView = ({
@@ -102,6 +134,7 @@ export const TripDetailView = ({
   onDelete,
   onAddParticipants,
   onRemoveParticipant,
+  onUpdateParticipantPickup,
   onOpenSeatPicker,
   onResetSeatAssignments,
   onLoadChangeLog,
@@ -114,6 +147,14 @@ export const TripDetailView = ({
   tripExpenses,
   onInviteCompanies,
   reviewerMode = false,
+  catalogHotels = [],
+  onRefreshHotelCatalog,
+  canManageTripHotels = false,
+  onAttachTripHotel,
+  onUpdateTripHotel,
+  onDetachTripHotel,
+  onAssignTripHotelRoom,
+  onClearTripHotelRoomAssignment,
 }: TripDetailViewProps) => {
   const [memberSearch, setMemberSearch] = useState('');
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -131,6 +172,8 @@ export const TripDetailView = ({
     note: '',
   });
   const [isCreatingExpense, setIsCreatingExpense] = useState(false);
+  const [pickupDrafts, setPickupDrafts] = useState<Record<string, string>>({});
+  const [pickupSavingId, setPickupSavingId] = useState<string | null>(null);
 
   const sharedIds = (trip.sharedCompanies ?? []).map(c => c.id);
   const companiesAvailableToInvite = companiesForInvite.filter(c => !sharedIds.includes(c.id));
@@ -141,6 +184,10 @@ export const TripDetailView = ({
     onLoadChangeLog();
     onLoadTripFinance();
   }, [trip.id, reviewerMode]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    setPickupDrafts({});
+  }, [trip.id]);
 
   useEffect(() => {
     if (reviewerMode) return;
@@ -207,7 +254,8 @@ export const TripDetailView = ({
           (c.phone && c.phone.includes(memberSearch)) ||
           (c.company?.name && c.company.name.toLowerCase().includes(q)) ||
           branchName.toLowerCase().includes(q) ||
-          advisorName.toLowerCase().includes(q)
+          advisorName.toLowerCase().includes(q) ||
+          (p.pickupLocation && p.pickupLocation.toLowerCase().includes(q))
         );
       })
     : participants;
@@ -275,18 +323,6 @@ export const TripDetailView = ({
     d ? format(parseISO(d), "d 'de' MMMM yyyy", { locale: es }) : '';
   const departureStr = fmtLong(trip.departureDate);
   const returnStr = fmtLong(trip.returnDate);
-  const visaDetail =
-    trip.isVisaTrip &&
-    trip.casDepartureDate &&
-    trip.casReturnDate &&
-    trip.consulateDepartureDate &&
-    trip.consulateReturnDate;
-  const casRangeStr = visaDetail
-    ? `${fmtLong(trip.casDepartureDate)} – ${fmtLong(trip.casReturnDate)}`
-    : '';
-  const consRangeStr = visaDetail
-    ? `${fmtLong(trip.consulateDepartureDate)} – ${fmtLong(trip.consulateReturnDate)}`
-    : '';
 
   const handleCreateExpense = async () => {
     if (!expenseForm.amount || !expenseForm.expenseDate) {
@@ -457,13 +493,7 @@ export const TripDetailView = ({
 
       writeLine(`Viaje: ${trip.title}`, { bold: true, size: 12, indent: 14 });
       writeLine(`Destino: ${trip.destination ?? '—'}`);
-      if (visaDetail) {
-        writeLine('Viaje de visas (CAS + consulado)');
-        writeLine(`CAS: ${casRangeStr}`);
-        writeLine(`Consulado: ${consRangeStr}`);
-      } else {
-        writeLine(`Fechas: ${departureStr} - ${returnStr}`);
-      }
+      writeLine(`Fechas: ${departureStr} - ${returnStr}`);
       writeLine(`Plazas: ${trip.participants?.length ?? 0}/${trip.totalSeats}`);
       writeLine(`Plantilla de camión: ${trip.busTemplate?.name ?? 'No asignada'}`);
       if (trip.notes) writeLine(`Notas: ${trip.notes}`);
@@ -502,6 +532,9 @@ export const TripDetailView = ({
           const staffPhone = p.staffMember?.phone?.trim();
           if (phone || companionPhone || staffPhone) {
             writeLine(`Tel.: ${phone ?? companionPhone ?? staffPhone}`, { indent: 24 });
+          }
+          if (!isCompanion && !isStaff && p.pickupLocation?.trim()) {
+            writeLine(`Recogida: ${p.pickupLocation.trim()}`, { indent: 24 });
           }
         });
       }
@@ -726,30 +759,10 @@ export const TripDetailView = ({
                 {trip.destination}
               </p>
             )}
-            {visaDetail ? (
-              <div className="text-muted-foreground space-y-1 mt-0.5">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Badge variant="secondary">Visas · CAS + consulado</Badge>
-                </div>
-                <p className="flex items-start gap-1 text-sm">
-                  <Calendar className="w-4 h-4 shrink-0 mt-0.5" />
-                  <span>
-                    <span className="font-medium text-foreground/90">CAS:</span> {casRangeStr}
-                  </span>
-                </p>
-                <p className="flex items-start gap-1 text-sm pl-0">
-                  <span className="w-4 shrink-0" aria-hidden />
-                  <span>
-                    <span className="font-medium text-foreground/90">Consulado:</span> {consRangeStr}
-                  </span>
-                </p>
-              </div>
-            ) : (
-              <p className="text-muted-foreground flex items-center gap-1 mt-0.5">
-                <Calendar className="w-4 h-4" />
-                {departureStr} – {returnStr}
-              </p>
-            )}
+            <p className="text-muted-foreground flex items-center gap-1 mt-0.5">
+              <Calendar className="w-4 h-4" />
+              {departureStr} – {returnStr}
+            </p>
             <p className="text-sm text-muted-foreground mt-1">
               {participants.length}/{trip.totalSeats} plazas
             </p>
@@ -1018,6 +1031,75 @@ export const TripDetailView = ({
                               Rol: {p.staffMember.role.trim()}
                             </div>
                           )}
+                          {!isCompanion && !isStaff && c && (
+                            <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:flex-wrap">
+                              <span className="flex items-center gap-1 text-xs font-medium text-muted-foreground shrink-0">
+                                <MapPin className="w-3.5 h-3.5" />
+                                Recogida en este viaje
+                              </span>
+                              {reviewerMode || !onUpdateParticipantPickup ? (
+                                <span className="text-sm text-muted-foreground">
+                                  {p.pickupLocation?.trim() ? p.pickupLocation.trim() : 'Sin indicar'}
+                                </span>
+                              ) : (
+                                <>
+                                  <Input
+                                    placeholder="Ej. Esquina Juárez y Reforma, 7:00"
+                                    maxLength={500}
+                                    value={
+                                      pickupDrafts[p.id] !== undefined
+                                        ? pickupDrafts[p.id]
+                                        : (p.pickupLocation ?? '')
+                                    }
+                                    onChange={(e) =>
+                                      setPickupDrafts((prev) => ({ ...prev, [p.id]: e.target.value }))
+                                    }
+                                    className="max-w-xl flex-1 min-w-[200px]"
+                                  />
+                                  <Button
+                                    type="button"
+                                    variant="secondary"
+                                    size="sm"
+                                    className="shrink-0"
+                                    disabled={
+                                      (() => {
+                                        const server = (p.pickupLocation ?? '').trim();
+                                        const cur = (
+                                          pickupDrafts[p.id] !== undefined
+                                            ? pickupDrafts[p.id]
+                                            : (p.pickupLocation ?? '')
+                                        ).trim();
+                                        return cur === server || pickupSavingId === p.id;
+                                      })()
+                                    }
+                                    onClick={async () => {
+                                      const raw =
+                                        pickupDrafts[p.id] !== undefined
+                                          ? pickupDrafts[p.id]
+                                          : (p.pickupLocation ?? '');
+                                      const normalized = raw.trim() === '' ? null : raw.trim();
+                                      setPickupSavingId(p.id);
+                                      try {
+                                        await onUpdateParticipantPickup(p.id, normalized);
+                                        setPickupDrafts((prev) => {
+                                          const next = { ...prev };
+                                          delete next[p.id];
+                                          return next;
+                                        });
+                                        toast.success('Lugar de recogida guardado');
+                                      } catch (err: any) {
+                                        toast.error(err.message || 'No se pudo guardar');
+                                      } finally {
+                                        setPickupSavingId(null);
+                                      }
+                                    }}
+                                  >
+                                    {pickupSavingId === p.id ? 'Guardando…' : 'Guardar'}
+                                  </Button>
+                                </>
+                              )}
+                            </div>
+                          )}
                         </div>
                         {!reviewerMode && (
                           <Button
@@ -1037,6 +1119,18 @@ export const TripDetailView = ({
             )}
           </CardContent>
         </Card>
+
+        <TripHotelsSection
+          trip={trip}
+          catalogHotels={catalogHotels}
+          canManage={!!canManageTripHotels}
+          onRefreshCatalog={onRefreshHotelCatalog}
+          onAttach={onAttachTripHotel}
+          onUpdate={onUpdateTripHotel}
+          onDetach={onDetachTripHotel}
+          onAssignRoom={onAssignTripHotelRoom}
+          onClearRoom={onClearTripHotelRoomAssignment}
+        />
 
         {!reviewerMode && (
           <Card>

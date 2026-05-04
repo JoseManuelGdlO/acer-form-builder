@@ -10,10 +10,12 @@ interface TripParticipantAttributes {
   name: string | null;
   phone: string | null;
   role: string | null;
+  pickupLocation: string | null;
   createdAt?: Date;
 }
 
-interface TripParticipantCreationAttributes extends Optional<TripParticipantAttributes, 'id' | 'createdAt'> {}
+interface TripParticipantCreationAttributes
+  extends Optional<TripParticipantAttributes, 'id' | 'createdAt' | 'pickupLocation'> {}
 
 export class TripParticipant extends Model<TripParticipantAttributes, TripParticipantCreationAttributes> implements TripParticipantAttributes {
   public id!: string;
@@ -24,6 +26,7 @@ export class TripParticipant extends Model<TripParticipantAttributes, TripPartic
   public name!: string | null;
   public phone!: string | null;
   public role!: string | null;
+  public pickupLocation!: string | null;
   public readonly createdAt!: Date;
 }
 
@@ -69,6 +72,11 @@ TripParticipant.init(
     role: {
       type: DataTypes.STRING(255),
       allowNull: true,
+    },
+    pickupLocation: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      field: 'pickup_location',
     },
   },
   {

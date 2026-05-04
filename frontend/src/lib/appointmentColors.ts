@@ -3,34 +3,20 @@ import type { CalendarEvent } from '@/types/form';
 /** Etiquetas para el calendario y tooltips */
 export const APPOINTMENT_TYPE_LABELS: Record<CalendarEvent['type'], string> = {
   office: 'Oficina',
-  cas: 'CAS',
-  consular: 'Consulado',
   trip_departure: 'Viaje · Salida',
   trip_return: 'Viaje · Regreso',
-  trip_visa_cas_dep: 'Viaje visas · CAS salida',
-  trip_visa_cas_ret: 'Viaje visas · CAS regreso',
-  trip_visa_con_dep: 'Viaje visas · Consulado salida',
-  trip_visa_con_ret: 'Viaje visas · Consulado regreso',
 };
 
 /**
- * Colores acordados para identificar citas:
- * Oficina → verde, Consulado → rojo, CAS → azul, Viajes → morado
+ * Colores acordes para identificar citas:
+ * Oficina → verde, Viajes → morado
  */
 export function appointmentTypeBadgeClass(type: CalendarEvent['type']): string {
   switch (type) {
     case 'office':
       return 'border-0 bg-green-600 text-white shadow-none hover:bg-green-600';
-    case 'cas':
-      return 'border-0 bg-blue-600 text-white shadow-none hover:bg-blue-600';
-    case 'consular':
-      return 'border-0 bg-red-600 text-white shadow-none hover:bg-red-600';
     case 'trip_departure':
     case 'trip_return':
-    case 'trip_visa_cas_dep':
-    case 'trip_visa_cas_ret':
-    case 'trip_visa_con_dep':
-    case 'trip_visa_con_ret':
       return 'border-0 bg-violet-600 text-white shadow-none hover:bg-violet-600';
     default:
       return 'border-0 bg-secondary text-secondary-foreground';
@@ -41,26 +27,16 @@ export function appointmentEventRowBorderClass(type: CalendarEvent['type']): str
   switch (type) {
     case 'office':
       return 'border-l-4 border-l-green-600';
-    case 'cas':
-      return 'border-l-4 border-l-blue-600';
-    case 'consular':
-      return 'border-l-4 border-l-red-600';
     case 'trip_departure':
     case 'trip_return':
-    case 'trip_visa_cas_dep':
-    case 'trip_visa_cas_ret':
-    case 'trip_visa_con_dep':
-    case 'trip_visa_con_ret':
       return 'border-l-4 border-l-violet-600';
     default:
       return '';
   }
 }
 
-/** Mismos colores en badges reutilizables (perfil, lista de clientes, etc.) */
+/** Mismos colores en badges reutilizables (perfil de cliente, etc.) */
 export const APPOINTMENT_BADGE_CLASSES = {
   office: 'border-0 bg-green-600 text-white shadow-none hover:bg-green-600',
-  cas: 'border-0 bg-blue-600 text-white shadow-none hover:bg-blue-600',
-  consular: 'border-0 bg-red-600 text-white shadow-none hover:bg-red-600',
   trip: 'border-0 bg-violet-600 text-white shadow-none hover:bg-violet-600',
 } as const;

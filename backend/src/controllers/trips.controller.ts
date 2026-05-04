@@ -17,35 +17,14 @@ import {
   Company,
   User,
   Branch,
+  Hotel,
+  TripHotel,
+  TripHotelRoom,
+  TripHotelRoomAssignment,
 } from '../models';
+import { createRoomsForNewTripHotel, roomCapacity, syncTripHotelReservedRooms } from '../utils/tripHotelRooms';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { hasPermission } from '../authorization/policies';
-
-function parseBoolVisa(v: unknown): boolean {
-  return v === true || v === 'true';
-}
-
-function validateVisaTripDates(d: {
-  casDepartureDate: string | null | undefined;
-  casReturnDate: string | null | undefined;
-  consulateDepartureDate: string | null | undefined;
-  consulateReturnDate: string | null | undefined;
-}): string | null {
-  const { casDepartureDate, casReturnDate, consulateDepartureDate, consulateReturnDate } = d;
-  if (!casDepartureDate || !casReturnDate || !consulateDepartureDate || !consulateReturnDate) {
-    return 'Las cuatro fechas del viaje de visas son obligatorias';
-  }
-  if (casDepartureDate > casReturnDate) {
-    return 'CAS: la fecha de regreso debe ser posterior o igual a la de salida';
-  }
-  if (consulateDepartureDate > consulateReturnDate) {
-    return 'Consulado: la fecha de regreso debe ser posterior o igual a la de salida';
-  }
-  if (casReturnDate > consulateDepartureDate) {
-    return 'La salida al consulado debe ser el mismo día o posterior al regreso del CAS';
-  }
-  return null;
-}
 
 function requireTripPermission(req: AuthRequest, res: Response, key: string): boolean {
   if (!req.user) {
@@ -141,6 +120,89 @@ export const getAllTrips = async (req: AuthRequest, res: Response): Promise<void
   }
 };
 
+/** Viajes visibles para la empresa (mismos ids que GET /trips). */
+async function tripIdsForCompany(companyId: string): Promise<string[]> {
+  const rows = await TripCompany.findAll({
+    where: { companyId },
+    attributes: ['tripId'],
+    raw: true,
+  });
+  return rows.map((r: any) => r.tripId).filter(Boolean);
+}
+
+export const getTripStats = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    if (!requireTripPermission(req, res, 'trips.view')) return;
+    const companyId = req.user?.companyId;
+    if (!companyId) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+    const tripIds = await tripIdsForCompany(companyId);
+    if (tripIds.length === 0) {
+      res.json({
+        upcomingTrips: 0,
+        departingIn30Days: 0,
+        totalSeatsUpcoming: 0,
+        participantCountUpcoming: 0,
+        occupancyRate: 0,
+      });
+      return;
+    }
+
+    const today = new Date();
+    const todayStr = today.toISOString().slice(0, 10);
+    const end30 = new Date(today);
+    end30.setDate(end30.getDate() + 30);
+    const end30Str = end30.toISOString().slice(0, 10);
+
+    const baseWhere = { id: { [Op.in]: tripIds } };
+
+    const upcomingTrips = await Trip.count({
+      where: { ...baseWhere, returnDate: { [Op.gte]: todayStr } },
+    });
+
+    const departingIn30Days = await Trip.count({
+      where: {
+        ...baseWhere,
+        departureDate: { [Op.between]: [todayStr, end30Str] },
+      },
+    });
+
+    const upcomingRows = await Trip.findAll({
+      where: { ...baseWhere, returnDate: { [Op.gte]: todayStr } },
+      attributes: ['id', 'totalSeats'],
+      raw: true,
+    });
+    const upcomingTripIds = upcomingRows.map((r: any) => r.id);
+    const totalSeatsUpcoming = upcomingRows.reduce(
+      (s, r: any) => s + (Number(r.total_seats ?? r.totalSeats) || 0),
+      0
+    );
+
+    const participantCountUpcoming =
+      upcomingTripIds.length === 0
+        ? 0
+        : await TripParticipant.count({
+            where: { tripId: { [Op.in]: upcomingTripIds } },
+          });
+
+    const occupancyRate =
+      totalSeatsUpcoming > 0 ? Math.round((participantCountUpcoming / totalSeatsUpcoming) * 100) : 0;
+
+    res.json({
+      upcomingTrips,
+      departingIn30Days,
+      totalSeatsUpcoming,
+      participantCountUpcoming,
+      occupancyRate,
+    });
+  } catch (error) {
+    console.error('Get trip stats error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 export const getTripById = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     if (!requireTripPermission(req, res, 'trips.view')) return;
@@ -201,7 +263,65 @@ export const getTripById = async (req: AuthRequest, res: Response): Promise<void
             {
               model: TripParticipant,
               as: 'participant',
-              attributes: ['id', 'participantType', 'name', 'phone', 'role', 'clientId', 'staffMemberId'],
+              attributes: [
+                'id',
+                'participantType',
+                'name',
+                'phone',
+                'role',
+                'clientId',
+                'staffMemberId',
+                'pickupLocation',
+              ],
+            },
+          ],
+        },
+        {
+          model: TripHotel,
+          as: 'hotels',
+          include: [
+            { model: Hotel, as: 'hotel' },
+            {
+              model: TripHotelRoom,
+              as: 'rooms',
+              separate: true,
+              order: [['sort_order', 'ASC']],
+              include: [
+                {
+                  model: TripHotelRoomAssignment,
+                  as: 'assignments',
+                  include: [
+                    {
+                      model: TripParticipant,
+                      as: 'participant',
+                      attributes: [
+                        'id',
+                        'participantType',
+                        'name',
+                        'phone',
+                        'role',
+                        'clientId',
+                        'staffMemberId',
+                        'pickupLocation',
+                      ],
+                      include: [
+                        {
+                          model: Client,
+                          as: 'client',
+                          required: false,
+                          attributes: ['id', 'name', 'email', 'phone', 'companyId'],
+                        },
+                        {
+                          model: StaffMember,
+                          as: 'staffMember',
+                          required: false,
+                          attributes: ['id', 'name', 'phone', 'role'],
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
             },
           ],
         },
@@ -306,52 +426,16 @@ export const createTrip = [
         return;
       }
       const companyId = req.user!.companyId;
-      const {
-        title,
-        totalSeats,
-        destination,
-        notes,
-        busTemplateId,
-        invitedCompanyIds,
-        isVisaTrip: isVisaTripBody,
-        casDepartureDate,
-        casReturnDate,
-        consulateDepartureDate,
-        consulateReturnDate,
-      } = req.body;
-      const isVisa = parseBoolVisa(isVisaTripBody);
-      let departureDate: string = req.body.departureDate;
-      let returnDate: string = req.body.returnDate;
-      let casDep: string | null = null;
-      let casRet: string | null = null;
-      let conDep: string | null = null;
-      let conRet: string | null = null;
-      if (isVisa) {
-        casDep = casDepartureDate;
-        casRet = casReturnDate;
-        conDep = consulateDepartureDate;
-        conRet = consulateReturnDate;
-        const visaErr = validateVisaTripDates({
-          casDepartureDate: casDep,
-          casReturnDate: casRet,
-          consulateDepartureDate: conDep,
-          consulateReturnDate: conRet,
-        });
-        if (visaErr) {
-          res.status(400).json({ error: visaErr });
-          return;
-        }
-        departureDate = casDep!;
-        returnDate = conRet!;
-      } else {
-        if (!departureDate || !returnDate) {
-          res.status(400).json({ error: 'Fechas de partida y regreso son obligatorias' });
-          return;
-        }
-        if (returnDate < departureDate) {
-          res.status(400).json({ error: 'La fecha de regreso debe ser posterior o igual a la de partida' });
-          return;
-        }
+      const { title, totalSeats, destination, notes, busTemplateId, invitedCompanyIds } = req.body;
+      const departureDate: string = req.body.departureDate;
+      const returnDate: string = req.body.returnDate;
+      if (!departureDate || !returnDate) {
+        res.status(400).json({ error: 'Fechas de partida y regreso son obligatorias' });
+        return;
+      }
+      if (returnDate < departureDate) {
+        res.status(400).json({ error: 'La fecha de regreso debe ser posterior o igual a la de partida' });
+        return;
       }
       let busTemplateIdToSet: string | null = null;
       if (busTemplateId) {
@@ -367,11 +451,6 @@ export const createTrip = [
         title,
         departureDate,
         returnDate,
-        isVisaTrip: isVisa,
-        casDepartureDate: isVisa ? casDep : null,
-        casReturnDate: isVisa ? casRet : null,
-        consulateDepartureDate: isVisa ? conDep : null,
-        consulateReturnDate: isVisa ? conRet : null,
         totalSeats: Number(totalSeats),
         destination: destination || null,
         notes: notes || null,
@@ -400,11 +479,6 @@ export const createTrip = [
           departureDate,
           returnDate,
           totalSeats,
-          isVisaTrip: isVisa,
-          casDepartureDate: casDep,
-          casReturnDate: casRet,
-          consulateDepartureDate: conDep,
-          consulateReturnDate: conRet,
         }),
       });
       for (const cid of validIds) {
@@ -459,8 +533,6 @@ export const updateTrip = [
         return;
       }
       const t = trip as any;
-      const finalIsVisa =
-        req.body.isVisaTrip !== undefined ? parseBoolVisa(req.body.isVisaTrip) : Boolean(t.isVisaTrip);
 
       const updates: Record<string, any> = {};
       const fieldsNoDates = ['title', 'totalSeats', 'destination', 'notes'] as const;
@@ -479,89 +551,32 @@ export const updateTrip = [
         }
       }
 
-      if (finalIsVisa) {
-        const casD = req.body.casDepartureDate !== undefined ? req.body.casDepartureDate : t.casDepartureDate;
-        const casR = req.body.casReturnDate !== undefined ? req.body.casReturnDate : t.casReturnDate;
-        const conD = req.body.consulateDepartureDate !== undefined ? req.body.consulateDepartureDate : t.consulateDepartureDate;
-        const conR = req.body.consulateReturnDate !== undefined ? req.body.consulateReturnDate : t.consulateReturnDate;
-        const visaErr = validateVisaTripDates({
-          casDepartureDate: casD,
-          casReturnDate: casR,
-          consulateDepartureDate: conD,
-          consulateReturnDate: conR,
-        });
-        if (visaErr) {
-          res.status(400).json({ error: visaErr });
+      const dep = req.body.departureDate !== undefined ? req.body.departureDate : t.departureDate;
+      const ret = req.body.returnDate !== undefined ? req.body.returnDate : t.returnDate;
+      if (req.body.departureDate !== undefined || req.body.returnDate !== undefined) {
+        if (!dep || !ret) {
+          res.status(400).json({ error: 'Fechas de partida y regreso son obligatorias' });
           return;
         }
-        const visaPatch = {
-          isVisaTrip: true,
-          casDepartureDate: casD,
-          casReturnDate: casR,
-          consulateDepartureDate: conD,
-          consulateReturnDate: conR,
-          departureDate: casD,
-          returnDate: conR,
-        };
-        for (const [key, newVal] of Object.entries(visaPatch)) {
-          const oldVal = t[key];
-          if (oldVal !== newVal && (oldVal != null || newVal != null)) {
-            await logTripChange(id, req.user!.id, 'trip_updated', {
-              fieldName: key,
-              oldValue: oldVal != null ? String(oldVal) : null,
-              newValue: newVal != null ? String(newVal) : null,
-            });
-          }
-          (updates as any)[key] = newVal;
+        if (ret < dep) {
+          res.status(400).json({ error: 'La fecha de regreso debe ser posterior o igual a la de partida' });
+          return;
         }
-      } else {
-        if (req.body.isVisaTrip !== undefined && !parseBoolVisa(req.body.isVisaTrip)) {
-          for (const key of ['casDepartureDate', 'casReturnDate', 'consulateDepartureDate', 'consulateReturnDate'] as const) {
-            if (t[key] != null) {
-              await logTripChange(id, req.user!.id, 'trip_updated', {
-                fieldName: key,
-                oldValue: String(t[key]),
-                newValue: '',
-              });
-            }
-          }
-          updates.isVisaTrip = false;
-          updates.casDepartureDate = null;
-          updates.casReturnDate = null;
-          updates.consulateDepartureDate = null;
-          updates.consulateReturnDate = null;
+        if (req.body.departureDate !== undefined && String(t.departureDate) !== String(dep)) {
+          await logTripChange(id, req.user!.id, 'trip_updated', {
+            fieldName: 'departureDate',
+            oldValue: t.departureDate != null ? String(t.departureDate) : null,
+            newValue: String(dep),
+          });
+          updates.departureDate = dep;
         }
-        const dep = req.body.departureDate !== undefined ? req.body.departureDate : t.departureDate;
-        const ret = req.body.returnDate !== undefined ? req.body.returnDate : t.returnDate;
-        if (req.body.departureDate !== undefined || req.body.returnDate !== undefined || (req.body.isVisaTrip !== undefined && !finalIsVisa)) {
-          if (!dep || !ret) {
-            res.status(400).json({ error: 'Fechas de partida y regreso son obligatorias' });
-            return;
-          }
-          if (ret < dep) {
-            res.status(400).json({ error: 'La fecha de regreso debe ser posterior o igual a la de partida' });
-            return;
-          }
-          if (req.body.departureDate !== undefined && String(t.departureDate) !== String(dep)) {
-            await logTripChange(id, req.user!.id, 'trip_updated', {
-              fieldName: 'departureDate',
-              oldValue: t.departureDate != null ? String(t.departureDate) : null,
-              newValue: String(dep),
-            });
-            updates.departureDate = dep;
-          }
-          if (req.body.returnDate !== undefined && String(t.returnDate) !== String(ret)) {
-            await logTripChange(id, req.user!.id, 'trip_updated', {
-              fieldName: 'returnDate',
-              oldValue: t.returnDate != null ? String(t.returnDate) : null,
-              newValue: String(ret),
-            });
-            updates.returnDate = ret;
-          }
-          if (req.body.isVisaTrip !== undefined && !finalIsVisa && req.body.departureDate === undefined && req.body.returnDate === undefined) {
-            updates.departureDate = dep;
-            updates.returnDate = ret;
-          }
+        if (req.body.returnDate !== undefined && String(t.returnDate) !== String(ret)) {
+          await logTripChange(id, req.user!.id, 'trip_updated', {
+            fieldName: 'returnDate',
+            oldValue: t.returnDate != null ? String(t.returnDate) : null,
+            newValue: String(ret),
+          });
+          updates.returnDate = ret;
         }
       }
       if (req.body.totalSeats !== undefined) {
@@ -830,6 +845,60 @@ export const addParticipants = [
   },
 ];
 
+export const updateParticipantPickup = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    if (!requireTripPermission(req, res, 'trips.participants_manage')) return;
+    const { id, participantId } = req.params;
+    const companyId = req.user!.companyId;
+    if (!companyId) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+    const inTrip = await ensureUserCompanyInTrip(req, id);
+    if (!inTrip) {
+      res.status(404).json({ error: 'Trip not found' });
+      return;
+    }
+    let participant = await TripParticipant.findOne({ where: { tripId: id, id: participantId } });
+    if (!participant) {
+      participant = await TripParticipant.findOne({ where: { tripId: id, clientId: participantId } });
+    }
+    if (!participant || participant.participantType !== 'client' || !participant.clientId) {
+      res.status(400).json({ error: 'Solo se puede indicar recogida para participantes tipo cliente' });
+      return;
+    }
+    const client = await Client.findByPk(participant.clientId, { attributes: ['id', 'companyId'] });
+    if (!client || (client as any).companyId !== companyId) {
+      res.status(403).json({ error: 'Solo puedes editar la recogida de clientes de tu compañía' });
+      return;
+    }
+    const raw = req.body?.pickupLocation;
+    if (raw === undefined) {
+      res.status(400).json({ error: 'Indica pickupLocation (texto o null para borrar)' });
+      return;
+    }
+    const normalized =
+      raw === null || (typeof raw === 'string' && raw.trim() === '') ? null : String(raw).trim();
+    if (normalized && normalized.length > 500) {
+      res.status(400).json({ error: 'Máximo 500 caracteres' });
+      return;
+    }
+    const oldVal = participant.pickupLocation ?? null;
+    await participant.update({ pickupLocation: normalized });
+    await logTripChange(id, req.user!.id, 'participant_pickup_updated', {
+      entityType: 'trip_participant',
+      entityId: participant.id,
+      fieldName: 'pickupLocation',
+      oldValue: oldVal,
+      newValue: normalized,
+    });
+    res.json({ id: participant.id, pickupLocation: normalized });
+  } catch (error) {
+    console.error('Update participant pickup error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 export const removeParticipant = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     if (!requireTripPermission(req, res, 'trips.office_admin')) return;
@@ -1090,19 +1159,7 @@ export const getTripInvitations = async (req: AuthRequest, res: Response): Promi
         {
           model: Trip,
           as: 'trip',
-          attributes: [
-            'id',
-            'title',
-            'destination',
-            'departureDate',
-            'returnDate',
-            'totalSeats',
-            'isVisaTrip',
-            'casDepartureDate',
-            'casReturnDate',
-            'consulateDepartureDate',
-            'consulateReturnDate',
-          ],
+          attributes: ['id', 'title', 'destination', 'departureDate', 'returnDate', 'totalSeats'],
         },
         { model: User, as: 'invitedByUser', attributes: ['id', 'name', 'email'] },
       ],
@@ -1196,6 +1253,479 @@ export const getTripChangeLog = async (req: AuthRequest, res: Response): Promise
     res.json(list);
   } catch (error) {
     console.error('Get trip change log error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+export const attachHotelToTrip = [
+  body('hotelId').isUUID().withMessage('hotelId must be a UUID'),
+  body('checkInDate').notEmpty().withMessage('checkInDate is required'),
+  body('checkOutDate').notEmpty().withMessage('checkOutDate is required'),
+  body('reservedSingles').optional().isInt({ min: 0 }),
+  body('reservedDoubles').optional().isInt({ min: 0 }),
+  body('reservedTriples').optional().isInt({ min: 0 }),
+  body('notes').optional().trim(),
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+      if (!requireTripPermission(req, res, 'trips.participants_manage')) return;
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        res.status(400).json({ errors: errors.array() });
+        return;
+      }
+      const { id } = req.params;
+      const companyId = req.user?.companyId;
+      if (!companyId) {
+        res.status(401).json({ error: 'Authentication required' });
+        return;
+      }
+      const inTrip = await ensureUserCompanyInTrip(req, id);
+      if (!inTrip) {
+        res.status(404).json({ error: 'Trip not found' });
+        return;
+      }
+      const {
+        hotelId,
+        checkInDate,
+        checkOutDate,
+        notes,
+      } = req.body;
+      const reservedSingles = Number(req.body.reservedSingles ?? 0);
+      const reservedDoubles = Number(req.body.reservedDoubles ?? 0);
+      const reservedTriples = Number(req.body.reservedTriples ?? 0);
+
+      if (reservedSingles + reservedDoubles + reservedTriples < 1) {
+        res.status(400).json({ error: 'Reserve at least one room' });
+        return;
+      }
+      const cin = String(checkInDate).slice(0, 10);
+      const cout = String(checkOutDate).slice(0, 10);
+      if (cin > cout) {
+        res.status(400).json({ error: 'checkInDate must be on or before checkOutDate' });
+        return;
+      }
+
+      const hotel = await Hotel.findOne({ where: { id: hotelId, companyId } });
+      if (!hotel) {
+        res.status(404).json({ error: 'Hotel not found' });
+        return;
+      }
+      if (
+        reservedSingles > hotel.totalSingleRooms ||
+        reservedDoubles > hotel.totalDoubleRooms ||
+        reservedTriples > hotel.totalTripleRooms
+      ) {
+        res.status(400).json({ error: 'Reserved rooms exceed hotel capacity for one or more room types' });
+        return;
+      }
+
+      const tripHotel = await TripHotel.create({
+        tripId: id,
+        hotelId,
+        checkInDate: cin,
+        checkOutDate: cout,
+        reservedSingles,
+        reservedDoubles,
+        reservedTriples,
+        notes: notes ?? null,
+      });
+      await createRoomsForNewTripHotel(tripHotel.id, reservedSingles, reservedDoubles, reservedTriples);
+      await logTripChange(id, req.user!.id, 'trip_hotel_attached', { entityId: tripHotel.id, newValue: hotel.name });
+
+      const full = await TripHotel.findByPk(tripHotel.id, {
+        include: [
+          { model: Hotel, as: 'hotel' },
+          {
+            model: TripHotelRoom,
+            as: 'rooms',
+            separate: true,
+            order: [['sort_order', 'ASC']],
+            include: [
+              {
+                model: TripHotelRoomAssignment,
+                as: 'assignments',
+                include: [
+                  {
+                    model: TripParticipant,
+                    as: 'participant',
+                    attributes: [
+                      'id',
+                      'participantType',
+                      'name',
+                      'phone',
+                      'role',
+                      'clientId',
+                      'staffMemberId',
+                      'pickupLocation',
+                    ],
+                    include: [
+                      { model: Client, as: 'client', required: false, attributes: ['id', 'name', 'email', 'phone', 'companyId'] },
+                      { model: StaffMember, as: 'staffMember', required: false, attributes: ['id', 'name', 'phone', 'role'] },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      });
+      res.status(201).json(full?.toJSON() ?? null);
+    } catch (error) {
+      console.error('Attach hotel to trip error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  },
+];
+
+export const updateTripHotel = [
+  body('checkInDate').optional().notEmpty(),
+  body('checkOutDate').optional().notEmpty(),
+  body('reservedSingles').optional().isInt({ min: 0 }),
+  body('reservedDoubles').optional().isInt({ min: 0 }),
+  body('reservedTriples').optional().isInt({ min: 0 }),
+  body('notes').optional(),
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+      if (!requireTripPermission(req, res, 'trips.participants_manage')) return;
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        res.status(400).json({ errors: errors.array() });
+        return;
+      }
+      const { id, tripHotelId } = req.params;
+      const companyId = req.user?.companyId;
+      if (!companyId) {
+        res.status(401).json({ error: 'Authentication required' });
+        return;
+      }
+      const inTrip = await ensureUserCompanyInTrip(req, id);
+      if (!inTrip) {
+        res.status(404).json({ error: 'Trip not found' });
+        return;
+      }
+
+      const tripHotel = await TripHotel.findOne({
+        where: { id: tripHotelId, tripId: id },
+        include: [{ model: Hotel, as: 'hotel' }],
+      });
+      if (!tripHotel) {
+        res.status(404).json({ error: 'Trip hotel not found' });
+        return;
+      }
+      const hotel = (tripHotel as any).hotel as Hotel;
+      if (!hotel || hotel.companyId !== companyId) {
+        res.status(404).json({ error: 'Hotel not found' });
+        return;
+      }
+
+      const prevSingles = tripHotel.reservedSingles;
+      const prevDoubles = tripHotel.reservedDoubles;
+      const prevTriples = tripHotel.reservedTriples;
+
+      const patch: Record<string, unknown> = {};
+      if (req.body.checkInDate != null) patch.checkInDate = String(req.body.checkInDate).slice(0, 10);
+      if (req.body.checkOutDate != null) patch.checkOutDate = String(req.body.checkOutDate).slice(0, 10);
+      if (req.body.notes !== undefined) patch.notes = req.body.notes === '' ? null : req.body.notes;
+
+      let newSingles = tripHotel.reservedSingles;
+      let newDoubles = tripHotel.reservedDoubles;
+      let newTriples = tripHotel.reservedTriples;
+      if (req.body.reservedSingles != null) newSingles = Number(req.body.reservedSingles);
+      if (req.body.reservedDoubles != null) newDoubles = Number(req.body.reservedDoubles);
+      if (req.body.reservedTriples != null) newTriples = Number(req.body.reservedTriples);
+
+      if (newSingles + newDoubles + newTriples < 1) {
+        res.status(400).json({ error: 'Reserve at least one room' });
+        return;
+      }
+      if (
+        newSingles > hotel.totalSingleRooms ||
+        newDoubles > hotel.totalDoubleRooms ||
+        newTriples > hotel.totalTripleRooms
+      ) {
+        res.status(400).json({ error: 'Reserved rooms exceed hotel capacity for one or more room types' });
+        return;
+      }
+
+      const cin = (patch.checkInDate as string) ?? String(tripHotel.checkInDate).slice(0, 10);
+      const cout = (patch.checkOutDate as string) ?? String(tripHotel.checkOutDate).slice(0, 10);
+      if (cin > cout) {
+        res.status(400).json({ error: 'checkInDate must be on or before checkOutDate' });
+        return;
+      }
+
+      await tripHotel.update({
+        ...patch,
+        reservedSingles: newSingles,
+        reservedDoubles: newDoubles,
+        reservedTriples: newTriples,
+      });
+
+      const countsChanged =
+        newSingles !== prevSingles || newDoubles !== prevDoubles || newTriples !== prevTriples;
+      if (countsChanged) {
+        const sync = await syncTripHotelReservedRooms(tripHotel.id, {
+          single: newSingles,
+          double: newDoubles,
+          triple: newTriples,
+        });
+        if (!sync.ok) {
+          res.status(400).json({ error: sync.error });
+          return;
+        }
+      }
+
+      await logTripChange(id, req.user!.id, 'trip_hotel_updated', { entityId: tripHotel.id });
+
+      const full = await TripHotel.findByPk(tripHotel.id, {
+        include: [
+          { model: Hotel, as: 'hotel' },
+          {
+            model: TripHotelRoom,
+            as: 'rooms',
+            separate: true,
+            order: [['sort_order', 'ASC']],
+            include: [
+              {
+                model: TripHotelRoomAssignment,
+                as: 'assignments',
+                include: [
+                  {
+                    model: TripParticipant,
+                    as: 'participant',
+                    attributes: [
+                      'id',
+                      'participantType',
+                      'name',
+                      'phone',
+                      'role',
+                      'clientId',
+                      'staffMemberId',
+                      'pickupLocation',
+                    ],
+                    include: [
+                      { model: Client, as: 'client', required: false, attributes: ['id', 'name', 'email', 'phone', 'companyId'] },
+                      { model: StaffMember, as: 'staffMember', required: false, attributes: ['id', 'name', 'phone', 'role'] },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      });
+      res.json(full?.toJSON() ?? null);
+    } catch (error) {
+      console.error('Update trip hotel error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  },
+];
+
+export const detachHotelFromTrip = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    if (!requireTripPermission(req, res, 'trips.participants_manage')) return;
+    const { id, tripHotelId } = req.params;
+    const companyId = req.user?.companyId;
+    if (!companyId) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+    const inTrip = await ensureUserCompanyInTrip(req, id);
+    if (!inTrip) {
+      res.status(404).json({ error: 'Trip not found' });
+      return;
+    }
+    const tripHotel = await TripHotel.findOne({
+      where: { id: tripHotelId, tripId: id },
+      include: [{ model: Hotel, as: 'hotel' }],
+    });
+    if (!tripHotel) {
+      res.status(404).json({ error: 'Trip hotel not found' });
+      return;
+    }
+    const hotel = (tripHotel as any).hotel as Hotel;
+    if (!hotel || hotel.companyId !== companyId) {
+      res.status(404).json({ error: 'Hotel not found' });
+      return;
+    }
+    await tripHotel.destroy();
+    await logTripChange(id, req.user!.id, 'trip_hotel_detached', { entityId: tripHotelId });
+    res.json({ message: 'Trip hotel removed' });
+  } catch (error) {
+    console.error('Detach hotel from trip error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+export const setTripHotelRoomAssignment = [
+  body('participantId').isUUID().withMessage('participantId is required'),
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+      if (!requireTripPermission(req, res, 'trips.participants_manage')) return;
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        res.status(400).json({ errors: errors.array() });
+        return;
+      }
+      const { id, tripHotelId, roomId } = req.params;
+      const { participantId } = req.body;
+      const companyId = req.user?.companyId;
+      if (!companyId) {
+        res.status(401).json({ error: 'Authentication required' });
+        return;
+      }
+      const inTrip = await ensureUserCompanyInTrip(req, id);
+      if (!inTrip) {
+        res.status(404).json({ error: 'Trip not found' });
+        return;
+      }
+
+      const tripHotel = await TripHotel.findOne({
+        where: { id: tripHotelId, tripId: id },
+        include: [{ model: Hotel, as: 'hotel' }],
+      });
+      if (!tripHotel) {
+        res.status(404).json({ error: 'Trip hotel not found' });
+        return;
+      }
+      const hotel = (tripHotel as any).hotel as Hotel;
+      if (!hotel || hotel.companyId !== companyId) {
+        res.status(404).json({ error: 'Hotel not found' });
+        return;
+      }
+
+      const room = await TripHotelRoom.findOne({
+        where: { id: roomId, tripHotelId: tripHotel.id },
+        include: [{ model: TripHotelRoomAssignment, as: 'assignments', required: false }],
+      });
+      if (!room) {
+        res.status(404).json({ error: 'Room not found' });
+        return;
+      }
+
+      const participant = await TripParticipant.findOne({
+        where: { id: participantId, tripId: id },
+      });
+      if (!participant) {
+        res.status(400).json({ error: 'Participant is not on this trip' });
+        return;
+      }
+
+      const cap = roomCapacity(room.roomType);
+      const currentCount = (room as any).assignments?.length ?? 0;
+      const alreadyInRoom = (room as any).assignments?.some((a: any) => a.participantId === participantId);
+      if (alreadyInRoom) {
+        res.json({ message: 'Already assigned', room: room.toJSON() });
+        return;
+      }
+      if (currentCount >= cap) {
+        res.status(400).json({ error: 'Room is full' });
+        return;
+      }
+
+      const otherRooms = await TripHotelRoom.findAll({
+        where: { tripHotelId: tripHotel.id },
+        attributes: ['id'],
+      });
+      const roomIds = otherRooms.map((r) => r.id);
+      await TripHotelRoomAssignment.destroy({
+        where: {
+          tripHotelRoomId: { [Op.in]: roomIds },
+          participantId,
+        },
+      });
+
+      await TripHotelRoomAssignment.create({
+        tripHotelRoomId: room.id,
+        participantId,
+      });
+
+      await logTripChange(id, req.user!.id, 'trip_hotel_room_assigned', {
+        entityId: room.id,
+        newValue: participantId,
+      });
+
+      const updated = await TripHotelRoom.findByPk(room.id, {
+        include: [
+          {
+            model: TripHotelRoomAssignment,
+            as: 'assignments',
+            include: [
+              {
+                model: TripParticipant,
+                as: 'participant',
+                attributes: [
+                  'id',
+                  'participantType',
+                  'name',
+                  'phone',
+                  'role',
+                  'clientId',
+                  'staffMemberId',
+                  'pickupLocation',
+                ],
+                include: [
+                  { model: Client, as: 'client', required: false, attributes: ['id', 'name', 'email', 'phone', 'companyId'] },
+                  { model: StaffMember, as: 'staffMember', required: false, attributes: ['id', 'name', 'phone', 'role'] },
+                ],
+              },
+            ],
+          },
+        ],
+      });
+      res.json(updated?.toJSON() ?? null);
+    } catch (error) {
+      console.error('Set trip hotel room assignment error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  },
+];
+
+export const clearTripHotelRoomAssignment = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    if (!requireTripPermission(req, res, 'trips.participants_manage')) return;
+    const { id, tripHotelId, roomId, participantId } = req.params;
+    const companyId = req.user?.companyId;
+    if (!companyId) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+    const inTrip = await ensureUserCompanyInTrip(req, id);
+    if (!inTrip) {
+      res.status(404).json({ error: 'Trip not found' });
+      return;
+    }
+
+    const tripHotel = await TripHotel.findOne({
+      where: { id: tripHotelId, tripId: id },
+      include: [{ model: Hotel, as: 'hotel' }],
+    });
+    if (!tripHotel) {
+      res.status(404).json({ error: 'Trip hotel not found' });
+      return;
+    }
+    const hotel = (tripHotel as any).hotel as Hotel;
+    if (!hotel || hotel.companyId !== companyId) {
+      res.status(404).json({ error: 'Hotel not found' });
+      return;
+    }
+
+    const room = await TripHotelRoom.findOne({
+      where: { id: roomId, tripHotelId: tripHotel.id },
+    });
+    if (!room) {
+      res.status(404).json({ error: 'Room not found' });
+      return;
+    }
+
+    await TripHotelRoomAssignment.destroy({
+      where: { tripHotelRoomId: room.id, participantId },
+    });
+    await logTripChange(id, req.user!.id, 'trip_hotel_room_unassigned', { entityId: room.id, oldValue: participantId });
+    res.json({ message: 'Assignment removed' });
+  } catch (error) {
+    console.error('Clear trip hotel room assignment error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };

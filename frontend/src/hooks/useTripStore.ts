@@ -1,5 +1,22 @@
 import { useState, useCallback } from 'react';
-import { Trip, TripInvitation, TripChangeLogEntry, TripParticipantClient, TripSeatAssignmentEntry, BusTemplate, TripIncome, TripExpense, TripFinanceSummary } from '@/types/form';
+import {
+  Trip,
+  TripInvitation,
+  TripChangeLogEntry,
+  TripParticipantClient,
+  TripSeatAssignmentEntry,
+  BusTemplate,
+  TripIncome,
+  TripExpense,
+  TripFinanceSummary,
+} from '@/types/form';
+import type {
+  Hotel as HotelCatalog,
+  TripHotelBooking,
+  TripHotelRoomAssignmentParticipant,
+  TripHotelRoomRow,
+  TripHotelRoomType,
+} from '@/types/hotel';
 import { api } from '@/lib/api';
 
 const isProbablyJwt = (value: string): boolean => {
@@ -40,8 +57,7 @@ function mapParticipant(p: any) {
     phone: client.phone,
     address: client.address,
     notes: client.notes,
-    visaStatusTemplateId: client.visa_status_template_id ?? client.visaStatusTemplateId ?? '',
-    visaStatusTemplate: client.visa_status_template ?? client.visaStatusTemplate ?? null,
+    status: (client.status as TripParticipantClient['status']) ?? 'pending',
     formsCompleted: client.forms_completed ?? client.formsCompleted ?? 0,
     assignedUserId: client.assigned_user_id ?? client.assignedUserId,
     parentClientId: client.parent_client_id ?? client.parentClientId ?? null,
@@ -89,6 +105,12 @@ function mapParticipant(p: any) {
           }
         : undefined,
     client: participantType === 'client' ? tripClient : null,
+    pickupLocation:
+      p.pickup_location !== undefined
+        ? p.pickup_location
+        : p.pickupLocation !== undefined
+          ? p.pickupLocation
+          : null,
   };
 }
 
@@ -111,6 +133,12 @@ function mapSeatAssignment(s: any): TripSeatAssignmentEntry {
       role: participant.role ?? null,
       clientId: participant.client_id ?? participant.clientId ?? null,
       staffMemberId: participant.staff_member_id ?? participant.staffMemberId ?? null,
+      pickupLocation:
+        participant.pickup_location !== undefined
+          ? participant.pickup_location
+          : participant.pickupLocation !== undefined
+            ? participant.pickupLocation
+            : null,
     };
   }
   if (client.id) {
@@ -120,6 +148,62 @@ function mapSeatAssignment(s: any): TripSeatAssignmentEntry {
     };
   }
   return entry;
+}
+
+function mapHotelCatalog(h: any): HotelCatalog {
+  return {
+    id: h.id,
+    companyId: h.company_id ?? h.companyId,
+    name: h.name,
+    address: h.address ?? null,
+    city: h.city ?? null,
+    country: h.country ?? null,
+    phone: h.phone ?? null,
+    email: h.email ?? null,
+    notes: h.notes ?? null,
+    totalSingleRooms: Number(h.total_single_rooms ?? h.totalSingleRooms ?? 0),
+    totalDoubleRooms: Number(h.total_double_rooms ?? h.totalDoubleRooms ?? 0),
+    totalTripleRooms: Number(h.total_triple_rooms ?? h.totalTripleRooms ?? 0),
+    createdAt: h.created_at ?? h.createdAt,
+    updatedAt: h.updated_at ?? h.updatedAt,
+  };
+}
+
+function mapTripHotelRoom(r: any): TripHotelRoomRow {
+  const assignments = (r.assignments || []).map((a: any) => ({
+    id: a.id,
+    tripHotelRoomId: a.trip_hotel_room_id ?? a.tripHotelRoomId,
+    participantId: a.participant_id ?? a.participantId,
+    participant: a.participant?.id
+      ? (mapParticipant(a.participant) as unknown as TripHotelRoomAssignmentParticipant)
+      : undefined,
+  }));
+  return {
+    id: r.id,
+    tripHotelId: r.trip_hotel_id ?? r.tripHotelId,
+    roomType: (r.room_type ?? r.roomType) as TripHotelRoomType,
+    label: r.label,
+    sortOrder: r.sort_order ?? r.sortOrder ?? 0,
+    assignments,
+  };
+}
+
+function mapTripHotel(th: any): TripHotelBooking {
+  return {
+    id: th.id,
+    tripId: th.trip_id ?? th.tripId,
+    hotelId: th.hotel_id ?? th.hotelId,
+    hotel: th.hotel ? mapHotelCatalog(th.hotel) : undefined,
+    checkInDate: String(th.check_in_date ?? th.checkInDate ?? '').slice(0, 10),
+    checkOutDate: String(th.check_out_date ?? th.checkOutDate ?? '').slice(0, 10),
+    reservedSingles: Number(th.reserved_singles ?? th.reservedSingles ?? 0),
+    reservedDoubles: Number(th.reserved_doubles ?? th.reservedDoubles ?? 0),
+    reservedTriples: Number(th.reserved_triples ?? th.reservedTriples ?? 0),
+    notes: th.notes ?? null,
+    rooms: (th.rooms || []).map(mapTripHotelRoom),
+    createdAt: th.created_at ?? th.createdAt,
+    updatedAt: th.updated_at ?? th.updatedAt,
+  };
 }
 
 function mapBusTemplate(raw: any): BusTemplate | null {
@@ -146,17 +230,13 @@ function mapTrip(raw: any): Trip {
   const participants = (raw.participants || []).map(mapParticipant);
   const seatAssignments = (raw.seat_assignments ?? raw.seatAssignments ?? []).map(mapSeatAssignment);
   const busTemplate = raw.bus_template ?? raw.busTemplate;
+  const tripHotelsRaw = raw.hotels ?? raw.trip_hotels ?? raw.tripHotels ?? [];
   return {
     id: raw.id,
     title: raw.title,
     destination: raw.destination ?? null,
     departureDate: raw.departure_date ?? raw.departureDate,
     returnDate: raw.return_date ?? raw.returnDate,
-    isVisaTrip: Boolean(raw.is_visa_trip ?? raw.isVisaTrip),
-    casDepartureDate: raw.cas_departure_date ?? raw.casDepartureDate ?? null,
-    casReturnDate: raw.cas_return_date ?? raw.casReturnDate ?? null,
-    consulateDepartureDate: raw.consulate_departure_date ?? raw.consulateDepartureDate ?? null,
-    consulateReturnDate: raw.consulate_return_date ?? raw.consulateReturnDate ?? null,
     notes: raw.notes ?? null,
     totalSeats: raw.total_seats ?? raw.totalSeats,
     companyId: raw.company_id ?? raw.companyId,
@@ -166,6 +246,7 @@ function mapTrip(raw: any): Trip {
     sharedCompanies: raw.shared_companies ?? raw.sharedCompanies ?? [],
     participants,
     seatAssignments,
+    tripHotels: Array.isArray(tripHotelsRaw) ? tripHotelsRaw.map(mapTripHotel) : [],
     participantCount: raw.participant_count ?? raw.participantCount ?? participants.length,
     createdAt: raw.created_at ?? raw.createdAt,
     updatedAt: raw.updated_at ?? raw.updatedAt,
@@ -186,11 +267,6 @@ function mapInvitation(raw: any): TripInvitation {
           departureDate: trip.departure_date ?? trip.departureDate,
           returnDate: trip.return_date ?? trip.returnDate,
           totalSeats: trip.total_seats ?? trip.totalSeats,
-          isVisaTrip: Boolean(trip.is_visa_trip ?? trip.isVisaTrip),
-          casDepartureDate: trip.cas_departure_date ?? trip.casDepartureDate ?? null,
-          casReturnDate: trip.cas_return_date ?? trip.casReturnDate ?? null,
-          consulateDepartureDate: trip.consulate_departure_date ?? trip.consulateDepartureDate ?? null,
-          consulateReturnDate: trip.consulate_return_date ?? trip.consulateReturnDate ?? null,
         }
       : undefined,
     invitedCompanyId: raw.invited_company_id ?? raw.invitedCompanyId,
@@ -334,11 +410,6 @@ export const useTripStore = () => {
         notes?: string;
         busTemplateId?: string | null;
         invitedCompanyIds?: string[];
-        isVisaTrip?: boolean;
-        casDepartureDate?: string;
-        casReturnDate?: string;
-        consulateDepartureDate?: string;
-        consulateReturnDate?: string;
       }
     ) => {
       const created = await api.createTrip(data, token);
@@ -362,11 +433,6 @@ export const useTripStore = () => {
         notes?: string;
         busTemplateId?: string | null;
         invitedCompanyIds?: string[];
-        isVisaTrip?: boolean;
-        casDepartureDate?: string | null;
-        casReturnDate?: string | null;
-        consulateDepartureDate?: string | null;
-        consulateReturnDate?: string | null;
       }
     ) => {
       const updated = await api.updateTrip(tripId, data, token);
@@ -407,6 +473,17 @@ export const useTripStore = () => {
     if (currentTrip?.id === tripId) setCurrentTrip(mapped);
   }, [currentTrip?.id]);
 
+  const updateParticipantPickup = useCallback(
+    async (token: string, tripId: string, participantId: string, pickupLocation: string | null) => {
+      await api.updateTripParticipantPickup(tripId, participantId, { pickupLocation }, token);
+      const trip = await api.getTrip(tripId, token);
+      const mapped = mapTrip(trip);
+      setTrips(prev => prev.map(t => (t.id === tripId ? mapped : t)));
+      if (currentTrip?.id === tripId) setCurrentTrip(mapped);
+    },
+    [currentTrip?.id]
+  );
+
   const setSeatAssignment = useCallback(
     async (
       token: string,
@@ -438,6 +515,85 @@ export const useTripStore = () => {
   const clearSeatAssignment = useCallback(
     async (token: string, tripId: string, opts: { participantId?: string; clientId?: string; seatId?: string }) => {
       await api.clearTripSeatAssignment(tripId, opts, token);
+      const trip = await api.getTrip(tripId, token);
+      const mapped = mapTrip(trip);
+      setTrips(prev => prev.map(t => (t.id === tripId ? mapped : t)));
+      if (currentTrip?.id === tripId) setCurrentTrip(mapped);
+    },
+    [currentTrip?.id]
+  );
+
+  const attachTripHotel = useCallback(
+    async (
+      token: string,
+      tripId: string,
+      data: {
+        hotelId: string;
+        checkInDate: string;
+        checkOutDate: string;
+        reservedSingles: number;
+        reservedDoubles: number;
+        reservedTriples: number;
+        notes?: string | null;
+      }
+    ) => {
+      await api.attachHotelToTrip(tripId, data, token);
+      const trip = await api.getTrip(tripId, token);
+      const mapped = mapTrip(trip);
+      setTrips(prev => prev.map(t => (t.id === tripId ? mapped : t)));
+      if (currentTrip?.id === tripId) setCurrentTrip(mapped);
+    },
+    [currentTrip?.id]
+  );
+
+  const updateTripHotelBooking = useCallback(
+    async (
+      token: string,
+      tripId: string,
+      tripHotelId: string,
+      data: {
+        checkInDate?: string;
+        checkOutDate?: string;
+        reservedSingles?: number;
+        reservedDoubles?: number;
+        reservedTriples?: number;
+        notes?: string | null;
+      }
+    ) => {
+      await api.updateTripHotel(tripId, tripHotelId, data, token);
+      const trip = await api.getTrip(tripId, token);
+      const mapped = mapTrip(trip);
+      setTrips(prev => prev.map(t => (t.id === tripId ? mapped : t)));
+      if (currentTrip?.id === tripId) setCurrentTrip(mapped);
+    },
+    [currentTrip?.id]
+  );
+
+  const detachTripHotel = useCallback(
+    async (token: string, tripId: string, tripHotelId: string) => {
+      await api.detachTripHotel(tripId, tripHotelId, token);
+      const trip = await api.getTrip(tripId, token);
+      const mapped = mapTrip(trip);
+      setTrips(prev => prev.map(t => (t.id === tripId ? mapped : t)));
+      if (currentTrip?.id === tripId) setCurrentTrip(mapped);
+    },
+    [currentTrip?.id]
+  );
+
+  const assignTripHotelRoom = useCallback(
+    async (token: string, tripId: string, tripHotelId: string, roomId: string, participantId: string) => {
+      await api.assignTripHotelRoom(tripId, tripHotelId, roomId, { participantId }, token);
+      const trip = await api.getTrip(tripId, token);
+      const mapped = mapTrip(trip);
+      setTrips(prev => prev.map(t => (t.id === tripId ? mapped : t)));
+      if (currentTrip?.id === tripId) setCurrentTrip(mapped);
+    },
+    [currentTrip?.id]
+  );
+
+  const clearTripHotelRoomAssignment = useCallback(
+    async (token: string, tripId: string, tripHotelId: string, roomId: string, participantId: string) => {
+      await api.clearTripHotelRoomAssignment(tripId, tripHotelId, roomId, participantId, token);
       const trip = await api.getTrip(tripId, token);
       const mapped = mapTrip(trip);
       setTrips(prev => prev.map(t => (t.id === tripId ? mapped : t)));
@@ -509,9 +665,15 @@ export const useTripStore = () => {
     deleteTrip,
     addParticipants,
     removeParticipant,
+    updateParticipantPickup,
     setSeatAssignment,
     resetSeatAssignments,
     clearSeatAssignment,
+    attachTripHotel,
+    updateTripHotelBooking,
+    detachTripHotel,
+    assignTripHotelRoom,
+    clearTripHotelRoomAssignment,
     clearCurrentTrip,
     fetchTripFinance,
     deleteTripIncome,

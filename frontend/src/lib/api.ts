@@ -325,7 +325,7 @@ class ApiClient {
       assignedUserId?: string;
       branchId?: string;
       productId?: string;
-      visaStatusTemplateId?: string;
+      status?: 'active' | 'inactive' | 'pending';
       checklistTemplateId?: string;
       checklistMode?: 'completed' | 'not_completed';
       page?: number;
@@ -341,7 +341,6 @@ class ApiClient {
       data: any[];
       meta: { page: number; limit: number; total: number; totalPages: number };
       templates?: any[];
-      visaStatusTemplates?: any[];
     }>(`/clients${queryParams ? `?${queryParams}` : ''}`, {
       method: 'GET',
       token: token ?? this.getToken(),
@@ -582,6 +581,20 @@ class ApiClient {
     });
   }
 
+  async getTripStats(token?: string | null) {
+    return this.request<{
+      upcomingTrips: number;
+      departingIn30Days: number;
+      totalSeatsUpcoming: number;
+      participantCountUpcoming: number;
+      occupancyRate: number;
+    }>('/trips/stats', {
+      method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
   async getTrip(id: string, token?: string | null) {
     const res = await this.request<any>(`/trips/${id}`, {
       method: 'GET',
@@ -699,11 +712,6 @@ class ApiClient {
     notes?: string;
     busTemplateId?: string | null;
     invitedCompanyIds?: string[];
-    isVisaTrip?: boolean;
-    casDepartureDate?: string;
-    casReturnDate?: string;
-    consulateDepartureDate?: string;
-    consulateReturnDate?: string;
   }, token?: string | null) {
     return this.request<any>('/trips', {
       method: 'POST',
@@ -724,11 +732,6 @@ class ApiClient {
       notes?: string;
       busTemplateId?: string | null;
       invitedCompanyIds?: string[];
-      isVisaTrip?: boolean;
-      casDepartureDate?: string | null;
-      casReturnDate?: string | null;
-      consulateDepartureDate?: string | null;
-      consulateReturnDate?: string | null;
     },
     token?: string | null
   ) {
@@ -766,6 +769,20 @@ class ApiClient {
       method: 'DELETE',
       token: token ?? this.getToken(),
       requireAuth: true,
+    });
+  }
+
+  async updateTripParticipantPickup(
+    tripId: string,
+    participantId: string,
+    data: { pickupLocation: string | null },
+    token?: string | null
+  ) {
+    return this.request<{ id: string; pickupLocation: string | null }>(`/trips/${tripId}/participants/${participantId}`, {
+      method: 'PATCH',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+      body: JSON.stringify(data),
     });
   }
 
@@ -810,6 +827,160 @@ class ApiClient {
     const id = opts.participantId ?? opts.clientId;
     if (!id) throw new Error('participantId, clientId or seatId required');
     return this.request<{ message: string }>(`/trips/${tripId}/seat-assignments/${id}`, {
+      method: 'DELETE',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async attachHotelToTrip(
+    tripId: string,
+    data: {
+      hotelId: string;
+      checkInDate: string;
+      checkOutDate: string;
+      reservedSingles: number;
+      reservedDoubles: number;
+      reservedTriples: number;
+      notes?: string | null;
+    },
+    token?: string | null
+  ) {
+    return this.request<any>(`/trips/${tripId}/hotels`, {
+      method: 'POST',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateTripHotel(
+    tripId: string,
+    tripHotelId: string,
+    data: {
+      checkInDate?: string;
+      checkOutDate?: string;
+      reservedSingles?: number;
+      reservedDoubles?: number;
+      reservedTriples?: number;
+      notes?: string | null;
+    },
+    token?: string | null
+  ) {
+    return this.request<any>(`/trips/${tripId}/hotels/${tripHotelId}`, {
+      method: 'PATCH',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+      body: JSON.stringify(data),
+    });
+  }
+
+  async detachTripHotel(tripId: string, tripHotelId: string, token?: string | null) {
+    return this.request<{ message: string }>(`/trips/${tripId}/hotels/${tripHotelId}`, {
+      method: 'DELETE',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async assignTripHotelRoom(
+    tripId: string,
+    tripHotelId: string,
+    roomId: string,
+    data: { participantId: string },
+    token?: string | null
+  ) {
+    return this.request<any>(`/trips/${tripId}/hotels/${tripHotelId}/rooms/${roomId}/assign`, {
+      method: 'POST',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+      body: JSON.stringify(data),
+    });
+  }
+
+  async clearTripHotelRoomAssignment(
+    tripId: string,
+    tripHotelId: string,
+    roomId: string,
+    participantId: string,
+    token?: string | null
+  ) {
+    return this.request<{ message: string }>(
+      `/trips/${tripId}/hotels/${tripHotelId}/rooms/${roomId}/assign/${participantId}`,
+      {
+        method: 'DELETE',
+        token: token ?? this.getToken(),
+        requireAuth: true,
+      }
+    );
+  }
+
+  // Hotels catalog
+  async getHotels(token?: string | null) {
+    return this.request<any[]>('/hotels', {
+      method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async getHotel(id: string, token?: string | null) {
+    return this.request<any>(`/hotels/${id}`, {
+      method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async createHotel(
+    data: {
+      name: string;
+      address?: string | null;
+      city?: string | null;
+      country?: string | null;
+      phone?: string | null;
+      email?: string | null;
+      notes?: string | null;
+      totalSingleRooms?: number;
+      totalDoubleRooms?: number;
+      totalTripleRooms?: number;
+    },
+    token?: string | null
+  ) {
+    return this.request<any>('/hotels', {
+      method: 'POST',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateHotel(
+    id: string,
+    data: {
+      name?: string;
+      address?: string | null;
+      city?: string | null;
+      country?: string | null;
+      phone?: string | null;
+      email?: string | null;
+      notes?: string | null;
+      totalSingleRooms?: number;
+      totalDoubleRooms?: number;
+      totalTripleRooms?: number;
+    },
+    token?: string | null
+  ) {
+    return this.request<any>(`/hotels/${id}`, {
+      method: 'PUT',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteHotel(id: string, token?: string | null) {
+    return this.request<{ message: string }>(`/hotels/${id}`, {
       method: 'DELETE',
       token: token ?? this.getToken(),
       requireAuth: true,
@@ -1172,41 +1343,6 @@ class ApiClient {
     });
   }
 
-  // Visa status templates
-  async getVisaStatusTemplates(token?: string | null) {
-    return this.request<any[]>('/visa-status-templates', {
-      method: 'GET',
-      token: token ?? this.getToken(),
-      requireAuth: true,
-    });
-  }
-
-  async createVisaStatusTemplate(templateData: any, token?: string | null) {
-    return this.request<any>('/visa-status-templates', {
-      method: 'POST',
-      token: token ?? this.getToken(),
-      requireAuth: true,
-      body: JSON.stringify(templateData),
-    });
-  }
-
-  async updateVisaStatusTemplate(id: string, templateData: any, token?: string | null) {
-    return this.request<any>(`/visa-status-templates/${id}`, {
-      method: 'PUT',
-      token: token ?? this.getToken(),
-      requireAuth: true,
-      body: JSON.stringify(templateData),
-    });
-  }
-
-  async deleteVisaStatusTemplate(id: string, token?: string | null) {
-    return this.request<{ message: string }>(`/visa-status-templates/${id}`, {
-      method: 'DELETE',
-      token: token ?? this.getToken(),
-      requireAuth: true,
-    });
-  }
-
   // Branches (sucursales)
   async getBranches(token?: string | null) {
     return this.request<any[]>('/branches', {
@@ -1478,7 +1614,7 @@ class ApiClient {
     });
   }
 
-  // Products (visas)
+  // Products (catálogo comercial)
   async getProducts(token?: string | null) {
     return this.request<any[]>('/products', {
       method: 'GET',

@@ -20,13 +20,13 @@ import conversacionesChatRoutes from './conversations.routes';
 import productsRoutes from './products.routes';
 import categoriesRoutes from './categories.routes';
 import notificationsRoutes from './notifications.routes';
-import visaStatusTemplatesRoutes from './visa-status-templates.routes';
 import financeRoutes from './finance.routes';
 import branchesRoutes from './branches.routes';
 import internalAppointmentsRoutes from './internal-appointments.routes';
 import calendarRoutes from './calendar.routes';
 import rolesRoutes from './roles.routes';
 import staffRoutes from './staff.routes';
+import hotelsRoutes from './hotels.routes';
 
 const router = Router();
 
@@ -49,9 +49,9 @@ router.use('/faqs', faqsRoutes);
 router.use('/bot', botRoutes);
 router.use('/addChat', conversacionesChatRoutes);
 router.use('/products', productsRoutes);
+router.use('/hotels', hotelsRoutes);
 router.use('/categories', categoriesRoutes);
 router.use('/notifications', notificationsRoutes);
-router.use('/visa-status-templates', visaStatusTemplatesRoutes);
 router.use('/finance', financeRoutes);
 router.use('/branches', branchesRoutes);
 router.use('/internal-appointments', internalAppointmentsRoutes);
