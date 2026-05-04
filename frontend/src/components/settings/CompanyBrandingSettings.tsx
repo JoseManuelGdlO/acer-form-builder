@@ -259,7 +259,7 @@ export function CompanyBrandingSettings() {
       applyTheme(mergedAfterSave);
       applyFavicon(res.faviconUrl ?? res.logoUrl ?? null);
       const hostname = window.location.hostname;
-      const domainToUse = hostname === 'localhost' || hostname === '127.0.0.1' ? 'saru' : hostname;
+      const domainToUse = hostname === 'localhost' || hostname === '127.0.0.1' ? 'aser' : hostname;
       await loadTenant(domainToUse);
       toast.success('Configuración guardada');
     } catch (err: unknown) {

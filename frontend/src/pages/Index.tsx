@@ -334,7 +334,16 @@ const Index = () => {
       .replace(/-+/g, '_');
 
     if (v === 'VIAJE_SOLO' || v === 'VIAJA_POR_TU_CUENTA' || v === 'VIAJA_POR_SU_CUENTA') return 'SOLO';
-    if (v === 'VIAJE_SARUVISAS' || v === 'VIAJA_CON_SARUVISAS') return 'CON_SARUVISAS';
+    if (
+      v === 'VIAJE_SARUVISAS' ||
+      v === 'VIAJA_CON_SARUVISAS' ||
+      v === 'CON_SARUVISAS' ||
+      v === 'VIAJE_ASER' ||
+      v === 'VIAJA_CON_ASER' ||
+      v === 'VIAJE_ASERVISAS' ||
+      v === 'VIAJA_CON_ASERVISAS'
+    )
+      return 'CON_ASER';
 
     return v;
   };
