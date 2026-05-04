@@ -5,8 +5,7 @@ services:
       dockerfile: Dockerfile
     container_name: asertours-backend
     expose:
-      # Must match PORT / BACKEND_PORT (nginx proxies http://backend:${BACKEND_PORT})
-      - "3001"
+      - "3000"
     volumes:
       # Imágenes de productos (y futuras subidas) en el servidor, no en la imagen Docker
       - ./uploads:/app/uploads
@@ -57,12 +56,8 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        # Same-origin `/api` — nginx proxies to backend (required for production domains)
-        - VITE_API_URL=${VITE_API_URL:-/api}
+        - VITE_API_URL=${VITE_API_URL:-http://localhost:3000/api}
     container_name: asertours-frontend
-    environment:
-      # Must match backend PORT (see frontend nginx default.conf.template)
-      - BACKEND_PORT=${BACKEND_PORT:-${PORT:-3001}}
     expose:
       - "80"
     depends_on:
