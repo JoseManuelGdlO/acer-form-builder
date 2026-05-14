@@ -3,17 +3,82 @@ name: Despliegue Automático a Producción
 on:
   push:
     branches:
-      - main 
+      - main
 
 jobs:
-  deploy:
+  ci-back:
+    name: Back CI
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
     steps:
-      - name: Conectar por SSH y ejecutar script
-        uses: appleboy/ssh-action@v1.0.3
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          script: |
-            /root/form-builder-plus/deploy.sh
+          node-version: 20
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+  ci-front:
+    name: Front CI
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+  deploy:
+    name: Trigger EasyPanel redeploy
+    runs-on: ubuntu-latest
+    needs:
+      - ci-back
+      - ci-front
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Trigger deploy webhook
+        env:
+          WEBHOOK_URL: ${{ secrets.EASYPANEL_DEPLOY_WEBHOOK_URL }}
+          WEBHOOK_URL_LEGACY: ${{ secrets.easypanel_deploy_webhook }}
+          EASYPANEL_DEPLOY_TOKEN: ${{ secrets.EASYPANEL_DEPLOY_TOKEN }}
+        run: |
+          EASYPANEL_DEPLOY_WEBHOOK_URL="${WEBHOOK_URL:-$WEBHOOK_URL_LEGACY}"
+          if [ -z "$EASYPANEL_DEPLOY_WEBHOOK_URL" ]; then
+            echo "Missing secret: set EASYPANEL_DEPLOY_WEBHOOK_URL or easypanel_deploy_webhook"
+            exit 1
+          fi
+
+          if [ -n "$EASYPANEL_DEPLOY_TOKEN" ]; then
+            curl --fail --silent --show-error \
+              -X POST "$EASYPANEL_DEPLOY_WEBHOOK_URL" \
+              -H "Authorization: Bearer $EASYPANEL_DEPLOY_TOKEN"
+          else
+            curl --fail --silent --show-error \
+              -X POST "$EASYPANEL_DEPLOY_WEBHOOK_URL"
+          fi
+
+          echo "EasyPanel redeploy triggered successfully."
