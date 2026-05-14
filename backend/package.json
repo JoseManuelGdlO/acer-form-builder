@@ -1,7 +1,7 @@
 {
-  "name": "saru-visas-backend",
+  "name": "aser-tour-backend",
   "version": "1.0.0",
-  "description": "Backend API for Saru Visas - Visa Management System",
+  "description": "Backend API for Aser Tours - Management System",
   "main": "dist/server.js",
   "scripts": {
     "generate-openapi": "node scripts/generate-openapi.js",
