@@ -260,7 +260,7 @@ export const deleteBusTemplate = async (req: AuthRequest, res: Response): Promis
       return;
     }
     await template.destroy();
-    res.status(204).send();
+    res.json({ message: 'Bus template deleted successfully' });
   } catch (error) {
     console.error('Delete bus template error:', error);
     res.status(500).json({ error: 'Internal server error' });
