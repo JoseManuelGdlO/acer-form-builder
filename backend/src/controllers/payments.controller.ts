@@ -19,7 +19,7 @@ function canManagePaymentReceipt(req: AuthRequest): boolean {
 }
 
 function sanitizePaymentRow(payment: ClientPayment) {
-  const raw = payment.toJSON() as Record<string, unknown>;
+  const raw = payment.toJSON() as unknown as Record<string, unknown>;
   const receiptImage = (raw.receiptImage ?? raw.receipt_image) as string | null | undefined;
   delete raw.receiptImage;
   delete raw.receipt_image;
