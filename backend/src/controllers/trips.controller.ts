@@ -414,7 +414,7 @@ export const createTrip = [
   body('totalSeats').isInt({ min: 1 }).withMessage('Total seats must be at least 1'),
   body('destination').optional().trim(),
   body('notes').optional().trim(),
-  body('busTemplateId').optional().isUUID(),
+  body('busTemplateId').optional({ nullable: true }).isUUID(),
   body('invitedCompanyIds').optional().isArray(),
   body('invitedCompanyIds.*').optional().isUUID(),
   async (req: AuthRequest, res: Response): Promise<void> => {

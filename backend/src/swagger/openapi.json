@@ -527,32 +527,17 @@
                     "type": "string"
                   },
                   "postalCode": {
-                    "type": "string"
+                    "type": "string",
+                    "format": "date-time"
                   },
                   "birthDate": {
                     "type": "string",
                     "format": "date-time"
                   },
                   "relationshipToHolder": {
-                    "type": "string",
-                    "format": "date-time"
-                  },
-                  "visaCasAppointmentDate": {
-                    "type": "string",
-                    "format": "date-time"
-                  },
-                  "visaCasAppointmentLocation": {
-                    "type": "string",
-                    "format": "date-time"
-                  },
-                  "visaConsularAppointmentDate": {
-                    "type": "string",
-                    "format": "date-time"
-                  },
-                  "visaConsularAppointmentLocation": {
                     "type": "string"
                   },
-                  "visaStatusTemplateId": {
+                  "status": {
                     "type": "string"
                   },
                   "productId": {
@@ -969,32 +954,17 @@
                     "type": "string"
                   },
                   "postalCode": {
-                    "type": "string"
+                    "type": "string",
+                    "format": "date-time"
                   },
                   "birthDate": {
                     "type": "string",
                     "format": "date-time"
                   },
                   "relationshipToHolder": {
-                    "type": "string",
-                    "format": "date-time"
-                  },
-                  "visaCasAppointmentDate": {
-                    "type": "string",
-                    "format": "date-time"
-                  },
-                  "visaCasAppointmentLocation": {
-                    "type": "string",
-                    "format": "date-time"
-                  },
-                  "visaConsularAppointmentDate": {
-                    "type": "string",
-                    "format": "date-time"
-                  },
-                  "visaConsularAppointmentLocation": {
                     "type": "string"
                   },
-                  "visaStatusTemplateId": {
+                  "status": {
                     "type": "string"
                   },
                   "productId": {
@@ -1330,6 +1300,29 @@
           },
           "400": {
             "description": "Bad Request (validation errors)"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/trips/stats": {
+      "get": {
+        "tags": [
+          "trips"
+        ],
+        "operationId": "get__api_trips_stats",
+        "summary": "GET /api/trips/stats",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
           },
           "401": {
             "description": "Unauthorized"
@@ -1688,6 +1681,47 @@
       }
     },
     "/api/trips/{id}/participants/{participantId}": {
+      "patch": {
+        "tags": [
+          "trips"
+        ],
+        "operationId": "patch__api_trips__id__participants__participantId_",
+        "summary": "PATCH /api/trips/{id}/participants/{participantId}",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID: id",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "participantId",
+            "in": "path",
+            "required": true,
+            "description": "ID: participantId",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      },
       "delete": {
         "tags": [
           "trips"
@@ -1871,6 +1905,327 @@
             "in": "path",
             "required": true,
             "description": "ID: id",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "participantId",
+            "in": "path",
+            "required": true,
+            "description": "ID: participantId",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/trips/{id}/hotels": {
+      "post": {
+        "tags": [
+          "trips"
+        ],
+        "operationId": "post__api_trips__id__hotels",
+        "summary": "POST /api/trips/{id}/hotels",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID: id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "hotelId": {
+                    "type": "integer"
+                  },
+                  "checkInDate": {
+                    "type": "integer"
+                  },
+                  "checkOutDate": {
+                    "type": "integer"
+                  },
+                  "reservedSingles": {
+                    "type": "integer"
+                  },
+                  "reservedDoubles": {
+                    "type": "integer"
+                  },
+                  "reservedTriples": {
+                    "type": "integer"
+                  },
+                  "notes": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request (validation errors)"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/trips/{id}/hotels/{tripHotelId}": {
+      "patch": {
+        "tags": [
+          "trips"
+        ],
+        "operationId": "patch__api_trips__id__hotels__tripHotelId_",
+        "summary": "PATCH /api/trips/{id}/hotels/{tripHotelId}",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID: id",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tripHotelId",
+            "in": "path",
+            "required": true,
+            "description": "ID: tripHotelId",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "checkInDate": {
+                    "type": "integer"
+                  },
+                  "checkOutDate": {
+                    "type": "integer"
+                  },
+                  "reservedSingles": {
+                    "type": "integer"
+                  },
+                  "reservedDoubles": {
+                    "type": "integer"
+                  },
+                  "reservedTriples": {
+                    "type": "integer"
+                  },
+                  "notes": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request (validation errors)"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "trips"
+        ],
+        "operationId": "delete__api_trips__id__hotels__tripHotelId_",
+        "summary": "DELETE /api/trips/{id}/hotels/{tripHotelId}",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID: id",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tripHotelId",
+            "in": "path",
+            "required": true,
+            "description": "ID: tripHotelId",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/trips/{id}/hotels/{tripHotelId}/rooms/{roomId}/assign": {
+      "post": {
+        "tags": [
+          "trips"
+        ],
+        "operationId": "post__api_trips__id__hotels__tripHotelId__rooms__roomId__assign",
+        "summary": "POST /api/trips/{id}/hotels/{tripHotelId}/rooms/{roomId}/assign",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID: id",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tripHotelId",
+            "in": "path",
+            "required": true,
+            "description": "ID: tripHotelId",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "roomId",
+            "in": "path",
+            "required": true,
+            "description": "ID: roomId",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "participantId": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "participantId"
+                ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request (validation errors)"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/trips/{id}/hotels/{tripHotelId}/rooms/{roomId}/assign/{participantId}": {
+      "delete": {
+        "tags": [
+          "trips"
+        ],
+        "operationId": "delete__api_trips__id__hotels__tripHotelId__rooms__roomId__assign__participantId_",
+        "summary": "DELETE /api/trips/{id}/hotels/{tripHotelId}/rooms/{roomId}/assign/{participantId}",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID: id",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tripHotelId",
+            "in": "path",
+            "required": true,
+            "description": "ID: tripHotelId",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "roomId",
+            "in": "path",
+            "required": true,
+            "description": "ID: roomId",
             "schema": {
               "type": "string"
             }
@@ -4752,6 +5107,238 @@
         }
       }
     },
+    "/api/hotels": {
+      "get": {
+        "tags": [
+          "hotels"
+        ],
+        "operationId": "get__api_hotels",
+        "summary": "GET /api/hotels",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "hotels"
+        ],
+        "operationId": "post__api_hotels",
+        "summary": "POST /api/hotels",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "address": {
+                    "type": "integer"
+                  },
+                  "city": {
+                    "type": "integer"
+                  },
+                  "country": {
+                    "type": "integer"
+                  },
+                  "phone": {
+                    "type": "integer"
+                  },
+                  "email": {
+                    "type": "integer"
+                  },
+                  "notes": {
+                    "type": "integer"
+                  },
+                  "totalSingleRooms": {
+                    "type": "integer"
+                  },
+                  "totalDoubleRooms": {
+                    "type": "integer"
+                  },
+                  "totalTripleRooms": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request (validation errors)"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/hotels/{id}": {
+      "get": {
+        "tags": [
+          "hotels"
+        ],
+        "operationId": "get__api_hotels__id_",
+        "summary": "GET /api/hotels/{id}",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID: id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "hotels"
+        ],
+        "operationId": "put__api_hotels__id_",
+        "summary": "PUT /api/hotels/{id}",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID: id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "integer"
+                  },
+                  "address": {
+                    "type": "integer"
+                  },
+                  "city": {
+                    "type": "integer"
+                  },
+                  "country": {
+                    "type": "integer"
+                  },
+                  "phone": {
+                    "type": "integer"
+                  },
+                  "email": {
+                    "type": "integer"
+                  },
+                  "notes": {
+                    "type": "integer"
+                  },
+                  "totalSingleRooms": {
+                    "type": "integer"
+                  },
+                  "totalDoubleRooms": {
+                    "type": "integer"
+                  },
+                  "totalTripleRooms": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request (validation errors)"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "hotels"
+        ],
+        "operationId": "delete__api_hotels__id_",
+        "summary": "DELETE /api/hotels/{id}",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID: id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
     "/api/categories": {
       "get": {
         "tags": [
@@ -4980,7 +5567,7 @@
                 "type": "object",
                 "properties": {
                   "type": {
-                    "type": "string"
+                    "type": "object"
                   },
                   "message": {
                     "type": "array"
@@ -5148,167 +5735,6 @@
           },
           "400": {
             "description": "Bad Request (validation errors)"
-          },
-          "401": {
-            "description": "Unauthorized"
-          }
-        }
-      }
-    },
-    "/api/visa-status-templates": {
-      "get": {
-        "tags": [
-          "visa-status-templates"
-        ],
-        "operationId": "get__api_visa_status_templates",
-        "summary": "GET /api/visa-status-templates",
-        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "401": {
-            "description": "Unauthorized"
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "visa-status-templates"
-        ],
-        "operationId": "post__api_visa_status_templates",
-        "summary": "POST /api/visa-status-templates",
-        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "label": {
-                    "type": "integer"
-                  },
-                  "order": {
-                    "type": "integer"
-                  },
-                  "color": {
-                    "type": "string"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "400": {
-            "description": "Bad Request (validation errors)"
-          },
-          "401": {
-            "description": "Unauthorized"
-          }
-        }
-      }
-    },
-    "/api/visa-status-templates/{id}": {
-      "put": {
-        "tags": [
-          "visa-status-templates"
-        ],
-        "operationId": "put__api_visa_status_templates__id_",
-        "summary": "PUT /api/visa-status-templates/{id}",
-        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "description": "ID: id",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "label": {
-                    "type": "integer"
-                  },
-                  "order": {
-                    "type": "integer"
-                  },
-                  "isActive": {
-                    "type": "boolean"
-                  },
-                  "color": {
-                    "type": "string"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "400": {
-            "description": "Bad Request (validation errors)"
-          },
-          "401": {
-            "description": "Unauthorized"
-          }
-        }
-      },
-      "delete": {
-        "tags": [
-          "visa-status-templates"
-        ],
-        "operationId": "delete__api_visa_status_templates__id_",
-        "summary": "DELETE /api/visa-status-templates/{id}",
-        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "description": "ID: id",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
           },
           "401": {
             "description": "Unauthorized"
