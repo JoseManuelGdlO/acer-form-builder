@@ -1,4 +1,12 @@
 import type { FinanceGranularity, FinanceOverviewResponse } from '@/types/finance';
+import type {
+  CommissionPayoutPreviewResponse,
+  CommissionPeriodType,
+  CommissionRateType,
+  CommissionUsersResponse,
+  CommissionsOverviewResponse,
+  PayCommissionsBatchResponse,
+} from '@/types/commission';
 
 /** Base URL for API calls (e.g. `/api` or `http://localhost:3001/api`). Exported for asset URLs. */
 export function getApiBaseURL(): string {
@@ -712,6 +720,7 @@ class ApiClient {
     notes?: string;
     busTemplateId?: string | null;
     invitedCompanyIds?: string[];
+    reminderConfig?: import('@/types/form').TripReminderConfig | null;
   }, token?: string | null) {
     return this.request<any>('/trips', {
       method: 'POST',
@@ -732,6 +741,7 @@ class ApiClient {
       notes?: string;
       busTemplateId?: string | null;
       invitedCompanyIds?: string[];
+      reminderConfig?: import('@/types/form').TripReminderConfig | null;
     },
     token?: string | null
   ) {
@@ -1490,6 +1500,81 @@ class ApiClient {
     });
   }
 
+  async getCommissionUsers(token?: string | null) {
+    return this.request<CommissionUsersResponse>(`/commissions/users`, {
+      method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async addCommissionUser(
+    userId: string,
+    payload: { rateType: CommissionRateType; ratePct?: number; fixedAmount?: number },
+    token?: string | null
+  ) {
+    return this.request<CommissionUsersResponse>(`/commissions/users`, {
+      method: 'POST',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+      body: JSON.stringify({ userId, ...payload }),
+    });
+  }
+
+  async updateCommissionUserRate(
+    userId: string,
+    payload: { rateType: CommissionRateType; ratePct?: number; fixedAmount?: number },
+    token?: string | null
+  ) {
+    return this.request<CommissionUsersResponse>(`/commissions/users/${userId}`, {
+      method: 'PUT',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async removeCommissionUser(userId: string, token?: string | null) {
+    return this.request<CommissionUsersResponse>(`/commissions/users/${userId}`, {
+      method: 'DELETE',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async getCommissionsOverview(token?: string | null) {
+    return this.request<CommissionsOverviewResponse>(`/commissions/overview`, {
+      method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async getCommissionPayoutPreview(
+    params: { periodType: CommissionPeriodType; referenceDate?: string },
+    token?: string | null
+  ) {
+    const query = new URLSearchParams({ periodType: params.periodType });
+    if (params.referenceDate) query.set('referenceDate', params.referenceDate);
+    return this.request<CommissionPayoutPreviewResponse>(`/commissions/payout-preview?${query}`, {
+      method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async payCommissionsBatch(
+    data: { periodType: CommissionPeriodType; referenceDate?: string },
+    token?: string | null
+  ) {
+    return this.request<PayCommissionsBatchResponse>(`/commissions/payouts`, {
+      method: 'POST',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+      body: JSON.stringify(data),
+    });
+  }
+
   async getClientPayments(clientId: string, token?: string | null) {
     return this.request<any[]>(`/payments/clients/${clientId}`, {
       method: 'GET',
@@ -1523,6 +1608,23 @@ class ApiClient {
       method: 'DELETE',
       token: token ?? this.getToken(),
       requireAuth: true,
+    });
+  }
+
+  async getPaymentReceipt(id: string, token?: string | null) {
+    return this.request<{ receiptImage: string }>(`/payments/${id}/receipt`, {
+      method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async uploadPaymentReceipt(id: string, receiptImage: string, token?: string | null) {
+    return this.request<{ hasReceipt: boolean }>(`/payments/${id}/receipt`, {
+      method: 'PUT',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+      body: JSON.stringify({ receiptImage }),
     });
   }
 

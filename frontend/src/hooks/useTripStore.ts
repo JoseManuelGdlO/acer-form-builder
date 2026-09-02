@@ -231,6 +231,7 @@ function mapTrip(raw: any): Trip {
   const seatAssignments = (raw.seat_assignments ?? raw.seatAssignments ?? []).map(mapSeatAssignment);
   const busTemplate = raw.bus_template ?? raw.busTemplate;
   const tripHotelsRaw = raw.hotels ?? raw.trip_hotels ?? raw.tripHotels ?? [];
+  const reminderRaw = parseJsonIfString(raw.reminder_config ?? raw.reminderConfig);
   return {
     id: raw.id,
     title: raw.title,
@@ -243,6 +244,7 @@ function mapTrip(raw: any): Trip {
     busTemplateId: raw.bus_template_id ?? raw.busTemplateId ?? null,
     busTemplate: busTemplate ? mapBusTemplate(busTemplate) : null,
     assignedUserId: raw.assigned_user_id ?? raw.assignedUserId,
+    reminderConfig: reminderRaw ?? null,
     sharedCompanies: raw.shared_companies ?? raw.sharedCompanies ?? [],
     participants,
     seatAssignments,
@@ -410,6 +412,7 @@ export const useTripStore = () => {
         notes?: string;
         busTemplateId?: string | null;
         invitedCompanyIds?: string[];
+        reminderConfig?: import('@/types/form').TripReminderConfig | null;
       }
     ) => {
       const created = await api.createTrip(data, token);
@@ -433,6 +436,7 @@ export const useTripStore = () => {
         notes?: string;
         busTemplateId?: string | null;
         invitedCompanyIds?: string[];
+        reminderConfig?: import('@/types/form').TripReminderConfig | null;
       }
     ) => {
       const updated = await api.updateTrip(tripId, data, token);

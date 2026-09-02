@@ -71,6 +71,7 @@ export const ClientFormModal = ({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [phoneError, setPhoneError] = useState('');
+  const [emailError, setEmailError] = useState('');
   const [postalCodeError, setPostalCodeError] = useState('');
 
   useEffect(() => {
@@ -111,6 +112,7 @@ export const ClientFormModal = ({
     }
     setError('');
     setPhoneError('');
+    setEmailError('');
     setPostalCodeError('');
     setIsLoading(false);
     // No incluir `users` en deps: el padre las refresca con
@@ -118,6 +120,21 @@ export const ClientFormModal = ({
     // vaciarían el borrador. El otro useEffect aplica la plantilla por defecto al cargar.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intencional: solo al abrir / cambiar cliente
   }, [client, open, defaultParentClientId, defaultAssignedUserId, isAdmin]);
+
+  const validateEmail = (value: string): boolean => {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      setEmailError('');
+      return true;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(trimmed)) {
+      setEmailError('Ingrese un correo electrónico válido (ejemplo: correo@dominio.com)');
+      return false;
+    }
+    setEmailError('');
+    return true;
+  };
 
   const validatePhone = (value: string): boolean => {
     if (!value || value.trim() === '+') {
@@ -158,8 +175,13 @@ export const ClientFormModal = ({
     setIsLoading(true);
     setError('');
     setPhoneError('');
+    setEmailError('');
     setPostalCodeError('');
 
+    if (!validateEmail(formData.email)) {
+      setIsLoading(false);
+      return;
+    }
     if (!validatePhone(formData.phone)) {
       setIsLoading(false);
       return;
@@ -175,6 +197,7 @@ export const ClientFormModal = ({
       const isEditFamily = !!client?.parentClientId;
       const payload: Omit<Client, 'id' | 'createdAt' | 'updatedAt' | 'formsCompleted'> = {
         ...formFields,
+        email: formData.email.trim(),
         birthDate: formData.birthDate || null,
         relationshipToHolder: formData.relationshipToHolder.trim() || null,
         phone: formData.phone || '',
@@ -229,16 +252,31 @@ export const ClientFormModal = ({
             <div className="space-y-2">
               <Label htmlFor="email" className="flex items-center gap-2">
                 <Mail className="w-4 h-4" />
-                Correo electrónico *
+                Correo electrónico
               </Label>
               <Input
                 id="email"
                 type="email"
                 value={formData.email}
-                onChange={e => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                onChange={e => {
+                  const emailValue = e.target.value;
+                  setFormData(prev => ({ ...prev, email: emailValue }));
+                  if (!emailValue.trim()) {
+                    setEmailError('');
+                  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailValue.trim())) {
+                    setEmailError('Ingrese un correo electrónico válido (ejemplo: correo@dominio.com)');
+                  } else {
+                    setEmailError('');
+                  }
+                }}
+                onBlur={() => validateEmail(formData.email)}
                 placeholder="correo@ejemplo.com"
-                required
+                className={cn(emailError && 'border-destructive')}
+                aria-invalid={!!emailError}
               />
+              {emailError && (
+                <p className="text-sm text-destructive">{emailError}</p>
+              )}
             </div>
           )}
 

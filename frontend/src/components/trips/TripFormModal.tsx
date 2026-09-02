@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Trip, BusTemplate } from '@/types/form';
+import { Trip, BusTemplate, TripReminderConfig } from '@/types/form';
 import {
   Dialog,
   DialogContent,
@@ -13,7 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { MapPin, Users } from 'lucide-react';
+import { MapPin, Users, Bell } from 'lucide-react';
 import { format } from 'date-fns';
 
 export interface TripFormSaveData {
@@ -25,6 +25,7 @@ export interface TripFormSaveData {
   busTemplateId?: string | null;
   departureDate?: string;
   returnDate?: string;
+  reminderConfig?: TripReminderConfig | null;
 }
 
 interface TripFormModalProps {
@@ -52,6 +53,9 @@ export const TripFormModal = ({
   const [totalSeats, setTotalSeats] = useState(30);
   const [busTemplateId, setBusTemplateId] = useState<string | null>(null);
   const [invitedCompanyIds, setInvitedCompanyIds] = useState<Set<string>>(new Set());
+  const [reminderDaysBefore, setReminderDaysBefore] = useState(7);
+  const [reminderFrequencyDays, setReminderFrequencyDays] = useState(1);
+  const [reminderMessage, setReminderMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -65,6 +69,9 @@ export const TripFormModal = ({
       setTotalSeats(trip.totalSeats);
       setBusTemplateId(trip.busTemplateId ?? null);
       setInvitedCompanyIds(new Set((trip.sharedCompanies ?? []).map((c) => c.id)));
+      setReminderDaysBefore(trip.reminderConfig?.daysBefore ?? 7);
+      setReminderFrequencyDays(trip.reminderConfig?.frequencyDays ?? 1);
+      setReminderMessage(trip.reminderConfig?.message ?? '');
     } else {
       setTitle('');
       setDestination('');
@@ -75,6 +82,9 @@ export const TripFormModal = ({
       setTotalSeats(30);
       setBusTemplateId(null);
       setInvitedCompanyIds(new Set());
+      setReminderDaysBefore(7);
+      setReminderFrequencyDays(1);
+      setReminderMessage('');
     }
     setError('');
     setIsLoading(false);
@@ -107,6 +117,17 @@ export const TripFormModal = ({
       setError('El número de plazas debe ser al menos 1');
       return;
     }
+    const trimmedReminderMessage = reminderMessage.trim();
+    if (trimmedReminderMessage) {
+      if (reminderDaysBefore < 1) {
+        setError('Los días antes del viaje deben ser al menos 1');
+        return;
+      }
+      if (reminderFrequencyDays < 1) {
+        setError('La frecuencia debe ser al menos 1 día');
+        return;
+      }
+    }
     setIsLoading(true);
     setError('');
     try {
@@ -119,6 +140,13 @@ export const TripFormModal = ({
         busTemplateId: busTemplateId || null,
         departureDate,
         returnDate,
+        reminderConfig: trimmedReminderMessage
+          ? {
+              daysBefore: reminderDaysBefore,
+              frequencyDays: reminderFrequencyDays,
+              message: trimmedReminderMessage,
+            }
+          : null,
       });
       onOpenChange(false);
     } catch (err: any) {
@@ -224,6 +252,49 @@ export const TripFormModal = ({
                 value={totalSeats}
                 onChange={(e) => setTotalSeats(Number(e.target.value) || 1)}
               />
+            </div>
+
+            <div className="space-y-3 rounded-md border border-border p-3">
+              <Label className="flex items-center gap-2 text-base">
+                <Bell className="w-4 h-4" />
+                Recordatorios
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Envía recordatorios automáticos por WhatsApp a los participantes del viaje. Puedes usar{' '}
+                {'{nombre}'}, {'{viaje}'}, {'{destino}'} y {'{fecha_partida}'} en el mensaje. Déjalo vacío para
+                desactivarlo.
+              </p>
+              <div className="space-y-2">
+                <Label htmlFor="trip-reminder-days-before">Días antes del viaje</Label>
+                <Input
+                  id="trip-reminder-days-before"
+                  type="number"
+                  min={1}
+                  value={reminderDaysBefore}
+                  onChange={(e) => setReminderDaysBefore(Number(e.target.value) || 1)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="trip-reminder-frequency">Frecuencia (cada cuántos días)</Label>
+                <Input
+                  id="trip-reminder-frequency"
+                  type="number"
+                  min={1}
+                  value={reminderFrequencyDays}
+                  onChange={(e) => setReminderFrequencyDays(Number(e.target.value) || 1)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="trip-reminder-message">Mensaje del recordatorio</Label>
+                <Textarea
+                  id="trip-reminder-message"
+                  value={reminderMessage}
+                  onChange={(e) => setReminderMessage(e.target.value)}
+                  placeholder="Ej. Recuerda confirmar tu asistencia y completar tu pago pendiente."
+                  rows={2}
+                  className="resize-none"
+                />
+              </div>
             </div>
 
             <div className="space-y-2">

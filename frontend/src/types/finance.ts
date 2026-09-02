@@ -41,4 +41,20 @@ export interface FinanceOverviewResponse {
     topClients: Array<{ clientId: string; name: string; amount: number; paymentsCount: number }>;
     topTrips: Array<{ tripId: string; title: string; income: number; expense: number; net: number }>;
   };
+  commissions?: {
+    kpis: {
+      totalPaid: number;
+    };
+    payouts: Array<{
+      id: string;
+      assignedUserId: string;
+      advisorName: string;
+      amount: number;
+      payoutDate: string;
+      concept: string;
+      periodType: string | null;
+      periodFrom: string | null;
+      periodTo: string | null;
+    }>;
+  };
 }

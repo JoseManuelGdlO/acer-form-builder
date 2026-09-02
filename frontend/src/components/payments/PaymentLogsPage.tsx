@@ -14,6 +14,7 @@ import { es } from 'date-fns/locale';
 import { api } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { PAYMENT_TYPE_LABELS, type PaymentType } from '@/types/form';
+import { PaymentReceiptActions } from '@/components/payments/PaymentReceiptActions';
 import { toast } from 'sonner';
 
 interface PaymentRow {
@@ -27,12 +28,16 @@ interface PaymentRow {
   clientName: string;
   createdAt: string;
   packageTitle?: string | null;
+  hasReceipt: boolean;
 }
 
 export const PaymentLogsPage = () => {
-  const { token } = useAuth();
+  const { token, can } = useAuth();
   const [payments, setPayments] = useState<PaymentRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  const canManageReceipt = can('client_payments.update') || can('payment_logs.view');
+  const canViewReceipt = can('payment_logs.view') || can('client_payments.view');
 
   useEffect(() => {
     if (token) {
@@ -59,6 +64,7 @@ export const PaymentLogsPage = () => {
           clientName: p.client?.name || '—',
           createdAt: p.created_at || p.createdAt,
           packageTitle: pkgTitle,
+          hasReceipt: Boolean(p.hasReceipt ?? p.has_receipt),
         };
       });
       setPayments(rows);
@@ -111,6 +117,7 @@ export const PaymentLogsPage = () => {
                   <TableHead>Tipo</TableHead>
                   <TableHead>Ticket/Transferencia</TableHead>
                   <TableHead className="max-w-[200px]">Nota</TableHead>
+                  <TableHead className="w-[100px] text-center">Comprobante</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -136,6 +143,20 @@ export const PaymentLogsPage = () => {
                     </TableCell>
                     <TableCell className="max-w-[200px] truncate text-muted-foreground">
                       {p.note || '—'}
+                    </TableCell>
+                    <TableCell>
+                      <PaymentReceiptActions
+                        paymentId={p.id}
+                        hasReceipt={p.hasReceipt}
+                        canManage={canManageReceipt}
+                        canView={canViewReceipt}
+                        dialogSubtitle={p.clientName}
+                        onHasReceiptChange={(hasReceipt) =>
+                          setPayments((prev) =>
+                            prev.map((row) => (row.id === p.id ? { ...row, hasReceipt } : row))
+                          )
+                        }
+                      />
                     </TableCell>
                   </TableRow>
                 ))}

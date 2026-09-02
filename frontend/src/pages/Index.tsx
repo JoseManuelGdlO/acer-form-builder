@@ -19,6 +19,7 @@ import { UserList } from '@/components/users/UserList';
 import { ChatbotSettings } from '@/components/chatbot/ChatbotSettings';
 import { SettingsPage } from '@/components/settings/SettingsPage';
 import { PaymentLogsPage } from '@/components/payments/PaymentLogsPage';
+import { CommissionsDashboard } from '@/components/commissions/CommissionsDashboard';
 import { ProductsList } from '@/components/products/ProductsList';
 import { HotelList } from '@/components/hotels/HotelList';
 import { HotelFormModal, type HotelFormSaveData } from '@/components/hotels/HotelFormModal';
@@ -42,7 +43,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { LayoutDashboard, FileText, Users, UserCog, Bot, Settings, Receipt, ChevronDown, ShoppingBag, MapPin, ChartNoAxesCombined, Calendar, Boxes, Shield, Building2 } from 'lucide-react';
+import { LayoutDashboard, FileText, Users, UserCog, Bot, Settings, Receipt, ChevronDown, ShoppingBag, MapPin, ChartNoAxesCombined, Calendar, Boxes, Shield, Building2, BadgePercent } from 'lucide-react';
 import { User } from '@/types/user';
 import { Client } from '@/types/form';
 import { Product } from '@/types/product';
@@ -70,6 +71,7 @@ const parseInitialClientNavigation = (): { initialView: View; initialClientId: s
     'calendar',
     'finance',
     'paymentLogs',
+    'commissions',
     'groups',
     'trips',
     'users',
@@ -724,11 +726,12 @@ const Index = () => {
   );
 
   const NavigationButtons = ({ current }: { current: View }) => {
-    const adminNavActive = ['finance', 'paymentLogs', 'users', 'roles', 'chatbot', 'settings'].includes(current);
+    const adminNavActive = ['finance', 'paymentLogs', 'commissions', 'users', 'roles', 'chatbot', 'settings'].includes(current);
     const showAdminMenu = canAny([
       'nav.admin.view',
       'nav.finance.view',
       'nav.payment_logs.view',
+      'nav.commissions.view',
       'nav.users.view',
       'nav.chatbot.view',
       'nav.settings.view',
@@ -854,6 +857,12 @@ const Index = () => {
                 <DropdownMenuItem onClick={() => handleNavigate('paymentLogs')} className="gap-2 cursor-pointer">
                   <Receipt className="w-4 h-4" />
                   Logs de pagos
+                </DropdownMenuItem>
+              )}
+              {can('nav.commissions.view') && (
+                <DropdownMenuItem onClick={() => handleNavigate('commissions')} className="gap-2 cursor-pointer">
+                  <BadgePercent className="w-4 h-4" />
+                  Comisiones
                 </DropdownMenuItem>
               )}
               {can('nav.users.view') && (
@@ -1327,6 +1336,31 @@ const Index = () => {
     );
   }
 
+  if (activeView === 'commissions') {
+    return (
+      <PermissionGuard
+        anyOf={['commissions.view', 'nav.commissions.view']}
+        fallback={
+          <div className="min-h-screen flex items-center justify-center">
+            <p className="text-muted-foreground">No tienes permisos para acceder a esta sección</p>
+          </div>
+        }
+      >
+        <>
+          <FloatingViewAs />
+          <div className={`min-h-screen bg-background ${viewingAs ? 'pt-10' : ''}`}>
+            <AppHeader>
+              <NavigationButtons current="commissions" />
+            </AppHeader>
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+              <CommissionsDashboard />
+            </div>
+          </div>
+        </>
+      </PermissionGuard>
+    );
+  }
+
   // Vista de grupos
   if (activeView === 'groups') {
     return (
@@ -1385,6 +1419,7 @@ const Index = () => {
                 invitedCompanyIds: data.invitedCompanyIds,
                 departureDate: data.departureDate,
                 returnDate: data.returnDate,
+                reminderConfig: data.reminderConfig,
               });
               await fetchTrip(tripId, token!);
             }}
