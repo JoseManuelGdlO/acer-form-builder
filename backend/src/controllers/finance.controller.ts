@@ -3,7 +3,7 @@ import { body, validationResult } from 'express-validator';
 import { Op } from 'sequelize';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { hasPermission } from '../authorization/policies';
-import { ClientPayment, FinanceExpense, Client, Product, Trip, User } from '../models';
+import { ClientPayment, FinanceExpense, Client, Product, Trip, User, CommissionPayout } from '../models';
 
 type Granularity = 'hourly' | 'daily' | 'weekly' | 'monthly' | 'bimonthly' | 'quarterly' | 'semiannual' | 'annual';
 
@@ -408,6 +408,37 @@ export const getFinanceOverview = async (req: AuthRequest, res: Response): Promi
       }
       tripRankMap.get(tripId)!.income += Number(payment.amount || 0);
     });
+
+    const payoutRows = await CommissionPayout.findAll({
+      where: {
+        companyId,
+        payoutDate: { [Op.between]: [toIsoDate(fromDate), toIsoDate(toDate)] },
+      },
+      include: [{ model: User, as: 'assignedUser', attributes: ['id', 'name'] }],
+      order: [['payoutDate', 'DESC']],
+    });
+
+    const payouts = payoutRows.map((payout) => ({
+      id: payout.id,
+      assignedUserId: payout.assignedUserId,
+      advisorName: (payout as CommissionPayout & { assignedUser?: User }).assignedUser?.name || 'Usuario',
+      amount: Number(Number(payout.amount).toFixed(2)),
+      payoutDate: payout.payoutDate,
+      concept: payout.concept,
+      periodType: payout.periodType ?? null,
+      periodFrom: payout.periodFrom ?? null,
+      periodTo: payout.periodTo ?? null,
+    }));
+
+    const totalPaid = payouts.reduce((acc, row) => acc + row.amount, 0);
+
+    const commissionsPayload = {
+      kpis: {
+        totalPaid: Number(totalPaid.toFixed(2)),
+      },
+      payouts,
+    };
+
     res.json({
       meta: {
         from: toIsoDate(fromDate),
@@ -458,6 +489,7 @@ export const getFinanceOverview = async (req: AuthRequest, res: Response): Promi
             expense: Number(x.expense.toFixed(2)),
           })),
       },
+      commissions: commissionsPayload,
     });
   } catch (error) {
     console.error('Get finance overview error:', error);

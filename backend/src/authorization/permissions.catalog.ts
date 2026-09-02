@@ -14,6 +14,7 @@ export const PERMISSION_KEYS = [
   'nav.admin.view',
   'nav.finance.view',
   'nav.payment_logs.view',
+  'nav.commissions.view',
   'nav.users.view',
   'nav.chatbot.view',
   'nav.settings.view',
@@ -114,6 +115,12 @@ export const PERMISSION_KEYS = [
   'finance.view',
   'payment_logs.view',
 
+  // Commissions
+  'commissions.view',
+  'commissions.create',
+  'commissions.update',
+  'commissions.delete',
+
   // Admin
   'users.view',
   'users.create',
@@ -175,6 +182,7 @@ const NAV_KEYS: PermissionKey[] = [
   'nav.admin.view',
   'nav.finance.view',
   'nav.payment_logs.view',
+  'nav.commissions.view',
   'nav.users.view',
   'nav.chatbot.view',
   'nav.settings.view',
@@ -281,6 +289,17 @@ export const PERMISSION_GROUPS: { id: string; label: string; keys: readonly Perm
     id: 'finance',
     label: 'Finanzas',
     keys: ['finance.view', 'payment_logs.view'],
+  },
+  {
+    id: 'commissions',
+    label: 'Comisiones',
+    keys: [
+      'nav.commissions.view',
+      'commissions.view',
+      'commissions.create',
+      'commissions.update',
+      'commissions.delete',
+    ],
   },
   {
     id: 'users_roles',

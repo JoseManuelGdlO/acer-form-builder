@@ -1283,6 +1283,9 @@
                     "items": {
                       "type": "string"
                     }
+                  },
+                  "reminderConfig": {
+                    "type": "string"
                   }
                 }
               }
@@ -1539,6 +1542,9 @@
                     "items": {
                       "type": "string"
                     }
+                  },
+                  "reminderConfig": {
+                    "type": "string"
                   }
                 }
               }
@@ -1650,6 +1656,9 @@
                       }
                     },
                     "required": []
+                  },
+                  "companionClientId": {
+                    "type": "array"
                   },
                   "groupIds": {
                     "type": "array",
@@ -4228,6 +4237,93 @@
         }
       }
     },
+    "/api/payments/{id}/receipt": {
+      "get": {
+        "tags": [
+          "payments"
+        ],
+        "operationId": "get__api_payments__id__receipt",
+        "summary": "GET /api/payments/{id}/receipt",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID: id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "payments"
+        ],
+        "operationId": "put__api_payments__id__receipt",
+        "summary": "PUT /api/payments/{id}/receipt",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID: id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "receiptImage": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "receiptImage"
+                ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request (validation errors)"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
     "/api/payments/{id}": {
       "delete": {
         "tags": [
@@ -5838,6 +5934,280 @@
             }
           }
         ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/commissions/users": {
+      "get": {
+        "tags": [
+          "commissions"
+        ],
+        "operationId": "get__api_commissions_users",
+        "summary": "GET /api/commissions/users",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "commissions"
+        ],
+        "operationId": "post__api_commissions_users",
+        "summary": "POST /api/commissions/users",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "userId": {
+                    "type": "number"
+                  },
+                  "rateType": {
+                    "type": "number"
+                  },
+                  "ratePct": {
+                    "type": "number"
+                  },
+                  "fixedAmount": {
+                    "type": "number"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request (validation errors)"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/commissions/users/{userId}": {
+      "put": {
+        "tags": [
+          "commissions"
+        ],
+        "operationId": "put__api_commissions_users__userId_",
+        "summary": "PUT /api/commissions/users/{userId}",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "ID: userId",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "rateType": {
+                    "type": "number"
+                  },
+                  "ratePct": {
+                    "type": "number"
+                  },
+                  "fixedAmount": {
+                    "type": "number"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request (validation errors)"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "commissions"
+        ],
+        "operationId": "delete__api_commissions_users__userId_",
+        "summary": "DELETE /api/commissions/users/{userId}",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "ID: userId",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/commissions/payout-preview": {
+      "get": {
+        "tags": [
+          "commissions"
+        ],
+        "operationId": "get__api_commissions_payout_preview",
+        "summary": "GET /api/commissions/payout-preview",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/commissions/payouts": {
+      "post": {
+        "tags": [
+          "commissions"
+        ],
+        "operationId": "post__api_commissions_payouts",
+        "summary": "POST /api/commissions/payouts",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "periodType": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "referenceDate": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request (validation errors)"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "commissions"
+        ],
+        "operationId": "get__api_commissions_payouts",
+        "summary": "GET /api/commissions/payouts",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/commissions/overview": {
+      "get": {
+        "tags": [
+          "commissions"
+        ],
+        "operationId": "get__api_commissions_overview",
+        "summary": "GET /api/commissions/overview",
+        "description": "Endpoint generado automaticamente desde rutas de Express. Requiere autenticacion.",
         "security": [
           {
             "bearerAuth": []

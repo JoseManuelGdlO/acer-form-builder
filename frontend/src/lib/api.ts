@@ -763,7 +763,12 @@ class ApiClient {
 
   async addTripParticipants(
     tripId: string,
-    data: { clientIds?: string[]; staffMemberIds?: string[]; companions?: { name: string; phone?: string }[] },
+    data: {
+      clientIds?: string[];
+      staffMemberIds?: string[];
+      companions?: { name: string; phone?: string }[];
+      companionClientId?: string;
+    },
     token?: string | null
   ) {
     return this.request<any>(`/trips/${tripId}/participants`, {

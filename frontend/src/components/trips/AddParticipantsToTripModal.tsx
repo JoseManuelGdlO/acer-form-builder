@@ -24,7 +24,12 @@ interface AddParticipantsToTripModalProps {
   availableStaffMembers: StaffMember[];
   totalSeats: number;
   currentCount: number;
-  onAdd: (data: { clientIds?: string[]; staffMemberIds?: string[]; companions?: { name: string; phone?: string }[] }) => Promise<void>;
+  onAdd: (data: {
+    clientIds?: string[];
+    staffMemberIds?: string[];
+    companions?: { name: string; phone?: string }[];
+    companionClientId?: string;
+  }) => Promise<void>;
 }
 
 export const AddParticipantsToTripModal = ({
@@ -43,6 +48,7 @@ export const AddParticipantsToTripModal = ({
   const [selectedClientIds, setSelectedClientIds] = useState<Set<string>>(new Set());
   const [selectedStaffIds, setSelectedStaffIds] = useState<Set<string>>(new Set());
   const [companions, setCompanions] = useState<Array<{ name: string; phone: string }>>([{ name: '', phone: '' }]);
+  const [companionClientId, setCompanionClientId] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
 
   const currentSet = useMemo(() => new Set(currentParticipantIds), [currentParticipantIds]);
@@ -94,6 +100,12 @@ export const AddParticipantsToTripModal = ({
   const countNewClients = selectedClientIds.size + selectedStaffIds.size;
   const countNewCompanions = validCompanions.length;
   const wouldExceed = currentCount + countNewClients + countNewCompanions > totalSeats;
+  const selectedClientList = useMemo(
+    () => availableClients.filter((c) => selectedClientIds.has(c.id)),
+    [availableClients, selectedClientIds]
+  );
+  const resolvedCompanionClientId =
+    companionClientId || (selectedClientIds.size === 1 ? Array.from(selectedClientIds)[0] : '');
 
   const handleSubmit = async () => {
     const clientIds = Array.from(selectedClientIds);
@@ -102,8 +114,22 @@ export const AddParticipantsToTripModal = ({
       toast.info('Selecciona un cliente o captura al menos un acompañante');
       return;
     }
+    if (validCompanions.length > 0) {
+      if (!resolvedCompanionClientId) {
+        toast.error('Selecciona a qué cliente pertenecen los acompañantes');
+        return;
+      }
+      if (clientIds.length > 1 && !companionClientId) {
+        toast.error('Con varios clientes, elige el titular de los acompañantes');
+        return;
+      }
+      if (!clientIds.includes(resolvedCompanionClientId) && !currentSet.has(resolvedCompanionClientId)) {
+        toast.error('El titular de los acompañantes debe estar seleccionado');
+        return;
+      }
+    }
     if (wouldExceed) {
-      toast.error(`Se ha alcanzado el límite de plazas (${totalSeats}). Quedarían ${currentCount + countNewClients}.`);
+      toast.error(`Se ha alcanzado el límite de plazas (${totalSeats}). Quedarían ${currentCount + countNewClients + countNewCompanions}.`);
       return;
     }
     setIsLoading(true);
@@ -112,12 +138,14 @@ export const AddParticipantsToTripModal = ({
         clientIds: clientIds.length ? clientIds : undefined,
         staffMemberIds: staffMemberIds.length ? staffMemberIds : undefined,
         companions: validCompanions.length ? validCompanions : undefined,
+        companionClientId: validCompanions.length ? resolvedCompanionClientId : undefined,
       });
       setSelectedClientIds(new Set());
       setSelectedStaffIds(new Set());
       setClientSearch('');
       setStaffSearch('');
       setCompanions([{ name: '', phone: '' }]);
+      setCompanionClientId('');
       onOpenChange(false);
       toast.success('Participantes agregados al viaje');
     } catch (err: any) {
@@ -129,15 +157,15 @@ export const AddParticipantsToTripModal = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
-        <DialogHeader>
+      <DialogContent className="max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
+        <DialogHeader className="shrink-0">
           <DialogTitle className="text-xl">Agregar participantes a &quot;{tripTitle}&quot;</DialogTitle>
         </DialogHeader>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm text-muted-foreground shrink-0">
           Plazas: {currentCount}/{totalSeats}. Al seleccionar un cliente principal, se incluiran automaticamente sus hijos.
         </p>
 
-        <div className="space-y-4 flex-1 min-h-0 flex flex-col">
+        <div className="flex-1 min-h-0 overflow-y-auto pr-1 space-y-4">
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
               <UserPlus className="w-4 h-4" />
@@ -198,7 +226,27 @@ export const AddParticipantsToTripModal = ({
 
           <div className="space-y-2">
             <Label>Acompañantes</Label>
-            <div className="space-y-2 max-h-[180px] overflow-y-auto pr-1">
+            {selectedClientIds.size > 1 && validCompanions.length > 0 && (
+              <div className="space-y-1">
+                <Label htmlFor="companion-titular" className="text-xs text-muted-foreground">
+                  Acompañantes de
+                </Label>
+                <select
+                  id="companion-titular"
+                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
+                  value={companionClientId}
+                  onChange={(e) => setCompanionClientId(e.target.value)}
+                >
+                  <option value="">Selecciona el cliente titular</option>
+                  {selectedClientList.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <div className="space-y-2">
               {companions.map((companion, idx) => (
                 <div key={`companion-${idx}`} className="grid grid-cols-[1fr_1fr_auto] gap-2">
                   <Input
@@ -251,7 +299,7 @@ export const AddParticipantsToTripModal = ({
           )}
         </div>
 
-        <DialogFooter className="mt-4">
+        <DialogFooter className="mt-4 pt-3 border-t border-border shrink-0">
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
             Cancelar
           </Button>

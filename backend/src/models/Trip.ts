@@ -12,6 +12,11 @@ interface TripAttributes {
   totalSeats: number;
   busTemplateId?: string | null;
   assignedUserId?: string | null;
+  reminderConfig?: {
+    daysBefore: number;
+    frequencyDays: number;
+    message: string;
+  } | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -23,6 +28,7 @@ interface TripCreationAttributes extends Optional<
   | 'notes'
   | 'busTemplateId'
   | 'assignedUserId'
+  | 'reminderConfig'
   | 'createdAt'
   | 'updatedAt'
 > {}
@@ -38,6 +44,7 @@ export class Trip extends Model<TripAttributes, TripCreationAttributes> implemen
   public totalSeats!: number;
   public busTemplateId!: string | null;
   public assignedUserId!: string | null;
+  public reminderConfig!: TripAttributes['reminderConfig'];
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
 }
@@ -99,6 +106,11 @@ Trip.init(
         key: 'id',
       },
       onDelete: 'SET NULL',
+    },
+    reminderConfig: {
+      type: DataTypes.JSON,
+      allowNull: true,
+      field: 'reminder_config',
     },
   },
   {
