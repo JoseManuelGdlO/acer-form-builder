@@ -23,6 +23,7 @@ import {
   TripHotelRoomAssignment,
 } from '../models';
 import { createRoomsForNewTripHotel, roomCapacity, syncTripHotelReservedRooms } from '../utils/tripHotelRooms';
+import { parseTripReminderConfigFromBody } from '../utils/trip-reminder';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { hasPermission } from '../authorization/policies';
 
@@ -63,25 +64,77 @@ async function logTripChange(
   });
 }
 
-async function resolveParticipantForTrip(
+async function getSeatGroupMembers(
+  tripId: string,
+  titular: TripParticipant
+): Promise<TripParticipant[]> {
+  if (titular.participantType !== 'client' || !titular.clientId) {
+    return [titular];
+  }
+  const companions = await TripParticipant.findAll({
+    where: {
+      tripId,
+      participantType: 'companion',
+      linkedClientId: titular.clientId,
+    },
+    order: [['createdAt', 'ASC']],
+  });
+  return [titular, ...companions];
+}
+
+async function resolveNextSeatSlotForTrip(
   tripId: string,
   ids: { participantId?: string; clientId?: string }
-): Promise<{ participant: TripParticipant; clientId: string | null } | null> {
-  if (ids.participantId) {
-    const participant = await TripParticipant.findOne({
-      where: { id: ids.participantId, tripId },
-    });
-    if (!participant) return null;
-    return { participant, clientId: participant.clientId ?? null };
-  }
+): Promise<{ participant: TripParticipant; error?: string } | null> {
+  let seed: TripParticipant | null = null;
+
   if (ids.clientId) {
-    const participant = await TripParticipant.findOne({
-      where: { tripId, clientId: ids.clientId },
+    seed = await TripParticipant.findOne({
+      where: { tripId, clientId: ids.clientId, participantType: 'client' },
     });
-    if (!participant) return null;
-    return { participant, clientId: participant.clientId ?? null };
+  } else if (ids.participantId) {
+    seed = await TripParticipant.findOne({ where: { id: ids.participantId, tripId } });
   }
-  return null;
+  if (!seed) return null;
+
+  if (seed.participantType === 'staff') {
+    return { participant: seed };
+  }
+
+  if (seed.participantType === 'companion') {
+    if (!seed.linkedClientId) {
+      return { participant: seed };
+    }
+    const titular = await TripParticipant.findOne({
+      where: { tripId, clientId: seed.linkedClientId, participantType: 'client' },
+    });
+    if (!titular) return { participant: seed };
+    seed = titular;
+  }
+
+  const group = await getSeatGroupMembers(tripId, seed);
+  const seatsAllowed = Number(seed.seatsAllowed ?? 1) || 1;
+  const assignments = await TripSeatAssignment.findAll({
+    where: {
+      tripId,
+      participantId: { [Op.in]: group.map((g) => g.id) },
+    },
+  });
+  if (assignments.length >= seatsAllowed) {
+    return {
+      participant: seed,
+      error: `Este cliente ya tiene asignados todos sus asientos (${seatsAllowed})`,
+    };
+  }
+  const assignedIds = new Set(assignments.map((a) => a.participantId).filter(Boolean));
+  const next = group.find((g) => !assignedIds.has(g.id));
+  if (!next) {
+    return {
+      participant: seed,
+      error: `Este cliente ya tiene asignados todos sus asientos (${seatsAllowed})`,
+    };
+  }
+  return { participant: next };
 }
 
 export const getAllTrips = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -272,6 +325,8 @@ export const getTripById = async (req: AuthRequest, res: Response): Promise<void
                 'clientId',
                 'staffMemberId',
                 'pickupLocation',
+                'linkedClientId',
+                'seatsAllowed',
               ],
             },
           ],
@@ -417,6 +472,7 @@ export const createTrip = [
   body('busTemplateId').optional().isUUID(),
   body('invitedCompanyIds').optional().isArray(),
   body('invitedCompanyIds.*').optional().isUUID(),
+  body('reminderConfig').optional({ nullable: true }),
   async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       if (!requireTripPermission(req, res, 'trips.create')) return;
@@ -427,6 +483,13 @@ export const createTrip = [
       }
       const companyId = req.user!.companyId;
       const { title, totalSeats, destination, notes, busTemplateId, invitedCompanyIds } = req.body;
+      let reminderConfig: ReturnType<typeof parseTripReminderConfigFromBody>;
+      try {
+        reminderConfig = parseTripReminderConfigFromBody(req.body.reminderConfig);
+      } catch {
+        res.status(400).json({ error: 'Configuración de recordatorio inválida' });
+        return;
+      }
       const departureDate: string = req.body.departureDate;
       const returnDate: string = req.body.returnDate;
       if (!departureDate || !returnDate) {
@@ -455,6 +518,7 @@ export const createTrip = [
         destination: destination || null,
         notes: notes || null,
         busTemplateId: busTemplateIdToSet,
+        reminderConfig: reminderConfig ?? null,
       });
       await TripCompany.create({ tripId: trip.id, companyId });
       const toInvite = Array.isArray(invitedCompanyIds)
@@ -512,6 +576,7 @@ export const updateTrip = [
   body('busTemplateId').optional({ nullable: true }).isUUID(),
   body('invitedCompanyIds').optional().isArray(),
   body('invitedCompanyIds.*').optional().isUUID(),
+  body('reminderConfig').optional({ nullable: true }),
   async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       if (!requireTripPermission(req, res, 'trips.update')) return;
@@ -533,6 +598,14 @@ export const updateTrip = [
         return;
       }
       const t = trip as any;
+
+      let reminderConfigUpdate: ReturnType<typeof parseTripReminderConfigFromBody>;
+      try {
+        reminderConfigUpdate = parseTripReminderConfigFromBody(req.body.reminderConfig);
+      } catch {
+        res.status(400).json({ error: 'Configuración de recordatorio inválida' });
+        return;
+      }
 
       const updates: Record<string, any> = {};
       const fieldsNoDates = ['title', 'totalSeats', 'destination', 'notes'] as const;
@@ -598,6 +671,9 @@ export const updateTrip = [
         } else {
           updates.busTemplateId = null;
         }
+      }
+      if (reminderConfigUpdate !== undefined) {
+        updates.reminderConfig = reminderConfigUpdate;
       }
       if (Object.keys(updates).length > 0) await trip.update(updates);
       if (req.body.invitedCompanyIds !== undefined) {
@@ -670,6 +746,7 @@ export const addParticipants = [
   body('companions').optional().isArray(),
   body('companions.*.name').optional().isString().trim().notEmpty(),
   body('companions.*.phone').optional({ nullable: true }).isString().trim(),
+  body('companionClientId').optional({ nullable: true }).isUUID(),
   body('groupIds').optional().isArray(),
   body('groupIds.*').optional().isUUID(),
   async (req: AuthRequest, res: Response): Promise<void> => {
@@ -697,7 +774,43 @@ export const addParticipants = [
       const clientIds = Array.isArray(req.body.clientIds) ? req.body.clientIds : [];
       const staffMemberIds = Array.isArray(req.body.staffMemberIds) ? req.body.staffMemberIds : [];
       const companions = Array.isArray(req.body.companions) ? req.body.companions : [];
+      const companionClientId =
+        typeof req.body.companionClientId === 'string' ? req.body.companionClientId : null;
       const groupIds = Array.isArray(req.body.groupIds) ? req.body.groupIds : [];
+      const validCompanions = companions.filter(
+        (c: any) => typeof c?.name === 'string' && c.name.trim()
+      );
+
+      let companionTitularId: string | null = null;
+      if (validCompanions.length > 0) {
+        if (companionClientId) {
+          companionTitularId = companionClientId;
+        } else if (clientIds.length === 1) {
+          companionTitularId = clientIds[0];
+        } else if (clientIds.length === 0) {
+          res.status(400).json({
+            error: 'Para agregar acompañantes selecciona exactamente un cliente titular',
+          });
+          return;
+        } else {
+          res.status(400).json({
+            error:
+              'Hay varios clientes seleccionados: indica companionClientId para asociar los acompañantes',
+          });
+          return;
+        }
+        if (!clientIds.includes(companionTitularId)) {
+          const titularOnTrip = await TripParticipant.findOne({
+            where: { tripId: id, clientId: companionTitularId, participantType: 'client' },
+          });
+          if (!titularOnTrip) {
+            res.status(400).json({
+              error: 'El cliente titular de los acompañantes debe estar seleccionado o ya en el viaje',
+            });
+            return;
+          }
+        }
+      }
       let toAdd: string[] = [...clientIds];
       for (const gid of groupIds) {
         const members = await ClientGroupMember.findAll({ where: { groupId: gid }, attributes: ['clientId'] });
@@ -755,13 +868,31 @@ export const addParticipants = [
         }
       }
       const newStaffIds = uniqueStaffIds.filter((sid) => !existingStaffSet.has(sid));
-      const companionCount = companions.filter((c: any) => typeof c?.name === 'string' && c.name.trim()).length;
+      const companionCount = validCompanions.length;
       if (currentCount + newClients.length + newStaffIds.length + companionCount > totalSeats) {
         res.status(400).json({ error: 'Se ha alcanzado el límite de plazas' });
         return;
       }
       for (const cid of newClients) {
-        await TripParticipant.create({ tripId: id, clientId: cid, participantType: 'client' });
+        const seatsAllowed =
+          companionTitularId && cid === companionTitularId ? 1 + companionCount : 1;
+        await TripParticipant.create({
+          tripId: id,
+          clientId: cid,
+          participantType: 'client',
+          seatsAllowed,
+          linkedClientId: null,
+        });
+      }
+      if (companionTitularId && !newClients.includes(companionTitularId)) {
+        const existingTitular = await TripParticipant.findOne({
+          where: { tripId: id, clientId: companionTitularId, participantType: 'client' },
+        });
+        if (existingTitular) {
+          const currentAllowed = Number(existingTitular.seatsAllowed ?? 1) || 1;
+          existingTitular.seatsAllowed = currentAllowed + companionCount;
+          await existingTitular.save();
+        }
       }
       const createdStaff: Array<{ staffMemberId: string; name: string; phone: string | null; role: string | null }> = [];
       if (newStaffIds.length > 0) {
@@ -778,6 +909,8 @@ export const addParticipants = [
             name: row.name,
             phone: row.phone ?? null,
             role: row.role ?? null,
+            seatsAllowed: 1,
+            linkedClientId: null,
           });
           createdStaff.push({
             staffMemberId: row.id,
@@ -787,8 +920,8 @@ export const addParticipants = [
           });
         }
       }
-      const createdCompanions: Array<{ name: string; phone: string | null }> = [];
-      for (const companion of companions) {
+      const createdCompanions: Array<{ name: string; phone: string | null; linkedClientId: string | null }> = [];
+      for (const companion of validCompanions) {
         const name = typeof companion?.name === 'string' ? companion.name.trim() : '';
         if (!name) continue;
         const phone = typeof companion?.phone === 'string' ? companion.phone.trim() : '';
@@ -799,8 +932,10 @@ export const addParticipants = [
           name,
           phone: phone || null,
           role: null,
+          seatsAllowed: 1,
+          linkedClientId: companionTitularId,
         });
-        createdCompanions.push({ name, phone: phone || null });
+        createdCompanions.push({ name, phone: phone || null, linkedClientId: companionTitularId });
       }
       await logTripChange(id, req.user!.id, 'participant_added', {
         newValue: JSON.stringify({ clientIds: newClients, groupIds, staff: createdStaff, companions: createdCompanions }),
@@ -1003,12 +1138,16 @@ export const setSeatAssignment = [
         res.status(400).json({ error: 'participantId or clientId is required' });
         return;
       }
-      const resolved = await resolveParticipantForTrip(id, { participantId, clientId });
-      if (!resolved) {
+      const resolvedSlot = await resolveNextSeatSlotForTrip(id, { participantId, clientId });
+      if (!resolvedSlot) {
         res.status(400).json({ error: 'Participant is not in trip' });
         return;
       }
-      const participant = resolved.participant;
+      if (resolvedSlot.error) {
+        res.status(400).json({ error: resolvedSlot.error });
+        return;
+      }
+      const participant = resolvedSlot.participant;
       const inTrip = await ensureUserCompanyInTrip(req, id);
       if (!inTrip) {
         res.status(404).json({ error: 'Trip not found' });
@@ -1053,6 +1192,7 @@ export const setSeatAssignment = [
       const payload: { tripId: string; participantId: string; clientId?: string | null; seatNumber?: number | null; seatId?: string | null } = {
         tripId: id,
         participantId: participant.id,
+        // Keep titular clientId; companions/staff leave null (display uses linkedClientId).
         clientId: participant.clientId ?? null,
       };
       if (useSeatId) {
@@ -1075,7 +1215,7 @@ export const setSeatAssignment = [
             as: 'seatAssignments',
             include: [
               { model: Client, as: 'client', required: false, include: [{ model: Company, as: 'company', attributes: ['id', 'name'] }] },
-              { model: TripParticipant, as: 'participant', attributes: ['id', 'participantType', 'name', 'phone', 'role', 'clientId', 'staffMemberId'] },
+              { model: TripParticipant, as: 'participant', attributes: ['id', 'participantType', 'name', 'phone', 'role', 'clientId', 'staffMemberId', 'linkedClientId', 'seatsAllowed'] },
             ],
           },
         ],

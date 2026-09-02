@@ -7,6 +7,35 @@ import { hasPermission, canAccessClientRecord } from '../authorization/policies'
 const PAYMENTS_ONLY_PRIMARY_MESSAGE =
   'Las cuentas de pago solo se gestionan en el cliente titular. Abre el perfil del titular para ver o registrar pagos.';
 
+const MAX_RECEIPT_DATA_URL_LENGTH = 4_000_000;
+
+const RECEIPT_IMAGE_REGEX = /^data:image\/(?:jpeg|jpg|png|webp|gif);base64,[a-zA-Z0-9+/=\s]+$/i;
+
+function canManagePaymentReceipt(req: AuthRequest): boolean {
+  return (
+    hasPermission(req.user?.permissions, 'client_payments.update') ||
+    hasPermission(req.user?.permissions, 'payment_logs.view')
+  );
+}
+
+function sanitizePaymentRow(payment: ClientPayment) {
+  const raw = payment.toJSON() as Record<string, unknown>;
+  const receiptImage = (raw.receiptImage ?? raw.receipt_image) as string | null | undefined;
+  delete raw.receiptImage;
+  delete raw.receipt_image;
+  return {
+    ...raw,
+    hasReceipt: Boolean(receiptImage && String(receiptImage).trim()),
+  };
+}
+
+function validateReceiptImage(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > MAX_RECEIPT_DATA_URL_LENGTH) return false;
+  return RECEIPT_IMAGE_REGEX.test(trimmed);
+}
+
 export const getCompanyPayments = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const companyId = req.user?.companyId;
@@ -34,7 +63,7 @@ export const getCompanyPayments = async (req: AuthRequest, res: Response): Promi
       order: [['payment_date', 'DESC'], ['created_at', 'DESC']],
     });
 
-    res.json(payments);
+    res.json(payments.map(sanitizePaymentRow));
   } catch (error) {
     console.error('Get company payments error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -77,7 +106,7 @@ export const getClientPayments = async (req: AuthRequest, res: Response): Promis
       order: [['payment_date', 'DESC'], ['created_at', 'DESC']],
     });
 
-    res.json(payments);
+    res.json(payments.map(sanitizePaymentRow));
   } catch (error) {
     console.error('Get client payments error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -156,7 +185,7 @@ export const createPayment = [
         ],
       });
 
-      res.status(201).json(created ?? payment);
+      res.status(201).json(sanitizePaymentRow(created ?? payment));
     } catch (error) {
       console.error('Create payment error:', error);
       res.status(500).json({ error: 'Internal server error' });
@@ -209,3 +238,89 @@ export const deletePayment = async (req: AuthRequest, res: Response): Promise<vo
     res.status(500).json({ error: 'Internal server error' });
   }
 };
+
+async function findPaymentForCompany(id: string, companyId: string) {
+  return ClientPayment.findOne({
+    where: { id, companyId },
+    include: [{ model: Client, as: 'client', attributes: ['id', 'parentClientId'] }],
+  });
+}
+
+function canViewPaymentReceipt(req: AuthRequest, client: Client | null): boolean {
+  if (hasPermission(req.user?.permissions, 'payment_logs.view')) return true;
+  if (!client) return false;
+  if (!hasPermission(req.user?.permissions, 'client_payments.view')) return false;
+  return canAccessClientRecord(req, client);
+}
+
+export const getPaymentReceipt = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const companyId = req.user?.companyId;
+    if (!companyId) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+
+    const payment = await findPaymentForCompany(id, companyId);
+    if (!payment) {
+      res.status(404).json({ error: 'Payment not found' });
+      return;
+    }
+
+    const client = await Client.findOne({ where: { id: payment.clientId, companyId } });
+    if (!canViewPaymentReceipt(req, client)) {
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
+
+    const receiptImage = payment.receiptImage?.trim();
+    if (!receiptImage) {
+      res.status(404).json({ error: 'No receipt uploaded for this payment' });
+      return;
+    }
+
+    res.json({ receiptImage });
+  } catch (error) {
+    console.error('Get payment receipt error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+export const updatePaymentReceipt = [
+  body('receiptImage').custom((value) => validateReceiptImage(value)).withMessage('Invalid receipt image'),
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        res.status(400).json({ errors: errors.array() });
+        return;
+      }
+
+      const { id } = req.params;
+      const companyId = req.user?.companyId;
+      if (!companyId) {
+        res.status(401).json({ error: 'Authentication required' });
+        return;
+      }
+      if (!canManagePaymentReceipt(req)) {
+        res.status(403).json({ error: 'Access denied' });
+        return;
+      }
+
+      const payment = await findPaymentForCompany(id, companyId);
+      if (!payment) {
+        res.status(404).json({ error: 'Payment not found' });
+        return;
+      }
+
+      payment.receiptImage = String(req.body.receiptImage).trim();
+      await payment.save();
+
+      res.json(sanitizePaymentRow(payment));
+    } catch (error) {
+      console.error('Update payment receipt error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  },
+];

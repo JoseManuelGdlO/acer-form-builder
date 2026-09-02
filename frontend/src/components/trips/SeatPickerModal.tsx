@@ -64,6 +64,8 @@ export function SeatPickerModal({
     busTemplate?.seatLabels?.[seatNumber - 1] ?? String(seatNumber);
 
   const seatAssignments = trip.seatAssignments ?? [];
+  const participants = trip.participants ?? [];
+
   const assignmentBySeatNumber = useMemo(() => {
     const m: Record<number, (typeof seatAssignments)[0]> = {};
     seatAssignments.forEach((a) => {
@@ -80,13 +82,75 @@ export function SeatPickerModal({
     return m;
   }, [seatAssignments]);
 
-  const participantsWithoutSeat = useMemo(
-    () =>
-      (trip.participants ?? []).filter(
-        (p) => !seatAssignments.some((s) => (s.participantId ?? s.clientId) === p.id)
-      ),
-    [trip.participants, seatAssignments]
-  );
+  const assignableTargets = useMemo(() => {
+    const assignedParticipantIds = new Set(
+      seatAssignments.map((s) => s.participantId).filter(Boolean) as string[]
+    );
+
+    const usedForClient = (clientId: string) => {
+      const groupIds = new Set<string>();
+      participants.forEach((p) => {
+        if (p.participantType === 'client' && p.clientId === clientId) groupIds.add(p.id);
+        if (p.participantType === 'companion' && p.linkedClientId === clientId) groupIds.add(p.id);
+      });
+      return seatAssignments.filter((s) => s.participantId && groupIds.has(s.participantId)).length;
+    };
+
+    const rows: Array<{
+      id: string;
+      label: string;
+      companyName?: string;
+      used: number;
+      allowed: number;
+      disabled: boolean;
+    }> = [];
+
+    participants.forEach((p) => {
+      if (p.participantType === 'client') {
+        const allowed = Number(p.seatsAllowed ?? 1) || 1;
+        const used = p.clientId ? usedForClient(p.clientId) : assignedParticipantIds.has(p.id) ? 1 : 0;
+        rows.push({
+          id: p.id,
+          label: p.client?.name ?? p.id,
+          companyName: p.client?.company?.name,
+          used,
+          allowed,
+          disabled: used >= allowed,
+        });
+        return;
+      }
+      if (p.participantType === 'staff') {
+        const used = assignedParticipantIds.has(p.id) ? 1 : 0;
+        rows.push({
+          id: p.id,
+          label: p.staffMember?.name ?? p.id,
+          used,
+          allowed: 1,
+          disabled: used >= 1,
+        });
+        return;
+      }
+      if (p.participantType === 'companion' && !p.linkedClientId) {
+        const used = assignedParticipantIds.has(p.id) ? 1 : 0;
+        rows.push({
+          id: p.id,
+          label: p.companion?.name ?? p.id,
+          used,
+          allowed: 1,
+          disabled: used >= 1,
+        });
+      }
+    });
+
+    return rows;
+  }, [participants, seatAssignments]);
+
+  const assignmentDisplayName = (a: (typeof seatAssignments)[0]) =>
+    a.displayName ||
+    (a as any).client?.name ||
+    a.participant?.name ||
+    a.clientId ||
+    '—';
 
   const handleSeatClickNumber = (seatNum: number) => {
     if (assignmentBySeatNumber[seatNum]) return;
@@ -226,21 +290,26 @@ export function SeatPickerModal({
                   )}
                   <ScrollArea className="flex-1 min-h-[120px] border rounded-lg p-2">
                     <ul className="space-y-1">
-                      {participantsWithoutSeat.length === 0 ? (
-                        <li className="text-sm text-muted-foreground">Todos tienen asiento.</li>
+                      {assignableTargets.length === 0 || assignableTargets.every((t) => t.disabled) ? (
+                        <li className="text-sm text-muted-foreground">
+                          {assignableTargets.length === 0 ? 'No hay participantes.' : 'Todos tienen asiento.'}
+                        </li>
                       ) : (
-                        participantsWithoutSeat.map((p) => (
-                          <li key={p.id}>
+                        assignableTargets.map((t) => (
+                          <li key={t.id}>
                             <Button
                               variant="ghost"
                               size="sm"
                               className="w-full justify-start gap-2"
-                              onClick={() => handleAssign(p.id)}
-                              disabled={assigning}
+                              onClick={() => handleAssign(t.id)}
+                              disabled={assigning || t.disabled}
                             >
-                              {p.client?.name ?? p.staffMember?.name ?? p.companion?.name ?? p.id}
-                              {p.client?.company && (
-                                <span className="text-muted-foreground text-xs">({p.client.company.name})</span>
+                              <span className="truncate">{t.label}</span>
+                              <span className="text-muted-foreground text-xs shrink-0">
+                                {t.used}/{t.allowed}
+                              </span>
+                              {t.companyName && (
+                                <span className="text-muted-foreground text-xs">({t.companyName})</span>
                               )}
                             </Button>
                           </li>
@@ -252,9 +321,7 @@ export function SeatPickerModal({
                     <div className="text-sm flex items-center gap-2 flex-wrap">
                       <span className="text-muted-foreground">Asignado a: </span>
                       <span>
-                        {(assignmentBySeatId[pendingSeatId] as any)?.client?.name ??
-                          assignmentBySeatId[pendingSeatId].participant?.name ??
-                          assignmentBySeatId[pendingSeatId].clientId}
+                        {assignmentDisplayName(assignmentBySeatId[pendingSeatId])}
                       </span>
                       {!reviewerSeatMode && (
                         <Button
@@ -293,7 +360,7 @@ export function SeatPickerModal({
                     return (
                       <li key={(a as any).id ?? (a.participantId ?? a.clientId) + (a.seatId ?? a.seatNumber)} className="flex items-center justify-between gap-2 text-sm">
                         <span>
-                          Asiento {label}: {(a as any).client?.name ?? a.participant?.name ?? a.clientId}
+                          Asiento {label}: {assignmentDisplayName(a)}
                           {(a as any).client?.company && (
                             <span className="text-muted-foreground text-xs ml-1">({(a as any).client.company.name})</span>
                           )}
@@ -364,12 +431,12 @@ export function SeatPickerModal({
                             isPending && 'bg-primary text-primary-foreground border-primary ring-2 ring-primary/50',
                             !isReserved && !isPending && 'bg-background border-border hover:border-primary hover:bg-primary/10 cursor-pointer'
                           )}
-                          title={isReserved ? `Asiento ${seatLabel(seatNum)}: ${(assigned as any)?.client?.name ?? 'Ocupado'}` : `Asiento ${seatLabel(seatNum)} - Clic para asignar`}
+                          title={isReserved ? `Asiento ${seatLabel(seatNum)}: ${assignmentDisplayName(assigned)}` : `Asiento ${seatLabel(seatNum)} - Clic para asignar`}
                         >
                           <span>{seatLabel(seatNum)}</span>
                           {isReserved && (
-                            <span className="truncate max-w-full px-0.5" title={(assigned as any)?.client?.name}>
-                              {(assigned as any)?.client?.name?.split(' ')[0] ?? '—'}
+                            <span className="truncate max-w-full px-0.5" title={assignmentDisplayName(assigned)}>
+                              {assignmentDisplayName(assigned).split(' ')[0] || '—'}
                             </span>
                           )}
                         </button>
@@ -393,21 +460,26 @@ export function SeatPickerModal({
               <>
                 <ScrollArea className="flex-1 min-h-[120px] border rounded-lg p-2">
                   <ul className="space-y-1">
-                    {participantsWithoutSeat.length === 0 ? (
-                      <li className="text-sm text-muted-foreground">Todos tienen asiento.</li>
+                    {assignableTargets.length === 0 || assignableTargets.every((t) => t.disabled) ? (
+                      <li className="text-sm text-muted-foreground">
+                        {assignableTargets.length === 0 ? 'No hay participantes.' : 'Todos tienen asiento.'}
+                      </li>
                     ) : (
-                      participantsWithoutSeat.map((p) => (
-                        <li key={p.id}>
+                      assignableTargets.map((t) => (
+                        <li key={t.id}>
                           <Button
                             variant="ghost"
                             size="sm"
                             className="w-full justify-start gap-2"
-                            onClick={() => handleAssign(p.id)}
-                            disabled={assigning}
+                            onClick={() => handleAssign(t.id)}
+                            disabled={assigning || t.disabled}
                           >
-                            {p.client?.name ?? p.staffMember?.name ?? p.companion?.name ?? p.id}
-                            {p.client?.company && (
-                              <span className="text-muted-foreground text-xs">({p.client.company.name})</span>
+                            <span className="truncate">{t.label}</span>
+                            <span className="text-muted-foreground text-xs shrink-0">
+                              {t.used}/{t.allowed}
+                            </span>
+                            {t.companyName && (
+                              <span className="text-muted-foreground text-xs">({t.companyName})</span>
                             )}
                           </Button>
                         </li>
@@ -432,7 +504,7 @@ export function SeatPickerModal({
                   .map((a) => (
                     <li key={(a.participantId ?? a.clientId) + (a.seatNumber ?? '')} className="flex items-center justify-between gap-2 text-sm">
                       <span>
-                        Asiento {seatLabel(a.seatNumber!)}: {(a as any).client?.name ?? a.participant?.name ?? a.clientId}
+                        Asiento {seatLabel(a.seatNumber!)}: {assignmentDisplayName(a)}
                         {(a as any).client?.company && (
                           <span className="text-muted-foreground text-xs ml-1">({(a as any).client.company.name})</span>
                         )}

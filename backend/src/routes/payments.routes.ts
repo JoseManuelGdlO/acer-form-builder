@@ -9,6 +9,8 @@ router.use(authenticate);
 router.get('/', paymentsController.getCompanyPayments);
 router.get('/clients/:clientId', paymentsController.getClientPayments);
 router.post('/clients/:clientId', paymentsController.createPayment);
+router.get('/:id/receipt', paymentsController.getPaymentReceipt);
+router.put('/:id/receipt', paymentsController.updatePaymentReceipt);
 router.delete('/:id', paymentsController.deletePayment);
 
 export default router;

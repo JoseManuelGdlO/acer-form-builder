@@ -372,8 +372,12 @@ export interface TripSeatAssignmentEntry {
     clientId?: string | null;
     staffMemberId?: string | null;
     pickupLocation?: string | null;
+    linkedClientId?: string | null;
+    seatsAllowed?: number;
   };
   client?: Client & { company?: { id: string; name: string } };
+  /** Nombre a mostrar en el mapa (cliente titular del grupo) */
+  displayName?: string;
 }
 
 export type BusBathroomPosition = 'front' | 'middle' | 'back';
@@ -455,6 +459,10 @@ export interface Trip {
     client?: TripParticipantClient | null;
     /** Lugar de recogida en este viaje (solo participantes tipo cliente) */
     pickupLocation?: string | null;
+    /** Cupo de asientos del grupo (cliente + acompañantes vinculados) */
+    seatsAllowed?: number;
+    /** Acompañante vinculado a este cliente titular */
+    linkedClientId?: string | null;
   }[];
   seatAssignments?: TripSeatAssignmentEntry[];
   /** Hoteles adjuntos al viaje (backend: `hotels`) */

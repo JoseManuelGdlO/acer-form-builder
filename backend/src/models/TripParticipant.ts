@@ -11,11 +11,16 @@ interface TripParticipantAttributes {
   phone: string | null;
   role: string | null;
   pickupLocation: string | null;
+  seatsAllowed: number;
+  linkedClientId: string | null;
   createdAt?: Date;
 }
 
 interface TripParticipantCreationAttributes
-  extends Optional<TripParticipantAttributes, 'id' | 'createdAt' | 'pickupLocation'> {}
+  extends Optional<
+    TripParticipantAttributes,
+    'id' | 'createdAt' | 'pickupLocation' | 'seatsAllowed' | 'linkedClientId'
+  > {}
 
 export class TripParticipant extends Model<TripParticipantAttributes, TripParticipantCreationAttributes> implements TripParticipantAttributes {
   public id!: string;
@@ -27,6 +32,8 @@ export class TripParticipant extends Model<TripParticipantAttributes, TripPartic
   public phone!: string | null;
   public role!: string | null;
   public pickupLocation!: string | null;
+  public seatsAllowed!: number;
+  public linkedClientId!: string | null;
   public readonly createdAt!: Date;
 }
 
@@ -77,6 +84,19 @@ TripParticipant.init(
       type: DataTypes.TEXT,
       allowNull: true,
       field: 'pickup_location',
+    },
+    seatsAllowed: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 1,
+      field: 'seats_allowed',
+    },
+    linkedClientId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      field: 'linked_client_id',
+      references: { model: 'clients', key: 'id' },
+      onDelete: 'SET NULL',
     },
   },
   {

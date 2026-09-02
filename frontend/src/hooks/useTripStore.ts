@@ -85,6 +85,8 @@ function mapParticipant(p: any) {
     participantType,
     clientId: p.client_id ?? p.clientId ?? null,
     staffMemberId: p.staff_member_id ?? p.staffMemberId ?? null,
+    seatsAllowed: Number(p.seats_allowed ?? p.seatsAllowed ?? 1) || 1,
+    linkedClientId: p.linked_client_id ?? p.linkedClientId ?? null,
     staffMember: staffMemberRaw
       ? {
           id: staffMemberRaw.id,
@@ -133,6 +135,8 @@ function mapSeatAssignment(s: any): TripSeatAssignmentEntry {
       role: participant.role ?? null,
       clientId: participant.client_id ?? participant.clientId ?? null,
       staffMemberId: participant.staff_member_id ?? participant.staffMemberId ?? null,
+      linkedClientId: participant.linked_client_id ?? participant.linkedClientId ?? null,
+      seatsAllowed: Number(participant.seats_allowed ?? participant.seatsAllowed ?? 1) || 1,
       pickupLocation:
         participant.pickup_location !== undefined
           ? participant.pickup_location
@@ -232,6 +236,21 @@ function mapTrip(raw: any): Trip {
   const busTemplate = raw.bus_template ?? raw.busTemplate;
   const tripHotelsRaw = raw.hotels ?? raw.trip_hotels ?? raw.tripHotels ?? [];
   const reminderRaw = parseJsonIfString(raw.reminder_config ?? raw.reminderConfig);
+  const clientNameById = new Map<string, string>();
+  participants.forEach((p: any) => {
+    if (p.participantType === 'client' && p.clientId && p.client?.name) {
+      clientNameById.set(p.clientId, p.client.name);
+    }
+  });
+  const seatAssignmentsWithDisplay = seatAssignments.map((a) => {
+    const linkedId = a.participant?.linkedClientId;
+    const displayName =
+      a.client?.name ||
+      (linkedId ? clientNameById.get(linkedId) : undefined) ||
+      a.participant?.name ||
+      undefined;
+    return displayName ? { ...a, displayName } : a;
+  });
   return {
     id: raw.id,
     title: raw.title,
@@ -247,7 +266,7 @@ function mapTrip(raw: any): Trip {
     reminderConfig: reminderRaw ?? null,
     sharedCompanies: raw.shared_companies ?? raw.sharedCompanies ?? [],
     participants,
-    seatAssignments,
+    seatAssignments: seatAssignmentsWithDisplay,
     tripHotels: Array.isArray(tripHotelsRaw) ? tripHotelsRaw.map(mapTripHotel) : [],
     participantCount: raw.participant_count ?? raw.participantCount ?? participants.length,
     createdAt: raw.created_at ?? raw.createdAt,
@@ -458,7 +477,12 @@ export const useTripStore = () => {
     async (
       token: string,
       tripId: string,
-      data: { clientIds?: string[]; staffMemberIds?: string[]; companions?: { name: string; phone?: string }[] }
+      data: {
+        clientIds?: string[];
+        staffMemberIds?: string[];
+        companions?: { name: string; phone?: string }[];
+        companionClientId?: string;
+      }
     ) => {
     const updated = await api.addTripParticipants(tripId, data, token);
     const trip = mapTrip(updated);

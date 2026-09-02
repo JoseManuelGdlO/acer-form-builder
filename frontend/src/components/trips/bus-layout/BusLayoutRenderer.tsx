@@ -84,7 +84,9 @@ export function BusLayoutRenderer({
         const isPending = isSeat && pendingSeatId === el.id;
         const Icon = ELEMENT_ICONS[el.type] ?? Armchair;
         const { w, h } = getElementSize(el);
-        const assignedClientName = isSeat ? ((assigned as any)?.client?.name as string | undefined) : undefined;
+        const assignedClientName = isSeat
+          ? (assigned?.displayName || (assigned as any)?.client?.name || assigned?.participant?.name) as string | undefined
+          : undefined;
         const assignedClientFirstName = clientFirstName(assignedClientName) ?? '—';
 
         return (

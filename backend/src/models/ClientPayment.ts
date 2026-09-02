@@ -15,12 +15,13 @@ interface ClientPaymentAttributes {
   paymentType: PaymentType;
   referenceNumber?: string;
   note?: string;
+  receiptImage?: string | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
 
 interface ClientPaymentCreationAttributes
-  extends Optional<ClientPaymentAttributes, 'id' | 'note' | 'tripId' | 'acquiredPackageId' | 'createdAt' | 'updatedAt'> {}
+  extends Optional<ClientPaymentAttributes, 'id' | 'note' | 'tripId' | 'acquiredPackageId' | 'receiptImage' | 'createdAt' | 'updatedAt'> {}
 
 export class ClientPayment extends Model<ClientPaymentAttributes, ClientPaymentCreationAttributes> implements ClientPaymentAttributes {
   public id!: string;
@@ -33,6 +34,7 @@ export class ClientPayment extends Model<ClientPaymentAttributes, ClientPaymentC
   public paymentType!: PaymentType;
   public referenceNumber?: string;
   public note?: string;
+  public receiptImage?: string | null;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
 }
@@ -103,6 +105,10 @@ ClientPayment.init(
     },
     note: {
       type: DataTypes.TEXT,
+      allowNull: true,
+    },
+    receiptImage: {
+      type: DataTypes.TEXT('long'),
       allowNull: true,
     },
   },

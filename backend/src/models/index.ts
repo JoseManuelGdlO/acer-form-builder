@@ -18,6 +18,9 @@ import { ClientAmountDueLog } from './ClientAmountDueLog';
 import { ClientPaymentDeletedLog } from './ClientPaymentDeletedLog';
 import { TripExpense } from './TripExpense';
 import { FinanceExpense } from './FinanceExpense';
+import { CommissionSetting } from './CommissionSetting';
+import { CommissionPayout } from './CommissionPayout';
+import { CommissionUserRate } from './CommissionUserRate';
 import { ClientMessage } from './ClientMessage';
 import { ClientGroup } from './ClientGroup';
 import { ClientGroupMember } from './ClientGroupMember';
@@ -47,6 +50,7 @@ import { Hotel } from './Hotel';
 import { TripHotel } from './TripHotel';
 import { TripHotelRoom } from './TripHotelRoom';
 import { TripHotelRoomAssignment } from './TripHotelRoomAssignment';
+import { TripReminderSend } from './TripReminderSend';
 
 // Company relationships (multi-tenant)
 Company.hasMany(User, { foreignKey: 'companyId', as: 'users' });
@@ -252,6 +256,11 @@ TripParticipant.belongsTo(Client, { foreignKey: 'clientId', as: 'client' });
 Client.hasMany(TripParticipant, { foreignKey: 'clientId', as: 'tripParticipants' });
 TripParticipant.belongsTo(StaffMember, { foreignKey: 'staffMemberId', as: 'staffMember' });
 StaffMember.hasMany(TripParticipant, { foreignKey: 'staffMemberId', as: 'tripParticipants' });
+Trip.hasMany(TripReminderSend, { foreignKey: 'tripId', as: 'reminderSends' });
+TripReminderSend.belongsTo(Trip, { foreignKey: 'tripId', as: 'trip' });
+TripReminderSend.belongsTo(TripParticipant, { foreignKey: 'participantId', as: 'participant' });
+TripParticipant.hasMany(TripReminderSend, { foreignKey: 'participantId', as: 'reminderSends' });
+TripReminderSend.belongsTo(Client, { foreignKey: 'clientId', as: 'client' });
 
 Trip.hasMany(TripGroup, { foreignKey: 'tripId', as: 'tripGroups' });
 TripGroup.belongsTo(Trip, { foreignKey: 'tripId', as: 'trip' });
@@ -292,6 +301,19 @@ Company.hasMany(FinanceExpense, { foreignKey: 'companyId', as: 'financeExpenses'
 FinanceExpense.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
 User.hasMany(FinanceExpense, { foreignKey: 'createdBy', as: 'createdFinanceExpenses' });
 FinanceExpense.belongsTo(User, { foreignKey: 'createdBy', as: 'createdByUser' });
+
+Company.hasOne(CommissionSetting, { foreignKey: 'companyId', as: 'commissionSetting' });
+CommissionSetting.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+Company.hasMany(CommissionPayout, { foreignKey: 'companyId', as: 'commissionPayouts' });
+CommissionPayout.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+User.hasMany(CommissionPayout, { foreignKey: 'assignedUserId', as: 'commissionPayouts' });
+CommissionPayout.belongsTo(User, { foreignKey: 'assignedUserId', as: 'assignedUser' });
+User.hasMany(CommissionPayout, { foreignKey: 'createdBy', as: 'createdCommissionPayouts' });
+CommissionPayout.belongsTo(User, { foreignKey: 'createdBy', as: 'createdByUser' });
+Company.hasMany(CommissionUserRate, { foreignKey: 'companyId', as: 'commissionUserRates' });
+CommissionUserRate.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+User.hasMany(CommissionUserRate, { foreignKey: 'userId', as: 'commissionUserRates' });
+CommissionUserRate.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 User.hasMany(InternalAppointment, { foreignKey: 'appointedByUserId', as: 'createdInternalAppointments' });
 InternalAppointment.belongsTo(User, { foreignKey: 'appointedByUserId', as: 'appointedByUser' });
 InternalAppointment.hasMany(InternalAppointmentHistory, { foreignKey: 'appointmentId', as: 'history' });
@@ -349,6 +371,9 @@ export {
   ClientPaymentDeletedLog,
   TripExpense,
   FinanceExpense,
+  CommissionSetting,
+  CommissionPayout,
+  CommissionUserRate,
   ClientMessage,
   FAQ,
   BotBehavior,
@@ -366,4 +391,5 @@ export {
   TripHotel,
   TripHotelRoom,
   TripHotelRoomAssignment,
+  TripReminderSend,
 };
