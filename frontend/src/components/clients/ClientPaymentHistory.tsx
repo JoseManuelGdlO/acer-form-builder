@@ -39,6 +39,7 @@ import type {
   ClientAcquiredPackage,
 } from '@/types/form';
 import { PAYMENT_TYPE_LABELS } from '@/types/form';
+import { PaymentReceiptActions } from '@/components/payments/PaymentReceiptActions';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
 import type { Product } from '@/types/product';
@@ -65,6 +66,7 @@ interface ClientPaymentHistoryProps {
     acquiredPackageId?: string | null;
   }) => void;
   onDeletePayment?: (paymentId: string) => void;
+  onPaymentReceiptUpdated?: (paymentId: string, hasReceipt: boolean) => void;
   /** Familiares del titular (opcional) para asignar paquete a un dependiente */
   familyMembers?: FamilyMemberOption[];
 }
@@ -78,11 +80,14 @@ export const ClientPaymentHistory = ({
   paymentDeletedHistory = [],
   onAddPayment,
   onDeletePayment,
+  onPaymentReceiptUpdated,
   familyMembers = [],
 }: ClientPaymentHistoryProps) => {
   const { can, token } = useAuth();
   const canViewAuditLogs = can('client_audit_logs.view');
   const canEditTotalAmountDue = can('client_financials.update');
+  const canManageReceipt = can('client_payments.update') || can('payment_logs.view');
+  const canViewReceipt = can('client_payments.view') || can('payment_logs.view');
   const [acquiredPackages, setAcquiredPackages] = useState<ClientAcquiredPackage[]>([]);
   const [productChoices, setProductChoices] = useState<Product[]>([]);
   const [packagesLoading, setPackagesLoading] = useState(true);
@@ -694,16 +699,29 @@ export const ClientPaymentHistory = ({
                         {format(new Date(item.payment.paymentDate), 'd MMM yyyy', { locale: es })}
                       </span>
                     </div>
-                    {onDeletePayment && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="w-7 h-7 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10"
-                        onClick={() => onDeletePayment(item.payment.id)}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
-                    )}
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      {(canManageReceipt || (canViewReceipt && item.payment.hasReceipt)) && (
+                        <PaymentReceiptActions
+                          paymentId={item.payment.id}
+                          hasReceipt={Boolean(item.payment.hasReceipt)}
+                          canManage={canManageReceipt}
+                          canView={canViewReceipt}
+                          onHasReceiptChange={(hasReceipt) =>
+                            onPaymentReceiptUpdated?.(item.payment.id, hasReceipt)
+                          }
+                        />
+                      )}
+                      {onDeletePayment && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="w-7 h-7 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => onDeletePayment(item.payment.id)}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 ) : item.kind === 'amount_due' ? (
                   <div

@@ -1,11 +1,22 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import type { ReactNode } from 'react';
+import { format, parseISO } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { Loader2, TrendingUp, Wallet, Landmark, Percent, Receipt, RotateCcw, Trash2, FileDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { PAYMENT_TYPE_LABELS, type PaymentType } from '@/types/form';
 import type { FinanceGranularity, FinanceOverviewResponse } from '@/types/finance';
 import { api } from '@/lib/api';
@@ -49,6 +60,37 @@ const formatter = new Intl.NumberFormat('es-MX', {
   currency: 'MXN',
   maximumFractionDigits: 2,
 });
+
+const PERIOD_TYPE_LABELS: Record<string, string> = {
+  monthly: 'Mensual',
+  bimonthly: 'Bimestral',
+  quarterly: 'Trimestral',
+  semiannual: 'Semestral',
+  annual: 'Anual',
+};
+
+const formatFinanceDate = (value: string | null | undefined): string => {
+  if (!value) return '—';
+  try {
+    return format(parseISO(value.length === 10 ? `${value}T12:00:00` : value), 'dd/MM/yyyy', { locale: es });
+  } catch {
+    return value;
+  }
+};
+
+const formatPayoutPeriod = (row: {
+  periodType: string | null;
+  periodFrom: string | null;
+  periodTo: string | null;
+  payoutDate: string;
+}): string => {
+  const typeLabel = row.periodType ? PERIOD_TYPE_LABELS[row.periodType] ?? row.periodType : null;
+  const dates =
+    row.periodFrom && row.periodTo
+      ? `${formatFinanceDate(row.periodFrom)} — ${formatFinanceDate(row.periodTo)}`
+      : formatFinanceDate(row.payoutDate);
+  return typeLabel ? `${typeLabel} (${dates})` : dates;
+};
 
 const pieColors = ['#2563eb', '#16a34a', '#f59e0b', '#9333ea', '#ef4444', '#06b6d4'];
 
@@ -183,6 +225,9 @@ export const FinanceDashboard = () => {
   const topClients = data?.rankings.topClients ?? [];
   const topTrips = data?.rankings.topTrips ?? [];
   const manualExpenses = data?.manualExpenses ?? [];
+  const commissionsData = data?.commissions;
+  const commissionPayouts = commissionsData?.payouts ?? [];
+  const commissionPayoutsTotal = commissionPayouts.reduce((acc, row) => acc + row.amount, 0);
 
   const handleCreateManualExpense = async (e: FormEvent) => {
     e.preventDefault();
@@ -587,6 +632,70 @@ export const FinanceDashboard = () => {
                     <Bar dataKey="amount" fill="var(--color-amount)" radius={6} />
                   </BarChart>
                 </ChartContainer>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Comisiones */}
+          <Card className="border-border/50">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Comisiones</CardTitle>
+              <p className="text-sm text-muted-foreground font-normal">
+                Comisiones pagadas a usuarios según los periodos liquidados en Administración → Comisiones.
+                Respeta los filtros de fecha del periodo seleccionado.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {commissionsData && (
+                <StatCard
+                  title="Total comisiones pagadas"
+                  value={formatter.format(commissionsData.kpis.totalPaid)}
+                  icon={<Wallet className="w-5 h-5" />}
+                />
+              )}
+
+              {commissionPayouts.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4">
+                  No hay comisiones pagadas en este periodo.
+                </p>
+              ) : (
+                <div className="rounded-md border overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Fecha pago</TableHead>
+                        <TableHead>Usuario</TableHead>
+                        <TableHead>Periodo</TableHead>
+                        <TableHead>Concepto</TableHead>
+                        <TableHead className="text-right">Monto pagado</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {commissionPayouts.map((row) => (
+                        <TableRow key={row.id}>
+                          <TableCell className="whitespace-nowrap">{formatFinanceDate(row.payoutDate)}</TableCell>
+                          <TableCell>{row.advisorName}</TableCell>
+                          <TableCell className="whitespace-nowrap text-muted-foreground">
+                            {formatPayoutPeriod(row)}
+                          </TableCell>
+                          <TableCell>{row.concept}</TableCell>
+                          <TableCell className="text-right font-medium">{formatter.format(row.amount)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                    <TableFooter>
+                      <TableRow>
+                        <TableCell className="font-semibold">Total</TableCell>
+                        <TableCell />
+                        <TableCell />
+                        <TableCell />
+                        <TableCell className="text-right font-semibold text-green-600">
+                          {formatter.format(commissionPayoutsTotal)}
+                        </TableCell>
+                      </TableRow>
+                    </TableFooter>
+                  </Table>
+                </div>
               )}
             </CardContent>
           </Card>

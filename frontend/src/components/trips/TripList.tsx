@@ -184,6 +184,7 @@ export const TripList = ({
           busTemplateId: data.busTemplateId ?? undefined,
           departureDate: data.departureDate,
           returnDate: data.returnDate,
+          reminderConfig: data.reminderConfig,
           sharedCompanies: data.invitedCompanyIds?.map(id => {
             const c = companiesForInvite.find(x => x.id === id);
             return c ? { id: c.id, name: c.name } : { id, name: '' };

@@ -282,6 +282,7 @@ export const ClientProfileView = ({
               paymentType: (p.payment_type || p.paymentType || 'efectivo') as ClientPayment['paymentType'],
               referenceNumber: p.reference_number || p.referenceNumber,
               note: p.note,
+              hasReceipt: Boolean(p.hasReceipt ?? p.has_receipt),
               acquiredPackageId: p.acquired_package_id ?? p.acquiredPackageId ?? undefined,
               acquiredPackage: ap
                 ? {
@@ -570,6 +571,7 @@ export const ClientProfileView = ({
         paymentType: (newPayment.payment_type || newPayment.paymentType || 'efectivo') as ClientPayment['paymentType'],
         referenceNumber: newPayment.reference_number || newPayment.referenceNumber,
         note: newPayment.note,
+        hasReceipt: Boolean(newPayment.hasReceipt ?? newPayment.has_receipt),
         acquiredPackageId: newPayment.acquired_package_id ?? newPayment.acquiredPackageId ?? undefined,
         acquiredPackage: ap
           ? {
@@ -584,6 +586,10 @@ export const ClientProfileView = ({
     } catch (error: any) {
       toast.error(error.message || 'Error al registrar el pago');
     }
+  };
+
+  const handlePaymentReceiptUpdated = (paymentId: string, hasReceipt: boolean) => {
+    setPayments((prev) => prev.map((p) => (p.id === paymentId ? { ...p, hasReceipt } : p)));
   };
 
   const handleDeletePayment = async (paymentId: string) => {
@@ -1275,6 +1281,7 @@ export const ClientProfileView = ({
                       paymentDeletedHistory={paymentDeletedHistory}
                       onAddPayment={handleAddPayment}
                       onDeletePayment={canDeletePayments ? handleDeletePayment : undefined}
+                      onPaymentReceiptUpdated={handlePaymentReceiptUpdated}
                       familyMembers={displayClient.children ?? []}
                     />
                   </AccordionContent>

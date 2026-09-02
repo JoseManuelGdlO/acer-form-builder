@@ -290,6 +290,7 @@ export interface ClientPayment {
   paymentType: PaymentType;
   referenceNumber?: string;
   note?: string;
+  hasReceipt?: boolean;
   createdAt: Date;
 }
 
@@ -424,6 +425,12 @@ export interface BusTemplate {
   updatedAt?: string;
 }
 
+export interface TripReminderConfig {
+  daysBefore: number;
+  frequencyDays: number;
+  message: string;
+}
+
 export interface Trip {
   id: string;
   title: string;
@@ -436,6 +443,7 @@ export interface Trip {
   busTemplateId?: string | null;
   busTemplate?: BusTemplate | null;
   assignedUserId?: string | null;
+  reminderConfig?: TripReminderConfig | null;
   sharedCompanies?: { id: string; name: string }[];
   participants?: {
     id: string;
