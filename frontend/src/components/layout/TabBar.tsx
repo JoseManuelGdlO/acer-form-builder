@@ -5,6 +5,7 @@ export type TabBarItem = {
   id: string;
   label: string;
   disabled?: boolean;
+  title?: string;
 };
 
 export type TabBarProps = {
@@ -31,7 +32,12 @@ export function TabBar({ tabs, value, onChange, className }: TabBarProps) {
           size="sm"
           variant={value === tab.id ? 'default' : 'ghost'}
           disabled={tab.disabled}
-          onClick={() => onChange(tab.id)}
+          title={tab.title}
+          className="shrink-0"
+          onClick={() => {
+            if (tab.disabled) return;
+            onChange(tab.id);
+          }}
         >
           {tab.label}
         </Button>

@@ -19,8 +19,12 @@ function AppContent() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="animate-pulse text-muted-foreground">Cargando...</div>
+      <div className="flex min-h-screen items-center justify-center bg-background p-4">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-1.5 w-16 rounded-full bg-secondary" aria-hidden />
+          <p className="font-display text-lg font-semibold">Cargando...</p>
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-primary" />
+        </div>
       </div>
     );
   }

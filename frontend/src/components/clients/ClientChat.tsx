@@ -62,7 +62,7 @@ export const ClientChat = ({
   };
 
   return (
-    <Card className="border-border/50 flex flex-col h-full">
+    <Card className="flex h-full min-h-0 flex-col border-border/50">
       <CardHeader className="px-6 py-4 border-b border-border/50 flex-row items-center justify-between gap-3 space-y-0">
         <CardTitle className="text-base flex items-center gap-2">
           <MessageCircle className="w-5 h-5 text-primary" />

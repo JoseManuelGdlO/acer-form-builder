@@ -39,7 +39,7 @@ import { userSeesAllClients } from '@/auth/userPermissions';
 import { RolesAdminPage } from '@/components/admin/RolesAdminPage';
 import { Button } from '@/components/ui/button';
 import { User } from '@/types/user';
-import { Client } from '@/types/form';
+import { Client, CalendarEvent } from '@/types/form';
 import { Product } from '@/types/product';
 import type { Hotel } from '@/types/hotel';
 import { api } from '@/lib/api';
@@ -264,6 +264,8 @@ const Index = () => {
     participantCountUpcoming: number;
     occupancyRate: number;
   } | null>(null);
+  /** Agenda del dashboard: `null` si no hay `appointments.view` */
+  const [dashboardAgenda, setDashboardAgenda] = useState<CalendarEvent[] | null>(null);
   const { categories, fetchCategories, createCategory, updateCategory, deleteCategory } = useCategoryStore();
 
   const areClientQueriesEqual = (
@@ -482,6 +484,31 @@ const Index = () => {
       })
       .catch(() => {
         if (!cancelled) setTripStats(null);
+      });
+    fetchTrips(token).catch((error) => {
+      console.error('Failed to fetch trips for dashboard:', error);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, activeView, can, fetchTrips]);
+
+  useEffect(() => {
+    if (!token || activeView !== 'dashboard') return;
+    if (!can('appointments.view')) {
+      setDashboardAgenda(null);
+      return;
+    }
+    let cancelled = false;
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    api
+      .getCalendarEvents(today, today, token)
+      .then((data) => {
+        if (!cancelled) setDashboardAgenda(Array.isArray(data) ? data : []);
+      })
+      .catch(() => {
+        if (!cancelled) setDashboardAgenda([]);
       });
     return () => {
       cancelled = true;
@@ -1450,6 +1477,11 @@ const Index = () => {
               }}
               clientStats={dashboardClientStats ?? filteredClientStats}
               tripStats={can('trips.view') ? tripStats : null}
+              trips={can('trips.view') ? trips : undefined}
+              canViewTrips={can('trips.view')}
+              agendaEvents={can('appointments.view') ? dashboardAgenda ?? [] : null}
+              canViewCalendar={can('nav.calendar.view')}
+              onNavigate={handleNavigate}
             />
           </div>
     );
