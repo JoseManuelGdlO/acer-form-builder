@@ -27,3 +27,10 @@ Registro pedido por el plan de cascada: controles de TravelUp que acer no tiene 
 | M10 | Ingresos en la card del listado | Omitido | `GET /trips` no incluye `totalIncome`; solo se pinta si el payload lo trae |
 | M10 | Coordinadora en KPIs del detalle | Omitido | El viaje tiene `assignedUserId` sin nombre de usuario en el payload |
 | M10 | Mapa fijo de 32 asientos del mock | Omitido | El layout sigue el JSON de la plantilla (`BusLayoutRenderer`); no se unificó con CalendarPage |
+| M11 | KPI «Por cobrar» / 9 cuentas | Omitido | `getFinanceOverview` no trae cuentas por cobrar; el 4.º KPI del bento es ticket promedio |
+| M11 | Estados Conciliado / Revisión en logs de pagos | Degradado | No existen en el backend; la columna usa `hasReceipt` (Con recibo / Sin recibo) junto a tipo y paquete reales |
+| M11 | Preview e historial de payouts de comisiones | Omitido | `GET /commissions/payout-preview` y `GET /commissions/payouts` no tienen UI; el lote se paga con `periodType` + `referenceDate` |
+| M12 | 7 checkboxes de permisos inventados (clientes, viajes, pagos, formularios, chatbot, usuarios, marca) | Omitido | El editor renderiza exclusivamente los grupos/keys de `GET /roles/catalog`; no se sustituyó el catálogo |
+| M12 | Conteo de miembros por rol en la lista ([2, 4, 8, 1] del mock) | Degradado | Se muestra la cantidad de permission keys del rol, no un conteo de usuarios asignados |
+| M13 | Horario del bot (mencionado en inventario BOT-07) | Omitido | El modelo `GET/PUT /bot` no tiene campo horario; se conservan name, personality, tone, greeting, fallback, branchesText, socialLinks, contactPhone, responseDelay e isActive |
+| M13 | Badge «Remota» en sucursales del prototipo | Degradado | El catálogo solo trae `isActive`; la fila usa Activa / Inactiva |

@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Building2, Pencil, Plus, Save, Trash2, X } from 'lucide-react';
+import { Building2, Pencil, Save, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSettingsStore } from '@/hooks/useSettingsStore';
 import { Branch } from '@/types/settings';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
+import { SectionTitle } from '@/components/layout/SectionTitle';
+import { StatusBadge } from '@/components/layout/StatusBadge';
 import {
   Dialog,
   DialogContent,
@@ -118,124 +119,61 @@ export const BranchesCatalog = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card className="border-border/50">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
-                <Building2 className="w-6 h-6 text-primary" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-foreground">{totalCount}</p>
-                <p className="text-sm text-muted-foreground">Total de sucursales</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-border/50">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-green-500/10 flex items-center justify-center">
-                <span className="text-green-500 font-bold text-lg">✓</span>
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-foreground">{activeCount}</p>
-                <p className="text-sm text-muted-foreground">Sucursales activas</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-border/50">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center">
-                <X className="w-6 h-6 text-muted-foreground" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-foreground">{totalCount - activeCount}</p>
-                <p className="text-sm text-muted-foreground">Sucursales inactivas</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card className="border-border/50">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-          <div>
-            <CardTitle className="text-xl flex items-center gap-2">
-              <Building2 className="w-5 h-5 text-primary" />
-              Catálogo de Sucursales
-            </CardTitle>
-            <CardDescription className="mt-1">
-              Gestiona las sucursales para asignarlas a usuarios y filtrar métricas.
-            </CardDescription>
+    <>
+      <Card className="p-5">
+        <SectionTitle
+          title="Sucursales"
+          action="+ Agregar"
+          onAction={() => setIsAddModalOpen(true)}
+        />
+        <p className="mb-1 text-xs text-muted-foreground">
+          {activeCount} activas · {totalCount - activeCount} inactivas
+        </p>
+        {sortedItems.length === 0 ? (
+          <div className="py-10 text-center text-muted-foreground">
+            <Building2 className="mx-auto mb-3 size-10 opacity-50" />
+            <p className="text-sm">No hay sucursales</p>
           </div>
-          <Button onClick={() => setIsAddModalOpen(true)} className="gap-2">
-            <Plus className="w-4 h-4" />
-            Agregar Sucursal
-          </Button>
-        </CardHeader>
-
-        <CardContent className="space-y-3">
-          {sortedItems.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              <Building2 className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p>No hay sucursales</p>
-              <p className="text-sm">Agrega la primera sucursal para comenzar</p>
-            </div>
-          ) : (
-            sortedItems.map((item, index) => (
-              <div
-                key={item.id}
-                className={`flex items-center gap-4 p-4 rounded-xl border transition-all ${
-                  item.isActive ? 'border-border/50 bg-card hover:border-primary/30' : 'border-border/30 bg-muted/20 opacity-60'
-                }`}
+        ) : (
+          sortedItems.map((item) => (
+            <div key={item.id} className="flex items-center gap-3 border-t py-3">
+              <Building2 className="size-4 shrink-0 text-primary" />
+              <span className={`min-w-0 flex-1 truncate text-sm ${item.isActive ? '' : 'line-through'}`}>
+                {item.name}
+              </span>
+              <StatusBadge tone={item.isActive ? 'success' : 'neutral'}>
+                {item.isActive ? 'Activa' : 'Inactiva'}
+              </StatusBadge>
+              <Switch
+                checked={item.isActive}
+                onCheckedChange={() => handleToggle(item.id, item.isActive)}
+                aria-label={item.isActive ? 'Desactivar sucursal' : 'Activar sucursal'}
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => {
+                  setEditingItem(item);
+                  setEditName(item.name);
+                }}
+                aria-label="Editar sucursal"
               >
-                <div className="flex items-center gap-3 text-muted-foreground cursor-grab">
-                  <span className="text-sm font-medium w-6">{index + 1}</span>
-                </div>
-
-                <div className="flex-1 min-w-0">
-                  <p className={`font-medium truncate ${!item.isActive && 'line-through'}`}>{item.name}</p>
-                </div>
-
-                <Badge
-                  variant={item.isActive ? 'default' : 'secondary'}
-                  className={item.isActive ? '' : 'bg-muted text-muted-foreground'}
-                >
-                  {item.isActive ? 'Activo' : 'Inactivo'}
-                </Badge>
-
-                <div className="flex items-center gap-2">
-                  <Switch checked={item.isActive} onCheckedChange={() => handleToggle(item.id, item.isActive)} />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => {
-                      setEditingItem(item);
-                      setEditName(item.name);
-                    }}
-                    className="h-9 w-9"
-                  >
-                    <Pencil className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setDeleteItemId(item.id)}
-                    className="h-9 w-9 text-destructive hover:text-destructive"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-            ))
-          )}
-        </CardContent>
+                <Pencil />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => setDeleteItemId(item.id)}
+                className="text-destructive hover:text-destructive"
+                aria-label="Desactivar sucursal"
+              >
+                <Trash2 />
+              </Button>
+            </div>
+          ))
+        )}
       </Card>
 
       <Dialog
@@ -247,12 +185,9 @@ export const BranchesCatalog = () => {
       >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Plus className="w-5 h-5 text-primary" />
-              Agregar Sucursal
-            </DialogTitle>
+            <DialogTitle className="font-display">Agregar sucursal</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="space-y-4 py-2">
             <label className="text-sm font-medium text-foreground">
               Nombre de la sucursal
               <Input
@@ -265,11 +200,11 @@ export const BranchesCatalog = () => {
             </label>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddModalOpen(false)}>
+            <Button type="button" variant="outline" onClick={() => setIsAddModalOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleAdd} className="gap-2">
-              <Save className="w-4 h-4" />
+            <Button type="button" onClick={handleAdd}>
+              <Save />
               Guardar
             </Button>
           </DialogFooter>
@@ -287,12 +222,9 @@ export const BranchesCatalog = () => {
       >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Pencil className="w-5 h-5 text-primary" />
-              Editar Sucursal
-            </DialogTitle>
+            <DialogTitle className="font-display">Editar sucursal</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="space-y-4 py-2">
             <label className="text-sm font-medium text-foreground">
               Nombre de la sucursal
               <Input
@@ -306,6 +238,7 @@ export const BranchesCatalog = () => {
           </div>
           <DialogFooter>
             <Button
+              type="button"
               variant="outline"
               onClick={() => {
                 setEditingItem(null);
@@ -314,9 +247,9 @@ export const BranchesCatalog = () => {
             >
               Cancelar
             </Button>
-            <Button onClick={handleEdit} className="gap-2">
-              <Save className="w-4 h-4" />
-              Guardar Cambios
+            <Button type="button" onClick={handleEdit}>
+              <Save />
+              Guardar cambios
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -325,7 +258,7 @@ export const BranchesCatalog = () => {
       <AlertDialog open={!!deleteItemId} onOpenChange={() => setDeleteItemId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Desactivar esta sucursal?</AlertDialogTitle>
+            <AlertDialogTitle className="font-display">¿Desactivar esta sucursal?</AlertDialogTitle>
             <AlertDialogDescription>
               La sucursal se marcará como inactiva. Los usuarios existentes conservarán su referencia, pero no se usará en nuevas asignaciones.
             </AlertDialogDescription>
@@ -338,7 +271,6 @@ export const BranchesCatalog = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </>
   );
 };
-

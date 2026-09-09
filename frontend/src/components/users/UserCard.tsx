@@ -1,8 +1,9 @@
 import { User } from '@/types/user';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { StatusBadge } from '@/components/layout/StatusBadge';
 import { UserRoleBadge } from './UserRoleBadge';
-import { Mail, Pencil, Trash2, Power } from 'lucide-react';
+import { Pencil, Power, Trash2 } from 'lucide-react';
 
 interface UserCardProps {
   user: User;
@@ -11,44 +12,69 @@ interface UserCardProps {
   onToggleStatus: (id: string) => void;
 }
 
+function initialsFromName(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  return parts
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? '')
+    .join('');
+}
+
 export function UserCard({ user, onEdit, onDelete, onToggleStatus }: UserCardProps) {
   const variant = user.role.systemKey === 'super_admin' ? 'admin' : 'default';
+  const roleLabel = user.role.name || 'Sin rol';
+  const branchLabel = user.branch?.name ? `sucursal ${user.branch.name}` : 'Sin sucursal';
+  const isActive = user.status === 'active';
 
   return (
-    <Card>
-      <CardContent className="p-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="space-y-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="font-semibold text-lg truncate">{user.name}</h3>
-              <UserRoleBadge label={user.role.name || 'Sin rol'} variant={variant} />
-              <span
-                className={`text-xs px-2 py-0.5 rounded-full ${
-                  user.status === 'active' ? 'bg-green-500/15 text-green-700' : 'bg-muted text-muted-foreground'
-                }`}
-              >
-                {user.status === 'active' ? 'Activo' : 'Inactivo'}
-              </span>
-            </div>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Mail className="h-4 w-4 shrink-0" />
-              <span className="truncate">{user.email}</span>
-            </div>
-            {user.branch && (
-              <p className="text-sm text-muted-foreground">Sucursal: {user.branch.name}</p>
-            )}
+    <Card className="overflow-hidden border-border p-0 shadow-sm">
+      <CardContent className="p-5">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="grid size-11 shrink-0 place-items-center rounded-full bg-secondary/30 font-display font-bold text-secondary-foreground">
+            {initialsFromName(user.name)}
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <Button variant="outline" size="sm" onClick={() => onEdit(user)} className="gap-1">
-              <Pencil className="h-4 w-4" />
-              Editar
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="truncate font-display font-semibold">{user.name}</h2>
+              <UserRoleBadge label={roleLabel} variant={variant} />
+            </div>
+            <p className="mt-0.5 truncate text-xs text-muted-foreground">
+              {roleLabel} · {branchLabel}
+            </p>
+            <p className="truncate text-xs text-muted-foreground">{user.email}</p>
+          </div>
+          <StatusBadge tone={isActive ? 'success' : 'neutral'}>
+            {isActive ? 'Activo' : 'Inactivo'}
+          </StatusBadge>
+          <div className="ml-auto flex shrink-0 items-center">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label="Editar usuario"
+              onClick={() => onEdit(user)}
+            >
+              <Pencil />
             </Button>
-            <Button variant="outline" size="sm" onClick={() => onToggleStatus(user.id)} className="gap-1">
-              <Power className="h-4 w-4" />
-              {user.status === 'active' ? 'Desactivar' : 'Activar'}
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label={isActive ? 'Desactivar usuario' : 'Activar usuario'}
+              onClick={() => onToggleStatus(user.id)}
+            >
+              <Power />
             </Button>
-            <Button variant="destructive" size="sm" onClick={() => onDelete(user.id)} className="gap-1">
-              <Trash2 className="h-4 w-4" />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="text-destructive hover:text-destructive"
+              aria-label="Eliminar usuario"
+              onClick={() => onDelete(user.id)}
+            >
+              <Trash2 />
             </Button>
           </div>
         </div>

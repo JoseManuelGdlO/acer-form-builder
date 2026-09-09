@@ -2,11 +2,12 @@ import { useState, useEffect } from 'react';
 import { useSettingsStore } from '@/hooks/useSettingsStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { ChecklistTemplate } from '@/types/settings';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
-import { Badge } from '@/components/ui/badge';
+import { SectionTitle } from '@/components/layout/SectionTitle';
+import { StatusBadge } from '@/components/layout/StatusBadge';
 import {
   Dialog,
   DialogContent,
@@ -24,21 +25,17 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { 
-  Plus, GripVertical, Pencil, Trash2, CheckSquare, 
-  ListChecks, Save, X 
-} from 'lucide-react';
+import { GripVertical, Pencil, Trash2, ListChecks, Save } from 'lucide-react';
 import { toast } from 'sonner';
 
 export const ChecklistCatalog = () => {
-  const { 
-    checklistTemplates, 
-    addChecklistItem, 
-    updateChecklistItem, 
+  const {
+    checklistTemplates,
+    addChecklistItem,
+    updateChecklistItem,
     deleteChecklistItem,
     toggleChecklistItem,
     fetchChecklistTemplates,
-    isLoading
   } = useSettingsStore();
   const { token } = useAuth();
 
@@ -48,7 +45,6 @@ export const ChecklistCatalog = () => {
   const [newItemLabel, setNewItemLabel] = useState('');
   const [editLabel, setEditLabel] = useState('');
 
-  // Load checklist templates on mount
   useEffect(() => {
     if (token && checklistTemplates.length === 0) {
       fetchChecklistTemplates(token).catch((error) => {
@@ -57,7 +53,7 @@ export const ChecklistCatalog = () => {
     }
   }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const activeCount = checklistTemplates.filter(item => item.isActive).length;
+  const activeCount = checklistTemplates.filter((item) => item.isActive).length;
   const totalCount = checklistTemplates.length;
 
   const handleAddItem = async () => {
@@ -70,8 +66,8 @@ export const ChecklistCatalog = () => {
       setNewItemLabel('');
       setIsAddModalOpen(false);
       toast.success('Paso agregado al checklist');
-    } catch (error: any) {
-      toast.error(error.message || 'Error al agregar el paso');
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'Error al agregar el paso');
     }
   };
 
@@ -85,8 +81,8 @@ export const ChecklistCatalog = () => {
       setEditingItem(null);
       setEditLabel('');
       toast.success('Paso actualizado');
-    } catch (error: any) {
-      toast.error(error.message || 'Error al actualizar el paso');
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'Error al actualizar el paso');
     }
   };
 
@@ -96,8 +92,8 @@ export const ChecklistCatalog = () => {
         await deleteChecklistItem(deleteItemId, token);
         setDeleteItemId(null);
         toast.success('Paso eliminado del checklist');
-      } catch (error: any) {
-        toast.error(error.message || 'Error al eliminar el paso');
+      } catch (error: unknown) {
+        toast.error(error instanceof Error ? error.message : 'Error al eliminar el paso');
       }
     }
   };
@@ -106,8 +102,8 @@ export const ChecklistCatalog = () => {
     try {
       await toggleChecklistItem(id, token);
       toast.success(currentStatus ? 'Paso desactivado' : 'Paso activado');
-    } catch (error: any) {
-      toast.error(error.message || 'Error al cambiar el estado del paso');
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'Error al cambiar el estado del paso');
     }
   };
 
@@ -116,155 +112,76 @@ export const ChecklistCatalog = () => {
     setEditLabel(item.label);
   };
 
-  // Remove duplicates by id and sort
   const sortedItems = [...checklistTemplates]
-    .filter((template, index, self) => 
-      index === self.findIndex(t => t.id === template.id)
-    )
+    .filter((template, index, self) => index === self.findIndex((t) => t.id === template.id))
     .sort((a, b) => a.order - b.order);
 
   return (
-    <div className="space-y-6">
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card className="border-border/50">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
-                <ListChecks className="w-6 h-6 text-primary" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-foreground">{totalCount}</p>
-                <p className="text-sm text-muted-foreground">Total de pasos</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-border/50">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-green-500/10 flex items-center justify-center">
-                <CheckSquare className="w-6 h-6 text-green-500" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-foreground">{activeCount}</p>
-                <p className="text-sm text-muted-foreground">Pasos activos</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-border/50">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center">
-                <X className="w-6 h-6 text-muted-foreground" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-foreground">{totalCount - activeCount}</p>
-                <p className="text-sm text-muted-foreground">Pasos inactivos</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Checklist Items Card */}
-      <Card className="border-border/50">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-          <div>
-            <CardTitle className="text-xl flex items-center gap-2">
-              <CheckSquare className="w-5 h-5 text-primary" />
-              Catálogo de Checklist
-            </CardTitle>
-            <CardDescription className="mt-1">
-              Gestiona los pasos del checklist que se aplicarán a todos los clientes
-            </CardDescription>
+    <>
+      <Card className="p-5">
+        <SectionTitle
+          title="Catálogo de checklist"
+          action="+ Agregar"
+          onAction={() => setIsAddModalOpen(true)}
+        />
+        <p className="mb-1 text-xs text-muted-foreground">
+          {activeCount} activos · {totalCount - activeCount} inactivos
+        </p>
+        {sortedItems.length === 0 ? (
+          <div className="py-10 text-center text-muted-foreground">
+            <ListChecks className="mx-auto mb-3 size-10 opacity-50" />
+            <p className="text-sm">No hay pasos en el checklist</p>
           </div>
-          <Button onClick={() => setIsAddModalOpen(true)} className="gap-2">
-            <Plus className="w-4 h-4" />
-            Agregar Paso
-          </Button>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {sortedItems.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              <ListChecks className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p>No hay pasos en el checklist</p>
-              <p className="text-sm">Agrega el primer paso para comenzar</p>
-            </div>
-          ) : (
-            sortedItems.map((item, index) => (
-              <div
-                key={item.id}
-                className={`flex items-center gap-4 p-4 rounded-xl border transition-all ${
-                  item.isActive 
-                    ? 'border-border/50 bg-card hover:border-primary/30' 
-                    : 'border-border/30 bg-muted/20 opacity-60'
-                }`}
+        ) : (
+          sortedItems.map((item, index) => (
+            <div key={item.id} className="flex items-center gap-3 border-t py-3">
+              <GripVertical className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+              <span className="grid size-5 shrink-0 place-items-center rounded bg-secondary/30 text-[10px] font-bold">
+                {index + 1}
+              </span>
+              <span className={`min-w-0 flex-1 truncate text-sm ${item.isActive ? '' : 'line-through'}`}>
+                {item.label}
+              </span>
+              <StatusBadge tone={item.isActive ? 'success' : 'neutral'}>
+                {item.isActive ? 'Activo' : 'Inactivo'}
+              </StatusBadge>
+              <Switch
+                checked={item.isActive}
+                onCheckedChange={() => handleToggle(item.id, item.isActive)}
+                aria-label={item.isActive ? 'Desactivar paso' : 'Activar paso'}
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => openEditModal(item)}
+                aria-label="Editar paso"
               >
-                <div className="flex items-center gap-3 text-muted-foreground cursor-grab">
-                  <GripVertical className="w-5 h-5" />
-                  <span className="text-sm font-medium w-6">{index + 1}</span>
-                </div>
-                
-                <div className="flex-1">
-                  <p className={`font-medium ${!item.isActive && 'line-through'}`}>
-                    {item.label}
-                  </p>
-                </div>
-
-                <Badge 
-                  variant={item.isActive ? 'default' : 'secondary'}
-                  className={item.isActive 
-                    ? 'bg-green-500/10 text-green-600 hover:bg-green-500/20' 
-                    : 'bg-muted text-muted-foreground'
-                  }
-                >
-                  {item.isActive ? 'Activo' : 'Inactivo'}
-                </Badge>
-
-                <div className="flex items-center gap-2">
-                  <Switch
-                    checked={item.isActive}
-                    onCheckedChange={() => handleToggle(item.id, item.isActive)}
-                  />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => openEditModal(item)}
-                    className="h-9 w-9"
-                  >
-                    <Pencil className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setDeleteItemId(item.id)}
-                    className="h-9 w-9 text-destructive hover:text-destructive"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-            ))
-          )}
-        </CardContent>
+                <Pencil />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => setDeleteItemId(item.id)}
+                className="text-destructive hover:text-destructive"
+                aria-label="Eliminar paso"
+              >
+                <Trash2 />
+              </Button>
+            </div>
+          ))
+        )}
       </Card>
 
-      {/* Add Modal */}
       <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Plus className="w-5 h-5 text-primary" />
-              Agregar Nuevo Paso
-            </DialogTitle>
+            <DialogTitle className="font-display">Agregar nuevo paso</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="space-y-4 py-2">
             <div>
-              <label className="text-sm font-medium text-foreground">
-                Nombre del paso
-              </label>
+              <label className="text-sm font-medium text-foreground">Nombre del paso</label>
               <Input
                 value={newItemLabel}
                 onChange={(e) => setNewItemLabel(e.target.value)}
@@ -275,31 +192,25 @@ export const ChecklistCatalog = () => {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddModalOpen(false)}>
+            <Button type="button" variant="outline" onClick={() => setIsAddModalOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleAddItem} className="gap-2">
-              <Save className="w-4 h-4" />
+            <Button type="button" onClick={handleAddItem}>
+              <Save />
               Guardar
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Edit Modal */}
       <Dialog open={!!editingItem} onOpenChange={() => setEditingItem(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Pencil className="w-5 h-5 text-primary" />
-              Editar Paso
-            </DialogTitle>
+            <DialogTitle className="font-display">Editar paso</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="space-y-4 py-2">
             <div>
-              <label className="text-sm font-medium text-foreground">
-                Nombre del paso
-              </label>
+              <label className="text-sm font-medium text-foreground">Nombre del paso</label>
               <Input
                 value={editLabel}
                 onChange={(e) => setEditLabel(e.target.value)}
@@ -310,25 +221,23 @@ export const ChecklistCatalog = () => {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditingItem(null)}>
+            <Button type="button" variant="outline" onClick={() => setEditingItem(null)}>
               Cancelar
             </Button>
-            <Button onClick={handleEditItem} className="gap-2">
-              <Save className="w-4 h-4" />
-              Guardar Cambios
+            <Button type="button" onClick={handleEditItem}>
+              <Save />
+              Guardar cambios
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation */}
       <AlertDialog open={!!deleteItemId} onOpenChange={() => setDeleteItemId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar este paso?</AlertDialogTitle>
+            <AlertDialogTitle className="font-display">¿Eliminar este paso?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción no se puede deshacer. El paso será eliminado del catálogo 
-              y no aparecerá en los checklists de nuevos clientes.
+              Esta acción no se puede deshacer. El paso será eliminado del catálogo y no aparecerá en los checklists de nuevos clientes.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -342,6 +251,6 @@ export const ChecklistCatalog = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </>
   );
 };

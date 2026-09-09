@@ -141,7 +141,7 @@ export function UserFormModal({ open, onClose, onSave, onUpdate, user, roles }: 
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{user ? 'Editar Usuario' : 'Nuevo Usuario'}</DialogTitle>
+          <DialogTitle className="font-display">{user ? 'Editar usuario' : 'Nuevo usuario'}</DialogTitle>
           <DialogDescription>
             La sucursal es opcional. Si no se asigna, el usuario quedará sin sucursal.
           </DialogDescription>

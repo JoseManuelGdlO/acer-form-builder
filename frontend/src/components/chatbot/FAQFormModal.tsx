@@ -11,7 +11,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { MessageCircle, Tag } from 'lucide-react';
 
 interface FAQFormModalProps {
   open: boolean;
@@ -50,15 +49,15 @@ export const FAQFormModal = ({
 
   const validate = () => {
     const newErrors: { question?: string; answer?: string } = {};
-    
+
     if (!question.trim()) {
       newErrors.question = 'La pregunta es requerida';
     }
-    
+
     if (!answer.trim()) {
       newErrors.answer = 'La respuesta es requerida';
     }
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -75,7 +74,7 @@ export const FAQFormModal = ({
     } else {
       onSave(question.trim(), answer.trim(), category.trim() || undefined);
     }
-    
+
     onOpenChange(false);
   };
 
@@ -83,13 +82,12 @@ export const FAQFormModal = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <MessageCircle className="w-5 h-5 text-primary" />
-            {isEditing ? 'Editar Pregunta Frecuente' : 'Nueva Pregunta Frecuente'}
+          <DialogTitle className="font-display">
+            {isEditing ? 'Editar pregunta frecuente' : 'Nueva pregunta frecuente'}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
+        <div className="space-y-4 py-2">
           <div className="space-y-2">
             <Label htmlFor="question">Pregunta *</Label>
             <Input
@@ -99,9 +97,7 @@ export const FAQFormModal = ({
               onChange={(e) => setQuestion(e.target.value)}
               className={errors.question ? 'border-destructive' : ''}
             />
-            {errors.question && (
-              <p className="text-sm text-destructive">{errors.question}</p>
-            )}
+            {errors.question ? <p className="text-sm text-destructive">{errors.question}</p> : null}
           </div>
 
           <div className="space-y-2">
@@ -114,16 +110,11 @@ export const FAQFormModal = ({
               rows={4}
               className={errors.answer ? 'border-destructive' : ''}
             />
-            {errors.answer && (
-              <p className="text-sm text-destructive">{errors.answer}</p>
-            )}
+            {errors.answer ? <p className="text-sm text-destructive">{errors.answer}</p> : null}
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="category" className="flex items-center gap-2">
-              <Tag className="w-4 h-4" />
-              Categoría (opcional)
-            </Label>
+            <Label htmlFor="category">Categoría (opcional)</Label>
             <Input
               id="category"
               placeholder="Ej: Documentos, Precios, Tiempos..."
@@ -134,11 +125,11 @@ export const FAQFormModal = ({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
-          <Button onClick={handleSubmit}>
-            {isEditing ? 'Guardar Cambios' : 'Agregar FAQ'}
+          <Button type="button" onClick={handleSubmit}>
+            {isEditing ? 'Guardar cambios' : 'Agregar pregunta'}
           </Button>
         </DialogFooter>
       </DialogContent>

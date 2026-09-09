@@ -5,10 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { SectionTitle } from '@/components/layout/SectionTitle';
 import { toast } from 'sonner';
-import { Loader2, Plus, Trash2, Save } from 'lucide-react';
+import { Loader2, Trash2, Save } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -16,6 +17,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import { cn } from '@/lib/utils';
 
 type CatalogGroup = { id: string; label: string; keys: string[] };
 
@@ -27,6 +29,46 @@ type RoleRow = {
   systemKey: string | null;
   permissions: string[];
 };
+
+function PermissionGroups({
+  catalog,
+  selectedKeys,
+  onToggle,
+  disabled = false,
+}: {
+  catalog: CatalogGroup[];
+  selectedKeys: Set<string>;
+  onToggle?: (key: string) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="space-y-6">
+      {catalog.map((group) => (
+        <div key={group.id}>
+          <p className="mb-2 font-display text-sm font-semibold">{group.label}</p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {group.keys.map((key) => (
+              <label
+                key={key}
+                className={cn(
+                  'flex items-center gap-3 rounded-md bg-muted p-3 text-sm',
+                  disabled ? 'cursor-default' : 'cursor-pointer',
+                )}
+              >
+                <Checkbox
+                  checked={selectedKeys.has(key)}
+                  onCheckedChange={() => onToggle?.(key)}
+                  disabled={disabled}
+                />
+                <span className="leading-tight break-all">{key}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export function RolesAdminPage() {
   const { token, can } = useAuth();
@@ -43,6 +85,11 @@ export function RolesAdminPage() {
   const [newKeys, setNewKeys] = useState<Set<string>>(new Set());
 
   const selected = useMemo(() => roles.find((r) => r.id === selectedId) ?? null, [roles, selectedId]);
+
+  const catalogKeySet = useMemo(
+    () => new Set(catalog.flatMap((group) => group.keys)),
+    [catalog],
+  );
 
   const loadAll = async () => {
     if (!token) return;
@@ -146,6 +193,13 @@ export function RolesAdminPage() {
     }
   };
 
+  const openCreate = () => {
+    setNewKeys(new Set());
+    setNewName('');
+    setNewDesc('');
+    setCreateOpen(true);
+  };
+
   if (!can('roles.view')) {
     return <p className="text-muted-foreground">No tienes permiso para ver esta sección.</p>;
   }
@@ -153,142 +207,131 @@ export function RolesAdminPage() {
   if (loading) {
     return (
       <div className="flex justify-center py-16">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <Loader2 className="size-8 animate-spin text-primary" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-semibold">Roles y permisos</h2>
-          <p className="text-sm text-muted-foreground">
-            Los roles de sistema no se pueden editar aquí. Crea roles personalizados para tu equipo.
-          </p>
-        </div>
-        {can('roles.create') && (
-          <Button
-            type="button"
-            onClick={() => {
-              setNewKeys(new Set());
-              setNewName('');
-              setNewDesc('');
-              setCreateOpen(true);
-            }}
-            className="gap-2"
-          >
-            <Plus className="h-4 w-4" />
-            Nuevo rol
-          </Button>
-        )}
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-[260px_1fr]">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Roles</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-1 p-2">
-            {roles.map((r) => (
+    <div className="mx-auto max-w-[1600px] p-4 sm:p-6 lg:p-8">
+      <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
+        <Card className="p-5">
+          <SectionTitle
+            title="Roles"
+            action={can('roles.create') ? '+ Nuevo' : undefined}
+            onAction={can('roles.create') ? openCreate : undefined}
+          />
+          {roles.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No hay roles en el catálogo.</p>
+          ) : (
+            roles.map((r) => (
               <button
                 key={r.id}
                 type="button"
                 onClick={() => setSelectedId(r.id)}
-                className={`w-full text-left rounded-md px-3 py-2 text-sm transition-colors ${
-                  selectedId === r.id ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-muted'
-                }`}
+                className={cn(
+                  'mb-1 w-full rounded-md p-3 text-left text-sm transition-colors',
+                  selectedId === r.id ? 'bg-primary text-primary-foreground' : 'hover:bg-muted',
+                )}
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="truncate">{r.name}</span>
-                  {r.isSystem && (
-                    <span className="text-[10px] uppercase text-muted-foreground shrink-0">Sistema</span>
-                  )}
+                  <span className="text-xs opacity-60">{r.permissions.length}</span>
                 </div>
+                {r.isSystem ? (
+                  <span className="mt-1 block text-[10px] uppercase tracking-wide opacity-60">Sistema</span>
+                ) : null}
               </button>
-            ))}
-          </CardContent>
+            ))
+          )}
         </Card>
 
-        <Card className="min-h-[420px]">
-          <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0">
-            <CardTitle className="text-base">
-              {selected ? selected.name : 'Selecciona un rol'}
-            </CardTitle>
-            {selected && !selected.isSystem && can('roles.delete') && (
-              <Button type="button" variant="outline" size="sm" className="gap-1" onClick={() => handleDelete(selected.id)}>
-                <Trash2 className="h-4 w-4" />
-                Eliminar
-              </Button>
-            )}
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {!selected ? (
-              <p className="text-sm text-muted-foreground">Elige un rol de la lista.</p>
-            ) : selected.isSystem ? (
-              <ScrollArea className="h-[360px] pr-3">
-                <p className="text-sm text-muted-foreground mb-3">
-                  Rol de sistema: los permisos están definidos por la plataforma.
-                </p>
-                <ul className="text-xs text-muted-foreground space-y-1 font-mono">
-                  {selected.permissions.sort().map((k) => (
-                    <li key={k}>{k}</li>
-                  ))}
-                </ul>
-              </ScrollArea>
-            ) : (
-              <>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label>Nombre</Label>
-                    <Input value={draftName} onChange={(e) => setDraftName(e.target.value)} disabled={!can('roles.update')} />
-                  </div>
-                  <div className="space-y-2 sm:col-span-2">
-                    <Label>Descripción (opcional)</Label>
-                    <Input
-                      value={draftDescription}
-                      onChange={(e) => setDraftDescription(e.target.value)}
-                      disabled={!can('roles.update')}
-                    />
-                  </div>
+        <Card className="min-h-[420px] p-5">
+          {!selected ? (
+            <p className="text-sm text-muted-foreground">Elige un rol de la lista.</p>
+          ) : (
+            <>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h2 className="font-display text-lg font-semibold">{selected.name}</h2>
+                  <p className="text-xs text-muted-foreground">
+                    {selected.isSystem
+                      ? 'Rol de sistema: los permisos están definidos por la plataforma.'
+                      : selected.description || 'Rol personalizado'}
+                  </p>
                 </div>
-                <ScrollArea className="h-[300px] border rounded-md p-3">
-                  <div className="space-y-6">
-                    {catalog.map((group) => (
-                      <div key={group.id}>
-                        <p className="text-sm font-medium mb-2">{group.label}</p>
-                        <div className="grid gap-2 sm:grid-cols-2">
-                          {group.keys.map((key) => (
-                            <label key={key} className="flex items-start gap-2 text-xs cursor-pointer">
-                              <Checkbox
-                                checked={draftKeys.has(key)}
-                                onCheckedChange={() => toggleKey(key, setDraftKeys)}
-                                disabled={!can('roles.update')}
-                              />
-                              <span className="font-mono leading-tight break-all">{key}</span>
-                            </label>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
+                <div className="flex shrink-0 flex-wrap gap-2">
+                  {selected.isSystem || !can('roles.delete') ? null : (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDelete(selected.id)}
+                    >
+                      <Trash2 />
+                      Eliminar
+                    </Button>
+                  )}
+                  {selected.isSystem || !can('roles.update') ? null : (
+                    <Button type="button" onClick={() => void handleSave()}>
+                      <Save />
+                      Guardar
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              {selected.isSystem ? (
+                <div className="mt-5 space-y-4">
+                  <PermissionGroups catalog={catalog} selectedKeys={new Set(selected.permissions)} disabled />
+                  {selected.permissions.some((key) => !catalogKeySet.has(key)) ? (
+                    <ul className="space-y-1 font-mono text-xs text-muted-foreground">
+                      {selected.permissions
+                        .filter((key) => !catalogKeySet.has(key))
+                        .sort()
+                        .map((key) => (
+                          <li key={key}>{key}</li>
+                        ))}
+                    </ul>
+                  ) : null}
+                </div>
+              ) : (
+                <div className="mt-5 space-y-4">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Nombre</Label>
+                      <Input
+                        value={draftName}
+                        onChange={(e) => setDraftName(e.target.value)}
+                        disabled={!can('roles.update')}
+                      />
+                    </div>
+                    <div className="space-y-2 sm:col-span-2">
+                      <Label>Descripción (opcional)</Label>
+                      <Input
+                        value={draftDescription}
+                        onChange={(e) => setDraftDescription(e.target.value)}
+                        disabled={!can('roles.update')}
+                      />
+                    </div>
                   </div>
-                </ScrollArea>
-                {can('roles.update') && (
-                  <Button type="button" className="gap-2" onClick={() => void handleSave()}>
-                    <Save className="h-4 w-4" />
-                    Guardar cambios
-                  </Button>
-                )}
-              </>
-            )}
-          </CardContent>
+                  <PermissionGroups
+                    catalog={catalog}
+                    selectedKeys={draftKeys}
+                    onToggle={(key) => toggleKey(key, setDraftKeys)}
+                    disabled={!can('roles.update')}
+                  />
+                </div>
+              )}
+            </>
+          )}
         </Card>
       </div>
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Nuevo rol</DialogTitle>
+            <DialogTitle className="font-display">Nuevo rol</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div className="space-y-2">
@@ -299,22 +342,12 @@ export function RolesAdminPage() {
               <Label>Descripción</Label>
               <Input value={newDesc} onChange={(e) => setNewDesc(e.target.value)} />
             </div>
-            <ScrollArea className="h-[280px] border rounded-md p-3">
-              <div className="space-y-4">
-                {catalog.map((group) => (
-                  <div key={group.id}>
-                    <p className="text-sm font-medium mb-2">{group.label}</p>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      {group.keys.map((key) => (
-                        <label key={key} className="flex items-start gap-2 text-xs cursor-pointer">
-                          <Checkbox checked={newKeys.has(key)} onCheckedChange={() => toggleKey(key, setNewKeys)} />
-                          <span className="font-mono leading-tight break-all">{key}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
+            <ScrollArea className="h-[280px] rounded-md border p-3">
+              <PermissionGroups
+                catalog={catalog}
+                selectedKeys={newKeys}
+                onToggle={(key) => toggleKey(key, setNewKeys)}
+              />
             </ScrollArea>
           </div>
           <DialogFooter>

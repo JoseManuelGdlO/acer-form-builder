@@ -1134,12 +1134,7 @@ const Index = () => {
           </div>
         }
       >
-        {renderShell(
-          'finance',
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-              <FinanceDashboard />
-            </div>
-        )}
+        {renderShell('finance', <FinanceDashboard />)}
       </PermissionGuard>
     );
   }
@@ -1154,13 +1149,7 @@ const Index = () => {
           </div>
         }
       >
-        {renderShell(
-          'paymentLogs',
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-              <h1 className="text-3xl font-bold text-primary mb-6">Logs de pagos</h1>
-              <PaymentLogsPage />
-            </div>
-        )}
+        {renderShell('paymentLogs', <PaymentLogsPage />)}
       </PermissionGuard>
     );
   }
@@ -1175,12 +1164,7 @@ const Index = () => {
           </div>
         }
       >
-        {renderShell(
-          'commissions',
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-              <CommissionsDashboard />
-            </div>
-        )}
+        {renderShell('commissions', <CommissionsDashboard />)}
       </PermissionGuard>
     );
   }
@@ -1333,12 +1317,7 @@ const Index = () => {
           </div>
         }
       >
-        {renderShell(
-          'roles',
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-              <RolesAdminPage />
-            </div>
-        )}
+        {renderShell('roles', <RolesAdminPage />)}
       </PermissionGuard>
     );
   }
@@ -1353,13 +1332,7 @@ const Index = () => {
           </div>
         }
       >
-        {renderShell(
-          'users',
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-              <h1 className="text-3xl font-bold text-primary mb-6">Gestión de Usuarios</h1>
-              <UserList />
-            </div>
-        )}
+        {renderShell('users', <UserList />)}
       </PermissionGuard>
     );
   }
@@ -1374,13 +1347,7 @@ const Index = () => {
           </div>
         }
       >
-        {renderShell(
-          'chatbot',
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-              <h1 className="text-3xl font-bold text-primary mb-6">Configuración del Chatbot</h1>
-              <ChatbotSettings />
-            </div>
-        )}
+        {renderShell('chatbot', <ChatbotSettings />)}
       </PermissionGuard>
     );
   }
@@ -1401,12 +1368,7 @@ const Index = () => {
           </div>
         }
       >
-        {renderShell(
-          'settings',
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-              <SettingsPage />
-            </div>
-        )}
+        {renderShell('settings', <SettingsPage />)}
       </PermissionGuard>
     );
   }
