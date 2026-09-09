@@ -19,11 +19,13 @@ type QuotesViewProps = {
   search?: string;
   onSearchChange?: (value: string) => void;
   createOpenSignal?: number;
+  openQuoteId?: string | null;
+  onOpenQuoteConsumed?: () => void;
 };
 
 const STATUS_FILTERS: Array<'all' | QuoteStatus> = ['all', 'draft', 'registered', 'expired'];
 
-export function QuotesView({ search = '', onSearchChange, createOpenSignal = 0 }: QuotesViewProps) {
+export function QuotesView({ search = '', onSearchChange, createOpenSignal = 0, openQuoteId = null, onOpenQuoteConsumed }: QuotesViewProps) {
   const { token, user, can } = useAuth();
   const { pickerClients, fetchClientsForPickers } = useClientStore();
   const store = useQuotesStore();
@@ -66,6 +68,20 @@ export function QuotesView({ search = '', onSearchChange, createOpenSignal = 0 }
     setEditing(null);
     setCreating(true);
   }, [createOpenSignal, canCreate]);
+
+  useEffect(() => {
+    if (!openQuoteId) return;
+    setTab('list');
+    setCreating(false);
+    setEditing(null);
+    setSelectedId(openQuoteId);
+    if (token) {
+      store.fetchQuote(token, openQuoteId).catch(() => {
+        toast.error('No se pudo abrir la cotización');
+      });
+    }
+    onOpenQuoteConsumed?.();
+  }, [openQuoteId, token, onOpenQuoteConsumed]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const list = useMemo(() => {
     if (filter === 'all') return store.quotes;

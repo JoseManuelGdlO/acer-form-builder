@@ -81,6 +81,9 @@ interface ClientListProps {
   onPageChange: (page: number) => void;
   /** Incrementar desde el CTA del header para abrir ClientFormModal sin reescribir el CRUD. */
   createOpenSignal?: number;
+  /** Abrir perfil (búsqueda global / calendario). */
+  focusClientId?: string | null;
+  onFocusClientConsumed?: () => void;
 }
 
 type ChecklistFilterType = 'all' | string; // 'all' or templateId
@@ -105,6 +108,8 @@ export const ClientList = ({
   onFiltersChange,
   onPageChange,
   createOpenSignal,
+  focusClientId = null,
+  onFocusClientConsumed,
 }: ClientListProps) => {
   const [searchQuery, setSearchQuery] = useState(initialQuery?.q || '');
   const [clientStatusFilter, setClientStatusFilter] = useState<ClientStatusFilterType>(
@@ -209,6 +214,37 @@ export const ClientList = ({
     setDefaultParentClientId(null);
     setIsFormOpen(true);
   }, [createOpenSignal]);
+
+  useEffect(() => {
+    if (!focusClientId) return;
+    let cancelled = false;
+    const openFocused = async () => {
+      const local = clients.find((client) => client.id === focusClientId);
+      if (local) {
+        if (!cancelled) setViewingClient(local);
+        onFocusClientConsumed?.();
+        return;
+      }
+      if (!token) {
+        onFocusClientConsumed?.();
+        return;
+      }
+      try {
+        const fetched = await api.getClient(focusClientId, token);
+        if (cancelled) return;
+        setViewingClient(mapApiClientToViewClient(fetched));
+      } catch (error) {
+        console.error('Failed to open client from search:', error);
+        toast.error('No se pudo abrir el cliente');
+      } finally {
+        if (!cancelled) onFocusClientConsumed?.();
+      }
+    };
+    void openFocused();
+    return () => {
+      cancelled = true;
+    };
+  }, [focusClientId, clients, token, onFocusClientConsumed]);
 
   useEffect(() => {
     if (hasAutoOpenedInitialClient.current) return;

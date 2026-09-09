@@ -90,4 +90,4 @@ export const SHELL_NAV_GROUPS: ShellNavGroup[] = [
   },
 ];
 
-export const HEADER_SEARCHABLE_VIEWS: ShellView[] = ['clients', 'trips', 'products', 'quotes'];
+export const HEADER_SEARCHABLE_VIEWS: ShellView[] = ['dashboard', 'clients', 'trips', 'products', 'quotes'];

@@ -3,7 +3,7 @@ import { Plus } from 'lucide-react';
 import type { ShellView } from '@/auth/viewPermissions';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { AppHeader, type AppHeaderCta } from './AppHeader';
+import { AppHeader, type AppHeaderCta, type AppHeaderSearchPanel } from './AppHeader';
 import { PageChrome } from './PageChrome';
 import { SHELL_VIEW_META } from './shellNav';
 
@@ -14,6 +14,7 @@ export type AppShellProps = {
   clientCount?: number | null;
   searchValue?: string;
   onSearchChange?: (value: string) => void;
+  searchPanel?: AppHeaderSearchPanel | null;
   cta?: AppHeaderCta | null;
   children: ReactNode;
 };
@@ -29,6 +30,7 @@ export function AppShell({
   clientCount,
   searchValue,
   onSearchChange,
+  searchPanel = null,
   cta,
   children,
 }: AppShellProps) {
@@ -42,6 +44,7 @@ export function AppShell({
         clientCount={clientCount}
         searchValue={searchValue}
         onSearchChange={onSearchChange}
+        searchPanel={searchPanel}
         cta={cta}
         offsetForViewAs={viewingAs}
       />

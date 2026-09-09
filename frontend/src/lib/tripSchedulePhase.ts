@@ -24,10 +24,10 @@ export function tripOccupancy(trip: Trip): { count: number; total: number; perce
 
 /** Ingresos solo si el listado los incluye en el payload. */
 export function tripListIncome(trip: Trip): number | null {
-  const extra = trip as Trip & { totalIncome?: unknown; income?: unknown };
-  if (typeof extra.totalIncome === 'number' && Number.isFinite(extra.totalIncome)) {
-    return extra.totalIncome;
+  if (typeof trip.totalIncome === 'number' && Number.isFinite(trip.totalIncome)) {
+    return trip.totalIncome;
   }
+  const extra = trip as Trip & { income?: unknown };
   if (typeof extra.income === 'number' && Number.isFinite(extra.income)) {
     return extra.income;
   }

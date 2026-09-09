@@ -30,6 +30,8 @@ interface DashboardProps {
   /** Lista prefetch (GET /trips); no pasar si no hay `trips.view` */
   trips?: Trip[];
   canViewTrips?: boolean;
+  /** KPI aproximado; omitir si no hay groups.view + trips.view */
+  groupsInOperation?: { inOperation: number; catalogTotal: number } | null;
   /** Eventos de hoy; `null` si no hay `appointments.view` (no mostrar ni pedir agenda) */
   agendaEvents?: CalendarEvent[] | null;
   canViewCalendar?: boolean;
@@ -65,17 +67,33 @@ function KpiCard({
   value,
   hint,
   emphasized = false,
+  onClick,
 }: {
   label: string;
   value: number | string;
   hint: string;
   emphasized?: boolean;
+  onClick?: () => void;
 }) {
-  return (
-    <Card className={cn('p-5', emphasized && 'bg-foreground text-background')}>
+  const inner = (
+    <>
       <p className="text-[10px] font-semibold uppercase tracking-widest opacity-55">{label}</p>
       <p className="mt-2 font-display text-3xl font-semibold">{value}</p>
       <p className={cn('mt-2 text-xs', emphasized ? 'text-secondary' : 'text-success')}>{hint}</p>
+    </>
+  );
+  if (onClick) {
+    return (
+      <Card className={cn('p-0', emphasized && 'bg-foreground text-background')}>
+        <button type="button" onClick={onClick} className="w-full p-5 text-left">
+          {inner}
+        </button>
+      </Card>
+    );
+  }
+  return (
+    <Card className={cn('p-5', emphasized && 'bg-foreground text-background')}>
+      {inner}
     </Card>
   );
 }
@@ -89,6 +107,7 @@ export const Dashboard = ({
   tripStats = null,
   trips,
   canViewTrips = false,
+  groupsInOperation = null,
   agendaEvents = null,
   canViewCalendar = false,
   onNavigate,
@@ -191,6 +210,16 @@ export const Dashboard = ({
             : 'Cargando ocupación',
           emphasized: true,
         },
+        ...(groupsInOperation
+          ? [
+              {
+                label: 'Grupos en operación',
+                value: groupsInOperation.inOperation,
+                hint: `${groupsInOperation.inOperation} con viaje vigente / ${groupsInOperation.catalogTotal} grupos en catálogo`,
+                onClick: () => onNavigate?.('groups'),
+              },
+            ]
+          : []),
       ]
     : [
         {
@@ -308,7 +337,8 @@ export const Dashboard = ({
             label={kpi.label}
             value={kpi.value}
             hint={kpi.hint}
-            emphasized={kpi.emphasized}
+            emphasized={'emphasized' in kpi ? kpi.emphasized : undefined}
+            onClick={'onClick' in kpi ? kpi.onClick : undefined}
           />
         ))}
       </section>

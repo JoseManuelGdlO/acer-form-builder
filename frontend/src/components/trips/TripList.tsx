@@ -88,6 +88,8 @@ interface TripListProps {
   onSearchChange?: (value: string) => void;
   /** Incrementar desde el CTA del header para abrir TripFormModal. */
   createOpenSignal?: number;
+  openTripId?: string | null;
+  onOpenTripConsumed?: () => void;
   users?: Array<{ id: string; name: string }>;
 }
 
@@ -138,6 +140,8 @@ export const TripList = ({
   searchQuery: searchQueryProp,
   onSearchChange,
   createOpenSignal,
+  openTripId = null,
+  onOpenTripConsumed,
   users = [],
 }: TripListProps) => {
   const [internalSearchQuery, setInternalSearchQuery] = useState('');
@@ -159,6 +163,13 @@ export const TripList = ({
     setEditingTrip(null);
     setIsFormOpen(true);
   }, [createOpenSignal]);
+
+  useEffect(() => {
+    if (!openTripId) return;
+    onFetchTrip?.(openTripId);
+    setViewingTripId(openTripId);
+    onOpenTripConsumed?.();
+  }, [openTripId, onFetchTrip, onOpenTripConsumed]);
 
   const filteredTrips = useMemo(() => {
     if (!searchQuery.trim()) return trips;

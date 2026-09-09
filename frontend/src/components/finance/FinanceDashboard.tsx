@@ -29,6 +29,8 @@ import {
 import { CartesianGrid, Cell, Line, LineChart, Pie, PieChart, XAxis, YAxis } from 'recharts';
 import { useAuth } from '@/contexts/AuthContext';
 import { exportFinanceOverviewPdf, formatDateRangeLabel, type FinancePdfFilterLabels } from '@/lib/financePdfExport';
+import { accountsReceivableFromClients } from '@/lib/accountsReceivable';
+import { useClientStore } from '@/hooks/useClientStore';
 import { SectionTitle } from '@/components/layout/SectionTitle';
 import { cn } from '@/lib/utils';
 
@@ -127,8 +129,12 @@ function KpiCard({
   );
 }
 
-export const FinanceDashboard = () => {
-  const { token } = useAuth();
+type FinanceDashboardProps = {
+  pickerAssignedUserId?: string;
+};
+
+export const FinanceDashboard = ({ pickerAssignedUserId }: FinanceDashboardProps) => {
+  const { token, canAny } = useAuth();
   const expenseConceptRef = useRef<HTMLInputElement>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [data, setData] = useState<FinanceOverviewResponse | null>(null);
@@ -147,6 +153,27 @@ export const FinanceDashboard = () => {
   const [expenseDate, setExpenseDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [expenseNote, setExpenseNote] = useState('');
   const [isSavingExpense, setIsSavingExpense] = useState(false);
+  const { pickerClients, fetchClientsForPickers } = useClientStore();
+  const [receivableReady, setReceivableReady] = useState(false);
+  const canViewClients = canAny(['clients.view_all', 'clients.view_assigned']);
+
+  useEffect(() => {
+    if (!token || !canViewClients) {
+      setReceivableReady(false);
+      return;
+    }
+    let cancelled = false;
+    fetchClientsForPickers(token, pickerAssignedUserId ? { assignedUserId: pickerAssignedUserId } : undefined)
+      .then(() => {
+        if (!cancelled) setReceivableReady(true);
+      })
+      .catch(() => {
+        if (!cancelled) setReceivableReady(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, canViewClients, pickerAssignedUserId, fetchClientsForPickers]);
 
   useEffect(() => {
     if (!token) return;
@@ -240,6 +267,7 @@ export const FinanceDashboard = () => {
   };
 
   const kpis = data?.kpis;
+  const receivable = receivableReady ? accountsReceivableFromClients(pickerClients) : null;
   const timeSeriesData = data?.timeseries ?? [];
   const paymentTypesData = data?.breakdowns.paymentTypes ?? [];
   const productsBreakdown = data?.breakdowns.products ?? [];
@@ -329,7 +357,7 @@ export const FinanceDashboard = () => {
         ? branches.find((b) => b.id === data.meta.branchId)?.name ?? data.meta.branchId
         : 'Todas',
     };
-    exportFinanceOverviewPdf(data, labels, formatter);
+    exportFinanceOverviewPdf(data, labels, formatter, receivable);
     toast.success('PDF descargado');
   };
 
@@ -454,11 +482,25 @@ export const FinanceDashboard = () => {
           <Loader2 className="size-8 animate-spin text-primary" />
         </div>
       ) : !data || !kpis ? (
-        <Card className="p-5">
-          <p className="py-10 text-center text-sm text-muted-foreground">
-            No hay datos financieros para este rango.
-          </p>
-        </Card>
+        <>
+          {receivable ? (
+            <Card className="p-5">
+              <p className="text-xs text-muted-foreground">Por cobrar</p>
+              <p className="mt-2 font-display text-2xl font-semibold">{formatter.format(receivable.amount)}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {receivable.accounts} {receivable.accounts === 1 ? 'cuenta con saldo' : 'cuentas con saldo'}
+              </p>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Saldo de expedientes, no del periodo seleccionado
+              </p>
+            </Card>
+          ) : null}
+          <Card className="p-5">
+            <p className="py-10 text-center text-sm text-muted-foreground">
+              No hay datos financieros para este rango.
+            </p>
+          </Card>
+        </>
       ) : (
         <>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -487,6 +529,19 @@ export const FinanceDashboard = () => {
               hintClassName="text-muted-foreground"
             />
           </div>
+
+          {receivable ? (
+            <Card className="p-5">
+              <p className="text-xs text-muted-foreground">Por cobrar</p>
+              <p className="mt-2 font-display text-2xl font-semibold">{formatter.format(receivable.amount)}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {receivable.accounts} {receivable.accounts === 1 ? 'cuenta con saldo' : 'cuentas con saldo'}
+              </p>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Saldo de expedientes, no del periodo seleccionado
+              </p>
+            </Card>
+          ) : null}
 
           <div className="grid gap-4 xl:grid-cols-[1.4fr_1fr]">
             <Card className="p-5">

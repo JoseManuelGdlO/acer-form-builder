@@ -21,10 +21,21 @@ import {
   type ShellNavGroup,
   type ShellNavItem,
 } from './shellNav';
+import { HeaderSearchResults } from './HeaderSearchResults';
+import type { HeaderSearchSection } from '@/hooks/useHeaderGlobalSearch';
 
 export type AppHeaderCta = {
   label: string;
   onClick: () => void;
+};
+
+export type AppHeaderSearchPanel = {
+  visible: boolean;
+  loading: boolean;
+  empty: boolean;
+  sections: HeaderSearchSection[];
+  onSelectHit: (section: HeaderSearchSection, id: string) => void;
+  onSeeAll: (view: ShellView) => void;
 };
 
 export type AppHeaderProps = {
@@ -33,6 +44,7 @@ export type AppHeaderProps = {
   clientCount?: number | null;
   searchValue?: string;
   onSearchChange?: (value: string) => void;
+  searchPanel?: AppHeaderSearchPanel | null;
   cta?: AppHeaderCta | null;
   offsetForViewAs?: boolean;
 };
@@ -171,6 +183,7 @@ export function AppHeader({
   clientCount,
   searchValue = '',
   onSearchChange,
+  searchPanel = null,
   cta,
   offsetForViewAs = false,
 }: AppHeaderProps) {
@@ -197,7 +210,9 @@ export function AppHeader({
   };
 
   const searchPlaceholder = searchEnabled
-    ? currentView === 'clients'
+    ? currentView === 'dashboard'
+      ? 'Buscar clientes, viajes, cotizaciones…'
+      : currentView === 'clients'
       ? 'Buscar clientes…'
       : currentView === 'trips'
         ? 'Buscar viajes…'
@@ -223,22 +238,36 @@ export function AppHeader({
             ) : null}
           </div>
 
-          <label
-            className={cn(
-              'mx-auto hidden w-full max-w-xl items-center gap-2 rounded-md border border-sidebar-border bg-sidebar-accent px-3 py-2 lg:flex',
-              !searchEnabled && 'opacity-60',
-            )}
-          >
-            <Search className="size-4 opacity-60" aria-hidden />
-            <input
-              value={searchValue}
-              onChange={(event) => onSearchChange?.(event.target.value)}
-              disabled={!searchEnabled}
-              className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-sidebar-foreground/50"
-              placeholder={searchPlaceholder}
-              aria-label="Búsqueda de la vista activa"
-            />
-          </label>
+          <div className="relative mx-auto hidden w-full max-w-xl lg:block">
+            <label
+              className={cn(
+                'flex w-full items-center gap-2 rounded-md border border-sidebar-border bg-sidebar-accent px-3 py-2',
+                !searchEnabled && 'opacity-60',
+              )}
+            >
+              <Search className="size-4 opacity-60" aria-hidden />
+              <input
+                value={searchValue}
+                onChange={(event) => onSearchChange?.(event.target.value)}
+                disabled={!searchEnabled}
+                className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-sidebar-foreground/50"
+                placeholder={searchPlaceholder}
+                aria-label="Búsqueda"
+                aria-expanded={Boolean(searchEnabled && searchPanel?.visible)}
+              />
+            </label>
+            {searchEnabled && searchPanel?.visible ? (
+              <div className="absolute left-0 right-0 top-full z-50 mt-1 rounded-md border border-border bg-card text-card-foreground shadow-md">
+                <HeaderSearchResults
+                  loading={searchPanel.loading}
+                  empty={searchPanel.empty}
+                  sections={searchPanel.sections}
+                  onSelectHit={searchPanel.onSelectHit}
+                  onSeeAll={searchPanel.onSeeAll}
+                />
+              </div>
+            ) : null}
+          </div>
 
           <div className="ml-auto flex items-center gap-2">
             {cta ? (
@@ -317,17 +346,30 @@ export function AppHeader({
 
       {mobileNav ? (
         <div className="max-h-[calc(100vh-5rem)] overflow-y-auto border-b border-border bg-card p-4 shadow-xl lg:hidden">
-          <label className="mb-4 flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2">
-            <Search className="size-4 text-muted-foreground" aria-hidden />
-            <input
-              value={searchValue}
-              onChange={(event) => onSearchChange?.(event.target.value)}
-              disabled={!searchEnabled}
-              className="min-w-0 flex-1 bg-transparent text-sm outline-none"
-              placeholder={searchPlaceholder}
-              aria-label="Búsqueda de la vista activa"
-            />
-          </label>
+          <div className="relative mb-4">
+            <label className="flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2">
+              <Search className="size-4 text-muted-foreground" aria-hidden />
+              <input
+                value={searchValue}
+                onChange={(event) => onSearchChange?.(event.target.value)}
+                disabled={!searchEnabled}
+                className="min-w-0 flex-1 bg-transparent text-sm outline-none"
+                placeholder={searchPlaceholder}
+                aria-label="Búsqueda"
+              />
+            </label>
+            {searchEnabled && searchPanel?.visible ? (
+              <div className="absolute left-0 right-0 top-full z-50 mt-1 rounded-md border border-border bg-card text-card-foreground shadow-md">
+                <HeaderSearchResults
+                  loading={searchPanel.loading}
+                  empty={searchPanel.empty}
+                  sections={searchPanel.sections}
+                  onSelectHit={searchPanel.onSelectHit}
+                  onSeeAll={searchPanel.onSeeAll}
+                />
+              </div>
+            ) : null}
+          </div>
           <nav className="grid gap-5 sm:grid-cols-3" aria-label="Navegación móvil">
             {visibleGroups.map((group) => (
               <div key={group.label}>

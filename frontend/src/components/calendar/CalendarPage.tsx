@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -7,6 +7,9 @@ import { Label } from '@/components/ui/label';
 import { api } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { CalendarEvent } from '@/types/form';
+import { CreateCalendarEventDialog } from './CreateCalendarEventDialog';
+import { Plus } from 'lucide-react';
+import { toast } from 'sonner';
 import {
   addMonths,
   eachDayOfInterval,
@@ -54,25 +57,47 @@ function dateKey(day: Date): string {
   return format(day, 'yyyy-MM-dd');
 }
 
-export const CalendarPage = () => {
-  const { token } = useAuth();
+type CalendarPageProps = {
+  assignedUserId?: string;
+  onOpenClient?: (clientId: string) => void;
+};
+
+export const CalendarPage = ({ assignedUserId, onOpenClient }: CalendarPageProps) => {
+  const { token, can } = useAuth();
   const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
   const [visibleMonth, setVisibleMonth] = useState<Date>(() => startOfMonth(new Date()));
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showBranch, setShowBranch] = useState<Record<string, boolean>>({});
+  const [createOpen, setCreateOpen] = useState(false);
+  const canCreateAppointment = can('appointments.create');
+
+  const loadMonthEvents = useCallback(async (): Promise<CalendarEvent[]> => {
+    if (!token) return [];
+    const from = format(startOfMonth(visibleMonth), 'yyyy-MM-dd');
+    const to = format(endOfMonth(visibleMonth), 'yyyy-MM-dd');
+    const data = await api.getCalendarEvents(from, to, token);
+    return Array.isArray(data) ? data : [];
+  }, [token, visibleMonth]);
 
   useEffect(() => {
     if (!token) return;
-    const from = format(startOfMonth(visibleMonth), 'yyyy-MM-dd');
-    const to = format(endOfMonth(visibleMonth), 'yyyy-MM-dd');
+    let cancelled = false;
     setIsLoading(true);
-    api
-      .getCalendarEvents(from, to, token)
-      .then((data) => setEvents(Array.isArray(data) ? data : []))
-      .catch(() => setEvents([]))
-      .finally(() => setIsLoading(false));
-  }, [token, visibleMonth]);
+    loadMonthEvents()
+      .then((data) => {
+        if (!cancelled) setEvents(data);
+      })
+      .catch(() => {
+        if (!cancelled) setEvents([]);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, loadMonthEvents]);
 
   const branchFilterKeys = useMemo(() => {
     const set = new Set<string>();
@@ -250,9 +275,17 @@ export const CalendarPage = () => {
 
         <Card className="p-5">
           <SectionTitle title="Agenda del día">
-            <span className="text-xs font-normal text-muted-foreground">
-              {format(selectedDate, "d 'de' MMMM yyyy", { locale: es })}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-normal text-muted-foreground">
+                {format(selectedDate, "d 'de' MMMM yyyy", { locale: es })}
+              </span>
+              {canCreateAppointment && token ? (
+                <Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
+                  <Plus className="size-4" />
+                  Evento
+                </Button>
+              ) : null}
+            </div>
           </SectionTitle>
 
           {isLoading ? (
@@ -267,7 +300,7 @@ export const CalendarPage = () => {
                   ? 'Hay eventos este día, pero ninguno coincide con las sucursales activas en los filtros.'
                   : 'No hay eventos para esta fecha.'}
               </p>
-              {eventsOnSelectedDateRaw.length === 0 ? (
+              {eventsOnSelectedDateRaw.length === 0 && !canCreateAppointment ? (
                 <p className="mt-2 text-xs text-muted-foreground">
                   Las citas se crean desde el perfil del cliente.
                 </p>
@@ -279,6 +312,7 @@ export const CalendarPage = () => {
               const timeText =
                 timeLabel ??
                 (event.type === 'office' ? 'Sin hora' : APPOINTMENT_TYPE_LABELS[event.type]);
+              const canOpenClient = event.type === 'office' && Boolean(event.clientId) && Boolean(onOpenClient);
 
               return (
                 <div
@@ -300,7 +334,17 @@ export const CalendarPage = () => {
                       {badgeLabel(event)}
                     </Badge>
                   </div>
-                  <p className="mt-1 text-sm">{event.title}</p>
+                  {canOpenClient ? (
+                    <button
+                      type="button"
+                      className="mt-1 text-left text-sm font-medium text-primary hover:underline"
+                      onClick={() => onOpenClient?.(event.clientId!)}
+                    >
+                      {event.title}
+                    </button>
+                  ) : (
+                    <p className="mt-1 text-sm">{event.title}</p>
+                  )}
                   {event.type === 'office' && event.advisorName ? (
                     <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
                       <User className="size-3.5 shrink-0 opacity-80" aria-hidden />
@@ -318,6 +362,37 @@ export const CalendarPage = () => {
           )}
         </Card>
       </div>
+
+      {token && canCreateAppointment ? (
+        <CreateCalendarEventDialog
+          open={createOpen}
+          onOpenChange={setCreateOpen}
+          appointmentDate={selectedDateKey}
+          token={token}
+          assignedUserId={assignedUserId}
+          onCreated={async (clientId) => {
+            try {
+              const next = await loadMonthEvents();
+              setEvents(next);
+              const created = next.find(
+                (event) =>
+                  event.type === 'office' &&
+                  event.clientId === clientId &&
+                  event.date === selectedDateKey,
+              );
+              if (created) {
+                const key = branchFilterKey(created);
+                if (showBranch[key] === false) {
+                  toast.message('Se activó la sucursal en el filtro para mostrar la cita.');
+                  setShowBranch((prev) => ({ ...prev, [key]: true }));
+                }
+              }
+            } catch {
+              toast.error('La cita se creó, pero no se pudo refrescar el calendario');
+            }
+          }}
+        />
+      ) : null}
     </div>
   );
 };

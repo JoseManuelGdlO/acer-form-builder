@@ -271,6 +271,12 @@ function mapTrip(raw: any): Trip {
     participantCount: raw.participant_count ?? raw.participantCount ?? participants.length,
     createdAt: raw.created_at ?? raw.createdAt,
     updatedAt: raw.updated_at ?? raw.updatedAt,
+    totalIncome: (() => {
+      const rawIncome = raw.totalIncome ?? raw.total_income;
+      if (rawIncome == null) return undefined;
+      const n = Number(rawIncome);
+      return Number.isFinite(n) ? n : undefined;
+    })(),
   };
 }
 

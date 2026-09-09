@@ -45,6 +45,10 @@ import { Product } from '@/types/product';
 import type { Hotel } from '@/types/hotel';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
+import { useHeaderGlobalSearch } from '@/hooks/useHeaderGlobalSearch';
+import type { HeaderSearchSection } from '@/hooks/useHeaderGlobalSearch';
+import { countGroupsInOperation } from '@/lib/groupsInOperation';
+import { HEADER_SEARCHABLE_VIEWS } from '@/components/layout/shellNav';
 
 type View = ShellView;
 
@@ -235,6 +239,11 @@ const Index = () => {
   const [headerSearch, setHeaderSearch] = useState('');
   const [tripCreateSignal, setTripCreateSignal] = useState(0);
   const pendingTripCreateRef = useRef(false);
+  const [focusClientId, setFocusClientId] = useState<string | null>(null);
+  const [focusTripId, setFocusTripId] = useState<string | null>(null);
+  const [focusQuoteId, setFocusQuoteId] = useState<string | null>(null);
+  const [groupsForDashboardReady, setGroupsForDashboardReady] = useState(false);
+  const [searchPanelDismissed, setSearchPanelDismissed] = useState(false);
   const [clientListQuery, setClientListQuery] = useState<{
     q?: string;
     status?: 'active' | 'inactive' | 'pending';
@@ -502,6 +511,29 @@ const Index = () => {
   }, [token, activeView, can, fetchTrips]);
 
   useEffect(() => {
+    if (!token || activeView !== 'dashboard') {
+      setGroupsForDashboardReady(false);
+      return;
+    }
+    if (!can('groups.view') || !can('trips.view')) {
+      setGroupsForDashboardReady(false);
+      return;
+    }
+    let cancelled = false;
+    fetchGroups(token)
+      .then(() => {
+        if (!cancelled) setGroupsForDashboardReady(true);
+      })
+      .catch((error) => {
+        console.error('Failed to fetch groups for dashboard:', error);
+        if (!cancelled) setGroupsForDashboardReady(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, activeView, can, fetchGroups]);
+
+  useEffect(() => {
     if (!token || activeView !== 'dashboard') return;
     if (!can('appointments.view')) {
       setDashboardAgenda(null);
@@ -754,9 +786,10 @@ const Index = () => {
   }, [headerSearch, activeView, handleClientFiltersChange]);
 
   useEffect(() => {
+    if (activeView !== 'clients') return;
     const q = clientListQuery.q ?? '';
     setHeaderSearch((prev) => (prev === q ? prev : q));
-  }, [clientListQuery.q]);
+  }, [clientListQuery.q, activeView]);
 
   const handleNavigate = useCallback(
     async (next: View) => {
@@ -787,6 +820,67 @@ const Index = () => {
     pendingTripCreateRef.current = false;
     setTripCreateSignal((n) => n + 1);
   }, [activeView]);
+
+  const groupsInOperation = useMemo(() => {
+    if (!groupsForDashboardReady || !can('groups.view') || !can('trips.view')) return null;
+    return countGroupsInOperation(groups, trips);
+  }, [groupsForDashboardReady, groups, trips, can]);
+
+  const headerGlobalSearch = useHeaderGlobalSearch({
+    query: headerSearch,
+    token,
+    can,
+    canAny,
+    trips,
+    products,
+  });
+
+  useEffect(() => {
+    setSearchPanelDismissed(false);
+  }, [headerSearch]);
+
+  const handleSearchHit = useCallback(
+    (section: HeaderSearchSection, id: string) => {
+      setSearchPanelDismissed(true);
+      if (section.id === 'clients') {
+        setFocusClientId(id);
+        void handleNavigate('clients');
+        return;
+      }
+      if (section.id === 'trips') {
+        setFocusTripId(id);
+        void handleNavigate('trips');
+        return;
+      }
+      if (section.id === 'quotes') {
+        setFocusQuoteId(id);
+        void handleNavigate('quotes');
+        return;
+      }
+      void handleNavigate(section.view);
+    },
+    [handleNavigate],
+  );
+
+  const handleSearchSeeAll = useCallback(
+    (view: View) => {
+      setSearchPanelDismissed(true);
+      void handleNavigate(view);
+    },
+    [handleNavigate],
+  );
+
+  const searchPanel =
+    HEADER_SEARCHABLE_VIEWS.includes(activeView) && headerGlobalSearch.visible && !searchPanelDismissed
+      ? {
+          visible: true,
+          loading: headerGlobalSearch.loading,
+          empty: headerGlobalSearch.empty,
+          sections: headerGlobalSearch.sections,
+          onSelectHit: handleSearchHit,
+          onSeeAll: handleSearchSeeAll,
+        }
+      : null;
 
   const buildHeaderCta = (view: View): AppHeaderCta | null => {
     if (!(can('trips.create') || can('trips.office_admin'))) return null;
@@ -824,6 +918,7 @@ const Index = () => {
         clientCount={scopeClientStats?.total ?? null}
         searchValue={headerSearch}
         onSearchChange={setHeaderSearch}
+        searchPanel={searchPanel}
         cta={buildHeaderCta(current)}
       >
         {body}
@@ -903,6 +998,8 @@ const Index = () => {
             initialQuery={clientListQuery}
             onFiltersChange={handleClientFiltersChange}
             onPageChange={handleClientPageChange}
+            focusClientId={focusClientId}
+            onFocusClientConsumed={() => setFocusClientId(null)}
           />
     );
   }
@@ -1135,7 +1232,15 @@ const Index = () => {
   }
 
   if (activeView === 'calendar') {
-    return renderShell('calendar', <CalendarPage />);
+    return renderShell('calendar', (
+      <CalendarPage
+        assignedUserId={viewingAs && !userSeesAllClients(viewingAs) ? viewingAs.id : undefined}
+        onOpenClient={(clientId) => {
+          setFocusClientId(clientId);
+          void handleNavigate('clients');
+        }}
+      />
+    ));
   }
 
   if (activeView === 'finance') {
@@ -1148,7 +1253,12 @@ const Index = () => {
           </div>
         }
       >
-        {renderShell('finance', <FinanceDashboard />)}
+        {renderShell(
+          'finance',
+          <FinanceDashboard
+            pickerAssignedUserId={viewingAs && !userSeesAllClients(viewingAs) ? viewingAs.id : undefined}
+          />,
+        )}
       </PermissionGuard>
     );
   }
@@ -1198,6 +1308,8 @@ const Index = () => {
           <QuotesView
             search={headerSearch}
             onSearchChange={setHeaderSearch}
+            openQuoteId={focusQuoteId}
+            onOpenQuoteConsumed={() => setFocusQuoteId(null)}
           />
         )}
       </PermissionGuard>
@@ -1340,6 +1452,8 @@ const Index = () => {
             searchQuery={headerSearch}
             onSearchChange={setHeaderSearch}
             createOpenSignal={tripCreateSignal}
+            openTripId={focusTripId}
+            onOpenTripConsumed={() => setFocusTripId(null)}
           />
     );
   }
@@ -1431,6 +1545,7 @@ const Index = () => {
               tripStats={can('trips.view') ? tripStats : null}
               trips={can('trips.view') ? trips : undefined}
               canViewTrips={can('trips.view')}
+              groupsInOperation={groupsInOperation}
               agendaEvents={can('appointments.view') ? dashboardAgenda ?? [] : null}
               canViewCalendar={can('nav.calendar.view')}
               onNavigate={handleNavigate}

@@ -166,6 +166,24 @@ export const getAllTrips = async (req: AuthRequest, res: Response): Promise<void
       delete j.participants;
       return j;
     });
+    if (hasPermission(req.user?.permissions, 'trip_finance.view') && list.length > 0) {
+      const ids = list.map((item) => item.id).filter(Boolean);
+      const sums = await ClientPayment.findAll({
+        attributes: ['tripId', [fn('SUM', col('amount')), 'totalIncome']],
+        where: { companyId, tripId: { [Op.in]: ids } },
+        group: ['tripId'],
+        raw: true,
+      });
+      const incomeByTripId: Record<string, number> = {};
+      for (const row of sums as any[]) {
+        const tripId = row.tripId || row.trip_id;
+        if (!tripId) continue;
+        incomeByTripId[tripId] = parseFloat(String(row.totalIncome ?? '0')) || 0;
+      }
+      for (const item of list) {
+        item.totalIncome = incomeByTripId[item.id] ?? 0;
+      }
+    }
     res.json(list);
   } catch (error) {
     console.error('Get all trips error:', error);

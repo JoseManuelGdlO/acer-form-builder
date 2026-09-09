@@ -119,6 +119,12 @@ class ApiClient {
 
       return await response.json();
     } catch (error) {
+      if (
+        (error instanceof DOMException && error.name === 'AbortError') ||
+        (error instanceof Error && error.name === 'AbortError')
+      ) {
+        throw error;
+      }
       console.error('API request failed:', error);
       throw error;
     }
@@ -340,7 +346,8 @@ class ApiClient {
       page?: number;
       limit?: number;
     },
-    token?: string | null
+    token?: string | null,
+    init?: { signal?: AbortSignal }
   ) {
     const normalizedParams = Object.fromEntries(
       Object.entries(params || {}).filter(([, value]) => value !== undefined && value !== null && value !== '')
@@ -354,6 +361,7 @@ class ApiClient {
       method: 'GET',
       token: token ?? this.getToken(),
       requireAuth: true,
+      signal: init?.signal,
     });
   }
 
@@ -1946,7 +1954,8 @@ class ApiClient {
   // Quotes (M14)
   async getQuotes(
     params?: { clientId?: string; status?: string; q?: string },
-    token?: string | null
+    token?: string | null,
+    init?: { signal?: AbortSignal }
   ) {
     const normalizedParams = Object.fromEntries(
       Object.entries(params || {}).filter(([, value]) => value !== undefined && value !== null && value !== '')
@@ -1956,6 +1965,7 @@ class ApiClient {
       method: 'GET',
       token: token ?? this.getToken(),
       requireAuth: true,
+      signal: init?.signal,
     });
   }
 
