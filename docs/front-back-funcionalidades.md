@@ -424,11 +424,10 @@ Editar tasas: `commissions.update`. Pagar lote: `commissions.create`.
 | COM-05 | shell | inline | mismo | Editar tasa | `updateCommissionUserRate` | PUT | `/commissions/users/:userId` | `updateCommissionUserRate` | update | Cambia rate |
 | COM-06 | shell | mismo | mismo | Quitar asesor | `removeCommissionUser` | DELETE | `/commissions/users/:userId` | `removeCommissionUser` | `commissions.delete` | Quita de esquema |
 | COM-07 | shell | mismo | mismo | Pagar lote | `payCommissionsBatch` | POST | `/commissions/payouts` | `payCommissionsBatch` | `commissions.create` | `{ periodType, referenceDate }` cierra periodo y registra payouts |
+| COM-08 | shell | mismo | mismo | Preview e historial de payouts | `getCommissionPayoutPreview` / `paidPayouts` | GET | `/commissions/payout-preview` | `getCommissionPayoutPreview` | `commissions.view` | Desglose antes de confirmar; historial desde overview. Wrapper `getCommissionPayouts` (`GET /commissions/payouts`) alineado en `api.ts` |
 
 No usados en UI aunque existen:
 
-- `GET /commissions/payout-preview`
-- `GET /commissions/payouts`
 - `GET /commissions/users` (método `getCommissionUsers` en `api.ts`)
 
 ---
@@ -826,9 +825,9 @@ Leyenda `uso_ui`: SI / NO / PARCIAL (método en `api.ts` pero ninguna pantalla l
 | POST | `/commissions/users` | SI | COM-04 |
 | PUT | `/commissions/users/:userId` | SI | COM-05 |
 | DELETE | `/commissions/users/:userId` | SI | COM-06 |
-| GET | `/commissions/payout-preview` | PARCIAL | Preview antes de pagar |
+| GET | `/commissions/payout-preview` | SI | COM-08 |
 | POST | `/commissions/payouts` | SI | COM-07 |
-| GET | `/commissions/payouts` | NO | No está ni en `api.ts` |
+| GET | `/commissions/payouts` | SI | Wrapper `getCommissionPayouts`; historial UI usa `paidPayouts` del overview |
 | GET | `/commissions/overview` | SI | COM-01 |
 
 ### 21.25b Quotes `/quotes`
@@ -890,8 +889,6 @@ Usar esta lista si hay que “completar” el front o no romper integraciones.
 | `GET /internal-appointments/:id/history` | audit cita | — |
 | `POST /trips/:id/finance/incomes` | ingreso manual viaje | ingresos salen de pagos |
 | `GET /commissions/users` | tasas | overview ya las trae |
-| `GET /commissions/payout-preview` | preview lote | UI paga directo |
-| `GET /commissions/payouts` | historial payouts | overview de finanzas/comisiones |
 | `POST /notifications` | crear notificación | workers (whatsapp_reply, etc.) |
 
 ---

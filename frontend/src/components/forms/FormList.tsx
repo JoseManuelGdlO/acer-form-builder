@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Plus, FileText } from 'lucide-react';
 import { Form } from '@/types/form';
 import { FormCard } from './FormCard';
@@ -34,6 +34,7 @@ interface FormListProps {
   onDuplicateForm?: (formId: string) => void | Promise<void>;
   /** Revisor: sin crear/eliminar/editar; solo ver público y duplicar */
   readOnly?: boolean;
+  submissions?: Array<{ formId: string; status?: string }>;
 }
 
 export const FormList = ({
@@ -43,6 +44,7 @@ export const FormList = ({
   onDeleteForm,
   onDuplicateForm,
   readOnly = false,
+  submissions,
 }: FormListProps) => {
   const [search, setSearch] = useState('');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -50,6 +52,19 @@ export const FormList = ({
   const [newFormDescription, setNewFormDescription] = useState('');
   const [formToDelete, setFormToDelete] = useState<{ id: string; name: string } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  const countsByFormId = useMemo(() => {
+    if (!submissions) return null;
+    const map = new Map<string, { total: number; completed: number }>();
+    for (const submission of submissions) {
+      if (!submission.formId) continue;
+      const entry = map.get(submission.formId) ?? { total: 0, completed: 0 };
+      entry.total += 1;
+      if (submission.status === 'completed') entry.completed += 1;
+      map.set(submission.formId, entry);
+    }
+    return map;
+  }, [submissions]);
 
   const filteredForms = forms.filter(
     form =>
@@ -130,6 +145,10 @@ export const FormList = ({
               onEdit={() => onSelectForm(form.id)}
               onDelete={() => handleDelete(form)}
               onDuplicate={() => handleDuplicate(form)}
+              responseCount={
+                countsByFormId ? (countsByFormId.get(form.id)?.total ?? 0) : null
+              }
+              completedCount={countsByFormId?.get(form.id)?.completed ?? 0}
             />
           ))}
         </div>

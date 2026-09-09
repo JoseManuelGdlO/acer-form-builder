@@ -25,6 +25,8 @@ interface FormCardProps {
   /** Solo ver / duplicar (revisor); abre vista pública al hacer clic */
   readOnly?: boolean;
   onViewPublic?: () => void;
+  responseCount?: number | null;
+  completedCount?: number;
 }
 
 function countQuestions(form: Form): number {
@@ -52,6 +54,8 @@ export const FormCard = ({
   onDuplicate,
   readOnly = false,
   onViewPublic,
+  responseCount,
+  completedCount,
 }: FormCardProps) => {
   const sectionCount = countSections(form);
   const questionCount = countQuestions(form);
@@ -135,6 +139,13 @@ export const FormCard = ({
         <p className="mt-1 text-xs text-muted-foreground">
           {sectionCount} {sectionCount === 1 ? 'sección' : 'secciones'} · {questionCount}{' '}
           {questionCount === 1 ? 'pregunta' : 'preguntas'}
+          {responseCount == null
+            ? null
+            : ` · ${responseCount} ${responseCount === 1 ? 'respuesta' : 'respuestas'}${
+                completedCount != null && completedCount > 0
+                  ? ` (${completedCount} ${completedCount === 1 ? 'completada' : 'completadas'})`
+                  : ''
+              }`}
         </p>
         <p className="mt-1 text-xs text-muted-foreground">
           Editado {formatDate(form.updatedAt)}

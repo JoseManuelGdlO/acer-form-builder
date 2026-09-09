@@ -140,6 +140,7 @@ const Index = () => {
   } = useFormStore();
 
   const { submissions, fetchSubmissions, getSubmissionStats } = useSubmissionStore();
+  const [submissionsReady, setSubmissionsReady] = useState(false);
 
   const {
     clients,
@@ -361,9 +362,14 @@ const Index = () => {
       
       // Load submissions
       if (submissions.length === 0) {
-        fetchSubmissions().catch((error) => {
-          console.error('Failed to fetch submissions:', error);
-        });
+        fetchSubmissions()
+          .then(() => setSubmissionsReady(true))
+          .catch((error) => {
+            console.error('Failed to fetch submissions:', error);
+            setSubmissionsReady(false);
+          });
+      } else {
+        setSubmissionsReady(true);
       }
       
       // Load clients
@@ -582,6 +588,11 @@ const Index = () => {
       fetchGroups(token).catch((error) => {
         console.error('Failed to fetch groups:', error);
       });
+      if (can('users.view')) {
+        fetchUsers(token).catch((error) => {
+          console.error('Failed to fetch users:', error);
+        });
+      }
     }
   }, [activeView, token]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -591,6 +602,11 @@ const Index = () => {
     if (can('trips.view')) {
       fetchTrips(token).catch((error) => {
         console.error('Failed to fetch trips:', error);
+      });
+    }
+    if (can('users.view')) {
+      fetchUsers(token).catch((error) => {
+        console.error('Failed to fetch users:', error);
       });
     }
     if (can('trips.office_admin')) {
@@ -1195,6 +1211,7 @@ const Index = () => {
       <GroupList
             groups={groups}
             availableClients={clientsForTripAndGroupPickers}
+            users={can('users.view') ? users : undefined}
             onCreate={async (data) => { await createGroup(data); }}
             onUpdate={async (id, data) => { await updateGroup(id, data); }}
             onDelete={deleteGroup}
@@ -1221,6 +1238,7 @@ const Index = () => {
             availableClients={clientsForTripAndGroupPickers}
             availableStaffMembers={staffMembers}
             companiesForInvite={companiesForTripShare}
+            users={can('users.view') ? users : []}
             onCreate={async (data) => {
               await createTrip(token!, data);
             }}
@@ -1427,6 +1445,11 @@ const Index = () => {
     <FormList
           forms={forms}
           readOnly={!canAny(['forms.update', 'forms.create', 'forms.delete'])}
+          submissions={
+            submissionsReady && canAny(['submissions.view_all', 'submissions.view_assigned'])
+              ? submissions
+              : undefined
+          }
           onSelectForm={async (formId) => {
             await selectForm(formId);
           }}

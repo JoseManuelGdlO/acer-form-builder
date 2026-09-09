@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type {
+  CommissionPayoutPreviewResponse,
   CommissionPeriodType,
   CommissionRateType,
   CommissionUserRate,
@@ -16,6 +17,7 @@ import type {
 import { api } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { SectionTitle } from '@/components/layout/SectionTitle';
+import { StatusBadge } from '@/components/layout/StatusBadge';
 import { cn } from '@/lib/utils';
 
 const formatter = new Intl.NumberFormat('es-MX', {
@@ -90,6 +92,9 @@ export const CommissionsDashboard = () => {
   const [payPeriodType, setPayPeriodType] = useState<CommissionPeriodType>('monthly');
   const [payDayOfMonth, setPayDayOfMonth] = useState(() => new Date().getDate());
   const [isPaying, setIsPaying] = useState(false);
+  const [payoutPreview, setPayoutPreview] = useState<CommissionPayoutPreviewResponse | null>(null);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  const [previewNonce, setPreviewNonce] = useState(0);
 
   const availableUsers = useMemo(() => {
     const configuredIds = new Set(commissionUsers.map((u) => u.userId));
@@ -157,6 +162,47 @@ export const CommissionsDashboard = () => {
   useEffect(() => {
     loadOverview();
   }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+    setIsPreviewLoading(true);
+    api
+      .getCommissionPayoutPreview(
+        { periodType: payPeriodType, referenceDate: buildReferenceDate(payDayOfMonth) },
+        token
+      )
+      .then((response) => {
+        if (!cancelled) setPayoutPreview(response);
+      })
+      .catch(() => {
+        if (!cancelled) setPayoutPreview(null);
+      })
+      .finally(() => {
+        if (!cancelled) setIsPreviewLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, payPeriodType, payDayOfMonth, previewNonce]);
+
+  const periodAlreadyPaid = payoutPreview?.alreadyPaid === true;
+  const nothingPending =
+    Boolean(payoutPreview) && !periodAlreadyPaid && (payoutPreview?.totalAmount ?? 0) === 0;
+  const canSubmitPayout =
+    canPayCommissions &&
+    Boolean(payoutPreview) &&
+    !periodAlreadyPaid &&
+    (payoutPreview?.totalAmount ?? 0) > 0 &&
+    !isPaying &&
+    !isLoading &&
+    !isPreviewLoading;
+  const payoutPeriodLabel =
+    payoutPreview?.period.label ||
+    (payoutPreview
+      ? `${payoutPreview.period.periodFrom} – ${payoutPreview.period.periodTo}`
+      : PAY_PERIOD_OPTIONS.find((option) => option.key === payPeriodType)?.label ?? 'periodo');
+  const paidPayouts = data?.paidPayouts ?? [];
 
   const buildRatePayload = (
     rateType: CommissionRateType,
@@ -254,10 +300,16 @@ export const CommissionsDashboard = () => {
   };
 
   const handlePayPeriod = async () => {
-    if (!token || !canPayCommissions) return;
+    if (!token || !canPayCommissions || !payoutPreview) return;
+    if (payoutPreview.alreadyPaid || payoutPreview.totalAmount === 0) return;
 
-    const periodLabel = PAY_PERIOD_OPTIONS.find((option) => option.key === payPeriodType)?.label ?? 'periodo';
-    if (!window.confirm(`¿Liquidar comisiones del periodo ${periodLabel}?`)) return;
+    if (
+      !window.confirm(
+        `¿Liquidar comisiones del periodo ${payoutPeriodLabel} por un total de ${formatter.format(payoutPreview.totalAmount)}?`
+      )
+    ) {
+      return;
+    }
 
     setIsPaying(true);
     try {
@@ -267,6 +319,7 @@ export const CommissionsDashboard = () => {
       );
       toast.success(`Comisiones pagadas: ${formatter.format(response.totalAmount)}`);
       await loadOverview();
+      setPreviewNonce((n) => n + 1);
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'No se pudo pagar comisiones');
     } finally {
@@ -315,7 +368,7 @@ export const CommissionsDashboard = () => {
             </p>
           </div>
           {commissionUsers.length > 0 && canPayCommissions ? (
-            <Button type="button" onClick={handlePayPeriod} disabled={isPaying || isLoading}>
+            <Button type="button" onClick={handlePayPeriod} disabled={!canSubmitPayout}>
               <Save className="size-4" />
               {isPaying ? 'Guardando…' : 'Guardar / liquidar'}
             </Button>
@@ -486,54 +539,139 @@ export const CommissionsDashboard = () => {
           </div>
         )}
 
-        {commissionUsers.length > 0 && canPayCommissions ? (
-          <div className="mt-4 space-y-4 border-t border-border/50 pt-4">
-            <SectionTitle title="Periodo a liquidar" className="mb-1" />
-            <p className="text-sm text-muted-foreground">
-              Selecciona el periodo y guarda para liquidar las comisiones pendientes.
-            </p>
-
-            <div className="flex flex-wrap gap-2">
-              {PAY_PERIOD_OPTIONS.map((option) => (
-                <Button
-                  key={option.key}
-                  type="button"
-                  size="sm"
-                  variant={payPeriodType === option.key ? 'default' : 'outline'}
-                  onClick={() => setPayPeriodType(option.key)}
-                >
-                  {option.label}
-                </Button>
-              ))}
+        <div className="mt-4 space-y-4 border-t border-border/50 pt-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <SectionTitle title="Periodo a liquidar" className="mb-1" />
+              <p className="text-sm text-muted-foreground">
+                Preview del lote con los mismos criterios que se enviarán al pagar.
+              </p>
             </div>
+            {periodAlreadyPaid ? <StatusBadge tone="warning">Periodo ya liquidado</StatusBadge> : null}
+          </div>
 
-            <div className="flex flex-wrap items-center gap-3 rounded-md border border-primary/20 bg-primary/5 px-3 py-2">
-              <Label htmlFor="pay-day-of-month" className="shrink-0 text-sm text-muted-foreground">
-                Día de referencia:
-              </Label>
-              <select
-                id="pay-day-of-month"
-                value={payDayOfMonth}
-                onChange={(e) => setPayDayOfMonth(Number(e.target.value))}
-                className="h-9 min-w-[100px] rounded-md border border-input bg-background px-3 text-sm font-medium"
+          <div className="flex flex-wrap gap-2">
+            {PAY_PERIOD_OPTIONS.map((option) => (
+              <Button
+                key={option.key}
+                type="button"
+                size="sm"
+                variant={payPeriodType === option.key ? 'default' : 'outline'}
+                onClick={() => setPayPeriodType(option.key)}
               >
-                {PAY_DAY_OPTIONS.map((day) => (
-                  <option key={day} value={day}>
-                    Día {day}
-                  </option>
-                ))}
-              </select>
-              <span className="text-sm text-muted-foreground">del mes actual (cierra el periodo)</span>
-            </div>
+                {option.label}
+              </Button>
+            ))}
+          </div>
 
+          <div className="flex flex-wrap items-center gap-3 rounded-md border border-primary/20 bg-primary/5 px-3 py-2">
+            <Label htmlFor="pay-day-of-month" className="shrink-0 text-sm text-muted-foreground">
+              Día de referencia:
+            </Label>
+            <select
+              id="pay-day-of-month"
+              value={payDayOfMonth}
+              onChange={(e) => setPayDayOfMonth(Number(e.target.value))}
+              className="h-9 min-w-[100px] rounded-md border border-input bg-background px-3 text-sm font-medium"
+            >
+              {PAY_DAY_OPTIONS.map((day) => (
+                <option key={day} value={day}>
+                  Día {day}
+                </option>
+              ))}
+            </select>
+            <span className="text-sm text-muted-foreground">del mes actual (cierra el periodo)</span>
+          </div>
+
+          {isPreviewLoading ? (
+            <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
+              <Loader2 className="size-4 animate-spin text-primary" />
+              Calculando preview…
+            </div>
+          ) : payoutPreview ? (
+            <div className="overflow-x-auto">
+              <p className="mb-2 text-xs text-muted-foreground">
+                {payoutPeriodLabel}
+              </p>
+              <div className="grid min-w-[560px] grid-cols-[1fr_120px_140px_80px] gap-3 text-xs text-muted-foreground">
+                <span>Asesor</span>
+                <span>Tasa</span>
+                <span className="text-right">Monto</span>
+                <span className="text-right">Pagos</span>
+              </div>
+              {(payoutPreview.users ?? []).map((user) => (
+                <div
+                  key={user.key}
+                  className="grid min-w-[560px] grid-cols-[1fr_120px_140px_80px] items-center gap-3 border-t py-3 text-sm"
+                >
+                  <span className="font-medium">{user.label}</span>
+                  <span>{formatUserRate(user)}</span>
+                  <b className="text-right text-success">{formatter.format(user.earned)}</b>
+                  <span className="text-right text-muted-foreground">{user.count}</span>
+                </div>
+              ))}
+              {(payoutPreview.users ?? []).length === 0 ? (
+                <p className="border-t py-3 text-sm text-muted-foreground">
+                  No hay asesores con comisión en este periodo.
+                </p>
+              ) : null}
+              <div className="grid min-w-[560px] grid-cols-[1fr_120px_140px_80px] items-center gap-3 border-t py-3 text-sm font-semibold">
+                <span>Total</span>
+                <span />
+                <span className="text-right text-success">{formatter.format(payoutPreview.totalAmount)}</span>
+                <span />
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">No se pudo cargar el preview de este periodo.</p>
+          )}
+
+          {nothingPending ? (
+            <p className="text-sm text-muted-foreground">Nada pendiente en este periodo.</p>
+          ) : null}
+
+          {canPayCommissions ? (
             <div className="flex justify-end">
-              <Button type="button" onClick={handlePayPeriod} disabled={isPaying}>
+              <Button type="button" onClick={handlePayPeriod} disabled={!canSubmitPayout}>
                 <Save className="size-4" />
                 {isPaying ? 'Guardando…' : 'Guardar'}
               </Button>
             </div>
-          </div>
-        ) : null}
+          ) : null}
+        </div>
+
+        <div className="mt-4 space-y-3 border-t border-border/50 pt-4">
+          <SectionTitle title="Historial de liquidaciones" className="mb-1" />
+          {paidPayouts.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Aún no hay liquidaciones.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <div className="grid min-w-[720px] grid-cols-[120px_1fr_140px_1fr_160px] gap-3 text-xs text-muted-foreground">
+                <span>Fecha</span>
+                <span>Asesor</span>
+                <span className="text-right">Monto</span>
+                <span>Concepto</span>
+                <span>Periodo</span>
+              </div>
+              {paidPayouts.map((payout) => (
+                <div
+                  key={payout.id}
+                  className="grid min-w-[720px] grid-cols-[120px_1fr_140px_1fr_160px] items-center gap-3 border-t py-3 text-sm"
+                >
+                  <span className="text-muted-foreground">{formatSaleDate(payout.payoutDate)}</span>
+                  <span className="font-medium">{payout.advisorName}</span>
+                  <b className="text-right text-success">{formatter.format(payout.amount)}</b>
+                  <span className="truncate text-muted-foreground" title={payout.concept}>
+                    {payout.concept || '—'}
+                  </span>
+                  <span className="truncate text-muted-foreground" title={payout.periodLabel}>
+                    {payout.periodLabel || '—'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </Card>
     </div>
   );

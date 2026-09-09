@@ -1,6 +1,7 @@
 import type { FinanceGranularity, FinanceOverviewResponse } from '@/types/finance';
 import type {
   CommissionPayoutPreviewResponse,
+  CommissionPayoutRow,
   CommissionPeriodType,
   CommissionRateType,
   CommissionUsersResponse,
@@ -1577,6 +1578,14 @@ class ApiClient {
       token: token ?? this.getToken(),
       requireAuth: true,
       body: JSON.stringify(data),
+    });
+  }
+
+  async getCommissionPayouts(token?: string | null) {
+    return this.request<{ payouts: CommissionPayoutRow[] }>(`/commissions/payouts`, {
+      method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
     });
   }
 

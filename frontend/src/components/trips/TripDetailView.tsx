@@ -55,6 +55,7 @@ import { isParticipantChildInTrip, sortTripParticipantsByFamily } from '@/lib/tr
 import { buildTripCompanyColorMap } from '@/lib/tripCompanyColors';
 import type { Hotel } from '@/types/hotel';
 import { TripHotelsSection } from '@/components/trips/TripHotelsSection';
+import { resolveUserName } from '@/lib/resolveUserName';
 
 const ACTION_LABELS: Record<string, string> = {
   trip_created: 'Viaje creado',
@@ -123,6 +124,7 @@ interface TripDetailViewProps {
   onDetachTripHotel?: (tripHotelId: string) => Promise<void>;
   onAssignTripHotelRoom?: (tripHotelId: string, roomId: string, participantId: string) => Promise<void>;
   onClearTripHotelRoomAssignment?: (tripHotelId: string, roomId: string, participantId: string) => Promise<void>;
+  users?: Array<{ id: string; name: string }>;
 }
 
 export const TripDetailView = ({
@@ -157,6 +159,7 @@ export const TripDetailView = ({
   onDetachTripHotel,
   onAssignTripHotelRoom,
   onClearTripHotelRoomAssignment,
+  users = [],
 }: TripDetailViewProps) => {
   type TripTabId = 'participantes' | 'asientos' | 'hoteles' | 'finanzas' | 'historial';
   const [tab, setTab] = useState<TripTabId>('participantes');
@@ -277,6 +280,7 @@ export const TripDetailView = ({
     reviewerMode
       ? ['Camión', trip.busTemplate?.name ?? 'Sin plantilla']
       : ['Ingresos', `$${Number(financeSummary?.totalIncome ?? 0).toLocaleString()}`],
+    ['Coordinación', resolveUserName(trip.assignedUserId, users) ?? 'Sin asignar'],
   ];
   const filteredParticipants = memberSearch.trim()
     ? participants.filter(p => {
@@ -698,7 +702,7 @@ export const TripDetailView = ({
           </div>
         </div>
 
-        <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-5">
           {headerKpis.map(([label, value]) => (
             <div key={label} className="rounded-md bg-muted p-3">
               <p className="text-[10px] text-muted-foreground">{label}</p>

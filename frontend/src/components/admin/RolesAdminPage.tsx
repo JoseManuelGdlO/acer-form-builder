@@ -87,6 +87,8 @@ export function RolesAdminPage() {
   const [newName, setNewName] = useState('');
   const [newDesc, setNewDesc] = useState('');
   const [newKeys, setNewKeys] = useState<Set<string>>(new Set());
+  const [memberCountByRoleId, setMemberCountByRoleId] = useState<Record<string, number>>({});
+  const [canCountMembers, setCanCountMembers] = useState(false);
 
   const selected = useMemo(() => roles.find((r) => r.id === selectedId) ?? null, [roles, selectedId]);
 
@@ -107,6 +109,30 @@ export function RolesAdminPage() {
         if (prev && rows.some((r) => r.id === prev)) return prev;
         return rows[0]?.id ?? null;
       });
+
+      if (can('users.view')) {
+        try {
+          const usersRaw = await api.getUsers(token);
+          const users = (Array.isArray(usersRaw) ? usersRaw : []) as Array<{
+            roleId?: string;
+            role?: { id?: string };
+          }>;
+          const counts = users.reduce<Record<string, number>>((acc, user) => {
+            const roleId = user.roleId || user.role?.id;
+            if (!roleId) return acc;
+            acc[roleId] = (acc[roleId] ?? 0) + 1;
+            return acc;
+          }, {});
+          setMemberCountByRoleId(counts);
+          setCanCountMembers(true);
+        } catch {
+          setMemberCountByRoleId({});
+          setCanCountMembers(false);
+        }
+      } else {
+        setMemberCountByRoleId({});
+        setCanCountMembers(false);
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'No se pudo cargar roles');
     } finally {
@@ -240,7 +266,11 @@ export function RolesAdminPage() {
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="truncate">{r.name}</span>
-                  <span className="text-xs opacity-60">{r.permissions.length}</span>
+                  <span className="shrink-0 text-xs opacity-60">
+                    {canCountMembers
+                      ? `${memberCountByRoleId[r.id] ?? 0} ${(memberCountByRoleId[r.id] ?? 0) === 1 ? 'miembro' : 'miembros'}`
+                      : '—'}
+                  </span>
                 </div>
                 {r.isSystem ? (
                   <span className="mt-1 block text-[10px] uppercase tracking-wide opacity-60">Sistema</span>
@@ -262,6 +292,7 @@ export function RolesAdminPage() {
                     {selected.isSystem
                       ? 'Rol de sistema: los permisos están definidos por la plataforma.'
                       : selected.description || 'Rol personalizado'}
+                    {` · ${selected.permissions.length} ${selected.permissions.length === 1 ? 'permiso' : 'permisos'}`}
                   </p>
                 </div>
                 <div className="flex shrink-0 flex-wrap gap-2">

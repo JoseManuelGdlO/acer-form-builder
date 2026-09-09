@@ -10,16 +10,20 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Users, MoreHorizontal, Eye, Pencil, Trash2 } from 'lucide-react';
 import type { MouseEvent } from 'react';
+import { resolveUserName } from '@/lib/resolveUserName';
 
 interface GroupCardProps {
   group: Group;
+  users?: Array<{ id: string; name: string }>;
   onView: () => void;
   onEdit: () => void;
   onDelete: () => void;
 }
 
-export const GroupCard = ({ group, onView, onEdit, onDelete }: GroupCardProps) => {
+export const GroupCard = ({ group, users, onView, onEdit, onDelete }: GroupCardProps) => {
   const clientCount = group.clients?.length ?? 0;
+  const responsibleName = users ? resolveUserName(group.assignedUserId, users) : null;
+  const showResponsible = users != null;
   const tripLabel =
     group.assignedTrips && group.assignedTrips.length > 0
       ? group.assignedTrips.map((t) => t.title).join(', ')
@@ -47,6 +51,11 @@ export const GroupCard = ({ group, onView, onEdit, onDelete }: GroupCardProps) =
               <p className="text-xs text-muted-foreground">
                 {clientCount} {clientCount === 1 ? 'integrante' : 'integrantes'}
               </p>
+              {showResponsible ? (
+                <p className="text-xs text-muted-foreground">
+                  Responsable: {responsibleName ?? 'Sin asignar'}
+                </p>
+              ) : null}
             </div>
           </div>
 

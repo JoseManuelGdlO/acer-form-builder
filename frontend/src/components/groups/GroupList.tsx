@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 interface GroupListProps {
   groups: Group[];
   availableClients: Client[];
+  users?: Array<{ id: string; name: string }>;
   onCreate: (data: { title: string; clientIds?: string[] }) => Promise<void>;
   onUpdate: (groupId: string, data: { title?: string; clientIds?: string[] }) => Promise<void>;
   onDelete: (groupId: string) => Promise<void>;
@@ -19,6 +20,7 @@ interface GroupListProps {
 export const GroupList = ({
   groups,
   availableClients,
+  users,
   onCreate,
   onUpdate,
   onDelete,
@@ -143,6 +145,7 @@ export const GroupList = ({
             <GroupCard
               key={group.id}
               group={group}
+              users={users}
               onView={() => viewDetail(group)}
               onEdit={() => openEdit(group)}
               onDelete={() => handleDelete(group.id)}
