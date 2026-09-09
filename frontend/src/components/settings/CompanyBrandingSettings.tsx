@@ -17,6 +17,7 @@ import {
   hslStringToHex,
   hexToHslString,
   THEME_COLOR_KEYS,
+  DEFAULT_THEME,
   APP_BACKGROUND_IMAGE_KEY,
   DASHBOARD_CARD_OPACITY_KEY,
   DASHBOARD_CENTER_LOGO_IMAGE_KEY,
@@ -38,32 +39,6 @@ import {
   Upload,
   X,
 } from 'lucide-react';
-
-/** Valores por defecto alineados con index.css y THEME_COLOR_KEYS. */
-const DEFAULT_THEME: Record<string, string> = {
-  primary: '234 66% 30%',
-  'primary-foreground': '0 0% 100%',
-  secondary: '0 67% 47%',
-  'secondary-foreground': '0 0% 100%',
-  background: '0 0% 100%',
-  foreground: '0 0% 18%',
-  card: '0 0% 100%',
-  'card-foreground': '0 0% 18%',
-  muted: '234 20% 95%',
-  'muted-foreground': '0 0% 45%',
-  accent: '230 45% 47%',
-  border: '234 20% 90%',
-  ring: '234 66% 30%',
-  radius: '0.75rem',
-  'sidebar-background': '234 66% 30%',
-  'sidebar-foreground': '0 0% 100%',
-  'sidebar-primary': '0 67% 47%',
-  'sidebar-primary-foreground': '0 0% 100%',
-  'sidebar-accent': '230 45% 47%',
-  'sidebar-accent-foreground': '0 0% 100%',
-  'sidebar-border': '234 50% 40%',
-  'sidebar-ring': '0 67% 47%',
-};
 
 const COLOR_GROUPS: { title: string; keys: { key: string; label: string }[] }[] = [
   {
@@ -190,7 +165,7 @@ function radiusToNumber(value: string): number {
   const match = value.match(/^([\d.]+)rem$/);
   if (match) return parseFloat(match[1]) * 16;
   const num = parseFloat(value);
-  return Number.isNaN(num) ? 12 : num;
+  return Number.isNaN(num) ? 8 : num;
 }
 
 function numberToRadius(num: number): string {
@@ -602,7 +577,7 @@ export function CompanyBrandingSettings() {
                   background: effectiveTheme['sidebar-background'] ? `hsl(${effectiveTheme['sidebar-background']})` : undefined,
                   color: effectiveTheme['sidebar-foreground'] ? `hsl(${effectiveTheme['sidebar-foreground']})` : undefined,
                   borderColor: effectiveTheme['sidebar-border'] ? `hsl(${effectiveTheme['sidebar-border']})` : undefined,
-                  borderRadius: effectiveTheme.radius ?? '0.75rem',
+                  borderRadius: effectiveTheme.radius ?? DEFAULT_THEME.radius,
                 }}
               >
                 <span className="font-semibold">Barra</span>
@@ -637,7 +612,7 @@ export function CompanyBrandingSettings() {
                     style={{
                       background: effectiveTheme.primary ? `hsl(${effectiveTheme.primary})` : undefined,
                       color: effectiveTheme['primary-foreground'] ? `hsl(${effectiveTheme['primary-foreground']})` : undefined,
-                      borderRadius: effectiveTheme.radius ?? '0.75rem',
+                      borderRadius: effectiveTheme.radius ?? DEFAULT_THEME.radius,
                     }}
                   >
                     Botón primario
@@ -649,7 +624,7 @@ export function CompanyBrandingSettings() {
                       background: effectiveTheme.secondary ? `hsl(${effectiveTheme.secondary})` : undefined,
                       color: effectiveTheme['secondary-foreground'] ? `hsl(${effectiveTheme['secondary-foreground']})` : undefined,
                       borderColor: effectiveTheme.border ? `hsl(${effectiveTheme.border})` : undefined,
-                      borderRadius: effectiveTheme.radius ?? '0.75rem',
+                      borderRadius: effectiveTheme.radius ?? DEFAULT_THEME.radius,
                     }}
                   >
                     Secundario
@@ -657,7 +632,7 @@ export function CompanyBrandingSettings() {
                 </div>
                 <div
                   className="rounded-lg border border-border p-4 max-w-sm bg-card text-card-foreground"
-                  style={{ borderRadius: effectiveTheme.radius ?? '0.75rem' }}
+                  style={{ borderRadius: effectiveTheme.radius ?? DEFAULT_THEME.radius }}
                 >
                   <p className="font-medium">Tarjeta de ejemplo</p>
                   <p className="text-sm text-muted-foreground mt-1">
@@ -729,7 +704,7 @@ export function CompanyBrandingSettings() {
                   className="flex-1"
                 />
                 <span className="text-sm tabular-nums text-muted-foreground w-14">
-                  {effectiveTheme.radius || '0.75rem'}
+                  {effectiveTheme.radius || DEFAULT_THEME.radius}
                 </span>
               </div>
             </div>
@@ -753,7 +728,7 @@ export function CompanyBrandingSettings() {
                     </Label>
                     <Input
                       id={`theme-${key}`}
-                      placeholder={DEFAULT_THEME[key] ?? 'ej. 234 66% 30%'}
+                      placeholder={DEFAULT_THEME[key] ?? 'ej. 203 82% 41%'}
                       value={theme[key] ?? ''}
                       onChange={(e) => setTheme((t) => ({ ...t, [key]: e.target.value }))}
                       className="font-mono text-sm"

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, type ReactNode } from 'react';
 import { useFormStore } from '@/hooks/useFormStore';
 import { useSubmissionStore } from '@/hooks/useSubmissionStore';
 import { useClientStore } from '@/hooks/useClientStore';
@@ -31,19 +31,13 @@ import { useCategoryStore } from '@/hooks/useCategoryStore';
 import type { Category } from '@/types/category';
 import { Dashboard } from '@/components/dashboard/Dashboard';
 import { ViewAsSelector } from '@/components/admin/ViewAsSelector';
-import { AppHeader } from '@/components/layout/AppHeader';
+import { AppShell } from '@/components/layout/AppShell';
+import type { AppHeaderCta } from '@/components/layout/AppHeader';
 import { PermissionGuard } from '@/components/auth/PermissionGuard';
-import { VIEW_ENTRY_PERMISSIONS, type ShellView } from '@/auth/viewPermissions';
+import { type ShellView } from '@/auth/viewPermissions';
 import { userSeesAllClients } from '@/auth/userPermissions';
 import { RolesAdminPage } from '@/components/admin/RolesAdminPage';
 import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { LayoutDashboard, FileText, Users, UserCog, Bot, Settings, Receipt, ChevronDown, ShoppingBag, MapPin, ChartNoAxesCombined, Calendar, Boxes, Shield, Building2, BadgePercent } from 'lucide-react';
 import { User } from '@/types/user';
 import { Client } from '@/types/form';
 import { Product } from '@/types/product';
@@ -235,6 +229,9 @@ const Index = () => {
   const [editingHotel, setEditingHotel] = useState<Hotel | null>(null);
   const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
   const [selectedFilterCategories, setSelectedFilterCategories] = useState<string[]>([]);
+  const [headerSearch, setHeaderSearch] = useState('');
+  const [clientCreateSignal, setClientCreateSignal] = useState(0);
+  const [tripCreateSignal, setTripCreateSignal] = useState(0);
   const [clientListQuery, setClientListQuery] = useState<{
     q?: string;
     status?: 'active' | 'inactive' | 'pending';
@@ -703,6 +700,19 @@ const Index = () => {
     });
   }, []);
 
+  useEffect(() => {
+    if (activeView !== 'clients') return;
+    const timeout = window.setTimeout(() => {
+      handleClientFiltersChange({ q: headerSearch.trim() || undefined });
+    }, 350);
+    return () => window.clearTimeout(timeout);
+  }, [headerSearch, activeView, handleClientFiltersChange]);
+
+  useEffect(() => {
+    const q = clientListQuery.q ?? '';
+    setHeaderSearch((prev) => (prev === q ? prev : q));
+  }, [clientListQuery.q]);
+
   const handleNavigate = useCallback(
     async (next: View) => {
       // If we're editing a form, the editor view "wins" over activeView in the render tree.
@@ -725,178 +735,34 @@ const Index = () => {
     [currentForm, editorHasUnsavedChanges, selectForm, token, fetchForms]
   );
 
-  const NavigationButtons = ({ current }: { current: View }) => {
-    const adminNavActive = ['finance', 'paymentLogs', 'commissions', 'users', 'roles', 'chatbot', 'settings'].includes(current);
-    const showAdminMenu = canAny([
-      'nav.admin.view',
-      'nav.finance.view',
-      'nav.payment_logs.view',
-      'nav.commissions.view',
-      'nav.users.view',
-      'nav.chatbot.view',
-      'nav.settings.view',
-      'roles.view',
-    ]);
-
-    return (
-      <>
-        {canAny(VIEW_ENTRY_PERMISSIONS.dashboard) && (
-          <Button
-            variant={current === 'dashboard' ? 'default' : 'ghost'}
-            size="sm"
-            onClick={() => handleNavigate('dashboard')}
-            className="h-8 gap-1.5 px-2 text-xs sm:text-sm"
-          >
-            <LayoutDashboard className="w-4 h-4 shrink-0" />
-            <span className="hidden sm:inline">Inicio</span>
-          </Button>
-        )}
-        {canAny(VIEW_ENTRY_PERMISSIONS.clients) && (
-          <Button
-            variant={current === 'clients' ? 'default' : 'ghost'}
-            size="sm"
-            onClick={() => handleNavigate('clients')}
-            className="h-8 gap-1.5 px-2 text-xs sm:text-sm"
-          >
-            <Users className="w-4 h-4 shrink-0" />
-            <span className="hidden sm:inline">Clientes</span>
-            {scopeClientStats !== null && scopeClientStats.total > 0 && (
-              <span className="px-1.5 py-0.5 text-xs rounded-full bg-secondary/20 text-secondary">
-                {scopeClientStats.total}
-              </span>
-            )}
-          </Button>
-        )}
-        {canAny(VIEW_ENTRY_PERMISSIONS.trips) && (
-          <Button
-            variant={current === 'trips' ? 'default' : 'ghost'}
-            size="sm"
-            onClick={() => handleNavigate('trips')}
-            className="h-8 gap-1.5 px-2 text-xs sm:text-sm"
-          >
-            <MapPin className="w-4 h-4 shrink-0" />
-            <span className="hidden sm:inline">Viajes</span>
-          </Button>
-        )}
-        {canAny(VIEW_ENTRY_PERMISSIONS.calendar) && (
-          <Button
-            variant={current === 'calendar' ? 'default' : 'ghost'}
-            size="sm"
-            onClick={() => handleNavigate('calendar')}
-            className="h-8 gap-1.5 px-2 text-xs sm:text-sm"
-          >
-            <Calendar className="w-4 h-4 shrink-0" />
-            <span className="hidden sm:inline">Calendario</span>
-          </Button>
-        )}
-        {canAny(VIEW_ENTRY_PERMISSIONS.forms) && (
-          <Button
-            variant={current === 'forms' ? 'default' : 'ghost'}
-            size="sm"
-            onClick={() => handleNavigate('forms')}
-            className="h-8 gap-1.5 px-2 text-xs sm:text-sm"
-          >
-            <FileText className="w-4 h-4 shrink-0" />
-            <span className="hidden sm:inline">Formularios</span>
-          </Button>
-        )}
-        {canAny(VIEW_ENTRY_PERMISSIONS.products) && (
-          <Button
-            variant={current === 'products' ? 'default' : 'ghost'}
-            size="sm"
-            onClick={() => handleNavigate('products')}
-            className="h-8 gap-1.5 px-2 text-xs sm:text-sm"
-          >
-            <ShoppingBag className="w-4 h-4 shrink-0" />
-            <span className="hidden sm:inline">Productos</span>
-          </Button>
-        )}
-        {canAny(VIEW_ENTRY_PERMISSIONS.hotels) && (
-          <Button
-            variant={current === 'hotels' ? 'default' : 'ghost'}
-            size="sm"
-            onClick={() => handleNavigate('hotels')}
-            className="h-8 gap-1.5 px-2 text-xs sm:text-sm"
-          >
-            <Building2 className="w-4 h-4 shrink-0" />
-            <span className="hidden sm:inline">Hoteles</span>
-          </Button>
-        )}
-        {canAny(VIEW_ENTRY_PERMISSIONS.groups) && (
-          <Button
-            variant={current === 'groups' ? 'default' : 'ghost'}
-            size="sm"
-            onClick={() => handleNavigate('groups')}
-            className="h-8 gap-1.5 px-2 text-xs sm:text-sm"
-          >
-            <Boxes className="w-4 h-4 shrink-0" />
-            <span className="hidden sm:inline">Grupos</span>
-          </Button>
-        )}
-        {showAdminMenu && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant={adminNavActive ? 'default' : 'ghost'}
-                size="sm"
-                className="h-8 gap-1.5 px-2 text-xs sm:text-sm"
-              >
-                <Settings className="w-4 h-4 shrink-0" />
-                <span className="hidden sm:inline">Administración</span>
-                <ChevronDown className="w-3.5 h-3.5 shrink-0 opacity-70" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-52">
-              {can('nav.finance.view') && (
-                <DropdownMenuItem onClick={() => handleNavigate('finance')} className="gap-2 cursor-pointer">
-                  <ChartNoAxesCombined className="w-4 h-4" />
-                  Finanzas
-                </DropdownMenuItem>
-              )}
-              {can('nav.payment_logs.view') && (
-                <DropdownMenuItem onClick={() => handleNavigate('paymentLogs')} className="gap-2 cursor-pointer">
-                  <Receipt className="w-4 h-4" />
-                  Logs de pagos
-                </DropdownMenuItem>
-              )}
-              {can('nav.commissions.view') && (
-                <DropdownMenuItem onClick={() => handleNavigate('commissions')} className="gap-2 cursor-pointer">
-                  <BadgePercent className="w-4 h-4" />
-                  Comisiones
-                </DropdownMenuItem>
-              )}
-              {can('nav.users.view') && (
-                <DropdownMenuItem onClick={() => handleNavigate('users')} className="gap-2 cursor-pointer">
-                  <UserCog className="w-4 h-4" />
-                  Usuarios
-                </DropdownMenuItem>
-              )}
-              {can('roles.view') && (
-                <DropdownMenuItem onClick={() => handleNavigate('roles')} className="gap-2 cursor-pointer">
-                  <Shield className="w-4 h-4" />
-                  Roles y permisos
-                </DropdownMenuItem>
-              )}
-              {can('nav.chatbot.view') && (
-                <DropdownMenuItem onClick={() => handleNavigate('chatbot')} className="gap-2 cursor-pointer">
-                  <Bot className="w-4 h-4" />
-                  Chatbot
-                </DropdownMenuItem>
-              )}
-              {can('nav.settings.view') && (
-                <DropdownMenuItem onClick={() => handleNavigate('settings')} className="gap-2 cursor-pointer">
-                  <Settings className="w-4 h-4" />
-                  Configuración
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
-      </>
-    );
+  const buildHeaderCta = (view: View): AppHeaderCta | null => {
+    if (view === 'clients') {
+      return { label: 'Nuevo cliente', onClick: () => setClientCreateSignal((n) => n + 1) };
+    }
+    if (view === 'trips' && (can('trips.create') || can('trips.office_admin'))) {
+      return { label: 'Nuevo viaje', onClick: () => setTripCreateSignal((n) => n + 1) };
+    }
+    if (view === 'products' && canAny(['products.create', 'products.update'])) {
+      return {
+        label: 'Nuevo producto',
+        onClick: () => {
+          setEditingProduct(null);
+          setProductModalOpen(true);
+        },
+      };
+    }
+    if (view === 'hotels' && canAny(['hotels.create', 'hotels.update'])) {
+      return {
+        label: 'Nuevo hotel',
+        onClick: () => {
+          setEditingHotel(null);
+          setHotelModalOpen(true);
+        },
+      };
+    }
+    return null;
   };
 
-  // Floating View As selector - always visible
   const FloatingViewAs = () =>
     can('session.view_as') ? (
       <ViewAsSelector
@@ -906,16 +772,28 @@ const Index = () => {
       />
     ) : null;
 
+  const renderShell = (current: View, body: ReactNode) => (
+    <>
+      <FloatingViewAs />
+      <AppShell
+        currentView={current}
+        viewingAs={Boolean(viewingAs)}
+        onNavigate={handleNavigate}
+        clientCount={scopeClientStats?.total ?? null}
+        searchValue={headerSearch}
+        onSearchChange={setHeaderSearch}
+        cta={buildHeaderCta(current)}
+      >
+        {body}
+      </AppShell>
+    </>
+  );
+
   // Si estamos editando un formulario, mostramos el editor (solo quien puede editar formularios)
   if (currentForm && can('forms.update')) {
-    return (
-      <>
-        <FloatingViewAs />
-        <div className={`min-h-screen bg-background ${viewingAs ? 'pt-10' : ''}`}>
-          <AppHeader>
-            <NavigationButtons current="forms" />
-          </AppHeader>
-          <FormEditor
+    return renderShell(
+      'forms',
+      <FormEditor
             form={currentForm}
             onBack={async () => {
               await selectForm(null);
@@ -953,21 +831,14 @@ const Index = () => {
               await reorderQuestions(currentForm.id, sectionId, questions);
             }}
           />
-        </div>
-      </>
     );
   }
 
   // Vista de clientes
   if (activeView === 'clients') {
-    return (
-      <>
-        <FloatingViewAs />
-        <div className={`min-h-screen bg-background ${viewingAs ? 'pt-10' : ''}`}>
-          <AppHeader>
-            <NavigationButtons current="clients" />
-          </AppHeader>
-          <ClientList
+    return renderShell(
+      'clients',
+      <ClientList
             clients={filteredClients}
             products={products}
             stats={{
@@ -990,9 +861,8 @@ const Index = () => {
             initialQuery={clientListQuery}
             onFiltersChange={handleClientFiltersChange}
             onPageChange={handleClientPageChange}
+            createOpenSignal={clientCreateSignal}
           />
-        </div>
-      </>
     );
   }
 
@@ -1080,13 +950,18 @@ const Index = () => {
       await fetchProducts(token);
     };
 
-    return (
+    const productQuery = headerSearch.trim().toLowerCase();
+    const listedProducts = productQuery
+      ? products.filter(
+          (p) =>
+            p.title.toLowerCase().includes(productQuery) ||
+            (p.description ?? '').toLowerCase().includes(productQuery),
+        )
+      : products;
+
+    return renderShell(
+      'products',
       <>
-        <FloatingViewAs />
-        <div className={viewingAs ? 'pt-10' : ''}>
-          <AppHeader>
-            <NavigationButtons current="products" />
-          </AppHeader>
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4 mb-4">
             <div className="space-y-3">
               <div className="flex flex-wrap gap-2 items-center">
@@ -1143,7 +1018,7 @@ const Index = () => {
             </div>
           </div>
           <ProductsList
-            products={products}
+            products={listedProducts}
             readOnly={!canAny(['products.create', 'products.update', 'products.delete'])}
             onCreate={handleCreate}
             onEdit={handleEdit}
@@ -1210,7 +1085,6 @@ const Index = () => {
               />
             </>
           )}
-        </div>
       </>
     );
   }
@@ -1244,13 +1118,9 @@ const Index = () => {
       }
     };
 
-    return (
+    return renderShell(
+      'hotels',
       <>
-        <FloatingViewAs />
-        <div className={viewingAs ? 'pt-10' : ''}>
-          <AppHeader>
-            <NavigationButtons current="hotels" />
-          </AppHeader>
           <HotelList
             hotels={hotels}
             readOnly={!canAny(['hotels.create', 'hotels.update', 'hotels.delete'])}
@@ -1266,23 +1136,12 @@ const Index = () => {
               onSubmit={handleSubmitHotel}
             />
           )}
-        </div>
       </>
     );
   }
 
   if (activeView === 'calendar') {
-    return (
-      <>
-        <FloatingViewAs />
-        <div className={`min-h-screen bg-background ${viewingAs ? 'pt-10' : ''}`}>
-          <AppHeader>
-            <NavigationButtons current="calendar" />
-          </AppHeader>
-          <CalendarPage />
-        </div>
-      </>
-    );
+    return renderShell('calendar', <CalendarPage />);
   }
 
   if (activeView === 'finance') {
@@ -1295,17 +1154,12 @@ const Index = () => {
           </div>
         }
       >
-        <>
-          <FloatingViewAs />
-          <div className={`min-h-screen bg-background ${viewingAs ? 'pt-10' : ''}`}>
-            <AppHeader>
-              <NavigationButtons current="finance" />
-            </AppHeader>
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {renderShell(
+          'finance',
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
               <FinanceDashboard />
             </div>
-          </div>
-        </>
+        )}
       </PermissionGuard>
     );
   }
@@ -1320,18 +1174,13 @@ const Index = () => {
           </div>
         }
       >
-        <>
-          <FloatingViewAs />
-          <div className={`min-h-screen bg-background ${viewingAs ? 'pt-10' : ''}`}>
-            <AppHeader>
-              <NavigationButtons current="paymentLogs" />
-            </AppHeader>
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {renderShell(
+          'paymentLogs',
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
               <h1 className="text-3xl font-bold text-primary mb-6">Logs de pagos</h1>
               <PaymentLogsPage />
             </div>
-          </div>
-        </>
+        )}
       </PermissionGuard>
     );
   }
@@ -1346,39 +1195,27 @@ const Index = () => {
           </div>
         }
       >
-        <>
-          <FloatingViewAs />
-          <div className={`min-h-screen bg-background ${viewingAs ? 'pt-10' : ''}`}>
-            <AppHeader>
-              <NavigationButtons current="commissions" />
-            </AppHeader>
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {renderShell(
+          'commissions',
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
               <CommissionsDashboard />
             </div>
-          </div>
-        </>
+        )}
       </PermissionGuard>
     );
   }
 
   // Vista de grupos
   if (activeView === 'groups') {
-    return (
-      <>
-        <FloatingViewAs />
-        <div className={`min-h-screen bg-background ${viewingAs ? 'pt-10' : ''}`}>
-          <AppHeader>
-            <NavigationButtons current="groups" />
-          </AppHeader>
-          <GroupList
+    return renderShell(
+      'groups',
+      <GroupList
             groups={groups}
             availableClients={clientsForTripAndGroupPickers}
             onCreate={async (data) => { await createGroup(data); }}
             onUpdate={async (id, data) => { await updateGroup(id, data); }}
             onDelete={deleteGroup}
           />
-        </div>
-      </>
     );
   }
 
@@ -1392,14 +1229,9 @@ const Index = () => {
       );
     }
     const tripReviewerMode = !can('trips.office_admin');
-    return (
-      <>
-        <FloatingViewAs />
-        <div className={`min-h-screen bg-background ${viewingAs ? 'pt-10' : ''}`}>
-          <AppHeader>
-            <NavigationButtons current="trips" />
-          </AppHeader>
-          <TripList
+    return renderShell(
+      'trips',
+      <TripList
             reviewerMode={tripReviewerMode}
             trips={trips}
             invitations={invitations}
@@ -1504,9 +1336,10 @@ const Index = () => {
                   }
                 : undefined
             }
+            searchQuery={headerSearch}
+            onSearchChange={setHeaderSearch}
+            createOpenSignal={tripCreateSignal}
           />
-        </div>
-      </>
     );
   }
 
@@ -1520,17 +1353,12 @@ const Index = () => {
           </div>
         }
       >
-        <>
-          <FloatingViewAs />
-          <div className={`min-h-screen bg-background ${viewingAs ? 'pt-10' : ''}`}>
-            <AppHeader>
-              <NavigationButtons current="roles" />
-            </AppHeader>
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {renderShell(
+          'roles',
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
               <RolesAdminPage />
             </div>
-          </div>
-        </>
+        )}
       </PermissionGuard>
     );
   }
@@ -1545,18 +1373,13 @@ const Index = () => {
           </div>
         }
       >
-        <>
-          <FloatingViewAs />
-          <div className={`min-h-screen bg-background ${viewingAs ? 'pt-10' : ''}`}>
-            <AppHeader>
-              <NavigationButtons current="users" />
-            </AppHeader>
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {renderShell(
+          'users',
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
               <h1 className="text-3xl font-bold text-primary mb-6">Gestión de Usuarios</h1>
               <UserList />
             </div>
-          </div>
-        </>
+        )}
       </PermissionGuard>
     );
   }
@@ -1571,18 +1394,13 @@ const Index = () => {
           </div>
         }
       >
-        <>
-          <FloatingViewAs />
-          <div className={`min-h-screen bg-background ${viewingAs ? 'pt-10' : ''}`}>
-            <AppHeader>
-              <NavigationButtons current="chatbot" />
-            </AppHeader>
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {renderShell(
+          'chatbot',
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
               <h1 className="text-3xl font-bold text-primary mb-6">Configuración del Chatbot</h1>
               <ChatbotSettings />
             </div>
-          </div>
-        </>
+        )}
       </PermissionGuard>
     );
   }
@@ -1603,17 +1421,12 @@ const Index = () => {
           </div>
         }
       >
-        <>
-          <FloatingViewAs />
-          <div className={`min-h-screen bg-background ${viewingAs ? 'pt-10' : ''}`}>
-            <AppHeader>
-              <NavigationButtons current="settings" />
-            </AppHeader>
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {renderShell(
+          'settings',
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
               <SettingsPage />
             </div>
-          </div>
-        </>
+        )}
       </PermissionGuard>
     );
   }
@@ -1622,14 +1435,9 @@ const Index = () => {
   if (activeView === 'dashboard') {
     const submissionStats = getSubmissionStats();
 
-    return (
-      <>
-        <FloatingViewAs />
-        <div className={`min-h-screen bg-background ${viewingAs ? 'pt-10' : ''}`}>
-          <AppHeader>
-            <NavigationButtons current="dashboard" />
-          </AppHeader>
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    return renderShell(
+      'dashboard',
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             <Dashboard
               forms={forms}
               submissions={submissions}
@@ -1644,21 +1452,13 @@ const Index = () => {
               tripStats={can('trips.view') ? tripStats : null}
             />
           </div>
-        </div>
-      </>
     );
   }
 
   // Vista de formularios con navegación
-  return (
-    <>
-      <FloatingViewAs />
-      <div className={`min-h-screen bg-background ${viewingAs ? 'pt-10' : ''}`}>
-        <AppHeader>
-          <NavigationButtons current="forms" />
-        </AppHeader>
-
-        <FormList
+  return renderShell(
+    'forms',
+    <FormList
           forms={forms}
           readOnly={!canAny(['forms.update', 'forms.create', 'forms.delete'])}
           onSelectForm={async (formId) => {
@@ -1681,8 +1481,6 @@ const Index = () => {
             }
           }}
         />
-      </div>
-    </>
   );
 };
 

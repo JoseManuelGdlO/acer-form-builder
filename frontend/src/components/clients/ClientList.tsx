@@ -70,6 +70,8 @@ interface ClientListProps {
     assignedUserId?: string;
   }) => void;
   onPageChange: (page: number) => void;
+  /** Incrementar desde el CTA del header para abrir ClientFormModal sin reescribir el CRUD. */
+  createOpenSignal?: number;
 }
 
 type ChecklistFilterType = 'all' | string; // 'all' or templateId
@@ -93,6 +95,7 @@ export const ClientList = ({
   initialQuery,
   onFiltersChange,
   onPageChange,
+  createOpenSignal,
 }: ClientListProps) => {
   const [searchQuery, setSearchQuery] = useState(initialQuery?.q || '');
   const [clientStatusFilter, setClientStatusFilter] = useState<ClientStatusFilterType>(
@@ -110,6 +113,7 @@ export const ClientList = ({
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [defaultParentClientId, setDefaultParentClientId] = useState<string | null>(null);
   const hasAutoOpenedInitialClient = useRef(false);
+  const lastCreateOpenSignal = useRef(createOpenSignal);
   
   const { checklistTemplates: clientStoreTemplates } = useClientStore();
   const { checklistTemplates: settingsTemplates, fetchChecklistTemplates } = useSettingsStore();
@@ -182,6 +186,20 @@ export const ClientList = ({
       setAdvisorFilter('all');
     }
   }, [branchFilter, advisorFilter, users]);
+
+  useEffect(() => {
+    const next = initialQuery?.q ?? '';
+    setSearchQuery((prev) => (prev === next ? prev : next));
+  }, [initialQuery?.q]);
+
+  useEffect(() => {
+    if (createOpenSignal == null) return;
+    if (lastCreateOpenSignal.current === createOpenSignal) return;
+    lastCreateOpenSignal.current = createOpenSignal;
+    setEditingClient(null);
+    setDefaultParentClientId(null);
+    setIsFormOpen(true);
+  }, [createOpenSignal]);
 
   useEffect(() => {
     if (hasAutoOpenedInitialClient.current) return;

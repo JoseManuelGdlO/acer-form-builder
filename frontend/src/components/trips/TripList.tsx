@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { Trip, TripInvitation, Client, StaffMember, BusTemplate, TripIncome, TripExpense, TripFinanceSummary } from '@/types/form';
 import type { Hotel } from '@/types/hotel';
 import { TripCard } from './TripCard';
@@ -87,6 +87,10 @@ interface TripListProps {
   onDetachTripHotel?: (tripId: string, tripHotelId: string) => Promise<void>;
   onAssignTripHotelRoom?: (tripId: string, tripHotelId: string, roomId: string, participantId: string) => Promise<void>;
   onClearTripHotelRoomAssignment?: (tripId: string, tripHotelId: string, roomId: string, participantId: string) => Promise<void>;
+  searchQuery?: string;
+  onSearchChange?: (value: string) => void;
+  /** Incrementar desde el CTA del header para abrir TripFormModal. */
+  createOpenSignal?: number;
 }
 
 export const TripList = ({
@@ -133,8 +137,14 @@ export const TripList = ({
   onDetachTripHotel,
   onAssignTripHotelRoom,
   onClearTripHotelRoomAssignment,
+  searchQuery: searchQueryProp,
+  onSearchChange,
+  createOpenSignal,
 }: TripListProps) => {
-  const [searchQuery, setSearchQuery] = useState('');
+  const [internalSearchQuery, setInternalSearchQuery] = useState('');
+  const searchQuery = searchQueryProp ?? internalSearchQuery;
+  const setSearchQuery = onSearchChange ?? setInternalSearchQuery;
+  const lastCreateOpenSignal = useRef(createOpenSignal);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingTrip, setEditingTrip] = useState<Trip | null>(null);
   const [viewingTripId, setViewingTripId] = useState<string | null>(null);
@@ -142,6 +152,14 @@ export const TripList = ({
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
   const [showBusTemplates, setShowBusTemplates] = useState(false);
   const [showStaffCatalog, setShowStaffCatalog] = useState(false);
+
+  useEffect(() => {
+    if (createOpenSignal == null) return;
+    if (lastCreateOpenSignal.current === createOpenSignal) return;
+    lastCreateOpenSignal.current = createOpenSignal;
+    setEditingTrip(null);
+    setIsFormOpen(true);
+  }, [createOpenSignal]);
 
   const filteredTrips = useMemo(() => {
     if (!searchQuery.trim()) return trips;

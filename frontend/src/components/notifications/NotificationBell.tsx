@@ -56,7 +56,7 @@ const NotificationBellItem = ({
   );
 };
 
-export function NotificationBell() {
+export function NotificationBell({ triggerClassName }: { triggerClassName?: string }) {
   const {
     notifications,
     unreadCount,
@@ -106,10 +106,10 @@ export function NotificationBell() {
   return (
     <DropdownMenu open={open} onOpenChange={onOpenChange}>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" className="gap-2 relative h-8 w-8 p-0">
-          <Bell className="w-4 h-4" />
+        <Button variant="ghost" size="icon" className={cn('relative', triggerClassName)}>
+          <Bell className="size-4" />
           {unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-primary text-primary-foreground text-[10px] font-semibold">
+            <span className="absolute right-0 top-0 grid size-4 place-items-center rounded-full bg-accent text-[9px] font-bold text-accent-foreground">
               {unreadCount > 99 ? '99+' : unreadCount}
             </span>
           )}

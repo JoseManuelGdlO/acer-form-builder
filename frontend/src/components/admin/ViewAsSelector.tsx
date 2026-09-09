@@ -33,13 +33,13 @@ export const ViewAsSelector = ({ users, viewingAs, onSelectUser }: ViewAsSelecto
   return (
     <>
       {viewingAs && (
-        <div className="fixed top-0 left-0 right-0 z-50 bg-amber-500 text-amber-950 py-2 px-4 flex items-center justify-between">
+        <div className="fixed top-0 left-0 right-0 z-50 bg-warning text-warning-foreground py-2 px-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Eye className="w-4 h-4" />
             <span className="text-sm font-medium">
               Viendo como: <strong>{viewingAs.name}</strong>
             </span>
-            <Badge variant="outline" className="bg-amber-400/50 text-amber-950 border-amber-600 text-xs">
+            <Badge variant="outline" className="border-warning-foreground/30 bg-warning/50 text-warning-foreground text-xs">
               {viewingAs.role.name}
             </Badge>
           </div>
@@ -47,7 +47,7 @@ export const ViewAsSelector = ({ users, viewingAs, onSelectUser }: ViewAsSelecto
             variant="ghost"
             size="sm"
             onClick={() => onSelectUser(null)}
-            className="text-amber-950 hover:bg-amber-400/50 gap-1.5"
+            className="gap-1.5 text-warning-foreground hover:bg-warning-foreground/10"
           >
             <X className="w-4 h-4" />
             Salir del modo vista

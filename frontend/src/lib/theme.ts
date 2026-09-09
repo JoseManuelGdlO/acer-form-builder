@@ -1,5 +1,8 @@
-/** HSL string format used in CSS: "H S% L%" (e.g. "234 66% 30%"). */
+/** HSL string format used in CSS: "H S% L%" (e.g. "203 82% 41%"). */
 export type HslString = string;
+
+/** Fallback hex for invalid HSL (TravelUp primary #1379BE). */
+const FALLBACK_PRIMARY_HEX = '#1379be';
 
 /** Keys stored in company.theme that are not CSS color variables. */
 export const APP_BACKGROUND_IMAGE_KEY = 'appBackgroundImage' as const;
@@ -37,6 +40,35 @@ export const THEME_COLOR_KEYS = [
 ] as const;
 
 export type ThemeColorKey = (typeof THEME_COLOR_KEYS)[number];
+
+/**
+ * Default TravelUp theme. Values are HSL `"H S% L%"` except `radius`.
+ * Must stay in sync with `:root` in `index.css`. Used by Settings → Restaurar.
+ */
+export const DEFAULT_THEME: Record<ThemeColorKey, string> = {
+  primary: '203 82% 41%',
+  'primary-foreground': '0 0% 100%',
+  secondary: '43 98% 53%',
+  'secondary-foreground': '40 50% 18%',
+  background: '210 67% 97%',
+  foreground: '220 35% 18%',
+  card: '0 0% 100%',
+  'card-foreground': '220 35% 18%',
+  muted: '210 45% 94%',
+  'muted-foreground': '220 15% 42%',
+  accent: '357 75% 48%',
+  border: '210 30% 88%',
+  ring: '203 82% 41%',
+  radius: '0.5rem',
+  'sidebar-background': '220 50% 18%',
+  'sidebar-foreground': '0 0% 98%',
+  'sidebar-primary': '203 82% 41%',
+  'sidebar-primary-foreground': '0 0% 100%',
+  'sidebar-accent': '220 40% 25%',
+  'sidebar-accent-foreground': '0 0% 98%',
+  'sidebar-border': '220 30% 32%',
+  'sidebar-ring': '43 98% 53%',
+};
 
 const THEME_META_KEYS = new Set<string>([
   APP_BACKGROUND_IMAGE_KEY,
@@ -121,7 +153,7 @@ function hexToHsl(hex: string): [number, number, number] {
  */
 export function hslStringToHex(hslString: string): string {
   const parsed = parseHslString(hslString);
-  if (!parsed) return '#1a237e';
+  if (!parsed) return FALLBACK_PRIMARY_HEX;
   const [h, s, l] = parsed;
   return hslToHex(h, s, l);
 }
@@ -162,7 +194,7 @@ export function applyAppBackground(theme: Record<string, string> | null | undefi
 
 /**
  * Apply company theme (CSS variables) to the document.
- * Values are HSL without hsl() wrapper, e.g. "234 66% 30%", except `radius` which is e.g. "0.75rem".
+ * Values are HSL without hsl() wrapper, e.g. "203 82% 41%", except `radius` which is e.g. "0.5rem".
  * Ignores metadata keys such as appBackgroundImage.
  */
 export function applyTheme(theme: Record<string, string> | null): void {

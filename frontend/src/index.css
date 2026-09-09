@@ -1,120 +1,119 @@
-@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    /* Color Palette (puede sobrescribirse por tema de compañía) */
-    --background: 0 0% 100%;
-    --foreground: 0 0% 18%;
+    /* TravelUp brand tokens (HSL puro: "H S% L%"). applyTheme puede sobrescribir los semánticos. */
+    --brand-primary: 203 82% 41%;
+    --brand-secondary: 43 98% 53%;
+    --brand-accent: 357 75% 48%;
+    --brand-canvas: 210 67% 97%;
+
+    --background: 210 67% 97%;
+    --foreground: 220 35% 18%;
 
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 18%;
+    --card-foreground: 220 35% 18%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 18%;
+    --popover-foreground: 220 35% 18%;
 
-    /* Primary: Navy Blue #1A237E */
-    --primary: 234 66% 30%;
+    /* Primary: TravelUp blue */
+    --primary: 203 82% 41%;
     --primary-foreground: 0 0% 100%;
 
-    /* Secondary: Corporate Red #C62828 */
-    --secondary: 0 67% 47%;
-    --secondary-foreground: 0 0% 100%;
+    /* Secondary: TravelUp gold */
+    --secondary: 43 98% 53%;
+    --secondary-foreground: 40 50% 18%;
 
-    --muted: 234 20% 95%;
-    --muted-foreground: 0 0% 45%;
+    --muted: 210 45% 94%;
+    --muted-foreground: 220 15% 42%;
 
-    /* Accent: Medium Blue #3949AB */
-    --accent: 230 45% 47%;
+    /* Accent: TravelUp red */
+    --accent: 357 75% 48%;
     --accent-foreground: 0 0% 100%;
 
-    /* Destructive: Red */
-    --destructive: 0 67% 47%;
+    --destructive: 357 75% 48%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 234 20% 90%;
-    --input: 234 20% 90%;
-    --ring: 234 66% 30%;
+    --border: 210 30% 88%;
+    --input: 210 25% 82%;
+    --ring: 203 82% 41%;
 
-    --radius: 0.75rem;
+    --radius: 0.5rem;
 
-    /* Custom tokens */
-    --success: 142 71% 45%;
+    /* Custom tokens — tonos alineados al prototipo; appointmentColors.ts no depende de estos */
+    --success: 150 50% 40%;
     --success-foreground: 0 0% 100%;
-    --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 100%;
-    --info: 230 45% 47%;
+    --warning: 43 90% 48%;
+    --warning-foreground: 40 50% 18%;
+    --info: 203 82% 41%;
     --info-foreground: 0 0% 100%;
 
-    /* Light Red for hover/gradients #E57373 */
-    --secondary-light: 0 71% 67%;
+    --secondary-light: 43 95% 70%;
 
-    /* Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(234 66% 30%) 0%, hsl(230 45% 47%) 100%);
-    --gradient-accent: linear-gradient(135deg, hsl(0 67% 47%) 0%, hsl(0 71% 67%) 100%);
-    --gradient-card: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(234 20% 98%) 100%);
-    
-    /* Shadows */
-    --shadow-sm: 0 1px 2px 0 hsl(234 66% 30% / 0.05);
-    --shadow-md: 0 4px 6px -1px hsl(234 66% 30% / 0.1), 0 2px 4px -2px hsl(234 66% 30% / 0.1);
-    --shadow-lg: 0 10px 15px -3px hsl(234 66% 30% / 0.1), 0 4px 6px -4px hsl(234 66% 30% / 0.1);
-    --shadow-xl: 0 20px 25px -5px hsl(234 66% 30% / 0.1), 0 8px 10px -6px hsl(234 66% 30% / 0.1);
-    --shadow-glow: 0 0 20px hsl(234 66% 30% / 0.2);
-    --shadow-glow-red: 0 0 20px hsl(0 67% 47% / 0.2);
+    --gradient-primary: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--primary) / 0.8) 100%);
+    --gradient-accent: linear-gradient(135deg, hsl(var(--accent)) 0%, hsl(var(--secondary)) 100%);
+    --gradient-card: linear-gradient(180deg, hsl(var(--card)) 0%, hsl(var(--brand-canvas)) 100%);
 
-    --sidebar-background: 234 66% 30%;
-    --sidebar-foreground: 0 0% 100%;
-    --sidebar-primary: 0 67% 47%;
+    --shadow-sm: 0 1px 2px 0 hsl(var(--primary) / 0.05);
+    --shadow-md: 0 4px 6px -1px hsl(var(--primary) / 0.1), 0 2px 4px -2px hsl(var(--primary) / 0.1);
+    --shadow-lg: 0 10px 15px -3px hsl(var(--primary) / 0.1), 0 4px 6px -4px hsl(var(--primary) / 0.1);
+    --shadow-xl: 0 20px 25px -5px hsl(var(--primary) / 0.1), 0 8px 10px -6px hsl(var(--primary) / 0.1);
+    --shadow-glow: 0 0 20px hsl(var(--primary) / 0.2);
+    --shadow-glow-red: 0 0 20px hsl(var(--accent) / 0.2);
+
+    --sidebar-background: 220 50% 18%;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 203 82% 41%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 230 45% 47%;
-    --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 234 50% 40%;
-    --sidebar-ring: 0 67% 47%;
+    --sidebar-accent: 220 40% 25%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 220 30% 32%;
+    --sidebar-ring: 43 98% 53%;
 
     /* Opacidad de superficies tipo card (tema: dashboardCardOpacity); 0–1 */
     --dashboard-card-opacity: 0.9;
   }
 
   .dark {
-    --background: 234 40% 8%;
-    --foreground: 0 0% 95%;
+    --background: 220 40% 8%;
+    --foreground: 210 20% 95%;
 
-    --card: 234 40% 12%;
-    --card-foreground: 0 0% 95%;
+    --card: 220 35% 12%;
+    --card-foreground: 210 20% 95%;
 
-    --popover: 234 40% 12%;
-    --popover-foreground: 0 0% 95%;
+    --popover: 220 35% 12%;
+    --popover-foreground: 210 20% 95%;
 
-    --primary: 234 66% 50%;
+    --primary: 203 82% 50%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 0 67% 47%;
-    --secondary-foreground: 0 0% 100%;
+    --secondary: 43 98% 53%;
+    --secondary-foreground: 40 50% 18%;
 
-    --muted: 234 30% 20%;
-    --muted-foreground: 0 0% 65%;
+    --muted: 220 30% 18%;
+    --muted-foreground: 210 15% 65%;
 
-    --accent: 230 45% 57%;
+    --accent: 357 75% 55%;
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 67% 47%;
+    --destructive: 357 75% 48%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 234 30% 25%;
-    --input: 234 30% 25%;
-    --ring: 234 66% 50%;
+    --border: 220 25% 22%;
+    --input: 220 25% 22%;
+    --ring: 203 82% 50%;
 
-    --sidebar-background: 234 50% 12%;
-    --sidebar-foreground: 0 0% 95%;
-    --sidebar-primary: 0 67% 47%;
+    --sidebar-background: 220 45% 10%;
+    --sidebar-foreground: 210 20% 95%;
+    --sidebar-primary: 203 82% 50%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 230 45% 47%;
-    --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 234 30% 25%;
-    --sidebar-ring: 0 67% 47%;
+    --sidebar-accent: 220 35% 18%;
+    --sidebar-accent-foreground: 210 20% 95%;
+    --sidebar-border: 220 25% 22%;
+    --sidebar-ring: 43 98% 53%;
   }
 }
 
@@ -125,7 +124,16 @@
 
   body {
     @apply bg-background text-foreground font-sans antialiased;
-    font-family: 'Montserrat', sans-serif;
+    font-family: Epilogue, sans-serif;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: Urbanist, sans-serif;
   }
 
   /*
