@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback, type ReactNode } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef, type ReactNode } from 'react';
 import { useFormStore } from '@/hooks/useFormStore';
 import { useSubmissionStore } from '@/hooks/useSubmissionStore';
 import { useClientStore } from '@/hooks/useClientStore';
@@ -232,9 +232,8 @@ const Index = () => {
   const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
   const [selectedFilterCategories, setSelectedFilterCategories] = useState<string[]>([]);
   const [headerSearch, setHeaderSearch] = useState('');
-  const [clientCreateSignal, setClientCreateSignal] = useState(0);
   const [tripCreateSignal, setTripCreateSignal] = useState(0);
-  const [quoteCreateSignal, setQuoteCreateSignal] = useState(0);
+  const pendingTripCreateRef = useRef(false);
   const [clientListQuery, setClientListQuery] = useState<{
     q?: string;
     status?: 'active' | 'inactive' | 'pending';
@@ -750,7 +749,7 @@ const Index = () => {
       if (currentForm && next !== 'forms') {
         if (editorHasUnsavedChanges) {
           const confirmed = window.confirm('Tienes cambios sin guardar. ¿Estás seguro de que quieres salir?');
-          if (!confirmed) return;
+          if (!confirmed) return false;
         }
 
         await selectForm(null);
@@ -761,39 +760,33 @@ const Index = () => {
       }
 
       setActiveView(next);
+      return true;
     },
     [currentForm, editorHasUnsavedChanges, selectForm, token, fetchForms]
   );
 
+  useEffect(() => {
+    if (activeView !== 'trips') return;
+    if (!pendingTripCreateRef.current) return;
+    pendingTripCreateRef.current = false;
+    setTripCreateSignal((n) => n + 1);
+  }, [activeView]);
+
   const buildHeaderCta = (view: View): AppHeaderCta | null => {
-    if (view === 'clients') {
-      return { label: 'Nuevo cliente', onClick: () => setClientCreateSignal((n) => n + 1) };
-    }
-    if (view === 'trips' && (can('trips.create') || can('trips.office_admin'))) {
-      return { label: 'Nuevo viaje', onClick: () => setTripCreateSignal((n) => n + 1) };
-    }
-    if (view === 'products' && canAny(['products.create', 'products.update'])) {
-      return {
-        label: 'Nuevo producto',
-        onClick: () => {
-          setEditingProduct(null);
-          setProductModalOpen(true);
-        },
-      };
-    }
-    if (view === 'hotels' && canAny(['hotels.create', 'hotels.update'])) {
-      return {
-        label: 'Nuevo hotel',
-        onClick: () => {
-          setEditingHotel(null);
-          setHotelModalOpen(true);
-        },
-      };
-    }
-    if (view === 'quotes' && can('quotes.create')) {
-      return { label: 'Nueva cotización', onClick: () => setQuoteCreateSignal((n) => n + 1) };
-    }
-    return null;
+    if (!(can('trips.create') || can('trips.office_admin'))) return null;
+    return {
+      label: 'Nuevo viaje',
+      onClick: () => {
+        if (view === 'trips') {
+          setTripCreateSignal((n) => n + 1);
+          return;
+        }
+        pendingTripCreateRef.current = true;
+        void handleNavigate('trips').then((ok) => {
+          if (!ok) pendingTripCreateRef.current = false;
+        });
+      },
+    };
   };
 
   const FloatingViewAs = () =>
@@ -894,7 +887,6 @@ const Index = () => {
             initialQuery={clientListQuery}
             onFiltersChange={handleClientFiltersChange}
             onPageChange={handleClientPageChange}
-            createOpenSignal={clientCreateSignal}
           />
     );
   }
@@ -1190,7 +1182,6 @@ const Index = () => {
           <QuotesView
             search={headerSearch}
             onSearchChange={setHeaderSearch}
-            createOpenSignal={quoteCreateSignal}
           />
         )}
       </PermissionGuard>
@@ -1407,7 +1398,7 @@ const Index = () => {
 
     return renderShell(
       'dashboard',
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="mx-auto max-w-[1600px] p-4 sm:p-6 lg:p-8">
             <Dashboard
               forms={forms}
               submissions={submissions}

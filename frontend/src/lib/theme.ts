@@ -46,28 +46,45 @@ export type ThemeColorKey = (typeof THEME_COLOR_KEYS)[number];
  * Must stay in sync with `:root` in `index.css`. Used by Settings → Restaurar.
  */
 export const DEFAULT_THEME: Record<ThemeColorKey, string> = {
-  primary: '203 82% 41%',
+  primary: '204 82% 41%',
   'primary-foreground': '0 0% 100%',
   secondary: '43 98% 53%',
-  'secondary-foreground': '40 50% 18%',
+  'secondary-foreground': '32 69% 11%',
   background: '210 67% 97%',
-  foreground: '220 35% 18%',
+  foreground: '210 43% 14%',
   card: '0 0% 100%',
-  'card-foreground': '220 35% 18%',
+  'card-foreground': '210 43% 14%',
   muted: '210 45% 94%',
-  'muted-foreground': '220 15% 42%',
+  'muted-foreground': '210 17% 40%',
   accent: '357 75% 48%',
-  border: '210 30% 88%',
-  ring: '203 82% 41%',
+  border: '213 29% 88%',
+  ring: '204 82% 41%',
   radius: '0.5rem',
-  'sidebar-background': '220 50% 18%',
-  'sidebar-foreground': '0 0% 98%',
-  'sidebar-primary': '203 82% 41%',
+  'sidebar-background': '211 100% 20%',
+  'sidebar-foreground': '211 100% 98%',
+  'sidebar-primary': '204 82% 41%',
   'sidebar-primary-foreground': '0 0% 100%',
-  'sidebar-accent': '220 40% 25%',
-  'sidebar-accent-foreground': '0 0% 98%',
-  'sidebar-border': '220 30% 32%',
+  'sidebar-accent': '206 100% 22%',
+  'sidebar-accent-foreground': '211 100% 98%',
+  'sidebar-border': '208 53% 37%',
   'sidebar-ring': '43 98% 53%',
+};
+
+/** Aproximaciones TravelUp anteriores; no pisan los HSL actuales del prototipo. */
+const SUPERSEDED_THEME_DEFAULTS: Partial<Record<ThemeColorKey, readonly string[]>> = {
+  primary: ['203 82% 41%'],
+  ring: ['203 82% 41%'],
+  'secondary-foreground': ['40 50% 18%'],
+  'muted-foreground': ['220 15% 42%'],
+  border: ['210 30% 88%'],
+  foreground: ['220 35% 18%'],
+  'card-foreground': ['220 35% 18%'],
+  'sidebar-background': ['220 50% 18%', '208 78% 22%', '234 66% 30%', '210 100% 19%'],
+  'sidebar-foreground': ['0 0% 98%', '0 0% 100%'],
+  'sidebar-primary': ['203 82% 41%'],
+  'sidebar-accent': ['220 40% 25%', '208 62% 26%', '230 45% 47%'],
+  'sidebar-accent-foreground': ['0 0% 98%', '0 0% 100%'],
+  'sidebar-border': ['220 30% 32%', '210 42% 38%', '234 50% 40%'],
 };
 
 const THEME_META_KEYS = new Set<string>([
@@ -211,6 +228,10 @@ export function applyTheme(theme: Record<string, string> | null): void {
   THEME_COLOR_KEYS.forEach((key) => {
     const value = theme[key];
     const prop = cssVarName(key);
+    if (value && SUPERSEDED_THEME_DEFAULTS[key]?.includes(value)) {
+      root.style.removeProperty(prop);
+      return;
+    }
     if (value != null && value !== '') {
       root.style.setProperty(prop, value);
     } else {

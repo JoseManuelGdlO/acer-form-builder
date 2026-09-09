@@ -322,7 +322,10 @@ export const Dashboard = ({
                 {format(new Date(), "EEEE d", { locale: es })}
               </h2>
             </div>
-            <StatusBadge tone="warning" className="bg-secondary text-secondary-foreground">
+            <StatusBadge
+              tone="warning"
+              className="h-6 items-center justify-center bg-secondary leading-none text-secondary-foreground"
+            >
               {todayAgenda.length} {todayAgenda.length === 1 ? 'bloque' : 'bloques'}
             </StatusBadge>
           </div>

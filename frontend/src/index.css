@@ -4,42 +4,42 @@
 
 @layer base {
   :root {
-    /* TravelUp brand tokens (HSL puro: "H S% L%"). applyTheme puede sobrescribir los semánticos. */
-    --brand-primary: 203 82% 41%;
+    /* TravelUp: hex de marca + oklch de chrome convertidos a HSL. */
+    --brand-primary: 204 82% 41%;
     --brand-secondary: 43 98% 53%;
     --brand-accent: 357 75% 48%;
     --brand-canvas: 210 67% 97%;
 
     --background: 210 67% 97%;
-    --foreground: 220 35% 18%;
+    --foreground: 210 43% 14%;
 
     --card: 0 0% 100%;
-    --card-foreground: 220 35% 18%;
+    --card-foreground: 210 43% 14%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 220 35% 18%;
+    --popover-foreground: 210 43% 14%;
 
-    /* Primary: TravelUp blue */
-    --primary: 203 82% 41%;
+    /* Primary: #1379BE */
+    --primary: 204 82% 41%;
     --primary-foreground: 0 0% 100%;
 
-    /* Secondary: TravelUp gold */
+    /* Secondary: #FDBB12 */
     --secondary: 43 98% 53%;
-    --secondary-foreground: 40 50% 18%;
+    --secondary-foreground: 32 69% 11%;
 
     --muted: 210 45% 94%;
-    --muted-foreground: 220 15% 42%;
+    --muted-foreground: 210 17% 40%;
 
-    /* Accent: TravelUp red */
+    /* Accent: #D51E26 */
     --accent: 357 75% 48%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 357 75% 48%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 210 30% 88%;
+    --border: 213 29% 88%;
     --input: 210 25% 82%;
-    --ring: 203 82% 41%;
+    --ring: 204 82% 41%;
 
     --radius: 0.5rem;
 
@@ -48,7 +48,7 @@
     --success-foreground: 0 0% 100%;
     --warning: 43 90% 48%;
     --warning-foreground: 40 50% 18%;
-    --info: 203 82% 41%;
+    --info: 204 82% 41%;
     --info-foreground: 0 0% 100%;
 
     --secondary-light: 43 95% 70%;
@@ -64,13 +64,14 @@
     --shadow-glow: 0 0 20px hsl(var(--primary) / 0.2);
     --shadow-glow-red: 0 0 20px hsl(var(--accent) / 0.2);
 
-    --sidebar-background: 220 50% 18%;
-    --sidebar-foreground: 0 0% 98%;
-    --sidebar-primary: 203 82% 41%;
+    /* Chrome del prototipo: oklch → HSL (barra = #003064) */
+    --sidebar-background: 211 100% 20%;
+    --sidebar-foreground: 211 100% 98%;
+    --sidebar-primary: 204 82% 41%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 40% 25%;
-    --sidebar-accent-foreground: 0 0% 98%;
-    --sidebar-border: 220 30% 32%;
+    --sidebar-accent: 206 100% 22%;
+    --sidebar-accent-foreground: 211 100% 98%;
+    --sidebar-border: 208 53% 37%;
     --sidebar-ring: 43 98% 53%;
 
     /* Opacidad de superficies tipo card (tema: dashboardCardOpacity); 0–1 */
