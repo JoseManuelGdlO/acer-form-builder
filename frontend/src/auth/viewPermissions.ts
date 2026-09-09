@@ -11,6 +11,7 @@ export type ShellView =
   | 'commissions'
   | 'groups'
   | 'trips'
+  | 'quotes'
   | 'users'
   | 'roles'
   | 'chatbot'
@@ -29,6 +30,7 @@ export const VIEW_ENTRY_PERMISSIONS: Record<ShellView, string[]> = {
   commissions: ['nav.commissions.view'],
   groups: ['nav.groups.view'],
   trips: ['nav.trips.view'],
+  quotes: ['nav.quotes.view', 'quotes.view'],
   users: ['nav.users.view'],
   roles: ['roles.view'],
   chatbot: ['nav.chatbot.view'],

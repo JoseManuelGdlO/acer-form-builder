@@ -36,6 +36,7 @@ import type { AppHeaderCta } from '@/components/layout/AppHeader';
 import { PermissionGuard } from '@/components/auth/PermissionGuard';
 import { type ShellView } from '@/auth/viewPermissions';
 import { userSeesAllClients } from '@/auth/userPermissions';
+import { QuotesView } from '@/components/quotes/QuotesView';
 import { RolesAdminPage } from '@/components/admin/RolesAdminPage';
 import { Button } from '@/components/ui/button';
 import { User } from '@/types/user';
@@ -68,6 +69,7 @@ const parseInitialClientNavigation = (): { initialView: View; initialClientId: s
     'commissions',
     'groups',
     'trips',
+    'quotes',
     'users',
     'roles',
     'chatbot',
@@ -232,6 +234,7 @@ const Index = () => {
   const [headerSearch, setHeaderSearch] = useState('');
   const [clientCreateSignal, setClientCreateSignal] = useState(0);
   const [tripCreateSignal, setTripCreateSignal] = useState(0);
+  const [quoteCreateSignal, setQuoteCreateSignal] = useState(0);
   const [clientListQuery, setClientListQuery] = useState<{
     q?: string;
     status?: 'active' | 'inactive' | 'pending';
@@ -539,7 +542,7 @@ const Index = () => {
 
   useEffect(() => {
     if (!token) return;
-    if (activeView !== 'trips' && activeView !== 'groups') return;
+    if (activeView !== 'trips' && activeView !== 'groups' && activeView !== 'quotes') return;
     const opts =
       viewingAs && !userSeesAllClients(viewingAs)
         ? { assignedUserId: viewingAs.id }
@@ -786,6 +789,9 @@ const Index = () => {
           setHotelModalOpen(true);
         },
       };
+    }
+    if (view === 'quotes' && can('quotes.create')) {
+      return { label: 'Nueva cotización', onClick: () => setQuoteCreateSignal((n) => n + 1) };
     }
     return null;
   };
@@ -1165,6 +1171,28 @@ const Index = () => {
         }
       >
         {renderShell('commissions', <CommissionsDashboard />)}
+      </PermissionGuard>
+    );
+  }
+
+  if (activeView === 'quotes') {
+    return (
+      <PermissionGuard
+        anyOf={['quotes.view', 'nav.quotes.view']}
+        fallback={
+          <div className="min-h-screen flex items-center justify-center">
+            <p className="text-muted-foreground">No tienes permisos para acceder a esta sección</p>
+          </div>
+        }
+      >
+        {renderShell(
+          'quotes',
+          <QuotesView
+            search={headerSearch}
+            onSearchChange={setHeaderSearch}
+            createOpenSignal={quoteCreateSignal}
+          />
+        )}
       </PermissionGuard>
     );
   }

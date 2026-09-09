@@ -6,6 +6,7 @@ import {
   Bus,
   CalendarDays,
   ChartNoAxesCombined,
+  ClipboardList,
   FileText,
   LayoutDashboard,
   Package,
@@ -23,11 +24,12 @@ export type ShellViewMeta = {
   subtitle: string;
 };
 
-/** Títulos de chrome por vista. No incluye `quotes` (M14). */
+/** Títulos de chrome por vista. */
 export const SHELL_VIEW_META: Record<ShellView, ShellViewMeta> = {
   dashboard: { title: 'Panel de operaciones', subtitle: 'Resumen del día y actividad reciente' },
   clients: { title: 'Clientes', subtitle: 'Expedientes, formularios, pagos y seguimiento' },
   trips: { title: 'Viajes', subtitle: 'Salidas, participantes, asientos y operación' },
+  quotes: { title: 'Cotizaciones', subtitle: 'Propuestas, vigencias, documentos y seguimiento' },
   calendar: { title: 'Calendario', subtitle: 'Agenda de salidas y citas' },
   forms: { title: 'Formularios', subtitle: 'Plantillas, respuestas y documentos' },
   products: { title: 'Productos', subtitle: 'Paquetes y categorías comerciales' },
@@ -53,7 +55,7 @@ export type ShellNavGroup = {
   items: ShellNavItem[];
 };
 
-/** Nav real de acer (Formularios en Catálogo; sin cotizaciones). */
+/** Nav real de acer (Formularios en Catálogo; Cotizaciones en Principal). */
 export const SHELL_NAV_GROUPS: ShellNavGroup[] = [
   {
     label: 'Principal',
@@ -61,6 +63,7 @@ export const SHELL_NAV_GROUPS: ShellNavGroup[] = [
       { id: 'dashboard', label: 'Inicio', icon: LayoutDashboard },
       { id: 'clients', label: 'Clientes', icon: UserRound },
       { id: 'trips', label: 'Viajes', icon: Bus },
+      { id: 'quotes', label: 'Cotizaciones', icon: ClipboardList },
       { id: 'calendar', label: 'Calendario', icon: CalendarDays },
     ],
   },
@@ -87,4 +90,4 @@ export const SHELL_NAV_GROUPS: ShellNavGroup[] = [
   },
 ];
 
-export const HEADER_SEARCHABLE_VIEWS: ShellView[] = ['clients', 'trips', 'products'];
+export const HEADER_SEARCHABLE_VIEWS: ShellView[] = ['clients', 'trips', 'products', 'quotes'];

@@ -1933,6 +1933,116 @@ class ApiClient {
       requireAuth: true,
     });
   }
+
+  // Quotes (M14)
+  async getQuotes(
+    params?: { clientId?: string; status?: string; q?: string },
+    token?: string | null
+  ) {
+    const normalizedParams = Object.fromEntries(
+      Object.entries(params || {}).filter(([, value]) => value !== undefined && value !== null && value !== '')
+    );
+    const queryParams = new URLSearchParams(normalizedParams as Record<string, string>).toString();
+    return this.request<any[]>(`/quotes${queryParams ? `?${queryParams}` : ''}`, {
+      method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async getQuote(id: string, token?: string | null) {
+    return this.request<any>(`/quotes/${id}`, {
+      method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async createQuote(data: Record<string, unknown>, token?: string | null) {
+    return this.request<any>('/quotes', {
+      method: 'POST',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateQuote(id: string, data: Record<string, unknown>, token?: string | null) {
+    return this.request<any>(`/quotes/${id}`, {
+      method: 'PUT',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateQuoteStatus(id: string, status: string, token?: string | null) {
+    return this.request<any>(`/quotes/${id}/status`, {
+      method: 'PATCH',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+      body: JSON.stringify({ status }),
+    });
+  }
+
+  async linkQuote(id: string, clientId: string, token?: string | null) {
+    return this.request<any>(`/quotes/${id}/link`, {
+      method: 'POST',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+      body: JSON.stringify({ clientId }),
+    });
+  }
+
+  async addQuoteEvent(id: string, label?: string, token?: string | null) {
+    return this.request<any>(`/quotes/${id}/events`, {
+      method: 'POST',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+      body: JSON.stringify({ label }),
+    });
+  }
+
+  async deleteQuote(id: string, token?: string | null) {
+    return this.request<{ message: string }>(`/quotes/${id}`, {
+      method: 'DELETE',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async getQuoteTemplate(token?: string | null) {
+    return this.request<any>('/quotes/template', {
+      method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async updateQuoteTemplate(data: Record<string, unknown>, token?: string | null) {
+    return this.request<any>('/quotes/template', {
+      method: 'PUT',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getQuotePdf(id: string, token?: string | null) {
+    return this.requestBlob(`/quotes/${id}/pdf`, {
+      method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async getQuoteTemplatePdf(token?: string | null) {
+    return this.requestBlob('/quotes/template/pdf', {
+      method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
 }
 
 export const api = new ApiClient(API_URL);

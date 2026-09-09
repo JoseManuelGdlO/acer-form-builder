@@ -10,6 +10,7 @@ import { ClientChat, ChatMessage } from './ClientChat';
 import { ClientFormData, ClientFormSubmission } from './ClientFormData';
 import { ClientNotes, ClientNote } from './ClientNotes';
 import { ClientPaymentHistory } from './ClientPaymentHistory';
+import { ClientQuotes } from '@/components/quotes/ClientQuotes';
 import { TabBar, type TabBarItem } from '@/components/layout/TabBar';
 import { StatusBadge, type StatusBadgeTone } from '@/components/layout/StatusBadge';
 import { useSettingsStore } from '@/hooks/useSettingsStore';
@@ -860,12 +861,14 @@ export const ClientProfileView = ({
     { id: 'citas', label: 'Citas' },
     ...(isTitular ? [{ id: 'pagos', label: 'Pagos' }] : []),
     { id: 'formularios', label: 'Formularios' },
-    {
-      id: 'cotizaciones',
-      label: 'Cotizaciones',
-      disabled: true,
-      title: 'Las cotizaciones se habilitarán más adelante (sin API todavía)',
-    },
+    can('quotes.view')
+      ? { id: 'cotizaciones', label: 'Cotizaciones' }
+      : {
+          id: 'cotizaciones',
+          label: 'Cotizaciones',
+          disabled: true,
+          title: 'No tienes permiso para ver cotizaciones',
+        },
   ];
   const formatYmdDate = (value?: string | null) => {
     if (!value) return 'Sin fecha';
@@ -1326,6 +1329,14 @@ export const ClientProfileView = ({
                   </div>
             </Card>
           </div>
+
+          {can('quotes.view') ? (
+            <div hidden={activeTab !== 'cotizaciones'}>
+              <Card className="p-5">
+                <ClientQuotes clientId={displayClient.id} clientName={displayClient.name} />
+              </Card>
+            </div>
+          ) : null}
         </div>
 
         <div className="flex h-[520px] min-h-0 flex-col xl:sticky xl:top-6 xl:h-[calc(100vh-8rem)]">

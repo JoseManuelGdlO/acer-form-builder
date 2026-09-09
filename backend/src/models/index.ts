@@ -51,6 +51,9 @@ import { TripHotel } from './TripHotel';
 import { TripHotelRoom } from './TripHotelRoom';
 import { TripHotelRoomAssignment } from './TripHotelRoomAssignment';
 import { TripReminderSend } from './TripReminderSend';
+import { Quote } from './Quote';
+import { QuoteEvent } from './QuoteEvent';
+import { QuoteTemplate } from './QuoteTemplate';
 
 // Company relationships (multi-tenant)
 Company.hasMany(User, { foreignKey: 'companyId', as: 'users' });
@@ -101,6 +104,12 @@ Company.hasMany(StaffMember, { foreignKey: 'companyId', as: 'staffMembers' });
 StaffMember.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
 Company.hasMany(Hotel, { foreignKey: 'companyId', as: 'hotels' });
 Hotel.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+Company.hasMany(Quote, { foreignKey: 'companyId', as: 'quotes' });
+Quote.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+Company.hasOne(QuoteTemplate, { foreignKey: 'companyId', as: 'quoteTemplate' });
+QuoteTemplate.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+Company.hasMany(QuoteEvent, { foreignKey: 'companyId', as: 'quoteEvents' });
+QuoteEvent.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
 
 // Notifications relationships (multi-tenant)
 Company.hasMany(Notification, { foreignKey: 'companyId', as: 'notifications' });
@@ -221,6 +230,14 @@ Client.hasMany(ClientMessage, { foreignKey: 'clientId', as: 'messages' });
 ClientMessage.belongsTo(Client, { foreignKey: 'clientId', as: 'client' });
 Client.hasMany(InternalAppointment, { foreignKey: 'clientId', as: 'internalAppointments' });
 InternalAppointment.belongsTo(Client, { foreignKey: 'clientId', as: 'client' });
+Client.hasMany(Quote, { foreignKey: 'clientId', as: 'quotes' });
+Quote.belongsTo(Client, { foreignKey: 'clientId', as: 'client' });
+Quote.hasMany(QuoteEvent, { foreignKey: 'quoteId', as: 'events' });
+QuoteEvent.belongsTo(Quote, { foreignKey: 'quoteId', as: 'quote' });
+User.hasMany(Quote, { foreignKey: 'advisorUserId', as: 'advisorQuotes' });
+Quote.belongsTo(User, { foreignKey: 'advisorUserId', as: 'advisor' });
+User.hasMany(Quote, { foreignKey: 'createdBy', as: 'createdQuotes' });
+Quote.belongsTo(User, { foreignKey: 'createdBy', as: 'creator' });
 
 // ClientGroup relationships
 User.hasMany(ClientGroup, { foreignKey: 'assignedUserId', as: 'assignedGroups' });
@@ -392,4 +409,7 @@ export {
   TripHotelRoom,
   TripHotelRoomAssignment,
   TripReminderSend,
+  Quote,
+  QuoteEvent,
+  QuoteTemplate,
 };

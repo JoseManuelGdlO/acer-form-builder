@@ -201,7 +201,9 @@ export function AppHeader({
       ? 'Buscar clientes…'
       : currentView === 'trips'
         ? 'Buscar viajes…'
-        : 'Buscar productos…'
+        : currentView === 'quotes'
+          ? 'Buscar cotizaciones…'
+          : 'Buscar productos…'
     : 'Buscar en esta vista…';
 
   return (

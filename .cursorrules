@@ -6,6 +6,12 @@ REGLAS CRÍTICAS INQUEBRANTABLES:
 3. CONSERVAR PERMISOS: Nunca modifiques la lógica de `can()` o `canAny()`. El control de acceso granular por roles y la funcionalidad `view-as` deben permanecer completamente intactos.
 4. CASCADA NO DESTRUCTIVA: Tus modificaciones son puramente visuales (layout, composición, chrome, colores). Las operaciones CRUD, filtros y lógica de negocio subyacente deben seguir funcionando con exactitud.
 
+EXCEPCIÓN ACTIVA: MÓDULO 14 (COTIZACIONES)
+- Para este módulo en específico, el alcance es FULLSTACK. Tienes permitido y debes diseñar la lógica de backend.
+- Puedes crear migraciones, modelos de base de datos (MySQL), controladores y rutas HTTP para el módulo de Cotizaciones.
+- Tienes permitido modificar `api.ts` EXCLUSIVAMENTE para añadir los nuevos métodos de Cotizaciones.
+- Las reglas de estilo visual (Tailwind, HSL, primitivas) se mantienen estrictamente obligatorias para el frontend de este módulo.
+
 GUÍAS DE ESTILO Y UI:
 - Stack Principal: React 18+, Vite, React Router DOM, Tailwind CSS.
 - Colores (Estricto): Usa EXCLUSIVAMENTE variables CSS en formato HSL (ej. `bg-brand-primary`, `text-success`). NUNCA uses códigos HEX, RGB o OkLCH directamente en los componentes.
