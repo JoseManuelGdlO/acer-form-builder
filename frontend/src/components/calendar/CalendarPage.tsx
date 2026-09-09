@@ -1,11 +1,24 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Calendar } from '@/components/ui/calendar';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import { api } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { CalendarEvent } from '@/types/form';
-import { endOfMonth, format, startOfMonth } from 'date-fns';
+import {
+  addMonths,
+  eachDayOfInterval,
+  endOfMonth,
+  endOfWeek,
+  format,
+  isSameDay,
+  isSameMonth,
+  isToday,
+  startOfMonth,
+  startOfWeek,
+} from 'date-fns';
 import { es } from 'date-fns/locale';
 import {
   APPOINTMENT_TYPE_LABELS,
@@ -13,13 +26,14 @@ import {
   appointmentTypeBadgeClass,
 } from '@/lib/appointmentColors';
 import { sortCalendarEvents } from '@/lib/calendarEventSort';
-import { CalendarDays, Clock, User } from 'lucide-react';
+import { Clock, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
+import { SectionTitle } from '@/components/layout/SectionTitle';
 
 /** Clave interna para eventos sin sucursal en filtros */
 const BRANCH_FILTER_NONE = '__sin_sucursal__';
+const WEEKDAY_LABELS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+const CELL_EVENT_LIMIT = 2;
 
 function branchFilterKey(event: CalendarEvent): string {
   const n = event.branchName?.trim();
@@ -30,10 +44,20 @@ function branchFilterLabel(key: string): string {
   return key === BRANCH_FILTER_NONE ? 'Sin sucursal' : key;
 }
 
+function monthGridDays(month: Date): Date[] {
+  const start = startOfWeek(startOfMonth(month), { weekStartsOn: 1 });
+  const end = endOfWeek(endOfMonth(month), { weekStartsOn: 1 });
+  return eachDayOfInterval({ start, end });
+}
+
+function dateKey(day: Date): string {
+  return format(day, 'yyyy-MM-dd');
+}
+
 export const CalendarPage = () => {
   const { token } = useAuth();
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
-  const [visibleMonth, setVisibleMonth] = useState<Date>(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
+  const [visibleMonth, setVisibleMonth] = useState<Date>(() => startOfMonth(new Date()));
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showBranch, setShowBranch] = useState<Record<string, boolean>>({});
@@ -73,20 +97,32 @@ export const CalendarPage = () => {
     [events, showBranch]
   );
 
-  const selectedDateKey = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '';
+  const eventsByDate = useMemo(() => {
+    const map = new Map<string, CalendarEvent[]>();
+    for (const event of visibleEvents) {
+      const list = map.get(event.date) ?? [];
+      list.push(event);
+      map.set(event.date, list);
+    }
+    for (const [key, list] of map) {
+      map.set(key, sortCalendarEvents(list));
+    }
+    return map;
+  }, [visibleEvents]);
+
+  const gridDays = useMemo(() => monthGridDays(visibleMonth), [visibleMonth]);
+
+  const selectedDateKey = dateKey(selectedDate);
   const eventsOnSelectedDateRaw = useMemo(
     () => events.filter((event) => event.date === selectedDateKey),
     [events, selectedDateKey]
   );
   const selectedDateEvents = useMemo(() => {
-    const list = visibleEvents.filter((event) => event.date === selectedDateKey);
-    return sortCalendarEvents(list);
-  }, [visibleEvents, selectedDateKey]);
+    return eventsByDate.get(selectedDateKey) ?? [];
+  }, [eventsByDate, selectedDateKey]);
 
-  const eventDates = useMemo(() => {
-    const unique = Array.from(new Set(visibleEvents.map((event) => event.date)));
-    return unique.map((d) => new Date(`${d}T00:00:00`));
-  }, [visibleEvents]);
+  const monthTitle = format(visibleMonth, 'MMMM yyyy', { locale: es });
+  const prettyMonthTitle = monthTitle.charAt(0).toUpperCase() + monthTitle.slice(1);
 
   const formatEventTime = (event: CalendarEvent) => {
     if (event.type === 'office' && event.startTime && /^\d{2}:\d{2}$/.test(event.startTime)) {
@@ -102,182 +138,184 @@ export const CalendarPage = () => {
     return APPOINTMENT_TYPE_LABELS[event.type];
   };
 
+  const shiftMonth = (delta: number) => {
+    const next = addMonths(startOfMonth(visibleMonth), delta);
+    setVisibleMonth(next);
+    setSelectedDate((prev) => {
+      if (isSameMonth(prev, next)) return prev;
+      const today = new Date();
+      if (isSameMonth(today, next)) return today;
+      return next;
+    });
+  };
+
+  const handleSelectDay = (day: Date) => {
+    setSelectedDate(day);
+    if (!isSameMonth(day, visibleMonth)) {
+      setVisibleMonth(startOfMonth(day));
+    }
+  };
+
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-8">
-      <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-gradient-to-br from-primary/10 via-card to-accent/5 p-6 sm:p-8 shadow-sm">
-        <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-primary/5 blur-3xl pointer-events-none" aria-hidden />
-        <div className="absolute -left-12 bottom-0 h-32 w-32 rounded-full bg-violet-500/10 blur-2xl pointer-events-none" aria-hidden />
-        <div className="relative flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-          <div className="flex items-start gap-4">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary/15 text-primary shadow-inner">
-              <CalendarDays className="h-7 w-7" />
+    <div className="mx-auto max-w-[1600px] p-4 sm:p-6 lg:p-8">
+      <div className="mb-5 flex flex-wrap items-center gap-x-4 gap-y-2">
+        <p className="text-xs font-medium text-muted-foreground">Mostrar sucursales</p>
+        {branchFilterKeys.length === 0 ? (
+          <p className="text-xs text-muted-foreground">No hay sucursales en los eventos de este mes.</p>
+        ) : (
+          branchFilterKeys.map((key) => (
+            <div key={key} className="flex items-center gap-2">
+              <Checkbox
+                id={`cal-branch-${key}`}
+                checked={showBranch[key] !== false}
+                onCheckedChange={(checked) =>
+                  setShowBranch((prev) => ({ ...prev, [key]: checked === true }))
+                }
+              />
+              <Label htmlFor={`cal-branch-${key}`} className="cursor-pointer text-xs font-medium">
+                {branchFilterLabel(key)}
+              </Label>
             </div>
-            <div>
-              <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">Calendario</h1>
-              <p className="text-muted-foreground mt-1 max-w-xl">
-                Citas internas y fechas de viajes. Filtra por sucursal; en oficina el distintivo muestra la
-                sucursal y el nombre del cliente va en el título.
-              </p>
-            </div>
-          </div>
-        </div>
-        <div className="relative mt-5 space-y-2">
-          <p className="text-xs font-medium text-muted-foreground">Mostrar sucursales (solo esta vista)</p>
-          {branchFilterKeys.length === 0 ? (
-            <p className="text-xs text-muted-foreground/90">No hay sucursales en los eventos de este mes.</p>
-          ) : (
-            <div className="flex flex-wrap gap-x-4 gap-y-2.5">
-              {branchFilterKeys.map((key) => (
-                <div
-                  key={key}
-                  className="flex items-center gap-2 rounded-full bg-background/80 px-2.5 py-1 shadow-sm border border-border/40 max-w-full"
-                >
-                  <Checkbox
-                    id={`cal-branch-${key}`}
-                    checked={showBranch[key] !== false}
-                    onCheckedChange={(checked) =>
-                      setShowBranch((prev) => ({ ...prev, [key]: checked === true }))
-                    }
-                    className="border-border/80 shrink-0"
-                  />
-                  <Label
-                    htmlFor={`cal-branch-${key}`}
-                    className="text-xs font-medium cursor-pointer flex items-center gap-2 min-w-0"
-                  >
-                    <span className="h-2.5 w-2.5 rounded-full shrink-0 bg-primary/80" aria-hidden />
-                    <span className="truncate">{branchFilterLabel(key)}</span>
-                  </Label>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+          ))
+        )}
       </div>
 
-      <div className="grid lg:grid-cols-[minmax(0,400px)_1fr] gap-8 items-start">
-        <Card className="overflow-hidden border-border/60 shadow-md rounded-2xl bg-card/90 backdrop-blur-sm">
-          <CardHeader className="pb-2 border-b border-border/40 bg-muted/20">
-            <CardTitle className="text-base font-semibold">Mes</CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 sm:p-5">
-            <Calendar
-              mode="single"
-              selected={selectedDate}
-              onSelect={setSelectedDate}
-              month={visibleMonth}
-              onMonthChange={setVisibleMonth}
-              modifiers={{ hasEvents: eventDates }}
-              modifiersClassNames={{
-                hasEvents: cn(
-                  'font-semibold relative',
-                  'after:absolute after:bottom-1 after:left-1/2 after:-translate-x-1/2',
-                  'after:h-1 after:w-1 after:rounded-full after:bg-primary after:shadow-sm'
-                ),
-              }}
-              className="mx-auto w-full max-w-[340px]"
-            />
-          </CardContent>
-        </Card>
+      <div className="grid gap-4 xl:grid-cols-[1fr_360px]">
+        <Card className="p-5">
+          <div className="mb-5 flex items-center justify-between gap-3">
+            <h2 className="font-display text-lg font-semibold">{prettyMonthTitle}</h2>
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => shiftMonth(-1)}>
+                Anterior
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => shiftMonth(1)}>
+                Siguiente
+              </Button>
+            </div>
+          </div>
 
-        <Card className="overflow-hidden border-border/60 shadow-md rounded-2xl min-h-[420px] flex flex-col bg-card/90 backdrop-blur-sm">
-          <CardHeader className="border-b border-border/40 bg-muted/15 pb-4">
-            <CardTitle className="text-lg sm:text-xl flex flex-wrap items-baseline gap-x-2 gap-y-1">
-              <span>Eventos</span>
-              <span className="text-muted-foreground font-normal text-base">
-                {selectedDate ? format(selectedDate, "d 'de' MMMM yyyy", { locale: es }) : 'Selecciona un día'}
+          <div className="grid grid-cols-7 text-center text-[11px] font-semibold uppercase text-muted-foreground">
+            {WEEKDAY_LABELS.map((label) => (
+              <span key={label} className="py-2">
+                {label}
               </span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="flex-1 p-4 sm:p-6">
-            {isLoading ? (
-              <div className="flex items-center gap-3 text-sm text-muted-foreground py-8">
-                <div className="h-5 w-5 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-                Cargando eventos...
-              </div>
-            ) : selectedDateEvents.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-border/80 bg-muted/20 px-6 py-12 text-center">
-                <p className="text-sm text-muted-foreground">
-                  {eventsOnSelectedDateRaw.length > 0
-                    ? 'Hay eventos este día, pero ninguno coincide con las sucursales activas en los filtros.'
-                    : 'No hay eventos para esta fecha.'}
-                </p>
-              </div>
-            ) : (
-              <ul className="space-y-3">
-                {selectedDateEvents.map((event, idx) => {
-                  const timeLabel = formatEventTime(event);
-                  const sidebarLabel =
-                    timeLabel != null
-                      ? { variant: 'time' as const, text: timeLabel }
-                      : event.type === 'office'
-                        ? { variant: 'muted' as const, text: 'Sin hora' }
-                        : { variant: 'type' as const, text: APPOINTMENT_TYPE_LABELS[event.type] };
-                  return (
-                    <li
-                      key={`${event.type}-${event.date}-${idx}-${event.title}`}
+            ))}
+          </div>
+
+          <div className="grid grid-cols-7 overflow-hidden rounded-md border border-border">
+            {gridDays.map((day) => {
+              const key = dateKey(day);
+              const dayEvents = eventsByDate.get(key) ?? [];
+              const extraCount = Math.max(0, dayEvents.length - CELL_EVENT_LIMIT);
+              const inMonth = isSameMonth(day, visibleMonth);
+              const selected = isSameDay(day, selectedDate);
+              const hasEvents = dayEvents.length > 0;
+              const label = format(day, "d 'de' MMMM yyyy", { locale: es });
+
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => handleSelectDay(day)}
+                  aria-pressed={selected}
+                  aria-label={`${label}${hasEvents ? `, ${dayEvents.length} eventos` : ''}`}
+                  className={cn(
+                    'min-h-20 border-b border-r border-border p-2 text-left text-xs hover:bg-muted',
+                    !inMonth && 'opacity-30',
+                    hasEvents && 'bg-secondary/15',
+                    selected && 'bg-primary/10 ring-1 ring-inset ring-primary',
+                    isToday(day) && 'font-semibold'
+                  )}
+                >
+                  <span>{format(day, 'd')}</span>
+                  {dayEvents.slice(0, CELL_EVENT_LIMIT).map((event, idx) => (
+                    <span
+                      key={`${event.type}-${event.tripId ?? event.clientId ?? event.title}-${idx}`}
                       className={cn(
-                        'group rounded-xl border border-border/50 bg-gradient-to-r from-card to-card/80 p-4 shadow-sm transition-shadow hover:shadow-md',
-                        appointmentEventRowBorderClass(event.type)
+                        appointmentTypeBadgeClass(event.type),
+                        'mt-1 block max-w-full truncate rounded px-1.5 py-1 text-[9px] font-medium leading-tight'
                       )}
                     >
-                      <div className="flex flex-col sm:flex-row sm:items-start gap-3">
-                        {sidebarLabel.variant === 'time' ? (
-                          <div className="flex shrink-0 items-center gap-2 rounded-lg bg-muted/50 px-3 py-2 text-sm font-mono font-semibold tabular-nums text-foreground border border-border/40">
-                            <Clock className="h-4 w-4 text-muted-foreground" aria-hidden />
-                            {sidebarLabel.text}
-                          </div>
-                        ) : (
-                          <div
-                            className={cn(
-                              'flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 border border-border/30',
-                              sidebarLabel.variant === 'muted'
-                                ? 'bg-muted/30 text-xs text-muted-foreground'
-                                : 'bg-muted/20 text-xs font-medium text-foreground'
-                            )}
-                          >
-                            <Clock className="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden />
-                            {sidebarLabel.text}
-                          </div>
-                        )}
-                        <div className="min-w-0 flex-1 space-y-2">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Badge
-                              className={cn(
-                                appointmentTypeBadgeClass(event.type),
-                                'max-w-[min(100%,18rem)] truncate shrink'
-                              )}
-                              title={badgeLabel(event)}
-                            >
-                              {badgeLabel(event)}
-                            </Badge>
-                            <span className="text-sm font-semibold text-foreground leading-snug min-w-0">
-                              {event.title}
-                            </span>
-                          </div>
-                          {event.type === 'office' && event.advisorName && (
-                            <div className="text-xs text-muted-foreground">
-                              <span className="inline-flex items-center gap-1.5">
-                                <User className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
-                                <span>
-                                  Asesor:{' '}
-                                  <span className="text-foreground font-medium">{event.advisorName}</span>
-                                </span>
-                              </span>
-                            </div>
-                          )}
-                          {event.note && (
-                            <p className="text-sm text-muted-foreground leading-relaxed border-t border-border/30 pt-2">
-                              {event.note}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </CardContent>
+                      {event.title}
+                    </span>
+                  ))}
+                  {extraCount > 0 ? (
+                    <span className="mt-1 block text-[9px] text-muted-foreground">+{extraCount} más</span>
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+        </Card>
+
+        <Card className="p-5">
+          <SectionTitle title="Agenda del día">
+            <span className="text-xs font-normal text-muted-foreground">
+              {format(selectedDate, "d 'de' MMMM yyyy", { locale: es })}
+            </span>
+          </SectionTitle>
+
+          {isLoading ? (
+            <div className="flex items-center gap-3 py-8 text-sm text-muted-foreground">
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              Cargando eventos...
+            </div>
+          ) : selectedDateEvents.length === 0 ? (
+            <div className="rounded-md bg-muted px-4 py-10 text-center">
+              <p className="text-sm text-muted-foreground">
+                {eventsOnSelectedDateRaw.length > 0
+                  ? 'Hay eventos este día, pero ninguno coincide con las sucursales activas en los filtros.'
+                  : 'No hay eventos para esta fecha.'}
+              </p>
+              {eventsOnSelectedDateRaw.length === 0 ? (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Las citas se crean desde el perfil del cliente.
+                </p>
+              ) : null}
+            </div>
+          ) : (
+            selectedDateEvents.map((event, idx) => {
+              const timeLabel = formatEventTime(event);
+              const timeText =
+                timeLabel ??
+                (event.type === 'office' ? 'Sin hora' : APPOINTMENT_TYPE_LABELS[event.type]);
+
+              return (
+                <div
+                  key={`${event.type}-${event.date}-${idx}-${event.title}`}
+                  className={cn(
+                    'mb-3 rounded-md bg-muted p-3',
+                    appointmentEventRowBorderClass(event.type)
+                  )}
+                >
+                  <p className="flex items-center gap-1.5 text-xs font-semibold">
+                    <Clock className="size-3.5 shrink-0 opacity-70" aria-hidden />
+                    {timeText}
+                  </p>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <Badge
+                      className={cn(appointmentTypeBadgeClass(event.type), 'max-w-[min(100%,18rem)] truncate')}
+                      title={badgeLabel(event)}
+                    >
+                      {badgeLabel(event)}
+                    </Badge>
+                  </div>
+                  <p className="mt-1 text-sm">{event.title}</p>
+                  {event.type === 'office' && event.advisorName ? (
+                    <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <User className="size-3.5 shrink-0 opacity-80" aria-hidden />
+                      Asesor: <span className="font-medium text-foreground">{event.advisorName}</span>
+                    </p>
+                  ) : null}
+                  {event.note ? (
+                    <p className="mt-2 border-t border-border/60 pt-2 text-sm text-muted-foreground">
+                      {event.note}
+                    </p>
+                  ) : null}
+                </div>
+              );
+            })
+          )}
         </Card>
       </div>
     </div>

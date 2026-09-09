@@ -989,67 +989,20 @@ const Index = () => {
     return renderShell(
       'products',
       <>
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4 mb-4">
-            <div className="space-y-3">
-              <div className="flex flex-wrap gap-2 items-center">
-                <span className="text-sm font-medium text-muted-foreground">Filtrar por categoría:</span>
-                {categories.map((cat: Category) => {
-                  const active = selectedFilterCategories.includes(cat.key);
-                  return (
-                    <button
-                      key={cat.id}
-                      type="button"
-                      onClick={() => toggleFilterCategory(cat.key)}
-                      className={`text-xs px-2 py-1 rounded-full border ${
-                        active
-                          ? 'bg-primary text-primary-foreground border-primary'
-                          : 'bg-background text-foreground hover:bg-accent'
-                      }`}
-                    >
-                      {cat.name}
-                    </button>
-                  );
-                })}
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={applyFilters}
-                    disabled={!token}
-                  >
-                    Aplicar filtros
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={clearFilters}
-                    disabled={!token && selectedFilterCategories.length === 0}
-                  >
-                    Quitar filtros
-                  </Button>
-                </div>
-                {canAny(['categories.create', 'categories.update', 'categories.delete']) && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setCategoryManagerOpen(true)}
-                  >
-                    Gestionar categorías
-                  </Button>
-                )}
-              </div>
-            </div>
-          </div>
           <ProductsList
             products={listedProducts}
             readOnly={!canAny(['products.create', 'products.update', 'products.delete'])}
             onCreate={handleCreate}
             onEdit={handleEdit}
             onDelete={handleDelete}
+            categories={categories}
+            selectedFilterCategories={selectedFilterCategories}
+            onToggleFilterCategory={toggleFilterCategory}
+            onApplyFilters={applyFilters}
+            onClearFilters={clearFilters}
+            canManageCategories={canAny(['categories.create', 'categories.update', 'categories.delete'])}
+            onManageCategories={() => setCategoryManagerOpen(true)}
+            filtersReady={Boolean(token)}
             categoriesMap={categories.reduce<Record<string, Category>>((acc, cat) => {
               const normalizedKey = normalizeCategoryKey(cat.key);
               acc[cat.key] = cat;

@@ -12,6 +12,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
 
 interface ProductFormModalProps {
   open: boolean;
@@ -117,14 +118,14 @@ export const ProductFormModal = ({
     <Dialog open={open} onOpenChange={(o) => !o && !isSubmitting && onClose()}>
       <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{product ? 'Editar producto' : 'Crear producto'}</DialogTitle>
+          <DialogTitle className="font-display">{product ? 'Editar producto' : 'Crear producto'}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <label className="text-sm font-medium">
+            <Label>
               Título
-              <span className="text-destructive ml-0.5">*</span>
-            </label>
+              <span className="ml-0.5 text-destructive">*</span>
+            </Label>
             <Input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
@@ -133,9 +134,7 @@ export const ProductFormModal = ({
             />
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium">
-              Descripción
-            </label>
+            <Label>Descripción</Label>
             <Textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -144,9 +143,7 @@ export const ProductFormModal = ({
             />
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium">
-              Requerimientos
-            </label>
+            <Label>Requerimientos</Label>
             <Textarea
               value={requirements}
               onChange={(e) => setRequirements(e.target.value)}
@@ -159,10 +156,10 @@ export const ProductFormModal = ({
             </p>
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium">
+            <Label>
               Qué incluye
-              <span className="text-destructive ml-0.5">*</span>
-            </label>
+              <span className="ml-0.5 text-destructive">*</span>
+            </Label>
             <Textarea
               value={includes}
               onChange={(e) => setIncludes(e.target.value)}
@@ -172,10 +169,10 @@ export const ProductFormModal = ({
             />
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium">
+            <Label>
               Precio
-              <span className="text-destructive ml-0.5">*</span>
-            </label>
+              <span className="ml-0.5 text-destructive">*</span>
+            </Label>
             <Input
               type="number"
               inputMode="numeric"
@@ -188,7 +185,7 @@ export const ProductFormModal = ({
             />
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium">Categorías</label>
+            <Label>Categorías</Label>
             {availableCategories && availableCategories.length > 0 ? (
               <>
                 <div className="grid grid-cols-2 gap-2">
@@ -206,7 +203,7 @@ export const ProductFormModal = ({
                             toggleCategory(cat.key);
                           }
                         }}
-                        className="flex items-center gap-2 rounded-md border px-2 py-1 text-left hover:bg-accent cursor-pointer"
+                        className="flex cursor-pointer items-center gap-2 rounded-md border border-border px-2 py-1 text-left hover:bg-muted/40"
                       >
                         <Badge
                           variant={(checked ? (cat.color as any) : 'outline') || (checked ? 'secondary' : 'outline')}
@@ -229,7 +226,7 @@ export const ProductFormModal = ({
             )}
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium">Imagen promocional</label>
+            <Label>Imagen promocional</Label>
             <Input type="file" accept="image/*" onChange={handleFileChange} />
             {previewUrl && (
               <div className="mt-2">
@@ -237,7 +234,7 @@ export const ProductFormModal = ({
                 <img
                   src={previewUrl}
                   alt="Vista previa"
-                  className="h-32 w-full object-cover rounded-md border"
+                  className="h-32 w-full rounded-md border border-border object-cover"
                 />
               </div>
             )}

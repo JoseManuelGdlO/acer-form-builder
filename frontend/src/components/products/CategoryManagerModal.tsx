@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Category } from '@/types/category';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Dialog,
   DialogContent,
@@ -84,14 +85,14 @@ export const CategoryManagerModal = ({
     <Dialog open={open} onOpenChange={(o) => !o && !isSubmitting && onClose()}>
       <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Gestionar categorías de productos</DialogTitle>
+          <DialogTitle className="font-display">Gestionar categorías de productos</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <label className="text-sm font-medium">
+            <Label>
               Nombre
-              <span className="text-destructive ml-0.5">*</span>
-            </label>
+              <span className="ml-0.5 text-destructive">*</span>
+            </Label>
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -100,9 +101,9 @@ export const CategoryManagerModal = ({
             />
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium">Color del badge</label>
+            <Label>Color del badge</Label>
             <select
-              className="border rounded-md px-2 py-1 text-sm bg-background"
+              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
               value={color}
               onChange={(e) => setColor(e.target.value)}
             >
@@ -125,13 +126,13 @@ export const CategoryManagerModal = ({
         </form>
 
         <div className="mt-6 space-y-2">
-          <h3 className="text-sm font-semibold">Categorías existentes</h3>
+          <h3 className="font-display text-sm font-semibold">Categorías existentes</h3>
           {categories.length === 0 ? (
             <p className="text-xs text-muted-foreground">
               Aún no tienes categorías configuradas. Crea una arriba.
             </p>
           ) : (
-            <div className="border rounded-md divide-y">
+            <div className="divide-y divide-border rounded-md border border-border">
               {categories.map((cat) => (
                 <div key={cat.id} className="flex items-center justify-between px-3 py-2 text-sm">
                   <div className="flex flex-col">

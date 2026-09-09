@@ -2,11 +2,14 @@ import { useState, useEffect, useMemo } from 'react';
 import { Trip, Client, StaffMember, TripChangeLogEntry, TripIncome, TripExpense, TripFinanceSummary } from '@/types/form';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { TabBar, type TabBarItem } from '@/components/layout/TabBar';
+import { StatusBadge } from '@/components/layout/StatusBadge';
+import { SectionTitle } from '@/components/layout/SectionTitle';
+import { tripOccupancy, tripSchedulePhase } from '@/lib/tripSchedulePhase';
+import { cn } from '@/lib/utils';
 import {
-  MapPin,
   ArrowLeft,
   Pencil,
   Trash2,
@@ -14,7 +17,6 @@ import {
   Search,
   Mail,
   Phone,
-  Calendar,
   Armchair,
   RotateCcw,
   History,
@@ -156,6 +158,8 @@ export const TripDetailView = ({
   onAssignTripHotelRoom,
   onClearTripHotelRoomAssignment,
 }: TripDetailViewProps) => {
+  type TripTabId = 'participantes' | 'asientos' | 'hoteles' | 'finanzas' | 'historial';
+  const [tab, setTab] = useState<TripTabId>('participantes');
   const [memberSearch, setMemberSearch] = useState('');
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [inviteCompanyModalOpen, setInviteCompanyModalOpen] = useState(false);
@@ -187,7 +191,14 @@ export const TripDetailView = ({
 
   useEffect(() => {
     setPickupDrafts({});
+    setTab('participantes');
   }, [trip.id]);
+
+  useEffect(() => {
+    if (reviewerMode && (tab === 'finanzas' || tab === 'historial')) {
+      setTab('participantes');
+    }
+  }, [reviewerMode, tab]);
 
   useEffect(() => {
     if (reviewerMode) return;
@@ -224,6 +235,49 @@ export const TripDetailView = ({
       .sort((a, b) => a[1].localeCompare(b[1], 'es'))
       .map(([id, name]) => ({ id, name }));
   }, [participants]);
+  const occupancy = tripOccupancy(trip);
+  const phase = tripSchedulePhase(trip.departureDate, trip.returnDate);
+  const hotelLabel = trip.tripHotels?.[0]?.hotel?.name ?? 'Sin hotel';
+  const assignedSeatCount = trip.seatAssignments?.length ?? 0;
+  const seatLabelByParticipantId = useMemo(() => {
+    const map = new Map<string, string>();
+    const floors = trip.busTemplate?.layout?.floors ?? [];
+    const labelForSeatId = (seatId: string) => {
+      for (const floor of floors) {
+        const el = (floor.elements ?? []).find((e) => e.type === 'seat' && e.id === seatId);
+        if (el) return el.label ?? seatId;
+      }
+      return seatId;
+    };
+    for (const a of trip.seatAssignments ?? []) {
+      const label = a.seatId
+        ? labelForSeatId(a.seatId)
+        : a.seatNumber != null
+          ? String(a.seatNumber)
+          : '—';
+      if (a.participantId) map.set(a.participantId, label);
+    }
+    return map;
+  }, [trip.seatAssignments, trip.busTemplate]);
+  const tripTabs: TabBarItem[] = [
+    { id: 'participantes', label: 'Participantes' },
+    { id: 'asientos', label: 'Asientos' },
+    { id: 'hoteles', label: 'Hoteles' },
+    ...(!reviewerMode
+      ? [
+          { id: 'finanzas', label: 'Finanzas' },
+          { id: 'historial', label: 'Historial' },
+        ]
+      : []),
+  ];
+  const headerKpis: Array<[string, string]> = [
+    ['Participantes', `${occupancy.count}/${occupancy.total}`],
+    ['Hotel', hotelLabel],
+    ['Asientos', `${assignedSeatCount}`],
+    reviewerMode
+      ? ['Camión', trip.busTemplate?.name ?? 'Sin plantilla']
+      : ['Ingresos', `$${Number(financeSummary?.totalIncome ?? 0).toLocaleString()}`],
+  ];
   const filteredParticipants = memberSearch.trim()
     ? participants.filter(p => {
         const c = p.client;
@@ -607,442 +661,266 @@ export const TripDetailView = ({
     }
   };
 
-  const financeCard = (
-    <Card>
-      <CardContent className="p-4 space-y-4">
-        <h2 className="font-semibold text-lg mb-1 flex items-center gap-2">
-          <DollarSign className="w-5 h-5" />
-          Finanzas del viaje
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div className="rounded-lg border p-3 bg-muted/20">
-            <p className="text-xs text-muted-foreground">Ingresos</p>
-            <p className="text-xl font-semibold text-emerald-600 dark:text-emerald-400">
-              ${Number(financeSummary?.totalIncome ?? 0).toLocaleString()}
-            </p>
-          </div>
-          <div className="rounded-lg border p-3 bg-muted/20">
-            <p className="text-xs text-muted-foreground">Gastos</p>
-            <p className="text-xl font-semibold text-rose-600 dark:text-rose-400">
-              ${Number(financeSummary?.totalExpense ?? 0).toLocaleString()}
-            </p>
-          </div>
-          <div className="rounded-lg border p-3 bg-muted/20">
-            <p className="text-xs text-muted-foreground">Neto</p>
-            <p className="text-xl font-semibold">
-              ${Number(financeSummary?.net ?? 0).toLocaleString()}
-            </p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-          <div className="space-y-2 border rounded-lg p-3 bg-muted/20">
-            <h3 className="font-medium">Ingresos de clientes</h3>
-            <p className="text-sm text-muted-foreground">
-              Los cobros a clientes se registran solo desde el detalle del cliente, no desde el viaje.
-            </p>
-          </div>
-
-          <div className="space-y-2 border rounded-lg p-3">
-            <h3 className="font-medium">Agregar gasto</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <Input
-                type="number"
-                min="0.01"
-                step="0.01"
-                placeholder="Monto"
-                value={expenseForm.amount}
-                onChange={(e) => setExpenseForm((prev) => ({ ...prev, amount: e.target.value }))}
-              />
-              <Input
-                type="date"
-                value={expenseForm.expenseDate}
-                onChange={(e) => setExpenseForm((prev) => ({ ...prev, expenseDate: e.target.value }))}
-              />
-              <Input
-                placeholder="Categoría (opcional)"
-                value={expenseForm.category}
-                onChange={(e) => setExpenseForm((prev) => ({ ...prev, category: e.target.value }))}
-              />
-              <Input
-                placeholder="Referencia (opcional)"
-                value={expenseForm.referenceNumber}
-                onChange={(e) => setExpenseForm((prev) => ({ ...prev, referenceNumber: e.target.value }))}
-              />
-              <Input
-                className="sm:col-span-2"
-                placeholder="Nota (opcional)"
-                value={expenseForm.note}
-                onChange={(e) => setExpenseForm((prev) => ({ ...prev, note: e.target.value }))}
-              />
-            </div>
-            <Button onClick={handleCreateExpense} disabled={isCreatingExpense}>
-              {isCreatingExpense ? 'Guardando...' : 'Agregar gasto'}
-            </Button>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-          <div>
-            <h3 className="font-medium mb-2">Ingresos</h3>
-            {tripIncomes.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Sin ingresos registrados.</p>
-            ) : (
-              <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
-                {tripIncomes.map((income) => (
-                  <div key={income.id} className="rounded-lg border p-3 flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="font-medium">${Number(income.amount).toLocaleString()} - {income.client?.name ?? income.clientId}</p>
-                      <p className="text-xs text-muted-foreground">{income.paymentDate} - {income.paymentType}</p>
-                      {income.referenceNumber && <p className="text-xs text-muted-foreground">Ref: {income.referenceNumber}</p>}
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-destructive hover:text-destructive"
-                      onClick={() => onDeleteTripIncome(income.id)}
-                    >
-                      Eliminar
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          <div>
-            <h3 className="font-medium mb-2">Gastos</h3>
-            {tripExpenses.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Sin gastos registrados.</p>
-            ) : (
-              <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
-                {tripExpenses.map((expense) => (
-                  <div key={expense.id} className="rounded-lg border p-3 flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="font-medium">${Number(expense.amount).toLocaleString()} {expense.category ? `- ${expense.category}` : ''}</p>
-                      <p className="text-xs text-muted-foreground">{expense.expenseDate}</p>
-                      {expense.referenceNumber && <p className="text-xs text-muted-foreground">Ref: {expense.referenceNumber}</p>}
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-destructive hover:text-destructive"
-                      onClick={() => onDeleteTripExpense(expense.id)}
-                    >
-                      Eliminar
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
+  const assignmentDisplayName = (a: NonNullable<Trip['seatAssignments']>[number]) =>
+    a.displayName || a.client?.name || a.participant?.name || a.clientId || a.participantId || '—';
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-[min(100%,88rem)] mx-auto px-4 sm:px-6 py-6 space-y-6 w-full">
-        <div className="flex items-start justify-between flex-wrap gap-4">
-          <div>
-            <Button variant="ghost" onClick={onBack} className="mb-2 -ml-2 gap-2">
-              <ArrowLeft className="w-4 h-4" />
-              Volver al listado
-            </Button>
-            <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
-              <MapPin className="w-8 h-8 text-primary" />
-              {trip.title}
-            </h1>
-            {trip.destination && (
-              <p className="text-muted-foreground flex items-center gap-1 mt-1">
-                <MapPin className="w-4 h-4" />
-                {trip.destination}
-              </p>
-            )}
-            <p className="text-muted-foreground flex items-center gap-1 mt-0.5">
-              <Calendar className="w-4 h-4" />
+    <div className="mx-auto max-w-[1600px] p-4 sm:p-6 lg:p-8">
+      <Button type="button" variant="ghost" onClick={onBack} className="-ml-2 gap-2">
+        <ArrowLeft className="size-4" />
+        Volver a viajes
+      </Button>
+
+      <Card className="mt-4 p-5">
+        <div className="flex flex-wrap items-start gap-4">
+          <div className="min-w-0">
+            <p className="text-xs text-muted-foreground">
               {departureStr} – {returnStr}
+              {trip.destination ? ` · ${trip.destination}` : ''}
             </p>
-            <p className="text-sm text-muted-foreground mt-1">
-              {participants.length}/{trip.totalSeats} plazas
-            </p>
-            {trip.notes && (
-              <p className="text-sm text-muted-foreground mt-2 max-w-xl">{trip.notes}</p>
-            )}
-            {companiesFromParticipants.length > 0 && (
-              <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                <span className="text-sm text-muted-foreground shrink-0">Compañías (participantes):</span>
-                {companiesFromParticipants.map(({ id, name }) => {
-                  const col = companyColorById.get(id);
-                  return (
-                    <Badge
-                      key={id}
-                      variant="outline"
-                      className="text-xs border font-medium"
-                      style={
-                        col
-                          ? {
-                              borderColor: col.main,
-                              backgroundColor: col.soft,
-                              color: 'inherit',
-                            }
-                          : undefined
-                      }
-                    >
-                      {name}
-                    </Badge>
-                  );
-                })}
-              </div>
-            )}
-            {(trip.sharedCompanies ?? []).length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-1.5">
-                <span className="text-sm text-muted-foreground">También colaboran:</span>
-                {(trip.sharedCompanies ?? []).map(c => {
-                  const col = companyColorById.get(c.id);
-                  return (
-                    <Badge
-                      key={c.id}
-                      variant="secondary"
-                      className="text-xs"
-                      style={
-                        col
-                          ? {
-                              borderColor: col.main,
-                              backgroundColor: col.soft,
-                            }
-                          : undefined
-                      }
-                    >
-                      {c.name}
-                    </Badge>
-                  );
-                })}
-              </div>
-            )}
-            <div className="flex items-center gap-2 mt-4 flex-wrap">
-              {!reviewerMode && (
-                <Button type="button" variant="outline" size="sm" onClick={() => onEdit(trip)} className="gap-2">
-                  <Pencil className="w-4 h-4" />
-                  Editar viaje
-                </Button>
-              )}
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={(e) => {
-                  (e.currentTarget as HTMLButtonElement).blur();
-                  onOpenSeatPicker();
-                }}
-                className="gap-2"
-              >
-                <Armchair className="w-4 h-4" />
-                Seleccionar asientos
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="gap-2"
-                onClick={handleDownloadTripDetails}
-              >
-                <Download className="w-4 h-4" />
-                Descargar detalles
-              </Button>
-              {!reviewerMode && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleResetSeats}
-                  disabled={isResetting || (trip.seatAssignments?.length ?? 0) === 0}
-                  className="gap-2"
-                >
-                  <RotateCcw className="w-4 h-4" />
-                  Reiniciar asignaciones
-                </Button>
-              )}
-              {!reviewerMode && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setDeleteConfirmOpen(true)}
-                  className="gap-2 text-destructive hover:text-destructive"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  Eliminar viaje
-                </Button>
-              )}
-            </div>
+            <h2 className="font-display text-2xl font-semibold">{trip.title}</h2>
+            {trip.notes ? (
+              <p className="mt-1 max-w-xl text-sm text-muted-foreground">{trip.notes}</p>
+            ) : null}
           </div>
-          <div className="flex items-center gap-2 shrink-0 flex-wrap">
-          <Button onClick={() => setAddModalOpen(true)} className="gap-2">
-            <UserPlus className="w-4 h-4" />
-            Agregar participantes
-          </Button>
-          {!reviewerMode && (
-            <Button
-              variant="outline"
-              onClick={openInviteModal}
-              className="gap-2"
-              disabled={companiesAvailableToInvite.length === 0}
-              title={companiesAvailableToInvite.length === 0 ? 'No hay más empresas disponibles para invitar' : 'Invitar a otra empresa a colaborar en el viaje'}
-            >
-              <Building2 className="w-4 h-4" />
-              Invitar empresa
+          <StatusBadge tone={phase.tone}>{phase.label}</StatusBadge>
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <Button type="button" variant="outline" onClick={handleDownloadTripDetails}>
+              <Download />
+              Descargar detalles
             </Button>
-          )}
-        </div>
+            {!reviewerMode ? (
+              <Button type="button" variant="outline" onClick={() => onEdit(trip)}>
+                <Pencil />
+                Editar viaje
+              </Button>
+            ) : null}
+          </div>
         </div>
 
-        <Card className="w-full">
-          <CardContent className="p-4 w-full">
-            <h2 className="font-semibold text-lg mb-3 flex items-center gap-2">
-              <UserPlus className="w-5 h-5" />
-              Participantes
-            </h2>
-            <div className="relative mb-3">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {headerKpis.map(([label, value]) => (
+            <div key={label} className="rounded-md bg-muted p-3">
+              <p className="text-[10px] text-muted-foreground">{label}</p>
+              <p className="mt-1 truncate text-sm font-semibold" title={value}>
+                {value}
+              </p>
+            </div>
+          ))}
+        </div>
+
+        {companiesFromParticipants.length > 0 ? (
+          <div className="mt-4 flex flex-wrap items-center gap-1.5">
+            <span className="text-xs text-muted-foreground">Compañías (participantes):</span>
+            {companiesFromParticipants.map(({ id, name }) => {
+              const col = companyColorById.get(id);
+              return (
+                <Badge
+                  key={id}
+                  variant="outline"
+                  className="text-xs font-medium"
+                  style={
+                    col
+                      ? { borderColor: col.main, backgroundColor: col.soft, color: 'inherit' }
+                      : undefined
+                  }
+                >
+                  {name}
+                </Badge>
+              );
+            })}
+          </div>
+        ) : null}
+        {(trip.sharedCompanies ?? []).length > 0 ? (
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <span className="text-xs text-muted-foreground">También colaboran:</span>
+            {(trip.sharedCompanies ?? []).map((c) => {
+              const col = companyColorById.get(c.id);
+              return (
+                <Badge
+                  key={c.id}
+                  variant="secondary"
+                  className="text-xs"
+                  style={col ? { borderColor: col.main, backgroundColor: col.soft } : undefined}
+                >
+                  {c.name}
+                </Badge>
+              );
+            })}
+          </div>
+        ) : null}
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button type="button" onClick={() => setAddModalOpen(true)}>
+            <UserPlus />
+            Agregar participantes
+          </Button>
+          {!reviewerMode ? (
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={openInviteModal}
+                disabled={companiesAvailableToInvite.length === 0}
+                title={
+                  companiesAvailableToInvite.length === 0
+                    ? 'No hay más empresas disponibles para invitar'
+                    : 'Invitar a otra empresa a colaborar en el viaje'
+                }
+              >
+                <Building2 />
+                Invitar empresa
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="text-destructive hover:text-destructive"
+                onClick={() => setDeleteConfirmOpen(true)}
+              >
+                <Trash2 />
+                Eliminar viaje
+              </Button>
+            </>
+          ) : null}
+        </div>
+      </Card>
+
+      <div className="mt-4">
+        <TabBar tabs={tripTabs} value={tab} onChange={(id) => setTab(id as TripTabId)} />
+
+        <div hidden={tab !== 'participantes'}>
+          <Card className="p-5">
+            <div className="relative mb-4">
+              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder="Buscar por nombre, email, compañía, oficina o asesor..."
                 value={memberSearch}
-                onChange={e => setMemberSearch(e.target.value)}
+                onChange={(e) => setMemberSearch(e.target.value)}
                 className="pl-9"
               />
             </div>
             {filteredParticipants.length === 0 ? (
-              <p className="text-muted-foreground py-6 text-center">
+              <p className="py-8 text-center text-sm text-muted-foreground">
                 {participants.length === 0
                   ? 'Aún no hay participantes. Agrega clientes.'
                   : 'No hay resultados para la búsqueda.'}
               </p>
             ) : (
-              <ScrollArea className="h-[min(520px,60vh)] w-full">
-                <ul className="divide-y">
-                  {filteredParticipants.map(p => {
-                    const c = p.client;
-                    const isCompanion = p.participantType === 'companion';
-                    const isStaff = p.participantType === 'staff';
-                    if (!c && !isCompanion && !isStaff) return null;
-                    const rowNumber = participants.indexOf(p) + 1;
-                    const childInGroup = c ? isParticipantChildInTrip(c, participantIdSet) : false;
-                    const coId = c?.company?.id;
-                    const coColors = coId ? companyColorById.get(coId) : undefined;
-                    return (
-                      <li
-                        key={p.id ?? c.id}
-                        className={`flex items-center justify-between gap-4 py-2.5 hover:bg-muted/30 ${
-                          childInGroup ? 'pl-8 pr-3 ml-3' : 'px-3'
-                        }`}
-                        style={
-                          coColors
-                            ? {
-                                borderLeftWidth: childInGroup ? 2 : 4,
-                                borderLeftStyle: 'solid',
-                                borderLeftColor: coColors.main,
-                                backgroundColor: coColors.soft,
-                              }
-                            : childInGroup
-                              ? { borderLeftWidth: 2, borderLeftStyle: 'solid', borderLeftColor: 'hsl(var(--primary) / 0.25)' }
-                              : undefined
-                        }
-                      >
-                        <span
-                          className="shrink-0 w-8 text-right text-sm tabular-nums text-muted-foreground"
-                          title="Nº en el listado"
-                        >
-                          {rowNumber}
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            {childInGroup && (
-                              <span
-                                className="text-xs font-semibold text-muted-foreground shrink-0 tabular-nums w-4 text-center"
-                                title="Integrante del grupo familiar"
-                              >
-                                F
-                              </span>
-                            )}
-                            <p className="font-medium truncate">{isCompanion ? p.companion?.name : isStaff ? p.staffMember?.name ?? p.companion?.name ?? p.id : c.name}</p>
-                            {isCompanion && (
-                              <Badge variant="secondary" className="text-xs">Acompañante</Badge>
-                            )}
-                            {isStaff && (
-                              <Badge variant="secondary" className="text-xs">Staff</Badge>
-                            )}
-                            {!isCompanion && !isStaff && c?.company && (
-                              <Badge
-                                variant="outline"
-                                className="text-xs shrink-0 font-medium"
-                                style={
-                                  coColors
-                                    ? {
-                                        borderColor: coColors.main,
-                                        backgroundColor: coColors.soft,
-                                      }
-                                    : undefined
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[720px] text-left text-sm">
+                  <thead>
+                    <tr className="text-xs text-muted-foreground">
+                      <th className="p-3 font-medium">Pasajero</th>
+                      <th className="font-medium">Punto de salida</th>
+                      <th className="font-medium">Asiento</th>
+                      <th className="font-medium">Pago</th>
+                      <th />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredParticipants.map((p) => {
+                      const c = p.client;
+                      const isCompanion = p.participantType === 'companion';
+                      const isStaff = p.participantType === 'staff';
+                      if (!c && !isCompanion && !isStaff) return null;
+                      const childInGroup = c ? isParticipantChildInTrip(c, participantIdSet) : false;
+                      const coId = c?.company?.id;
+                      const coColors = coId ? companyColorById.get(coId) : undefined;
+                      const displayName = isCompanion
+                        ? p.companion?.name
+                        : isStaff
+                          ? p.staffMember?.name ?? p.companion?.name ?? p.id
+                          : c.name;
+                      const phone = isCompanion
+                        ? p.companion?.phone?.trim()
+                        : isStaff
+                          ? p.staffMember?.phone?.trim()
+                          : c.phone?.trim();
+                      const balance = c?.tripBalanceDue;
+                      return (
+                        <tr
+                          key={p.id ?? c?.id}
+                          className={cn('border-t', childInGroup && 'bg-muted/20')}
+                          style={
+                            coColors
+                              ? {
+                                  borderLeftWidth: childInGroup ? 2 : 4,
+                                  borderLeftStyle: 'solid',
+                                  borderLeftColor: coColors.main,
+                                  backgroundColor: coColors.soft,
                                 }
-                              >
-                                <Building2 className="w-3 h-3 mr-0.5" />
-                                {c.company.name}
-                              </Badge>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-x-3 gap-y-1 text-sm text-muted-foreground flex-wrap mt-0.5">
-                            {!isStaff && c?.assignedUser?.branch?.name && (
-                              <span className="flex items-center gap-1 min-w-0">
-                                <MapPinned className="w-3.5 h-3.5 shrink-0" />
-                                <span className="truncate">Oficina: {c.assignedUser.branch.name}</span>
-                              </span>
-                            )}
-                            {!isStaff && c?.assignedUser?.name && (
-                              <span className="flex items-center gap-1 min-w-0">
-                                <UserCircle className="w-3.5 h-3.5 shrink-0" />
-                                <span className="truncate">Asesor: {c.assignedUser.name}</span>
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
-                            {!isStaff && c?.email && (
-                              <span className="flex items-center gap-1 truncate">
-                                <Mail className="w-3.5 h-3.5 shrink-0" />
-                                {c?.email}
-                              </span>
-                            )}
-                            {!isStaff && c?.tripBalanceDue != null &&
-                              c?.tripBalanceDue !== undefined &&
-                              Number(c?.tripBalanceDue) > 0 && (
-                                <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
-                                  <DollarSign className="w-3.5 h-3.5" />
-                                  Pendiente: ${Number(c?.tripBalanceDue).toLocaleString()}
+                              : childInGroup
+                                ? {
+                                    borderLeftWidth: 2,
+                                    borderLeftStyle: 'solid',
+                                    borderLeftColor: 'hsl(var(--primary) / 0.25)',
+                                  }
+                                : undefined
+                          }
+                        >
+                          <td className={cn('p-3 align-top', childInGroup && 'pl-8')}>
+                            <div className="flex flex-wrap items-center gap-2">
+                              {childInGroup ? (
+                                <span className="w-4 shrink-0 text-center text-xs font-semibold text-muted-foreground" title="Integrante del grupo familiar">
+                                  F
                                 </span>
-                              )}
-                          </div>
-                          {(isCompanion ? p.companion?.phone?.trim() : isStaff ? p.staffMember?.phone?.trim() : c.phone?.trim()) && (
-                            <div className="flex items-center gap-1 text-sm text-muted-foreground mt-0.5 min-w-0">
-                              <Phone className="w-3.5 h-3.5 shrink-0" />
-                              <span className="truncate">{isCompanion ? p.companion?.phone?.trim() : isStaff ? p.staffMember?.phone?.trim() : c.phone.trim()}</span>
+                              ) : null}
+                              <p className="font-medium">{displayName}</p>
+                              {isCompanion ? <Badge variant="secondary" className="text-xs">Acompañante</Badge> : null}
+                              {isStaff ? <Badge variant="secondary" className="text-xs">Staff</Badge> : null}
+                              {!isCompanion && !isStaff && c?.company ? (
+                                <Badge
+                                  variant="outline"
+                                  className="shrink-0 text-xs font-medium"
+                                  style={
+                                    coColors
+                                      ? { borderColor: coColors.main, backgroundColor: coColors.soft }
+                                      : undefined
+                                  }
+                                >
+                                  <Building2 className="mr-0.5 size-3" />
+                                  {c.company.name}
+                                </Badge>
+                              ) : null}
                             </div>
-                          )}
-                          {isStaff && p.staffMember?.role?.trim() && (
-                            <div className="text-xs text-muted-foreground mt-0.5">
-                              Rol: {p.staffMember.role.trim()}
+                            <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                              {!isStaff && c?.assignedUser?.branch?.name ? (
+                                <span className="flex items-center gap-1">
+                                  <MapPinned className="size-3.5" />
+                                  Oficina: {c.assignedUser.branch.name}
+                                </span>
+                              ) : null}
+                              {!isStaff && c?.assignedUser?.name ? (
+                                <span className="flex items-center gap-1">
+                                  <UserCircle className="size-3.5" />
+                                  Asesor: {c.assignedUser.name}
+                                </span>
+                              ) : null}
+                              {!isStaff && c?.email ? (
+                                <span className="flex items-center gap-1">
+                                  <Mail className="size-3.5" />
+                                  {c.email}
+                                </span>
+                              ) : null}
+                              {phone ? (
+                                <span className="flex items-center gap-1">
+                                  <Phone className="size-3.5" />
+                                  {phone}
+                                </span>
+                              ) : null}
+                              {isStaff && p.staffMember?.role?.trim() ? (
+                                <span>Rol: {p.staffMember.role.trim()}</span>
+                              ) : null}
                             </div>
-                          )}
-                          {!isCompanion && !isStaff && c && (
-                            <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:flex-wrap">
-                              <span className="flex items-center gap-1 text-xs font-medium text-muted-foreground shrink-0">
-                                <MapPin className="w-3.5 h-3.5" />
-                                Recogida en este viaje
-                              </span>
-                              {reviewerMode || !onUpdateParticipantPickup ? (
+                          </td>
+                          <td className="align-top py-3 pr-3">
+                            {!isCompanion && !isStaff && c ? (
+                              reviewerMode || !onUpdateParticipantPickup ? (
                                 <span className="text-sm text-muted-foreground">
                                   {p.pickupLocation?.trim() ? p.pickupLocation.trim() : 'Sin indicar'}
                                 </span>
                               ) : (
-                                <>
+                                <div className="flex min-w-[220px] flex-col gap-2 sm:flex-row sm:items-center">
                                   <Input
                                     placeholder="Ej. Esquina Juárez y Reforma, 7:00"
                                     maxLength={500}
@@ -1054,24 +932,20 @@ export const TripDetailView = ({
                                     onChange={(e) =>
                                       setPickupDrafts((prev) => ({ ...prev, [p.id]: e.target.value }))
                                     }
-                                    className="max-w-xl flex-1 min-w-[200px]"
                                   />
                                   <Button
                                     type="button"
                                     variant="secondary"
                                     size="sm"
-                                    className="shrink-0"
-                                    disabled={
-                                      (() => {
-                                        const server = (p.pickupLocation ?? '').trim();
-                                        const cur = (
-                                          pickupDrafts[p.id] !== undefined
-                                            ? pickupDrafts[p.id]
-                                            : (p.pickupLocation ?? '')
-                                        ).trim();
-                                        return cur === server || pickupSavingId === p.id;
-                                      })()
-                                    }
+                                    disabled={(() => {
+                                      const server = (p.pickupLocation ?? '').trim();
+                                      const cur = (
+                                        pickupDrafts[p.id] !== undefined
+                                          ? pickupDrafts[p.id]
+                                          : (p.pickupLocation ?? '')
+                                      ).trim();
+                                      return cur === server || pickupSavingId === p.id;
+                                    })()}
                                     onClick={async () => {
                                       const raw =
                                         pickupDrafts[p.id] !== undefined
@@ -1096,88 +970,285 @@ export const TripDetailView = ({
                                   >
                                     {pickupSavingId === p.id ? 'Guardando…' : 'Guardar'}
                                   </Button>
-                                </>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                        {!reviewerMode && (
+                                </div>
+                              )
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </td>
+                          <td className="align-top py-3 pr-3 font-medium">
+                            {seatLabelByParticipantId.get(p.id) ?? '—'}
+                          </td>
+                          <td className="align-top py-3 pr-3">
+                            {isCompanion || isStaff || balance == null ? (
+                              <span className="text-muted-foreground">—</span>
+                            ) : Number(balance) > 0 ? (
+                              <StatusBadge tone="warning">
+                                Pendiente ${Number(balance).toLocaleString()}
+                              </StatusBadge>
+                            ) : (
+                              <StatusBadge tone="success">Al día</StatusBadge>
+                            )}
+                          </td>
+                          <td className="align-top py-3 pr-3 text-right">
+                            {!reviewerMode ? (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="text-destructive hover:text-destructive"
+                                onClick={() => onRemoveParticipant(p.id)}
+                              >
+                                Quitar
+                              </Button>
+                            ) : null}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+        </div>
+
+        <div hidden={tab !== 'asientos'}>
+          <Card className="p-5">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={(e) => {
+                  (e.currentTarget as HTMLButtonElement).blur();
+                  onOpenSeatPicker();
+                }}
+              >
+                <Armchair />
+                Seleccionar asientos
+              </Button>
+              {!reviewerMode ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleResetSeats}
+                  disabled={isResetting || assignedSeatCount === 0}
+                >
+                  <RotateCcw />
+                  Reiniciar asignaciones
+                </Button>
+              ) : null}
+            </div>
+            <p className="mt-3 text-sm text-muted-foreground">
+              Plantilla: {trip.busTemplate?.name ?? 'Sin plantilla (cupo numérico)'}. El mapa se abre en el selector y se dibuja desde el JSON de la plantilla.
+            </p>
+            <div className="mt-4 space-y-2">
+              {(trip.seatAssignments ?? []).length === 0 ? (
+                <p className="rounded-md bg-muted p-3 text-sm text-muted-foreground">Sin asignaciones de asientos.</p>
+              ) : (
+                (trip.seatAssignments ?? []).map((a) => (
+                  <div
+                    key={(a as { id?: string }).id ?? `${a.participantId ?? a.clientId}-${a.seatId ?? a.seatNumber}`}
+                    className="rounded-md bg-muted p-3 text-sm"
+                  >
+                    Asiento {a.participantId ? seatLabelByParticipantId.get(a.participantId) ?? '—' : a.seatNumber ?? a.seatId} · {assignmentDisplayName(a)}
+                  </div>
+                ))
+              )}
+            </div>
+          </Card>
+        </div>
+
+        <div hidden={tab !== 'hoteles'}>
+          <Card className="p-5">
+            <TripHotelsSection
+              trip={trip}
+              catalogHotels={catalogHotels}
+              canManage={!!canManageTripHotels}
+              onRefreshCatalog={onRefreshHotelCatalog}
+              onAttach={onAttachTripHotel}
+              onUpdate={onUpdateTripHotel}
+              onDetach={onDetachTripHotel}
+              onAssignRoom={onAssignTripHotelRoom}
+              onClearRoom={onClearTripHotelRoomAssignment}
+              embedded
+            />
+          </Card>
+        </div>
+
+        {!reviewerMode ? (
+          <div hidden={tab !== 'finanzas'}>
+            <Card className="space-y-4 p-5">
+              <SectionTitle title="Finanzas del viaje" />
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="rounded-md bg-muted p-4">
+                  <p className="text-xs text-muted-foreground">Ingresos</p>
+                  <p className="mt-2 font-display text-xl font-semibold text-success">
+                    ${Number(financeSummary?.totalIncome ?? 0).toLocaleString()}
+                  </p>
+                </div>
+                <div className="rounded-md bg-muted p-4">
+                  <p className="text-xs text-muted-foreground">Egresos</p>
+                  <p className="mt-2 font-display text-xl font-semibold text-destructive">
+                    ${Number(financeSummary?.totalExpense ?? 0).toLocaleString()}
+                  </p>
+                </div>
+                <div className="rounded-md bg-muted p-4">
+                  <p className="text-xs text-muted-foreground">Utilidad</p>
+                  <p className="mt-2 font-display text-xl font-semibold">
+                    ${Number(financeSummary?.net ?? 0).toLocaleString()}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid gap-4 xl:grid-cols-2">
+                <div className="rounded-md bg-muted/40 p-4">
+                  <h3 className="font-display text-sm font-semibold">Ingresos de clientes</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Los cobros a clientes se registran solo desde el detalle del cliente, no desde el viaje.
+                  </p>
+                </div>
+                <div className="rounded-md border p-4">
+                  <h3 className="font-display text-sm font-semibold">Agregar gasto</h3>
+                  <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <Input
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      placeholder="Monto"
+                      value={expenseForm.amount}
+                      onChange={(e) => setExpenseForm((prev) => ({ ...prev, amount: e.target.value }))}
+                    />
+                    <Input
+                      type="date"
+                      value={expenseForm.expenseDate}
+                      onChange={(e) => setExpenseForm((prev) => ({ ...prev, expenseDate: e.target.value }))}
+                    />
+                    <Input
+                      placeholder="Categoría (opcional)"
+                      value={expenseForm.category}
+                      onChange={(e) => setExpenseForm((prev) => ({ ...prev, category: e.target.value }))}
+                    />
+                    <Input
+                      placeholder="Referencia (opcional)"
+                      value={expenseForm.referenceNumber}
+                      onChange={(e) => setExpenseForm((prev) => ({ ...prev, referenceNumber: e.target.value }))}
+                    />
+                    <Input
+                      className="sm:col-span-2"
+                      placeholder="Nota (opcional)"
+                      value={expenseForm.note}
+                      onChange={(e) => setExpenseForm((prev) => ({ ...prev, note: e.target.value }))}
+                    />
+                  </div>
+                  <Button className="mt-3" type="button" onClick={handleCreateExpense} disabled={isCreatingExpense}>
+                    <DollarSign />
+                    {isCreatingExpense ? 'Guardando...' : 'Agregar gasto'}
+                  </Button>
+                </div>
+              </div>
+
+              <div className="grid gap-4 xl:grid-cols-2">
+                <div>
+                  <h3 className="mb-2 font-display text-sm font-semibold">Ingresos</h3>
+                  {tripIncomes.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Sin ingresos registrados.</p>
+                  ) : (
+                    <div className="max-h-[260px] space-y-2 overflow-y-auto pr-1">
+                      {tripIncomes.map((income) => (
+                        <div key={income.id} className="flex items-start justify-between gap-3 rounded-md bg-muted p-3">
+                          <div className="min-w-0">
+                            <p className="font-medium">
+                              ${Number(income.amount).toLocaleString()} - {income.client?.name ?? income.clientId}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {income.paymentDate} - {income.paymentType}
+                            </p>
+                            {income.referenceNumber ? (
+                              <p className="text-xs text-muted-foreground">Ref: {income.referenceNumber}</p>
+                            ) : null}
+                          </div>
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="text-destructive hover:text-destructive shrink-0"
-                            onClick={() => onRemoveParticipant(p.id)}
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => onDeleteTripIncome(income.id)}
                           >
-                            Quitar
+                            Eliminar
                           </Button>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
-              </ScrollArea>
-            )}
-          </CardContent>
-        </Card>
-
-        <TripHotelsSection
-          trip={trip}
-          catalogHotels={catalogHotels}
-          canManage={!!canManageTripHotels}
-          onRefreshCatalog={onRefreshHotelCatalog}
-          onAttach={onAttachTripHotel}
-          onUpdate={onUpdateTripHotel}
-          onDetach={onDetachTripHotel}
-          onAssignRoom={onAssignTripHotelRoom}
-          onClearRoom={onClearTripHotelRoomAssignment}
-        />
-
-        {!reviewerMode && (
-          <Card>
-            <CardContent className="p-4">
-              <h2 className="font-semibold text-lg mb-3 flex items-center gap-2">
-                <History className="w-5 h-5" />
-                Historial de cambios
-              </h2>
-              {changeLog.length === 0 ? (
-                <p className="text-muted-foreground py-4 text-center text-sm">Aún no hay cambios registrados.</p>
-              ) : (
-                <ScrollArea className="h-[200px]">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b text-left text-muted-foreground">
-                        <th className="pb-2 pr-2">Fecha</th>
-                        <th className="pb-2 pr-2">Usuario</th>
-                        <th className="pb-2 pr-2">Acción</th>
-                        <th className="pb-2">Detalle</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {changeLog.map(entry => (
-                        <tr key={entry.id} className="border-b border-border/50">
-                          <td className="py-2 pr-2 whitespace-nowrap text-muted-foreground">
-                            {format(new Date(entry.createdAt), 'dd/MM/yyyy HH:mm', { locale: es })}
-                          </td>
-                          <td className="py-2 pr-2">{entry.user?.name ?? '—'}</td>
-                          <td className="py-2 pr-2">{ACTION_LABELS[entry.action] ?? entry.action}</td>
-                          <td className="py-2 text-muted-foreground">
-                            {entry.fieldName && entry.oldValue != null && entry.newValue != null
-                              ? `${entry.fieldName}: ${entry.oldValue} → ${entry.newValue}`
-                              : entry.newValue ?? entry.oldValue ?? '—'}
-                          </td>
-                        </tr>
+                        </div>
                       ))}
-                    </tbody>
-                  </table>
-                </ScrollArea>
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <h3 className="mb-2 font-display text-sm font-semibold">Gastos</h3>
+                  {tripExpenses.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Sin gastos registrados.</p>
+                  ) : (
+                    <div className="max-h-[260px] space-y-2 overflow-y-auto pr-1">
+                      {tripExpenses.map((expense) => (
+                        <div key={expense.id} className="flex items-start justify-between gap-3 rounded-md bg-muted p-3">
+                          <div className="min-w-0">
+                            <p className="font-medium">
+                              ${Number(expense.amount).toLocaleString()}
+                              {expense.category ? ` - ${expense.category}` : ''}
+                            </p>
+                            <p className="text-xs text-muted-foreground">{expense.expenseDate}</p>
+                            {expense.referenceNumber ? (
+                              <p className="text-xs text-muted-foreground">Ref: {expense.referenceNumber}</p>
+                            ) : null}
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => onDeleteTripExpense(expense.id)}
+                          >
+                            Eliminar
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </Card>
+          </div>
+        ) : null}
+
+        {!reviewerMode ? (
+          <div hidden={tab !== 'historial'}>
+            <Card className="p-5">
+              <SectionTitle title="Historial de cambios" />
+              {changeLog.length === 0 ? (
+                <p className="py-4 text-center text-sm text-muted-foreground">Aún no hay cambios registrados.</p>
+              ) : (
+                <div className="space-y-3">
+                  {changeLog.map((entry) => (
+                    <div key={entry.id} className="flex gap-3">
+                      <History className="mt-0.5 size-4 text-muted-foreground" />
+                      <div>
+                        <p className="text-sm">{ACTION_LABELS[entry.action] ?? entry.action}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {entry.user?.name ?? '—'} · {format(new Date(entry.createdAt), 'dd/MM/yyyy HH:mm', { locale: es })}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {entry.fieldName && entry.oldValue != null && entry.newValue != null
+                            ? `${entry.fieldName}: ${entry.oldValue} → ${entry.newValue}`
+                            : entry.newValue ?? entry.oldValue ?? ''}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
-            </CardContent>
-          </Card>
-        )}
+            </Card>
+          </div>
+        ) : null}
+      </div>
 
-        {!reviewerMode && financeCard}
-
-        <AddParticipantsToTripModal
+      <AddParticipantsToTripModal
           open={addModalOpen}
           onOpenChange={setAddModalOpen}
           tripTitle={trip.title}
@@ -1261,7 +1332,6 @@ export const TripDetailView = ({
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-      </div>
     </div>
   );
 };

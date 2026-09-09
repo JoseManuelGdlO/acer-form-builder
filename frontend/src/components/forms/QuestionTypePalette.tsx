@@ -1,6 +1,8 @@
 import { useDraggable } from '@dnd-kit/core';
+import { Plus } from 'lucide-react';
 import { QuestionType, QUESTION_TYPE_CONFIG } from '@/types/form';
 import { QuestionTypeIcon } from './QuestionTypeIcon';
+import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
 interface DraggableQuestionTypeProps {
@@ -21,19 +23,15 @@ const DraggableQuestionType = ({ type }: DraggableQuestionTypeProps) => {
       {...listeners}
       {...attributes}
       className={cn(
-        'flex items-center gap-3 p-3 rounded-lg cursor-grab transition-all duration-200',
-        'bg-card border border-border hover:border-primary/50 hover:shadow-md',
-        'active:cursor-grabbing',
-        isDragging && 'opacity-50 scale-105 shadow-lg'
+        'mt-2 flex w-full cursor-grab items-center gap-2 rounded-md bg-card p-2 text-left text-xs active:cursor-grabbing',
+        'border border-transparent hover:border-primary/40',
+        isDragging && 'opacity-50 shadow-md',
       )}
+      title={config.description}
     >
-      <div className="flex-shrink-0 w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
-        <QuestionTypeIcon type={type} className="w-4 h-4 text-primary" />
-      </div>
-      <div className="min-w-0">
-        <p className="text-sm font-medium text-foreground truncate">{config.label}</p>
-        <p className="text-xs text-muted-foreground truncate">{config.description}</p>
-      </div>
+      <Plus className="size-3 shrink-0 text-muted-foreground" />
+      <QuestionTypeIcon type={type} className="size-3.5 shrink-0 text-primary" />
+      <span className="min-w-0 truncate font-medium">{config.label}</span>
     </div>
   );
 };
@@ -42,16 +40,16 @@ export const QuestionTypePalette = () => {
   const questionTypes = Object.keys(QUESTION_TYPE_CONFIG) as QuestionType[];
 
   return (
-    <div className="bg-card rounded-xl border border-border p-4 shadow-card">
-      <h3 className="text-sm font-semibold text-foreground mb-4">Tipos de Pregunta</h3>
-      <p className="text-xs text-muted-foreground mb-4">
-        Arrastra un tipo de pregunta al formulario
+    <Card className="bg-muted/40 p-4">
+      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        Tipos de pregunta
       </p>
-      <div className="space-y-2">
-        {questionTypes.map(type => (
-          <DraggableQuestionType key={type} type={type} />
-        ))}
-      </div>
-    </div>
+      <p className="mt-1 text-[11px] text-muted-foreground">
+        Arrastra un tipo a una sección. Incluye carga de archivos y visibilidad condicional.
+      </p>
+      {questionTypes.map(type => (
+        <DraggableQuestionType key={type} type={type} />
+      ))}
+    </Card>
   );
 };

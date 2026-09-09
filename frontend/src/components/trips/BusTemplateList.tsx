@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { BusTemplate, BusLayout } from '@/types/form';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Bus, ArrowLeft, Plus, Pencil, Trash2, Droplets, Layers } from 'lucide-react';
+import { Card } from '@/components/ui/card';
+import { Bus, ArrowLeft, Plus, Pencil, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { BusTemplateFormModal } from './BusTemplateFormModal';
 import {
@@ -69,91 +69,75 @@ export const BusTemplateList = ({
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-4xl mx-auto p-6 space-y-6">
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <div>
-            <Button variant="ghost" onClick={onBack} className="mb-2 -ml-2 gap-2">
-              <ArrowLeft className="w-4 h-4" />
-              Volver a Viajes
-            </Button>
-            <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
-              <Bus className="w-8 h-8 text-primary" />
-              Mis camiones
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              Plantillas de camión para reutilizar en tus viajes
-            </p>
-          </div>
-          <Button onClick={() => { setEditingTemplate(null); setFormOpen(true); }} className="gap-2">
-            <Plus className="w-4 h-4" />
-            Nueva plantilla
+    <div className="mx-auto max-w-[1600px] p-4 sm:p-6 lg:p-8">
+      <Button type="button" variant="ghost" onClick={onBack} className="-ml-2 mb-4 gap-2">
+        <ArrowLeft />
+        Volver a viajes
+      </Button>
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h2 className="font-display text-xl font-semibold">Mis camiones</h2>
+          <p className="text-sm text-muted-foreground">Plantillas de camión para reutilizar en tus viajes</p>
+        </div>
+        <Button type="button" onClick={() => { setEditingTemplate(null); setFormOpen(true); }}>
+          <Plus />
+          Nueva plantilla
+        </Button>
+      </div>
+
+      {templates.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-border py-16 text-center">
+          <Bus className="mx-auto mb-4 size-12 text-muted-foreground" />
+          <p className="mb-4 text-sm text-muted-foreground">No tienes plantillas de camión aún.</p>
+          <Button type="button" onClick={() => setFormOpen(true)}>
+            <Plus />
+            Crear primera plantilla
           </Button>
         </div>
-
-        {templates.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <Bus className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-muted-foreground mb-4">No tienes plantillas de camión aún.</p>
-              <Button onClick={() => setFormOpen(true)} className="gap-2">
-                <Plus className="w-4 h-4" />
-                Crear primera plantilla
-              </Button>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-3">
-            {templates.map(t => (
-              <Card key={t.id} className="group">
-                <CardContent className="p-4 flex items-center justify-between gap-4 flex-wrap">
-                  <div className="flex items-center gap-4 min-w-0">
-                    <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                      <Bus className="w-6 h-6 text-primary" />
-                    </div>
-                    <div className="min-w-0">
-                      <h3 className="font-semibold text-lg">{t.name}</h3>
-                      <div className="flex flex-wrap gap-3 text-sm text-muted-foreground mt-0.5">
-                        <span className="flex items-center gap-1">
-                          <Layers className="w-3.5 h-3.5" />
-                          {t.totalSeats} plazas, {t.rows} filas
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Droplets className="w-3.5 h-3.5" />
-                          Baño: {BATHROOM_LABELS[t.bathroomPosition] ?? t.bathroomPosition}
-                        </span>
-                        <span>{t.floors} piso{t.floors === 2 ? 's' : ''}</span>
-                        {t.floors === 2 && t.stairsPosition && (
-                          <span>Escaleras: {BATHROOM_LABELS[t.stairsPosition] ?? t.stairsPosition}</span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex gap-2 shrink-0">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => { setEditingTemplate(t); setFormOpen(true); }}
-                      className="gap-1.5"
-                    >
-                      <Pencil className="w-4 h-4" />
-                      Editar
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-destructive hover:text-destructive"
-                      onClick={() => setDeleteConfirmId(t.id)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      Eliminar
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {templates.map((t) => (
+            <Card key={t.id} className="p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div className="grid size-10 shrink-0 place-items-center rounded-md bg-primary/15 text-primary">
+                  <Bus className="size-5" />
+                </div>
+                <div className="flex gap-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => { setEditingTemplate(t); setFormOpen(true); }}
+                    aria-label="Editar plantilla"
+                  >
+                    <Pencil />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => setDeleteConfirmId(t.id)}
+                    aria-label="Eliminar plantilla"
+                  >
+                    <Trash2 />
+                  </Button>
+                </div>
+              </div>
+              <h3 className="mt-4 font-display font-semibold">{t.name}</h3>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {t.totalSeats} plazas · {t.rows} filas · {t.floors} piso{t.floors === 2 ? 's' : ''}
+              </p>
+              <div className="mt-3 rounded-md bg-muted p-3 text-xs">
+                <p>Baño: {BATHROOM_LABELS[t.bathroomPosition] ?? t.bathroomPosition}</p>
+                {t.floors === 2 && t.stairsPosition ? (
+                  <p className="mt-1">Escaleras: {BATHROOM_LABELS[t.stairsPosition] ?? t.stairsPosition}</p>
+                ) : null}
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
 
         <BusTemplateFormModal
           template={editingTemplate}
@@ -178,7 +162,6 @@ export const BusTemplateList = ({
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-      </div>
     </div>
   );
 };
