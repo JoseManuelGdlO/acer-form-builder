@@ -65,7 +65,7 @@ export const ChecklistCatalog = () => {
       await addChecklistItem(newItemLabel.trim(), token);
       setNewItemLabel('');
       setIsAddModalOpen(false);
-      toast.success('Paso agregado al checklist');
+      toast.success('Paso agregado al seguimiento');
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : 'Error al agregar el paso');
     }
@@ -91,7 +91,7 @@ export const ChecklistCatalog = () => {
       try {
         await deleteChecklistItem(deleteItemId, token);
         setDeleteItemId(null);
-        toast.success('Paso eliminado del checklist');
+        toast.success('Paso eliminado del seguimiento');
       } catch (error: unknown) {
         toast.error(error instanceof Error ? error.message : 'Error al eliminar el paso');
       }
@@ -120,7 +120,7 @@ export const ChecklistCatalog = () => {
     <>
       <Card className="p-5">
         <SectionTitle
-          title="Catálogo de checklist"
+          title="Catálogo de seguimiento"
           action="+ Agregar"
           onAction={() => setIsAddModalOpen(true)}
         />
@@ -130,7 +130,7 @@ export const ChecklistCatalog = () => {
         {sortedItems.length === 0 ? (
           <div className="py-10 text-center text-muted-foreground">
             <ListChecks className="mx-auto mb-3 size-10 opacity-50" />
-            <p className="text-sm">No hay pasos en el checklist</p>
+            <p className="text-sm">No hay pasos en el seguimiento</p>
           </div>
         ) : (
           sortedItems.map((item, index) => (
@@ -237,7 +237,7 @@ export const ChecklistCatalog = () => {
           <AlertDialogHeader>
             <AlertDialogTitle className="font-display">¿Eliminar este paso?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción no se puede deshacer. El paso será eliminado del catálogo y no aparecerá en los checklists de nuevos clientes.
+              Esta acción no se puede deshacer. El paso será eliminado del catálogo y no aparecerá en el seguimiento de nuevos clientes.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

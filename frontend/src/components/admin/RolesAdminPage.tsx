@@ -45,7 +45,11 @@ function PermissionGroups({
     <div className="space-y-6">
       {catalog.map((group) => (
         <div key={group.id}>
-          <p className="mb-2 font-display text-sm font-semibold">{group.label}</p>
+          <p className="mb-2 font-display text-sm font-semibold">
+            {group.label === 'Mensajes, notas y seguimiento'
+              ? 'Mensajes, notas y seguimiento'
+              : group.label}
+          </p>
           <div className="grid gap-2 sm:grid-cols-2">
             {group.keys.map((key) => (
               <label

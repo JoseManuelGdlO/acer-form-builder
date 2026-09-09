@@ -677,7 +677,7 @@ export const ClientProfileView = ({
         )
       );
     } catch (error: any) {
-      toast.error(error.message || 'Error al actualizar el checklist');
+      toast.error(error.message || 'Error al actualizar el seguimiento');
     }
   };
 
@@ -856,7 +856,7 @@ export const ClientProfileView = ({
     .join(' · ');
   const profileTabs: TabBarItem[] = [
     { id: 'resumen', label: 'Resumen' },
-    { id: 'checklist', label: 'Checklist' },
+    { id: 'checklist', label: 'Seguimiento' },
     { id: 'notas', label: 'Notas' },
     { id: 'citas', label: 'Citas' },
     ...(isTitular ? [{ id: 'pagos', label: 'Pagos' }] : []),

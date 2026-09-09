@@ -730,7 +730,7 @@ export const ClientList = ({
               </div>
 
               <div>
-                <h3 className="mb-2 text-xs font-medium text-muted-foreground">Filtro por Checklist</h3>
+                <h3 className="mb-2 text-xs font-medium text-muted-foreground">Filtro por seguimiento</h3>
                 <div className="flex flex-wrap gap-2">
                   {checklistFilterButtons.map((filter) => (
                     <button
@@ -747,7 +747,7 @@ export const ClientList = ({
                 </div>
                 {checklistFilter !== 'all' && (
                   <div className="mt-3 space-y-2">
-                    <Label htmlFor="client-filter-checklist-mode">Modo del checklist seleccionado</Label>
+                    <Label htmlFor="client-filter-checklist-mode">Modo del seguimiento seleccionado</Label>
                     <Select
                       value={checklistMode}
                       onValueChange={(v) => setChecklistMode(v as ChecklistMode)}
