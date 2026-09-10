@@ -9,7 +9,7 @@ const sequelizePg = new Sequelize(
     host: config.pg.host,
     port: config.pg.port,
     dialect: 'postgres',
-    logging: config.nodeEnv === 'development' ? console.log : false,
+    logging: false,
     pool: {
       max: 5,
       min: 0,

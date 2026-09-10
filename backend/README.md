@@ -39,6 +39,18 @@ npm run migrate
 npm run seed
 ```
 
+## Logging
+
+| Variable | Valores | Default |
+|----------|---------|---------|
+| `LOG_LEVEL` | `error`, `warn`, `info`, `debug` | `debug` en desarrollo, `info` en producción |
+
+Cada petición HTTP genera una línea con timestamp, método, ruta, código de estado y duración. Con `LOG_LEVEL=debug` se incluyen además los query params y el body (con campos sensibles enmascarados).
+
+```bash
+LOG_LEVEL=debug npm run dev
+```
+
 ## Scripts Disponibles
 
 - `npm run dev` - Iniciar servidor en modo desarrollo con hot reload

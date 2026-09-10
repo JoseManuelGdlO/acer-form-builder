@@ -4,6 +4,7 @@ import cors from 'cors';
 import { config } from './config/env';
 import routes from './routes';
 import { errorHandler } from './middleware/error.middleware';
+import { requestLogger } from './middleware/requestLogger.middleware';
 import swaggerUi from 'swagger-ui-express';
 import openApiSpec from './swagger/openapi.json';
 
@@ -17,6 +18,7 @@ app.use(cors({
 
 app.use(express.json({ limit: '15mb' }));
 app.use(express.urlencoded({ extended: true, limit: '15mb' }));
+app.use(requestLogger);
 
 // Servir archivos subidos (productos, etc.) desde la carpeta configurada
 const uploadsPath = path.isAbsolute(config.uploadsDir)

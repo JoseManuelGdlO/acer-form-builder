@@ -2,9 +2,34 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+export type LogLevel = 'error' | 'warn' | 'info' | 'debug';
+
+const LOG_LEVELS: LogLevel[] = ['error', 'warn', 'info', 'debug'];
+
+function parseLogLevel(): LogLevel {
+  const fallback: LogLevel =
+    (process.env.NODE_ENV || 'development') === 'production' ? 'info' : 'debug';
+  const raw = (process.env.LOG_LEVEL || fallback).trim().toLowerCase();
+  if (LOG_LEVELS.includes(raw as LogLevel)) return raw as LogLevel;
+  console.warn(`[config] Invalid LOG_LEVEL "${raw}", falling back to info`);
+  return 'info';
+}
+
+const logLevelRank: Record<LogLevel, number> = {
+  error: 0,
+  warn: 1,
+  info: 2,
+  debug: 3,
+};
+
+export function isLogLevelAtLeast(level: LogLevel): boolean {
+  return logLevelRank[config.logLevel] >= logLevelRank[level];
+}
+
 export const config = {
   port: process.env.PORT || 3001,
   nodeEnv: process.env.NODE_ENV || 'development',
+  logLevel: parseLogLevel(),
   db: {
     host: process.env.DB_HOST || 'localhost',
     port: parseInt(process.env.DB_PORT || '3306', 10),

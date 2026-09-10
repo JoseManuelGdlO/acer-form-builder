@@ -9,7 +9,7 @@ const sequelize = new Sequelize(
     host: config.db.host,
     port: config.db.port,
     dialect: 'mysql',
-    logging: config.nodeEnv === 'development' ? console.log : false,
+    logging: false,
     pool: {
       max: 5,
       min: 0,
