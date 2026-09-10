@@ -232,11 +232,6 @@ export function AppHeader({
             ) : (
               <span className="truncate font-display text-lg font-bold text-sidebar-foreground">{companyName}</span>
             )}
-            {logoUrl ? (
-              <span className="hidden truncate font-display text-sm font-semibold text-sidebar-foreground min-[420px]:block max-w-[10rem]">
-                {companyName}
-              </span>
-            ) : null}
           </div>
 
           <div className="relative mx-auto hidden w-full max-w-xl lg:block">
