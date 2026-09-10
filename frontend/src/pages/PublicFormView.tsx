@@ -28,6 +28,8 @@ import {
   normalizePhoneDigits,
 } from '@/lib/phone';
 import { api } from '@/lib/api';
+import { useTenant } from '@/contexts/TenantContext';
+import { getCompanyBrandLogo } from '@/lib/theme';
 import DatePicker, { registerLocale, ReactDatePickerCustomHeaderProps } from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import '@/styles/datepicker.css';
@@ -295,6 +297,7 @@ export default function PublicFormView() {
   const { formId } = useParams<{ formId: string }>();
   const [searchParams] = useSearchParams();
   const sessionToken = searchParams.get('token');
+  const { tenant } = useTenant();
 
   const [form, setForm] = useState<Form | null>(null);
   const [formCompany, setFormCompany] = useState<{ name: string; logoUrl: string | null } | null>(null);
@@ -1057,8 +1060,8 @@ export default function PublicFormView() {
     }
   };
 
-  const companyDisplayName = formCompany?.name || 'Compañía';
-  const companyLogoUrl = formCompany?.logoUrl ?? null;
+  const companyDisplayName = formCompany?.name || tenant?.company?.name || 'Compañía';
+  const companyLogoUrl = getCompanyBrandLogo(tenant?.theme, formCompany?.logoUrl ?? tenant?.company?.logoUrl);
 
   if (isLoading) {
     return (

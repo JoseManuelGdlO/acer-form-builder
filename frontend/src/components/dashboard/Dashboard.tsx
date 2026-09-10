@@ -5,7 +5,7 @@ import { format, formatDistanceToNow, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Form, FormSubmission, Client, Trip, CalendarEvent } from '@/types/form';
 import { useTenant } from '@/contexts/TenantContext';
-import { DASHBOARD_CENTER_LOGO_IMAGE_KEY } from '@/lib/theme';
+import { getCompanyBrandLogo } from '@/lib/theme';
 import { SectionTitle } from '@/components/layout/SectionTitle';
 import { StatusBadge } from '@/components/layout/StatusBadge';
 import { cn } from '@/lib/utils';
@@ -113,9 +113,7 @@ export const Dashboard = ({
   onNavigate,
 }: DashboardProps) => {
   const { tenant } = useTenant();
-  const dashboardCenterLogoImage = tenant?.theme?.[DASHBOARD_CENTER_LOGO_IMAGE_KEY]?.trim() ?? '';
-  const companyLogo = tenant?.company?.logoUrl?.trim() ?? '';
-  const heroLogo = dashboardCenterLogoImage || companyLogo;
+  const heroLogo = getCompanyBrandLogo(tenant?.theme, tenant?.company?.logoUrl) ?? '';
   const companyName = tenant?.company?.name?.trim() || 'operaciones';
 
   const completionRate =

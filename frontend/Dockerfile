@@ -16,7 +16,7 @@ COPY . .
 ARG VITE_API_URL=/api
 ENV VITE_API_URL=$VITE_API_URL
 # Canonical URL for OG/Twitter meta (WhatsApp requires absolute og:image)
-ARG VITE_SITE_ORIGIN=https://oficina.asertours.mx
+ARG VITE_SITE_ORIGIN=https://backoffice.travelup.mx/
 ENV VITE_SITE_ORIGIN=$VITE_SITE_ORIGIN
 
 # Build the application

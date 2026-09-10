@@ -3,7 +3,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: asertours-backend
+    container_name: travelup-backend
     expose:
       - "3000"
     volumes:
@@ -58,8 +58,8 @@ services:
       args:
         - VITE_API_URL=${VITE_API_URL:-http://localhost:3000/api}
         # OG/WhatsApp preview — URL absoluta para og:image (override en .env del servidor)
-        - VITE_SITE_ORIGIN=${VITE_SITE_ORIGIN:-https://oficina.asertours.mx}
-    container_name: asertours-frontend
+        - VITE_SITE_ORIGIN=${VITE_SITE_ORIGIN:-https://backoffice.travelup.mx}
+    container_name: travelup-frontend
     expose:
       - "80"
     depends_on:

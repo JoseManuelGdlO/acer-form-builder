@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTenant } from '@/contexts/TenantContext';
+import { getCompanyBrandLogo } from '@/lib/theme';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,7 +19,7 @@ const Login = () => {
   const navigate = useNavigate();
 
   const companyName = tenant?.company?.name || 'Sistema';
-  const logoUrl = tenant?.company?.logoUrl ?? null;
+  const logoUrl = getCompanyBrandLogo(tenant?.theme, tenant?.company?.logoUrl);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

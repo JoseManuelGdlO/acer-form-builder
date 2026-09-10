@@ -662,7 +662,7 @@ async function sendQuotePdf(
     return;
   }
   const template = await getOrCreateTemplate(companyId);
-  const company = await Company.findByPk(companyId, { attributes: ['id', 'name', 'logoUrl'] });
+  const company = await Company.findByPk(companyId, { attributes: ['id', 'name', 'logoUrl', 'theme'] });
   const includes =
     quote && Array.isArray(quote.includes) && quote.includes.length
       ? quote.includes

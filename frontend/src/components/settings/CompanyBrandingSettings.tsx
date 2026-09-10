@@ -23,8 +23,9 @@ import {
   DASHBOARD_CENTER_LOGO_IMAGE_KEY,
   getDashboardCardOpacity,
 } from '@/lib/theme';
-import { applyFavicon } from '@/lib/favicon';
+import { applyFavicon, toStoredFaviconUrl } from '@/lib/favicon';
 import { useTenant } from '@/contexts/TenantContext';
+import { getTenantLookupDomain } from '@/lib/tenant-domain';
 import { SectionTitle } from '@/components/layout/SectionTitle';
 import {
   ChevronDown,
@@ -197,7 +198,6 @@ function numberToRadius(num: number): string {
 export function CompanyBrandingSettings() {
   const { tenant, loadTenant } = useTenant();
   const [domain, setDomain] = useState('');
-  const [logoUrl, setLogoUrl] = useState('');
   const [faviconUrl, setFaviconUrl] = useState('');
   const [theme, setTheme] = useState<Record<string, string>>({});
   const [advisorClientAccessMode, setAdvisorClientAccessMode] = useState<'assigned_only' | 'company_wide'>('assigned_only');
@@ -223,7 +223,6 @@ export function CompanyBrandingSettings() {
       .then((company) => {
         if (!cancelled) {
           setDomain(company.domain ?? '');
-          setLogoUrl(company.logoUrl ?? '');
           setFaviconUrl(company.faviconUrl ?? '');
           setTheme(mergeWithDefaultTheme(parseSavedTheme(company.theme)));
           setAdvisorClientAccessMode(company.advisorClientAccessMode ?? 'assigned_only');
@@ -245,8 +244,7 @@ export function CompanyBrandingSettings() {
     try {
       const res = await api.updateMyCompany({
         domain: domain.trim() || null,
-        logoUrl: logoUrl.trim() || null,
-        faviconUrl: faviconUrl.trim() || null,
+        faviconUrl: toStoredFaviconUrl(faviconUrl),
         theme,
         advisorClientAccessMode,
       });
@@ -256,10 +254,8 @@ export function CompanyBrandingSettings() {
       });
       setTheme(mergedAfterSave);
       applyTheme(mergedAfterSave);
-      applyFavicon(res.faviconUrl ?? res.logoUrl ?? null);
-      const hostname = window.location.hostname;
-      const domainToUse = hostname === 'localhost' || hostname === '127.0.0.1' ? 'aser' : hostname;
-      await loadTenant(domainToUse);
+      applyFavicon(res.faviconUrl ?? null);
+      await loadTenant(getTenantLookupDomain());
       toast.success('Configuración guardada');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error al guardar';
@@ -362,9 +358,9 @@ export function CompanyBrandingSettings() {
       <Card className="p-5">
         <SectionTitle title="Identidad visual" />
         <div className="rounded-lg bg-sidebar p-5">
-          {logoUrl ? (
+          {dashboardCenterLogoImage ? (
             <img
-              src={logoUrl}
+              src={dashboardCenterLogoImage}
               alt={`Vista previa del logotipo ${companyName}`}
               className="h-14 w-52 object-contain object-left"
             />
@@ -386,29 +382,51 @@ export function CompanyBrandingSettings() {
           />
         </div>
 
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="company-logo-url" className="text-xs font-medium">
-              Logotipo (URL)
-            </Label>
-            <Input
-              id="company-logo-url"
-              placeholder="https://... o /uploads/logo.png"
-              value={logoUrl}
-              onChange={(e) => setLogoUrl(e.target.value)}
-            />
+        <div className="mt-4 space-y-2">
+          <h4 className="text-sm font-semibold text-foreground">Logotipo</h4>
+          <input
+            ref={centerLogoInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleCenterLogoFile}
+          />
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={isCompressingCenterLogo}
+              onClick={() => centerLogoInputRef.current?.click()}
+            >
+              <Upload />
+              {isCompressingCenterLogo ? 'Procesando…' : 'Cambiar logotipo'}
+            </Button>
+            {dashboardCenterLogoImage ? (
+              <Button type="button" variant="ghost" size="sm" onClick={clearCenterLogoImage}>
+                <X />
+                Quitar logotipo
+              </Button>
+            ) : null}
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="company-favicon-url" className="text-xs font-medium">
-              Favicon (URL)
-            </Label>
-            <Input
-              id="company-favicon-url"
-              placeholder="https://... o /uploads/favicon.ico"
-              value={faviconUrl}
-              onChange={(e) => setFaviconUrl(e.target.value)}
-            />
-          </div>
+          <p className="text-xs text-muted-foreground">
+            Se usa en la cabecera, el inicio de sesión y el dashboard. Pulsa «Guardar» para persistirlo.
+          </p>
+        </div>
+
+        <div className="mt-4 space-y-2">
+          <Label htmlFor="company-favicon-url" className="text-xs font-medium">
+            Favicon (pestaña)
+          </Label>
+          <Input
+            id="company-favicon-url"
+            placeholder="/favicon.png"
+            value={faviconUrl}
+            onChange={(e) => setFaviconUrl(e.target.value)}
+          />
+          <p className="text-xs text-muted-foreground">
+            Déjalo vacío para usar el icono por defecto de la app.
+          </p>
         </div>
 
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
@@ -602,48 +620,6 @@ export function CompanyBrandingSettings() {
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">Sin imagen de fondo; se usa el color de «Fondo».</p>
-          )}
-        </div>
-
-        <div className="mt-5 space-y-2">
-          <h4 className="text-sm font-semibold text-foreground">Logotipo centrado en inicio</h4>
-          <input
-            ref={centerLogoInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={handleCenterLogoFile}
-          />
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={isCompressingCenterLogo}
-              onClick={() => centerLogoInputRef.current?.click()}
-            >
-              <Upload />
-              {isCompressingCenterLogo ? 'Procesando…' : 'Cambiar logotipo de inicio'}
-            </Button>
-            {dashboardCenterLogoImage ? (
-              <Button type="button" variant="ghost" size="sm" onClick={clearCenterLogoImage}>
-                <X />
-                Quitar logotipo
-              </Button>
-            ) : null}
-          </div>
-          {dashboardCenterLogoImage ? (
-            <div className="flex max-h-72 items-center justify-center overflow-hidden rounded-lg border bg-muted/40 p-4">
-              <img
-                src={dashboardCenterLogoImage}
-                alt="Vista previa del logotipo centrado de inicio"
-                className="max-h-64 w-auto object-contain"
-              />
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Sin logotipo central; el dashboard no reserva el centro.
-            </p>
           )}
         </div>
 

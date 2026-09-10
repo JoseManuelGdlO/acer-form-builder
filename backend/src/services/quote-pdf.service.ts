@@ -4,6 +4,7 @@ import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage, type RGB }
 import { Company } from '../models';
 import { QuoteTemplate } from '../models/QuoteTemplate';
 import { config } from '../config/env';
+import { resolveCompanyLogoUrl } from '../utils/company-branding';
 
 type QuotePdfPayload = {
   folio: string;
@@ -126,7 +127,7 @@ export async function renderQuotePdf(params: {
 
   let textX = 32;
   if (template.showLogo) {
-    const logo = await loadLogoBytes(company?.logoUrl);
+    const logo = await loadLogoBytes(resolveCompanyLogoUrl(company));
     if (logo) {
       try {
         const image = logo.kind === 'png' ? await pdf.embedPng(logo.bytes) : await pdf.embedJpg(logo.bytes);

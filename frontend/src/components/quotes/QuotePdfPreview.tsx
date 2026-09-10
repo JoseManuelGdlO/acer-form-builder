@@ -2,6 +2,7 @@ import { useTenant } from '@/contexts/TenantContext';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Quote, QuoteTemplate } from '@/types/quote';
 import { formatQuoteDate, formatQuoteMoney, textToLines } from '@/lib/quoteFormat';
+import { getCompanyBrandLogo } from '@/lib/theme';
 
 type QuotePdfPreviewProps = {
   quote?: Quote | null;
@@ -11,7 +12,7 @@ type QuotePdfPreviewProps = {
 export function QuotePdfPreview({ quote, template }: QuotePdfPreviewProps) {
   const { tenant } = useTenant();
   const { company } = useAuth();
-  const logoUrl = company?.logoUrl ?? tenant?.company?.logoUrl ?? null;
+  const logoUrl = getCompanyBrandLogo(tenant?.theme, company?.logoUrl ?? tenant?.company?.logoUrl);
   const includes = quote?.includes?.length ? quote.includes : textToLines(template.includes);
   const excludes = quote?.excludes?.length ? quote.excludes : textToLines(template.excludes);
   const terms = quote?.terms || template.terms;

@@ -1,7 +1,7 @@
 {
-  "name": "aser-tour-backend",
+  "name": "travelup-backend",
   "version": "1.0.0",
-  "description": "Backend API for Aser Tours - Management System",
+  "description": "Backend API for TravelUp - Management System",
   "main": "dist/server.js",
   "scripts": {
     "generate-openapi": "node scripts/generate-openapi.js",

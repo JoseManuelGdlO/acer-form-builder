@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback, ReactNode 
 import { api } from '@/lib/api';
 import { applyTheme } from '@/lib/theme';
 import { applyFavicon } from '@/lib/favicon';
+import { getTenantLookupDomain } from '@/lib/tenant-domain';
 
 export interface TenantCompany {
   id: string;
@@ -49,8 +50,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
         theme: data.theme ?? null,
       });
       applyTheme(data.theme ?? null);
-      const faviconUrl = data.company.faviconUrl ?? data.company.logoUrl ?? null;
-      applyFavicon(faviconUrl);
+      applyFavicon(data.company.faviconUrl ?? null);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '';
       const is404 = (err as { status?: number; response?: { status?: number } })?.response?.status === 404
@@ -65,9 +65,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    const hostname = window.location.hostname;
-    const domainToUse = hostname === 'localhost' || hostname === '127.0.0.1' ? 'aser' : hostname;
-    loadTenant(domainToUse);
+    loadTenant(getTenantLookupDomain());
   }, [loadTenant]);
 
   return (

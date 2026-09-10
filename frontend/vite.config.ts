@@ -3,7 +3,6 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 
-/** WhatsApp / Facebook OG tags need absolute image URLs; build with VITE_SITE_ORIGIN=https://oficina.asertours.mx */
 function htmlSiteOriginPlugin(siteOrigin: string) {
   const prefix = siteOrigin.replace(/\/$/, "");
   return {

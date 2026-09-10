@@ -93,6 +93,17 @@ const THEME_META_KEYS = new Set<string>([
   DASHBOARD_CENTER_LOGO_IMAGE_KEY,
 ]);
 
+/** Single brand logo: uploaded start/dashboard image, then legacy logoUrl. */
+export function getCompanyBrandLogo(
+  theme?: Record<string, string> | null,
+  logoUrl?: string | null,
+): string | null {
+  const fromTheme = theme?.[DASHBOARD_CENTER_LOGO_IMAGE_KEY]?.trim();
+  if (fromTheme) return fromTheme;
+  const fromUrl = logoUrl?.trim();
+  return fromUrl || null;
+}
+
 export function getDashboardCardOpacity(theme: Record<string, string> | null | undefined): number {
   const raw = theme?.[DASHBOARD_CARD_OPACITY_KEY];
   if (!raw) return DEFAULT_DASHBOARD_CARD_OPACITY;

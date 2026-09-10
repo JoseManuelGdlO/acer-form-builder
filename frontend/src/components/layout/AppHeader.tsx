@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { ChevronDown, LogOut, Menu, Plus, Search, X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTenant } from '@/contexts/TenantContext';
+import { getCompanyBrandLogo } from '@/lib/theme';
 import { VIEW_ENTRY_PERMISSIONS, type ShellView } from '@/auth/viewPermissions';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { Button } from '@/components/ui/button';
@@ -190,7 +191,7 @@ export function AppHeader({
   const { user, company, logout, canAny } = useAuth();
   const { tenant } = useTenant();
   const companyName = company?.name || tenant?.company?.name || 'Compañía';
-  const logoUrl = company?.logoUrl ?? tenant?.company?.logoUrl ?? null;
+  const logoUrl = getCompanyBrandLogo(tenant?.theme, company?.logoUrl ?? tenant?.company?.logoUrl);
   const [mobileNav, setMobileNav] = useState(false);
   const searchEnabled = HEADER_SEARCHABLE_VIEWS.includes(currentView);
   const pageTitle = SHELL_VIEW_META[currentView]?.title;

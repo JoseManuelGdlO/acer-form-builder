@@ -3,6 +3,7 @@ import { Response } from 'express';
 import { body, validationResult } from 'express-validator';
 import { Form, Company } from '../models';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { resolveCompanyLogoUrl } from '../utils/company-branding';
 
 function cloneFormSectionsWithNewIds(sections: unknown): unknown[] {
   if (!Array.isArray(sections)) return [];
@@ -67,7 +68,7 @@ export const getFormById = async (req: AuthRequest, res: Response): Promise<void
     // Public (no auth): return form with company for branding
     const form = await Form.findOne({
       where: { id, isDeleted: false },
-      include: [{ model: Company, as: 'company', attributes: ['id', 'name', 'slug', 'logoUrl'] }],
+      include: [{ model: Company, as: 'company', attributes: ['id', 'name', 'slug', 'logoUrl', 'theme'] }],
     });
     if (!form) {
       res.status(404).json({ error: 'Form not found' });
@@ -77,7 +78,9 @@ export const getFormById = async (req: AuthRequest, res: Response): Promise<void
     const company = (form as any).company;
     res.json({
       ...formJson,
-      company: company ? { id: company.id, name: company.name, slug: company.slug, logoUrl: company.logoUrl } : null,
+      company: company
+        ? { id: company.id, name: company.name, slug: company.slug, logoUrl: resolveCompanyLogoUrl(company) }
+        : null,
     });
   } catch (error) {
     console.error('Get form by id error:', error);
