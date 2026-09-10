@@ -233,8 +233,8 @@ export function SeatPickerModal({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Armchair className="w-5 h-5" />
+            <DialogTitle className="flex items-center gap-2 font-display">
+              <Armchair className="size-5" />
               Selección de asientos — {trip.title}
             </DialogTitle>
             <DialogDescription className="sr-only">
@@ -242,8 +242,8 @@ export function SeatPickerModal({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid grid-cols-1 md:grid-cols-[1.7fr_1fr_1fr] gap-4 flex-1 min-h-0">
-            <div className="flex flex-col min-h-0">
+          <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 md:grid-cols-[1.7fr_1fr_1fr]">
+            <div className="flex min-h-0 flex-col rounded-md bg-muted/30 p-3">
               <p className="text-xs text-muted-foreground mb-2">
                 {reviewerSeatMode
                   ? 'Haz clic en un asiento libre para asignar un participante.'
@@ -397,8 +397,8 @@ export function SeatPickerModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Armchair className="w-5 h-5" />
+          <DialogTitle className="flex items-center gap-2 font-display">
+            <Armchair className="size-5" />
             Selección de asientos — {trip.title}
           </DialogTitle>
           <DialogDescription className="sr-only">
@@ -408,7 +408,7 @@ export function SeatPickerModal({
 
         <div className="grid grid-cols-1 md:grid-cols-[1.7fr_1fr_1fr] gap-4 flex-1 min-h-0">
           <div className="flex flex-col min-h-0">
-            <div className="rounded-lg border bg-muted/20 p-3 overflow-auto flex-1 min-h-[200px]">
+            <div className="rounded-lg border bg-muted/30 p-3 overflow-auto flex-1 min-h-[200px]">
               <p className="text-xs text-muted-foreground mb-2">Haz clic en un asiento libre para asignar.</p>
               <div className="flex flex-col gap-2">
                 {Array.from({ length: rows }, (_, rowIndex) => (

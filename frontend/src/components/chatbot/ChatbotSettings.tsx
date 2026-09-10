@@ -4,38 +4,29 @@ import { FAQ } from '@/types/chatbot';
 import { FAQCard } from './FAQCard';
 import { FAQFormModal } from './FAQFormModal';
 import { BotBehaviorSettings } from './BotBehaviorSettings';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  Bot, 
-  MessageCircleQuestion, 
-  Plus, 
-  Search, 
-  Settings2,
-  HelpCircle,
-  CheckCircle,
-  XCircle,
-  Loader2
-} from 'lucide-react';
+import { Toolbar } from '@/components/layout/Toolbar';
+import { TabBar } from '@/components/layout/TabBar';
+import { SectionTitle } from '@/components/layout/SectionTitle';
+import { Bot, Plus, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export const ChatbotSettings = () => {
-  const { 
-    faqs, 
+  const {
+    faqs,
     faqsLoading,
     botBehavior,
     botBehaviorLoading,
     fetchFAQs,
     fetchBotBehavior,
     flushBotBehavior,
-    addFAQ, 
-    updateFAQ, 
-    deleteFAQ, 
+    addFAQ,
+    updateFAQ,
+    deleteFAQ,
     toggleFAQStatus,
     updateBotBehavior,
-    getFAQStats 
+    getFAQStats,
   } = useChatbotStore();
 
   useEffect(() => {
@@ -45,11 +36,12 @@ export const ChatbotSettings = () => {
       void flushBotBehavior();
     };
   }, [fetchFAQs, fetchBotBehavior, flushBotBehavior]);
-  
+
+  const [tab, setTab] = useState('faqs');
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingFAQ, setEditingFAQ] = useState<FAQ | null>(null);
-  
+
   const stats = getFAQStats();
 
   const filteredFAQs = faqs
@@ -108,102 +100,77 @@ export const ChatbotSettings = () => {
     if (!open) setEditingFAQ(null);
   };
 
+  const handleFlushBehavior = async () => {
+    await flushBotBehavior();
+    toast.success('Configuración guardada');
+  };
+
   return (
-    <div className="space-y-6">
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Total FAQs</p>
-                <p className="text-3xl font-bold text-primary">{stats.total}</p>
-              </div>
-              <HelpCircle className="w-10 h-10 text-primary/60" />
-            </div>
-          </CardContent>
+    <div className="mx-auto max-w-[1600px] p-4 sm:p-6 lg:p-8">
+      <div className="mb-5 grid gap-4 sm:grid-cols-3">
+        <Card className="p-5">
+          <p className="text-xs text-muted-foreground">Total FAQs</p>
+          <p className="mt-2 font-display text-2xl font-semibold">{stats.total}</p>
         </Card>
-        
-        <Card className="bg-gradient-to-br from-green-50 to-green-100/50 border-green-200">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Activas</p>
-                <p className="text-3xl font-bold text-green-600">{stats.active}</p>
-              </div>
-              <CheckCircle className="w-10 h-10 text-green-500/60" />
-            </div>
-          </CardContent>
+        <Card className="p-5">
+          <p className="text-xs text-muted-foreground">Activas</p>
+          <p className="mt-2 font-display text-2xl font-semibold text-success">{stats.active}</p>
         </Card>
-        
-        <Card className="bg-gradient-to-br from-orange-50 to-orange-100/50 border-orange-200">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Inactivas</p>
-                <p className="text-3xl font-bold text-orange-600">{stats.inactive}</p>
-              </div>
-              <XCircle className="w-10 h-10 text-orange-500/60" />
-            </div>
-          </CardContent>
+        <Card className="p-5">
+          <p className="text-xs text-muted-foreground">Inactivas</p>
+          <p className="mt-2 font-display text-2xl font-semibold">{stats.inactive}</p>
         </Card>
       </div>
 
-      {/* Tabs */}
-      <Tabs defaultValue="faqs" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 max-w-md">
-          <TabsTrigger value="faqs" className="gap-2">
-            <MessageCircleQuestion className="w-4 h-4" />
-            Preguntas Frecuentes
-          </TabsTrigger>
-          <TabsTrigger value="behavior" className="gap-2">
-            <Settings2 className="w-4 h-4" />
-            Comportamiento
-          </TabsTrigger>
-        </TabsList>
+      <TabBar
+        tabs={[
+          { id: 'faqs', label: 'Preguntas frecuentes' },
+          { id: 'behavior', label: 'Comportamiento' },
+        ]}
+        value={tab}
+        onChange={setTab}
+      />
 
-        <TabsContent value="faqs" className="mt-6">
-          {/* Search and Add */}
-          <div className="flex flex-col sm:flex-row gap-3 mb-6">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar preguntas..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <Button onClick={() => setIsModalOpen(true)} className="gap-2" disabled={faqsLoading}>
-              <Plus className="w-4 h-4" />
-              Nueva FAQ
+      {tab === 'faqs' ? (
+        <>
+          <Toolbar
+            search={searchTerm}
+            onSearchChange={setSearchTerm}
+            placeholder="Buscar preguntas…"
+          >
+            <Button type="button" onClick={() => setIsModalOpen(true)} disabled={faqsLoading}>
+              <Plus />
+              Nueva pregunta
             </Button>
-          </div>
+          </Toolbar>
 
-          {/* FAQ List */}
           {faqsLoading ? (
-            <Card className="border-dashed">
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <Loader2 className="w-10 h-10 text-muted-foreground animate-spin mb-4" />
-                <p className="text-muted-foreground">Cargando preguntas frecuentes...</p>
-              </CardContent>
-            </Card>
+            <div className="flex justify-center py-16">
+              <Loader2 className="size-8 animate-spin text-primary" />
+            </div>
           ) : filteredFAQs.length === 0 ? (
-            <Card className="border-dashed">
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <Bot className="w-12 h-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-medium mb-2">No hay preguntas frecuentes</h3>
-                <p className="text-muted-foreground text-center mb-4">
-                  Agrega preguntas y respuestas para que el bot pueda ayudar a tus clientes.
-                </p>
-                <Button onClick={() => setIsModalOpen(true)} variant="outline" className="gap-2">
-                  <Plus className="w-4 h-4" />
+            <div className="rounded-lg border border-dashed border-border py-16 text-center">
+              <div className="mx-auto mb-4 flex size-16 items-center justify-center rounded-full bg-muted/50">
+                <Bot className="size-8 text-muted-foreground" />
+              </div>
+              <h3 className="mb-1 font-display text-lg font-semibold text-foreground">
+                {searchTerm ? 'Sin resultados' : 'No hay preguntas frecuentes'}
+              </h3>
+              <p className="mb-4 text-sm text-muted-foreground">
+                {searchTerm
+                  ? 'No se encontraron preguntas con ese término'
+                  : 'Agrega preguntas y respuestas para que el bot pueda ayudar a tus clientes.'}
+              </p>
+              {!searchTerm ? (
+                <Button type="button" variant="outline" onClick={() => setIsModalOpen(true)}>
+                  <Plus />
                   Agregar primera FAQ
                 </Button>
-              </CardContent>
-            </Card>
+              ) : null}
+            </div>
           ) : (
-            <div className="space-y-3">
+            <Card className="p-5">
+              <SectionTitle title="Base de respuestas" />
               {filteredFAQs.map((faq) => (
                 <FAQCard
                   key={faq.id}
@@ -213,25 +180,21 @@ export const ChatbotSettings = () => {
                   onToggleStatus={() => handleToggleStatus(faq.id)}
                 />
               ))}
-            </div>
-          )}
-        </TabsContent>
-
-        <TabsContent value="behavior" className="mt-6">
-          {botBehaviorLoading ? (
-            <Card className="border-dashed">
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <Loader2 className="w-10 h-10 text-muted-foreground animate-spin mb-4" />
-                <p className="text-muted-foreground">Cargando configuración del bot...</p>
-              </CardContent>
             </Card>
-          ) : (
-            <BotBehaviorSettings behavior={botBehavior} onUpdate={updateBotBehavior} />
           )}
-        </TabsContent>
-      </Tabs>
+        </>
+      ) : botBehaviorLoading ? (
+        <div className="flex justify-center py-16">
+          <Loader2 className="size-8 animate-spin text-primary" />
+        </div>
+      ) : (
+        <BotBehaviorSettings
+          behavior={botBehavior}
+          onUpdate={updateBotBehavior}
+          onFlush={handleFlushBehavior}
+        />
+      )}
 
-      {/* Modal */}
       <FAQFormModal
         open={isModalOpen}
         onOpenChange={handleCloseModal}

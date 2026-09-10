@@ -49,7 +49,7 @@ Query del shell (`/`):
 - `?view=<ShellView>` — vista inicial.
 - `?view=clients&clientId=<uuid>` — abre perfil de cliente (notificaciones).
 
-`ShellView`: `dashboard` | `forms` | `clients` | `products` | `hotels` | `calendar` | `finance` | `paymentLogs` | `commissions` | `groups` | `trips` | `users` | `roles` | `chatbot` | `settings`.
+`ShellView`: `dashboard` | `forms` | `clients` | `products` | `hotels` | `calendar` | `finance` | `paymentLogs` | `commissions` | `groups` | `trips` | `quotes` | `users` | `roles` | `chatbot` | `settings`.
 
 ---
 
@@ -424,12 +424,33 @@ Editar tasas: `commissions.update`. Pagar lote: `commissions.create`.
 | COM-05 | shell | inline | mismo | Editar tasa | `updateCommissionUserRate` | PUT | `/commissions/users/:userId` | `updateCommissionUserRate` | update | Cambia rate |
 | COM-06 | shell | mismo | mismo | Quitar asesor | `removeCommissionUser` | DELETE | `/commissions/users/:userId` | `removeCommissionUser` | `commissions.delete` | Quita de esquema |
 | COM-07 | shell | mismo | mismo | Pagar lote | `payCommissionsBatch` | POST | `/commissions/payouts` | `payCommissionsBatch` | `commissions.create` | `{ periodType, referenceDate }` cierra periodo y registra payouts |
+| COM-08 | shell | mismo | mismo | Preview e historial de payouts | `getCommissionPayoutPreview` / `paidPayouts` | GET | `/commissions/payout-preview` | `getCommissionPayoutPreview` | `commissions.view` | Desglose antes de confirmar; historial desde overview. Wrapper `getCommissionPayouts` (`GET /commissions/payouts`) alineado en `api.ts` |
 
 No usados en UI aunque existen:
 
-- `GET /commissions/payout-preview`
-- `GET /commissions/payouts`
 - `GET /commissions/users` (método `getCommissionUsers` en `api.ts`)
+
+---
+
+## 16.1 Shell `quotes` — Cotizaciones (M14 fullstack)
+
+Permiso de entrada: `quotes.view` o `nav.quotes.view`.  
+Crear: `quotes.create`. Editar / ligar / seguimiento / plantilla: `quotes.update`. Borrar: `quotes.delete`.
+
+El tab Cotizaciones del perfil de cliente usa el mismo API con `?clientId=`.
+
+| id | tipo | superficie | archivo | accion_ui | api_client | http | endpoint | controller | permiso | logica_back |
+|---|---|---|---|---|---|---|---|---|---|---|
+| QUOTE-01 | shell | Lista | `quotes/QuotesView.tsx` | Listar / filtrar / buscar | `getQuotes` | GET | `/quotes?q=&status=&clientId=` | `listQuotes` | `quotes.view` | Cotizaciones del tenant; alcance assigned si no hay `clients.view_all` |
+| QUOTE-02 | shell | mismo | mismo | Alta | `createQuote` | POST | `/quotes` | `createQuote` | `quotes.create` | Folio `COT-XXXXXX`, copia incluye/no incluye de plantilla, eventos de alta y ligue |
+| QUOTE-03 | shell | Detalle | `quotes/QuoteDetail.tsx` | Ver / editar | `getQuote` `updateQuote` | GET / PUT | `/quotes/:id` | `getQuoteById` `updateQuote` | view / update | Actualiza importes, fechas, textos y cliente |
+| QUOTE-04 | shell | Detalle | mismo | Registrar / borrador | `updateQuoteStatus` | PATCH | `/quotes/:id/status` | `updateQuoteStatus` | update | `draft` \| `registered` \| `expired` + evento de seguimiento |
+| QUOTE-05 | shell | Detalle | mismo | Descargar PDF | `getQuotePdf` | GET | `/quotes/:id/pdf` | `downloadQuotePdf` | view | PDF con plantilla del tenant y logo si `showLogo` |
+| QUOTE-06 | shell | Plantilla | `quotes/QuoteTemplateEditor.tsx` | Guardar plantilla | `getQuoteTemplate` `updateQuoteTemplate` | GET / PUT | `/quotes/template` | `getQuoteTemplate` `updateQuoteTemplate` | view / update | Una plantilla por company; se crea con defaults al primer GET |
+| QUOTE-07 | shell | Plantilla | mismo | PDF de ejemplo | `getQuoteTemplatePdf` | GET | `/quotes/template/pdf` | `downloadQuoteTemplatePdf` | view | PDF placeholder con la plantilla |
+| QUOTE-08 | subvista | Perfil cliente | `quotes/ClientQuotes.tsx` | Tab Cotizaciones | `getQuotes` | GET | `/quotes?clientId=` | `listQuotes` | view | Filtro por cliente del expediente |
+| QUOTE-09 | subvista | mismo | mismo | Ligar existente | `linkQuote` | POST | `/quotes/:id/link` | `linkQuote` | update | Cambia `clientId` y registra evento |
+| QUOTE-10 | subvista | Detalle | `QuoteDetail` | Nota de seguimiento | `addQuoteEvent` | POST | `/quotes/:id/events` | `addQuoteEvent` | update | Timeline de la cotización |
 
 ---
 
@@ -804,10 +825,27 @@ Leyenda `uso_ui`: SI / NO / PARCIAL (método en `api.ts` pero ninguna pantalla l
 | POST | `/commissions/users` | SI | COM-04 |
 | PUT | `/commissions/users/:userId` | SI | COM-05 |
 | DELETE | `/commissions/users/:userId` | SI | COM-06 |
-| GET | `/commissions/payout-preview` | PARCIAL | Preview antes de pagar |
+| GET | `/commissions/payout-preview` | SI | COM-08 |
 | POST | `/commissions/payouts` | SI | COM-07 |
-| GET | `/commissions/payouts` | NO | No está ni en `api.ts` |
+| GET | `/commissions/payouts` | SI | Wrapper `getCommissionPayouts`; historial UI usa `paidPayouts` del overview |
 | GET | `/commissions/overview` | SI | COM-01 |
+
+### 21.25b Quotes `/quotes`
+
+| http | endpoint | uso_ui | conectado a |
+|---|---|---|---|
+| GET | `/quotes` | SI | QUOTE-01, QUOTE-08 |
+| GET | `/quotes/template` | SI | QUOTE-06 |
+| PUT | `/quotes/template` | SI | QUOTE-06 |
+| GET | `/quotes/template/pdf` | SI | QUOTE-07 |
+| GET | `/quotes/:id` | SI | QUOTE-03 |
+| GET | `/quotes/:id/pdf` | SI | QUOTE-05 |
+| POST | `/quotes` | SI | QUOTE-02 |
+| PUT | `/quotes/:id` | SI | QUOTE-03 |
+| PATCH | `/quotes/:id/status` | SI | QUOTE-04 |
+| POST | `/quotes/:id/link` | SI | QUOTE-09 |
+| POST | `/quotes/:id/events` | SI | QUOTE-10 |
+| DELETE | `/quotes/:id` | PARCIAL | Método en `api.ts`; la UI no expone borrar |
 
 ### 21.26 Branches `/branches`
 
@@ -851,8 +889,6 @@ Usar esta lista si hay que “completar” el front o no romper integraciones.
 | `GET /internal-appointments/:id/history` | audit cita | — |
 | `POST /trips/:id/finance/incomes` | ingreso manual viaje | ingresos salen de pagos |
 | `GET /commissions/users` | tasas | overview ya las trae |
-| `GET /commissions/payout-preview` | preview lote | UI paga directo |
-| `GET /commissions/payouts` | historial payouts | overview de finanzas/comisiones |
 | `POST /notifications` | crear notificación | workers (whatsapp_reply, etc.) |
 
 ---
@@ -873,7 +909,7 @@ Fuente: `backend/src/authorization/permissions.catalog.ts`. El front filtra nav 
 
 | grupo | keys |
 |---|---|
-| Navegación | `nav.dashboard.view` `nav.clients.view` `nav.calendar.view` `nav.forms.view` `nav.products.view` `nav.hotels.view` `nav.trips.view` `nav.admin.view` `nav.finance.view` `nav.payment_logs.view` `nav.commissions.view` `nav.users.view` `nav.chatbot.view` `nav.settings.view` `nav.groups.view` |
+| Navegación | `nav.dashboard.view` `nav.clients.view` `nav.calendar.view` `nav.forms.view` `nav.products.view` `nav.hotels.view` `nav.trips.view` `nav.quotes.view` `nav.admin.view` `nav.finance.view` `nav.payment_logs.view` `nav.commissions.view` `nav.users.view` `nav.chatbot.view` `nav.settings.view` `nav.groups.view` |
 | Clientes | `clients.view_all` `clients.view_assigned` `clients.create` `clients.update` `clients.delete` `clients.reassign_advisor` `client_financials.view` `client_financials.update` `client_payments.view` `client_payments.create` `client_payments.update` `client_payments.delete` `client_audit_logs.view` |
 | Submissions | `submissions.view_all` `submissions.view_assigned` `submissions.update` `submissions.delete` |
 | Comms cliente | `client_messages.*` `client_notes.*` `client_checklist.view` `client_checklist.update` |
@@ -883,6 +919,7 @@ Fuente: `backend/src/authorization/permissions.catalog.ts`. El front filtra nav 
 | Viajes | `trips.view` `create` `update` `delete` `trips.participants_manage` `trips.office_admin` `trip_invitations.*` `trip_bus_templates.*` `trip_finance.view` `companies.view` |
 | Finanzas | `finance.view` `payment_logs.view` |
 | Comisiones | `commissions.view` `create` `update` `delete` |
+| Cotizaciones | `quotes.view` `create` `update` `delete` `nav.quotes.view` |
 | Users/roles | `users.*` `roles.*` `session.view_as` |
 | Tenant | `branches.*` `company_branding.view/update` `checklist_templates.*` `faqs.*` `bot_behavior.view/update` |
 | Otros | `groups.*` `notifications.*` `conversations.view` `conversations.update` |
@@ -907,6 +944,7 @@ Fuente: `backend/src/authorization/permissions.catalog.ts`. El front filtra nav 
 | Calendario | `calendar/CalendarPage.tsx` |
 | Grupos | `groups/GroupList.tsx` `GroupFormModal.tsx` `GroupDetailView.tsx` `AddClientsToGroupModal.tsx` |
 | Viajes | `trips/TripList.tsx` `TripFormModal.tsx` `TripDetailView.tsx` `AddParticipantsToTripModal.tsx` `SeatPickerModal.tsx` `BusTemplateList.tsx` `BusTemplateFormModal.tsx` `StaffCatalogView.tsx` `TripHotelsSection.tsx` |
+| Cotizaciones | `quotes/QuotesView.tsx` `QuoteTable.tsx` `QuoteFormModal.tsx` `QuoteDetail.tsx` `QuoteTemplateEditor.tsx` `ClientQuotes.tsx` |
 | Finanzas | `finance/FinanceDashboard.tsx` `lib/financePdfExport.ts` |
 | Logs pagos | `payments/PaymentLogsPage.tsx` `PaymentReceiptActions.tsx` |
 | Comisiones | `commissions/CommissionsDashboard.tsx` |

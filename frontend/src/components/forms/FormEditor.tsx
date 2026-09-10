@@ -10,7 +10,6 @@ import {
   DragStartEvent,
   DragEndEvent,
   DragOverEvent,
-  useDroppable,
 } from '@dnd-kit/core';
 import {
   arrayMove,
@@ -18,14 +17,15 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import { ArrowLeft, FileText, Plus, Save } from 'lucide-react';
+import { ArrowLeft, Plus, Save, Upload } from 'lucide-react';
 import { Form, FormSection, Question, QuestionType, QUESTION_TYPE_CONFIG, PdfTemplate } from '@/types/form';
-import { QuestionCard } from './QuestionCard';
 import { QuestionTypePalette } from './QuestionTypePalette';
 import { SectionCard } from './SectionCard';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { StatusBadge } from '@/components/layout/StatusBadge';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 const MAX_TEMPLATE_SIZE_MB = 25;
@@ -384,6 +384,18 @@ export const FormEditor = ({
       0
     );
 
+  const handleBack = () => {
+    if (hasUnsavedChanges) {
+      if (window.confirm('Tienes cambios sin guardar. ¿Estás seguro de que quieres salir?')) {
+        onBack();
+      }
+      return;
+    }
+    onBack();
+  };
+
+  const sections = Array.isArray(localForm.sections) ? localForm.sections : [];
+
   return (
     <DndContext
       sensors={sensors}
@@ -392,175 +404,143 @@ export const FormEditor = ({
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
     >
-      <div className="min-h-screen bg-background">
-        {/* Header */}
-        <header className="sticky top-0 z-40 bg-card/80 backdrop-blur-sm border-b border-border">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center justify-between h-16">
-              <div className="flex items-center gap-4">
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  onClick={() => {
-                    if (hasUnsavedChanges) {
-                      if (window.confirm('Tienes cambios sin guardar. ¿Estás seguro de que quieres salir?')) {
-                        onBack();
-                      }
-                    } else {
-                      onBack();
+      <div className="mx-auto max-w-[1600px] p-4 sm:p-6 lg:p-8">
+        <Button type="button" variant="ghost" onClick={handleBack} className="gap-2">
+          <ArrowLeft className="size-4" />
+          Volver a formularios
+        </Button>
+
+        <Card className="mt-4 p-5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs text-muted-foreground">Constructor de formulario</p>
+              <Input
+                value={localForm.name}
+                onChange={e => handleLocalUpdateForm({ name: e.target.value })}
+                className="mt-1 h-auto border-0 bg-transparent p-0 font-display text-xl font-semibold focus-visible:ring-0"
+                aria-label="Nombre del formulario"
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                {sections.length} {sections.length === 1 ? 'sección' : 'secciones'} · {getTotalQuestions()}{' '}
+                {getTotalQuestions() === 1 ? 'pregunta' : 'preguntas'}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {hasUnsavedChanges ? (
+                <StatusBadge tone="warning">Cambios sin guardar</StatusBadge>
+              ) : null}
+              <input
+                id="pdf-template-upload"
+                type="file"
+                accept="application/pdf"
+                className="hidden"
+                onChange={handleTemplateUpload}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isUploadingTemplate}
+                onClick={() => document.getElementById('pdf-template-upload')?.click()}
+              >
+                <Upload className="size-4" />
+                {isUploadingTemplate ? 'Subiendo PDF...' : pdfTemplate ? 'Reemplazar PDF' : 'Subir plantilla PDF'}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!pdfTemplate || isDownloadingPreview}
+                onClick={handleDownloadPreview}
+              >
+                {isDownloadingPreview ? 'Generando preview...' : 'Descargar preview'}
+              </Button>
+              <Button
+                type="button"
+                onClick={handleSave}
+                disabled={isSaving || !hasUnsavedChanges}
+              >
+                <Save className="size-4" />
+                {isSaving ? 'Guardando...' : 'Guardar'}
+              </Button>
+            </div>
+          </div>
+
+          <Textarea
+            value={localForm.description || ''}
+            onChange={e => handleLocalUpdateForm({ description: e.target.value })}
+            placeholder="Agrega una descripción para tu formulario..."
+            className="mt-5 min-h-[80px] resize-none bg-muted/40"
+          />
+
+          <div className="mt-6 grid gap-4 lg:grid-cols-[1fr_240px]">
+            <div className="min-w-0 space-y-3">
+              <SortableContext
+                items={sections.map(s => s.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                {sections.map((section, sectionIndex) => (
+                  <SectionCard
+                    key={section.id}
+                    section={section}
+                    sectionIndex={sectionIndex}
+                    isExpanded={expandedSections.has(section.id)}
+                    isActive={activeSectionId === section.id}
+                    isDragOver={dragOverSectionId === section.id}
+                    onToggle={() => toggleSection(section.id)}
+                    onSelect={() => setActiveSectionId(section.id)}
+                    onUpdate={updates => handleLocalUpdateSection(section.id, updates)}
+                    onDelete={() => handleLocalDeleteSection(section.id)}
+                    onAddQuestion={type => handleLocalAddQuestion(section.id, type)}
+                    onUpdateQuestion={(questionId, updates) =>
+                      handleLocalUpdateQuestion(section.id, questionId, updates)
                     }
-                  }}
-                >
-                  <ArrowLeft className="w-5 h-5" />
-                </Button>
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center">
-                    <FileText className="w-5 h-5 text-primary-foreground" />
-                  </div>
-                  <div>
-                    <Input
-                      value={localForm.name}
-                      onChange={e => handleLocalUpdateForm({ name: e.target.value })}
-                      className="text-lg font-semibold border-0 p-0 h-auto focus-visible:ring-0 bg-transparent"
-                    />
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="text-sm text-muted-foreground">
-                  {localForm.sections.length} secciones · {getTotalQuestions()} preguntas
-                </span>
-                {hasUnsavedChanges && (
-                  <span className="text-xs text-amber-600">Cambios sin guardar</span>
-                )}
-                <Button 
-                  className="gradient-primary text-primary-foreground gap-2"
-                  onClick={handleSave}
-                  disabled={isSaving || !hasUnsavedChanges}
-                >
-                  <Save className="w-4 h-4" />
-                  {isSaving ? 'Guardando...' : 'Guardar'}
-                </Button>
-                <div>
-                  <input
-                    id="pdf-template-upload"
-                    type="file"
-                    accept="application/pdf"
-                    className="hidden"
-                    onChange={handleTemplateUpload}
+                    onDeleteQuestion={questionId =>
+                      handleLocalDeleteQuestion(section.id, questionId)
+                    }
+                    onReorderQuestions={questions => {
+                      setLocalForm(prev => ({
+                        ...prev,
+                        sections: (Array.isArray(prev.sections) ? prev.sections : []).map(s =>
+                          s.id === section.id ? { ...s, questions } : s
+                        ),
+                      }));
+                      setHasUnsavedChanges(true);
+                    }}
+                    canDelete={sections.length > 1}
+                    allQuestions={allQuestions}
+                    pdfTemplate={pdfTemplate}
                   />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={isUploadingTemplate}
-                    onClick={() => document.getElementById('pdf-template-upload')?.click()}
-                  >
-                    {isUploadingTemplate ? 'Subiendo PDF...' : pdfTemplate ? 'Reemplazar plantilla PDF' : 'Subir plantilla PDF'}
-                  </Button>
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={!pdfTemplate || isDownloadingPreview}
-                  onClick={handleDownloadPreview}
-                >
-                  {isDownloadingPreview ? 'Generando preview...' : 'Descargar preview dummy'}
-                </Button>
-              </div>
+                ))}
+              </SortableContext>
+
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleLocalAddSection}
+                className="h-14 w-full gap-2 border-dashed"
+              >
+                <Plus className="size-5" />
+                Agregar nueva sección
+              </Button>
+            </div>
+
+            <div className="lg:sticky lg:top-28 lg:self-start">
+              <QuestionTypePalette />
             </div>
           </div>
-        </header>
-
-        {/* Main Content */}
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex gap-8">
-            {/* Sections & Questions Area */}
-            <div className="flex-1 min-w-0">
-              {/* Form Description */}
-              <div className="bg-card rounded-xl border border-border p-6 mb-6 shadow-card">
-                <Textarea
-                  value={localForm.description || ''}
-                  onChange={e => handleLocalUpdateForm({ description: e.target.value })}
-                  placeholder="Agrega una descripción para tu formulario..."
-                  className="min-h-[80px] resize-none border-0 p-0 text-base focus-visible:ring-0"
-                />
-              </div>
-
-              {/* Sections List */}
-              <div className="space-y-4">
-                <SortableContext
-                  items={localForm.sections.map(s => s.id)}
-                  strategy={verticalListSortingStrategy}
-                >
-                  {localForm.sections.map((section, sectionIndex) => (
-                    <SectionCard
-                      key={section.id}
-                      section={section}
-                      sectionIndex={sectionIndex}
-                      isExpanded={expandedSections.has(section.id)}
-                      isActive={activeSectionId === section.id}
-                      isDragOver={dragOverSectionId === section.id}
-                      onToggle={() => toggleSection(section.id)}
-                      onSelect={() => setActiveSectionId(section.id)}
-                      onUpdate={updates => handleLocalUpdateSection(section.id, updates)}
-                      onDelete={() => handleLocalDeleteSection(section.id)}
-                      onAddQuestion={type => handleLocalAddQuestion(section.id, type)}
-                      onUpdateQuestion={(questionId, updates) =>
-                        handleLocalUpdateQuestion(section.id, questionId, updates)
-                      }
-                      onDeleteQuestion={questionId =>
-                        handleLocalDeleteQuestion(section.id, questionId)
-                      }
-                      onReorderQuestions={questions => {
-                        setLocalForm(prev => ({
-                          ...prev,
-                          sections: prev.sections.map(s =>
-                            s.id === section.id ? { ...s, questions } : s
-                          ),
-                        }));
-                        setHasUnsavedChanges(true);
-                      }}
-                      canDelete={localForm.sections.length > 1}
-                      allQuestions={allQuestions}
-                      pdfTemplate={pdfTemplate}
-                    />
-                  ))}
-                </SortableContext>
-
-                {/* Add Section Button */}
-                <Button
-                  variant="outline"
-                  onClick={handleLocalAddSection}
-                  className="w-full h-14 border-dashed gap-2"
-                >
-                  <Plus className="w-5 h-5" />
-                  Agregar nueva sección
-                </Button>
-              </div>
-            </div>
-
-            {/* Sidebar - Question Types */}
-            <div className="w-72 flex-shrink-0">
-              <div className="sticky top-24">
-                <QuestionTypePalette />
-              </div>
-            </div>
-          </div>
-        </main>
+        </Card>
       </div>
 
-      {/* Drag Overlay */}
       <DragOverlay>
-        {activeQuestion && (
-          <div className="bg-card rounded-xl border border-primary p-4 shadow-xl opacity-90">
+        {activeQuestion ? (
+          <div className="rounded-md border border-primary bg-card p-4 opacity-90 shadow-lg">
             <p className="font-medium">{activeQuestion.title}</p>
           </div>
-        )}
-        {activeDragType && (
-          <div className="bg-card rounded-xl border border-primary p-4 shadow-xl opacity-90">
+        ) : null}
+        {activeDragType ? (
+          <div className="rounded-md border border-primary bg-card p-4 opacity-90 shadow-lg">
             <p className="font-medium">{QUESTION_TYPE_CONFIG[activeDragType].label}</p>
           </div>
-        )}
+        ) : null}
       </DragOverlay>
     </DndContext>
   );

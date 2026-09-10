@@ -1,9 +1,10 @@
-import { useState } from 'react';
-import { Plus, Search, FileText } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Plus, FileText } from 'lucide-react';
 import { Form } from '@/types/form';
 import { FormCard } from './FormCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Toolbar } from '@/components/layout/Toolbar';
 import {
   Dialog,
   DialogContent,
@@ -33,6 +34,7 @@ interface FormListProps {
   onDuplicateForm?: (formId: string) => void | Promise<void>;
   /** Revisor: sin crear/eliminar/editar; solo ver público y duplicar */
   readOnly?: boolean;
+  submissions?: Array<{ formId: string; status?: string }>;
 }
 
 export const FormList = ({
@@ -42,6 +44,7 @@ export const FormList = ({
   onDeleteForm,
   onDuplicateForm,
   readOnly = false,
+  submissions,
 }: FormListProps) => {
   const [search, setSearch] = useState('');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -49,6 +52,19 @@ export const FormList = ({
   const [newFormDescription, setNewFormDescription] = useState('');
   const [formToDelete, setFormToDelete] = useState<{ id: string; name: string } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  const countsByFormId = useMemo(() => {
+    if (!submissions) return null;
+    const map = new Map<string, { total: number; completed: number }>();
+    for (const submission of submissions) {
+      if (!submission.formId) continue;
+      const entry = map.get(submission.formId) ?? { total: 0, completed: 0 };
+      entry.total += 1;
+      if (submission.status === 'completed') entry.completed += 1;
+      map.set(submission.formId, entry);
+    }
+    return map;
+  }, [submissions]);
 
   const filteredForms = forms.filter(
     form =>
@@ -104,89 +120,66 @@ export const FormList = ({
   };
 
   return (
-    <div className="bg-transparent">
-      {/* Contenedor sin bg-background: si no, tapa la imagen de fondo global (solo min-h-screen era transparente). */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Page Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-          <div>
-            <h2 className="text-2xl font-bold text-foreground">Mis Formularios</h2>
-            <p className="text-muted-foreground mt-1">
-              {readOnly
-                ? 'Consulta y duplica formularios existentes'
-                : 'Crea y gestiona formularios para tus clientes'}
-            </p>
-          </div>
-          {!readOnly && (
-            <Button
-              onClick={() => setIsCreateDialogOpen(true)}
-              className="gradient-primary text-primary-foreground gap-2"
-            >
-              <Plus className="w-4 h-4" />
-              Nuevo Formulario
-            </Button>
-          )}
-        </div>
-
-        {/* Search */}
-        <div className="relative mb-6">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Buscar formularios..."
-            className="pl-10 max-w-md"
-          />
-        </div>
-
-        {/* Forms Grid */}
-        {filteredForms.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredForms.map(form => (
-              <FormCard
-                key={form.id}
-                form={form}
-                readOnly={readOnly}
-                onViewPublic={() => openPublicForm(form.id)}
-                onEdit={() => onSelectForm(form.id)}
-                onDelete={() => handleDelete(form)}
-                onDuplicate={() => handleDuplicate(form)}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-16 px-4">
-            <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-6">
-              <FileText className="w-10 h-10 text-primary" />
-            </div>
-            <h3 className="text-xl font-semibold text-foreground mb-2">
-              {search ? 'Sin resultados' : 'No tienes formularios'}
-            </h3>
-            <p className="text-muted-foreground max-w-md mx-auto mb-6">
-              {search
-                ? 'Intenta con otro término de búsqueda'
-                : readOnly
-                  ? 'No hay formularios disponibles'
-                  : 'Crea tu primer formulario para empezar a recopilar información de tus clientes'}
-            </p>
-            {!search && !readOnly && (
-              <Button
-                onClick={() => setIsCreateDialogOpen(true)}
-                className="gradient-primary text-primary-foreground gap-2"
-              >
-                <Plus className="w-4 h-4" />
-                Crear Formulario
-              </Button>
-            )}
-          </div>
+    <div className="mx-auto max-w-[1600px] p-4 sm:p-6 lg:p-8">
+      <Toolbar
+        search={search}
+        onSearchChange={setSearch}
+        placeholder="Buscar formulario…"
+      >
+        {readOnly ? null : (
+          <Button type="button" onClick={() => setIsCreateDialogOpen(true)}>
+            <Plus />
+            Nuevo formulario
+          </Button>
         )}
-      </main>
+      </Toolbar>
 
-      {/* Create Form Dialog (solo admin) */}
+      {filteredForms.length > 0 ? (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {filteredForms.map(form => (
+            <FormCard
+              key={form.id}
+              form={form}
+              readOnly={readOnly}
+              onViewPublic={() => openPublicForm(form.id)}
+              onEdit={() => onSelectForm(form.id)}
+              onDelete={() => handleDelete(form)}
+              onDuplicate={() => handleDuplicate(form)}
+              responseCount={
+                countsByFormId ? (countsByFormId.get(form.id)?.total ?? 0) : null
+              }
+              completedCount={countsByFormId?.get(form.id)?.completed ?? 0}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-lg border border-dashed border-border py-16 text-center">
+          <div className="mx-auto mb-4 flex size-16 items-center justify-center rounded-full bg-muted/50">
+            <FileText className="size-8 text-muted-foreground" />
+          </div>
+          <h3 className="mb-1 font-display text-lg font-semibold text-foreground">
+            {search ? 'Sin resultados' : 'No hay formularios'}
+          </h3>
+          <p className="mb-4 text-sm text-muted-foreground">
+            {search
+              ? 'No se encontraron formularios con ese término'
+              : readOnly
+                ? 'No hay formularios disponibles'
+                : 'Crea el primero para recopilar información de tus clientes'}
+          </p>
+          {!search && !readOnly ? (
+            <Button type="button" onClick={() => setIsCreateDialogOpen(true)}>
+              <Plus />
+              Crear formulario
+            </Button>
+          ) : null}
+        </div>
+      )}
+
       <Dialog open={!readOnly && isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Nuevo Formulario</DialogTitle>
+            <DialogTitle className="font-display">Nuevo formulario</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -213,18 +206,13 @@ export const FormList = ({
             <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
               Cancelar
             </Button>
-            <Button
-              onClick={handleCreateForm}
-              disabled={!newFormName.trim()}
-              className="gradient-primary text-primary-foreground"
-            >
-              Crear Formulario
+            <Button onClick={handleCreateForm} disabled={!newFormName.trim()}>
+              Crear formulario
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
       <AlertDialog
         open={!!formToDelete}
         onOpenChange={(open) => {
@@ -235,7 +223,7 @@ export const FormList = ({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar formulario?</AlertDialogTitle>
+            <AlertDialogTitle className="font-display">¿Eliminar formulario?</AlertDialogTitle>
             <AlertDialogDescription>
               Esta acción no se puede deshacer. El formulario
               {formToDelete ? ` "${formToDelete.name}"` : ''} se marcará como eliminado y dejará de estar disponible.

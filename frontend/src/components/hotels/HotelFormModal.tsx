@@ -3,6 +3,7 @@ import type { Hotel } from '@/types/hotel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import {
   Dialog,
   DialogContent,
@@ -102,49 +103,49 @@ export const HotelFormModal = ({ open, hotel, onClose, onSubmit }: HotelFormModa
     <Dialog open={open} onOpenChange={(o) => !o && !isSubmitting && onClose()}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>{hotel ? 'Editar hotel' : 'Nuevo hotel'}</DialogTitle>
+          <DialogTitle className="font-display">{hotel ? 'Editar hotel' : 'Nuevo hotel'}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <label className="text-sm font-medium">
+            <Label>
               Nombre
-              <span className="text-destructive ml-0.5">*</span>
-            </label>
+              <span className="ml-0.5 text-destructive">*</span>
+            </Label>
             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nombre del hotel" required />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Ciudad</label>
+              <Label>Ciudad</Label>
               <Input value={city} onChange={(e) => setCity(e.target.value)} placeholder="Ciudad" />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">País</label>
+              <Label>País</Label>
               <Input value={country} onChange={(e) => setCountry(e.target.value)} placeholder="País" />
             </div>
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium">Dirección</label>
+            <Label>Dirección</Label>
             <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Calle, número, colonia…" />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Teléfono</label>
+              <Label>Teléfono</Label>
               <Input value={phone} onChange={(e) => setPhone(e.target.value)} />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Email</label>
+              <Label>Email</Label>
               <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
             </div>
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium">Notas</label>
+            <Label>Notas</Label>
             <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
           </div>
           <div className="space-y-2">
-            <p className="text-sm font-medium">Inventario de habitaciones (catálogo)</p>
+            <p className="font-display text-sm font-semibold">Inventario de habitaciones (catálogo)</p>
             <div className="grid grid-cols-3 gap-2">
               <div>
-                <label className="text-xs text-muted-foreground">Sencillas</label>
+                <Label className="text-xs text-muted-foreground">Sencillas</Label>
                 <Input
                   type="number"
                   min={0}
@@ -153,7 +154,7 @@ export const HotelFormModal = ({ open, hotel, onClose, onSubmit }: HotelFormModa
                 />
               </div>
               <div>
-                <label className="text-xs text-muted-foreground">Dobles</label>
+                <Label className="text-xs text-muted-foreground">Dobles</Label>
                 <Input
                   type="number"
                   min={0}
@@ -162,7 +163,7 @@ export const HotelFormModal = ({ open, hotel, onClose, onSubmit }: HotelFormModa
                 />
               </div>
               <div>
-                <label className="text-xs text-muted-foreground">Triples</label>
+                <Label className="text-xs text-muted-foreground">Triples</Label>
                 <Input
                   type="number"
                   min={0}

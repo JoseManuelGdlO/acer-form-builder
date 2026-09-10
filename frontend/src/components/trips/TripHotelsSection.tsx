@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { Trip } from '@/types/form';
 import type { Hotel, TripHotelBooking, TripHotelRoomRow, TripHotelRoomType } from '@/types/hotel';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -20,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Building2, Plus, Pencil, Trash2, Users } from 'lucide-react';
+import { Building2, Plus, Pencil, Trash2, Users, BedDouble } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -72,6 +71,8 @@ interface TripHotelsSectionProps {
   onDetach?: (tripHotelId: string) => Promise<void>;
   onAssignRoom?: (tripHotelId: string, roomId: string, participantId: string) => Promise<void>;
   onClearRoom?: (tripHotelId: string, roomId: string, participantId: string) => Promise<void>;
+  /** Sin Card envolvente (el tab del detalle ya la aporta). */
+  embedded?: boolean;
 }
 
 export const TripHotelsSection = ({
@@ -84,6 +85,7 @@ export const TripHotelsSection = ({
   onDetach,
   onAssignRoom,
   onClearRoom,
+  embedded = false,
 }: TripHotelsSectionProps) => {
   const stays = trip.tripHotels ?? [];
   const [attachOpen, setAttachOpen] = useState(false);
@@ -222,122 +224,142 @@ export const TripHotelsSection = ({
     }
   };
 
-  const participants = trip.participants ?? [];
-
   return (
     <>
-      <Card className="w-full">
-        <CardContent className="p-4 w-full">
-          <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-            <h2 className="font-semibold text-lg flex items-center gap-2">
-              <Building2 className="w-5 h-5" />
-              Hoteles
-            </h2>
-            {canManage && onAttach && (
-              <Button type="button" size="sm" className="gap-1" onClick={openAttach} disabled={busy}>
-                <Plus className="w-4 h-4" />
-                Agregar hotel
-              </Button>
-            )}
-          </div>
-          {catalogHotels.length === 0 && canManage && (
-            <p className="text-sm text-muted-foreground mb-3">
-              No hay hoteles en el catálogo o no tienes permiso para verlos. Crea hoteles en la sección Hoteles.
-            </p>
-          )}
-          {stays.length === 0 ? (
-            <p className="text-muted-foreground text-sm py-4 text-center">Aún no hay hoteles asignados a este viaje.</p>
-          ) : (
-            <div className="space-y-4">
-              {stays.map((stay) => {
-                const h = stay.hotel;
-                const loc = [h?.city, h?.country].filter(Boolean).join(', ') || h?.address;
-                return (
-                  <div key={stay.id} className="border rounded-lg p-3 space-y-3 bg-muted/20">
-                    <div className="flex flex-wrap justify-between gap-2">
-                      <div>
-                        <p className="font-medium">{h?.name ?? 'Hotel'}</p>
-                        {loc && <p className="text-xs text-muted-foreground">{loc}</p>}
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {format(parseISO(stay.checkInDate), 'dd MMM yyyy', { locale: es })} →{' '}
-                          {format(parseISO(stay.checkOutDate), 'dd MMM yyyy', { locale: es })}
-                        </p>
-                        {stay.notes && <p className="text-sm mt-1">{stay.notes}</p>}
-                      </div>
-                      {canManage && (onUpdate || onDetach) && (
-                        <div className="flex gap-1">
-                          {onUpdate && (
-                            <Button type="button" variant="outline" size="sm" className="gap-1" onClick={() => openEdit(stay)}>
-                              <Pencil className="w-3.5 h-3.5" />
-                              Editar
-                            </Button>
-                          )}
-                          {onDetach && (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              className="text-destructive gap-1"
-                              onClick={() => confirmDetach(stay)}
-                              disabled={busy}
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                              Quitar
-                            </Button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                      {(stay.rooms ?? []).map((room) => {
-                        const cap = roomCap(room.roomType);
-                        const assigned = room.assignments ?? [];
-                        const full = assigned.length >= cap;
-                        return (
-                          <button
-                            key={room.id}
-                            type="button"
-                            disabled={(!canManage || !onAssignRoom || !onClearRoom) && assigned.length === 0}
-                            onClick={() => {
-                              if ((!canManage || !onAssignRoom || !onClearRoom) && assigned.length === 0) return;
-                              setRoomDialog({ stay, room });
-                            }}
-                            className={`text-left border rounded-md p-2.5 text-sm transition-colors ${
-                              (canManage && onAssignRoom && onClearRoom) || assigned.length > 0
-                                ? 'hover:bg-accent/50 cursor-pointer'
-                                : 'opacity-80'
-                            }`}
-                          >
-                            <div className="flex justify-between items-start gap-1">
-                              <span className="font-medium">{room.label}</span>
-                              <Badge variant={full ? 'default' : 'secondary'} className="text-[10px] shrink-0">
-                                {assigned.length}/{cap}
-                              </Badge>
-                            </div>
-                            <div className="mt-1.5 flex flex-wrap gap-1">
-                              {assigned.length === 0 ? (
-                                <span className="text-muted-foreground text-xs">
-                                  {canManage && onAssignRoom ? 'Clic para asignar' : 'Vacía'}
-                                </span>
-                              ) : (
-                                assigned.map((a) => (
-                                  <Badge key={a.id} variant="outline" className="text-[10px] font-normal truncate max-w-full">
-                                    {participantDisplayName(trip, a.participantId)}
-                                  </Badge>
-                                ))
-                              )}
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        {!embedded ? (
+          <h2 className="flex items-center gap-2 font-display text-base font-semibold">
+            <Building2 className="size-5" />
+            Hoteles
+          </h2>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            {stays.length === 0 ? 'Aún no hay hoteles en este viaje.' : `${stays.length} hotel(es) asignado(s)`}
+          </p>
+        )}
+        {canManage && onAttach && !embedded ? (
+          <Button type="button" size="sm" onClick={openAttach} disabled={busy}>
+            <Plus />
+            Agregar hotel
+          </Button>
+        ) : null}
+      </div>
+      {catalogHotels.length === 0 && canManage ? (
+        <p className="mb-3 text-sm text-muted-foreground">
+          No hay hoteles en el catálogo o no tienes permiso para verlos. Crea hoteles en la sección Hoteles.
+        </p>
+      ) : null}
+      <div className="grid gap-3 md:grid-cols-2">
+        {stays.map((stay) => {
+          const h = stay.hotel;
+          const loc = [h?.city, h?.country].filter(Boolean).join(', ') || h?.address;
+          const roomCount = stay.rooms?.length ?? stay.reservedSingles + stay.reservedDoubles + stay.reservedTriples;
+          const guestCount = (stay.rooms ?? []).reduce(
+            (n, room) => n + (room.assignments?.length ?? 0),
+            0,
+          );
+          return (
+            <div key={stay.id} className="rounded-md bg-muted p-4">
+              <BedDouble className="size-5 text-primary" />
+              <div className="mt-3 flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <h3 className="font-display font-semibold">{h?.name ?? 'Hotel'}</h3>
+                  {loc ? <p className="mt-1 text-xs text-muted-foreground">{loc}</p> : null}
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {format(parseISO(stay.checkInDate), 'dd MMM yyyy', { locale: es })} →{' '}
+                    {format(parseISO(stay.checkOutDate), 'dd MMM yyyy', { locale: es })}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {roomCount} habitaciones · {guestCount} huéspedes
+                  </p>
+                  {stay.notes ? <p className="mt-2 text-sm">{stay.notes}</p> : null}
+                </div>
+                {canManage && (onUpdate || onDetach) ? (
+                  <div className="flex gap-1">
+                    {onUpdate ? (
+                      <Button type="button" variant="outline" size="sm" onClick={() => openEdit(stay)}>
+                        <Pencil />
+                        Editar
+                      </Button>
+                    ) : null}
+                    {onDetach ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive"
+                        onClick={() => confirmDetach(stay)}
+                        disabled={busy}
+                      >
+                        <Trash2 />
+                        Quitar
+                      </Button>
+                    ) : null}
                   </div>
-                );
-              })}
+                ) : null}
+              </div>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {(stay.rooms ?? []).map((room) => {
+                  const cap = roomCap(room.roomType);
+                  const assigned = room.assignments ?? [];
+                  const full = assigned.length >= cap;
+                  return (
+                    <button
+                      key={room.id}
+                      type="button"
+                      disabled={(!canManage || !onAssignRoom || !onClearRoom) && assigned.length === 0}
+                      onClick={() => {
+                        if ((!canManage || !onAssignRoom || !onClearRoom) && assigned.length === 0) return;
+                        setRoomDialog({ stay, room });
+                      }}
+                      className={`rounded-md border bg-card p-2.5 text-left text-sm transition-colors ${
+                        (canManage && onAssignRoom && onClearRoom) || assigned.length > 0
+                          ? 'cursor-pointer hover:bg-accent/50'
+                          : 'opacity-80'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-1">
+                        <span className="font-medium">{room.label}</span>
+                        <Badge variant={full ? 'default' : 'secondary'} className="shrink-0 text-[10px]">
+                          {assigned.length}/{cap}
+                        </Badge>
+                      </div>
+                      <div className="mt-1.5 flex flex-wrap gap-1">
+                        {assigned.length === 0 ? (
+                          <span className="text-xs text-muted-foreground">
+                            {canManage && onAssignRoom ? 'Clic para asignar' : 'Vacía'}
+                          </span>
+                        ) : (
+                          assigned.map((a) => (
+                            <Badge key={a.id} variant="outline" className="max-w-full truncate text-[10px] font-normal">
+                              {participantDisplayName(trip, a.participantId)}
+                            </Badge>
+                          ))
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          )}
-        </CardContent>
-      </Card>
+          );
+        })}
+        {canManage && onAttach ? (
+          <button
+            type="button"
+            onClick={openAttach}
+            disabled={busy}
+            className="rounded-md border border-dashed p-4 text-center hover:bg-muted/50"
+          >
+            <Plus className="mx-auto size-5" />
+            <p className="mt-2 text-xs">Asignar otro hotel</p>
+          </button>
+        ) : stays.length === 0 ? (
+          <p className="col-span-full py-4 text-center text-sm text-muted-foreground">
+            Aún no hay hoteles asignados a este viaje.
+          </p>
+        ) : null}
+      </div>
 
       <Dialog open={attachOpen} onOpenChange={setAttachOpen}>
         <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">

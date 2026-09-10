@@ -5,9 +5,9 @@ import { Product } from '@/types/product';
 import { ClientCard } from './ClientCard';
 import { ClientFormModal } from './ClientFormModal';
 import { ClientProfileView } from './ClientProfileView';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { Toolbar } from '@/components/layout/Toolbar';
 import {
   Select,
   SelectContent,
@@ -22,12 +22,21 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Search, Users, Plus, CheckCircle2, SlidersHorizontal, X } from 'lucide-react';
+import { Users, Plus, CheckCircle2, X } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useClientStore } from '@/hooks/useClientStore';
 import { useSettingsStore } from '@/hooks/useSettingsStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
+
+const filterChipClass = (active: boolean) =>
+  cn(
+    'flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm transition-colors',
+    active
+      ? 'border-primary bg-primary/5 shadow-sm'
+      : 'border-border hover:border-primary/30 hover:bg-muted/30',
+  );
 
 interface ClientListProps {
   clients: Client[];
@@ -70,6 +79,11 @@ interface ClientListProps {
     assignedUserId?: string;
   }) => void;
   onPageChange: (page: number) => void;
+  /** Incrementar desde el CTA del header para abrir ClientFormModal sin reescribir el CRUD. */
+  createOpenSignal?: number;
+  /** Abrir perfil (búsqueda global / calendario). */
+  focusClientId?: string | null;
+  onFocusClientConsumed?: () => void;
 }
 
 type ChecklistFilterType = 'all' | string; // 'all' or templateId
@@ -93,6 +107,9 @@ export const ClientList = ({
   initialQuery,
   onFiltersChange,
   onPageChange,
+  createOpenSignal,
+  focusClientId = null,
+  onFocusClientConsumed,
 }: ClientListProps) => {
   const [searchQuery, setSearchQuery] = useState(initialQuery?.q || '');
   const [clientStatusFilter, setClientStatusFilter] = useState<ClientStatusFilterType>(
@@ -110,6 +127,7 @@ export const ClientList = ({
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [defaultParentClientId, setDefaultParentClientId] = useState<string | null>(null);
   const hasAutoOpenedInitialClient = useRef(false);
+  const lastCreateOpenSignal = useRef(createOpenSignal);
   
   const { checklistTemplates: clientStoreTemplates } = useClientStore();
   const { checklistTemplates: settingsTemplates, fetchChecklistTemplates } = useSettingsStore();
@@ -182,6 +200,51 @@ export const ClientList = ({
       setAdvisorFilter('all');
     }
   }, [branchFilter, advisorFilter, users]);
+
+  useEffect(() => {
+    const next = initialQuery?.q ?? '';
+    setSearchQuery((prev) => (prev === next ? prev : next));
+  }, [initialQuery?.q]);
+
+  useEffect(() => {
+    if (createOpenSignal == null) return;
+    if (lastCreateOpenSignal.current === createOpenSignal) return;
+    lastCreateOpenSignal.current = createOpenSignal;
+    setEditingClient(null);
+    setDefaultParentClientId(null);
+    setIsFormOpen(true);
+  }, [createOpenSignal]);
+
+  useEffect(() => {
+    if (!focusClientId) return;
+    let cancelled = false;
+    const openFocused = async () => {
+      const local = clients.find((client) => client.id === focusClientId);
+      if (local) {
+        if (!cancelled) setViewingClient(local);
+        onFocusClientConsumed?.();
+        return;
+      }
+      if (!token) {
+        onFocusClientConsumed?.();
+        return;
+      }
+      try {
+        const fetched = await api.getClient(focusClientId, token);
+        if (cancelled) return;
+        setViewingClient(mapApiClientToViewClient(fetched));
+      } catch (error) {
+        console.error('Failed to open client from search:', error);
+        toast.error('No se pudo abrir el cliente');
+      } finally {
+        if (!cancelled) onFocusClientConsumed?.();
+      }
+    };
+    void openFocused();
+    return () => {
+      cancelled = true;
+    };
+  }, [focusClientId, clients, token, onFocusClientConsumed]);
 
   useEffect(() => {
     if (hasAutoOpenedInitialClient.current) return;
@@ -546,66 +609,50 @@ export const ClientList = ({
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-5xl mx-auto p-6 space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">
-              Clientes
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              Gestiona tu base de clientes
-            </p>
-          </div>
-          <Button onClick={handleOpenNewClient} className="gap-2">
-            <Plus className="w-4 h-4" />
-            Nuevo Cliente
-          </Button>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            className="gap-2"
-            onClick={() => setIsFiltersModalOpen(true)}
-          >
-            <SlidersHorizontal className="w-4 h-4" />
-            Filtros
-          </Button>
-          {hasActiveFilters && (
-            <Button
-              variant="ghost"
-              className="gap-2"
-              onClick={clearFilters}
-            >
-              <X className="w-4 h-4" />
+    <div className="mx-auto max-w-[1600px] p-4 sm:p-6 lg:p-8">
+        <Toolbar
+          search={searchQuery}
+          onSearchChange={setSearchQuery}
+          placeholder="Buscar por nombre, email, teléfono o código postal..."
+          onFiltersClick={() => setIsFiltersModalOpen(true)}
+          filtersLabel={hasActiveFilters ? 'Filtros activos' : 'Filtros'}
+        >
+          {hasActiveFilters ? (
+            <Button type="button" variant="ghost" onClick={clearFilters}>
+              <X />
               Quitar filtros
             </Button>
-          )}
+          ) : null}
+          <Button type="button" onClick={handleOpenNewClient}>
+            <Plus />
+            Agregar cliente
+          </Button>
+        </Toolbar>
+
+        <div className="mb-5 flex flex-wrap gap-2">
+          {clientStatusFilterButtons.map((filter) => (
+            <button
+              key={filter.key}
+              type="button"
+              onClick={() => setClientStatusFilter(filter.key)}
+              className={filterChipClass(clientStatusFilter === filter.key)}
+            >
+              {filter.icon}
+              <span className="font-medium">{filter.label}</span>
+              <span className="font-bold text-primary">({filter.count})</span>
+            </button>
+          ))}
         </div>
 
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por nombre, email, teléfono o código postal..."
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            className="pl-10 h-12"
-          />
-        </div>
-
-        {/* Clients List */}
         {clients.length === 0 ? (
-          <div className="text-center py-16">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted/50 flex items-center justify-center">
-              <Users className="w-8 h-8 text-muted-foreground" />
+          <div className="rounded-lg border border-dashed border-border py-16 text-center">
+            <div className="mx-auto mb-4 flex size-16 items-center justify-center rounded-full bg-muted/50">
+              <Users className="size-8 text-muted-foreground" />
             </div>
-            <h3 className="text-lg font-medium text-foreground mb-1">
+            <h3 className="mb-1 font-display text-lg font-semibold text-foreground">
               No hay clientes
             </h3>
-            <p className="text-muted-foreground mb-4">
+            <p className="mb-4 text-sm text-muted-foreground">
               {searchQuery ||
               clientStatusFilter !== 'all' ||
               checklistFilter !== 'all' ||
@@ -620,15 +667,15 @@ export const ClientList = ({
               checklistFilter === 'all' &&
               productFilter === 'all' &&
               (!isAdmin || (branchFilter === 'all' && advisorFilter === 'all')) && (
-              <Button onClick={handleOpenNewClient} className="gap-2">
-                <Plus className="w-4 h-4" />
-                Agregar Cliente
+              <Button type="button" onClick={handleOpenNewClient}>
+                <Plus />
+                Agregar cliente
               </Button>
             )}
           </div>
         ) : (
-          <div className="space-y-3">
-            {clients.map(client => (
+          <div className="grid gap-4 xl:grid-cols-2">
+            {clients.map((client) => (
               <ClientCard
                 key={client.id}
                 client={client}
@@ -644,12 +691,13 @@ export const ClientList = ({
         )}
 
         {pagination.totalPages > 0 && (
-          <div className="flex items-center justify-between pt-2">
+          <div className="flex items-center justify-between pt-5">
             <p className="text-sm text-muted-foreground">
-              Pagina {pagination.page} de {pagination.totalPages} - {pagination.total} clientes
+              Página {pagination.page} de {pagination.totalPages} — {pagination.total} clientes
             </p>
             <div className="flex items-center gap-2">
               <Button
+                type="button"
                 variant="outline"
                 size="sm"
                 disabled={pagination.page <= 1}
@@ -658,6 +706,7 @@ export const ClientList = ({
                 Anterior
               </Button>
               <Button
+                type="button"
                 variant="outline"
                 size="sm"
                 disabled={pagination.page >= pagination.totalPages}
@@ -689,9 +738,9 @@ export const ClientList = ({
         />
 
         <Dialog open={isFiltersModalOpen} onOpenChange={setIsFiltersModalOpen}>
-          <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogContent className="max-h-[85vh] max-w-3xl overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Filtros de clientes</DialogTitle>
+              <DialogTitle className="font-display">Filtros de clientes</DialogTitle>
               <DialogDescription>
                 Selecciona los filtros para acotar la lista de clientes.
               </DialogDescription>
@@ -699,48 +748,42 @@ export const ClientList = ({
 
             <div className="space-y-6">
               <div>
-                <h3 className="text-xs font-medium text-muted-foreground mb-2">Estado del cliente</h3>
+                <h3 className="mb-2 text-xs font-medium text-muted-foreground">Estado del cliente</h3>
                 <div className="flex flex-wrap gap-2">
-                  {clientStatusFilterButtons.map(filter => (
+                  {clientStatusFilterButtons.map((filter) => (
                     <button
                       key={filter.key}
+                      type="button"
                       onClick={() => setClientStatusFilter(filter.key)}
-                      className={`px-3 py-1.5 rounded-lg border transition-all duration-200 flex items-center gap-2 ${
-                        clientStatusFilter === filter.key
-                          ? 'border-primary bg-primary/5 shadow-sm'
-                          : 'border-border/50 hover:border-primary/30 hover:bg-muted/30'
-                      }`}
+                      className={filterChipClass(clientStatusFilter === filter.key)}
                     >
                       {filter.icon}
-                      <span className="text-sm font-medium">{filter.label}</span>
-                      <span className="text-sm font-bold text-primary">({filter.count})</span>
+                      <span className="font-medium">{filter.label}</span>
+                      <span className="font-bold text-primary">({filter.count})</span>
                     </button>
                   ))}
                 </div>
               </div>
 
               <div>
-                <h3 className="text-xs font-medium text-muted-foreground mb-2">Filtro por Checklist</h3>
+                <h3 className="mb-2 text-xs font-medium text-muted-foreground">Filtro por seguimiento</h3>
                 <div className="flex flex-wrap gap-2">
-                  {checklistFilterButtons.map(filter => (
+                  {checklistFilterButtons.map((filter) => (
                     <button
                       key={filter.key}
+                      type="button"
                       onClick={() => setChecklistFilter(filter.key)}
-                      className={`px-3 py-1.5 rounded-lg border transition-all duration-200 flex items-center gap-2 ${
-                        checklistFilter === filter.key
-                          ? 'border-primary bg-primary/5 shadow-sm'
-                          : 'border-border/50 hover:border-primary/30 hover:bg-muted/30'
-                      }`}
+                      className={filterChipClass(checklistFilter === filter.key)}
                     >
                       {filter.icon}
-                      <span className="text-sm font-medium">{filter.label}</span>
-                      <span className="text-sm font-bold text-primary">({filter.count})</span>
+                      <span className="font-medium">{filter.label}</span>
+                      <span className="font-bold text-primary">({filter.count})</span>
                     </button>
                   ))}
                 </div>
                 {checklistFilter !== 'all' && (
                   <div className="mt-3 space-y-2">
-                    <Label htmlFor="client-filter-checklist-mode">Modo del checklist seleccionado</Label>
+                    <Label htmlFor="client-filter-checklist-mode">Modo del seguimiento seleccionado</Label>
                     <Select
                       value={checklistMode}
                       onValueChange={(v) => setChecklistMode(v as ChecklistMode)}
@@ -758,21 +801,18 @@ export const ClientList = ({
               </div>
 
               <div>
-                <h3 className="text-xs font-medium text-muted-foreground mb-2">Filtro por Producto Adquirido</h3>
+                <h3 className="mb-2 text-xs font-medium text-muted-foreground">Filtro por Producto Adquirido</h3>
                 <div className="flex flex-wrap gap-2">
-                  {productFilterButtons.map(filter => (
+                  {productFilterButtons.map((filter) => (
                     <button
                       key={filter.key}
+                      type="button"
                       onClick={() => setProductFilter(filter.key)}
-                      className={`px-3 py-1.5 rounded-lg border transition-all duration-200 flex items-center gap-2 ${
-                        productFilter === filter.key
-                          ? 'border-primary bg-primary/5 shadow-sm'
-                          : 'border-border/50 hover:border-primary/30 hover:bg-muted/30'
-                      }`}
+                      className={filterChipClass(productFilter === filter.key)}
                     >
                       {filter.icon}
-                      <span className="text-sm font-medium">{filter.label}</span>
-                      <span className="text-sm font-bold text-primary">({filter.count})</span>
+                      <span className="font-medium">{filter.label}</span>
+                      <span className="font-bold text-primary">({filter.count})</span>
                     </button>
                   ))}
                 </div>
@@ -842,7 +882,6 @@ export const ClientList = ({
             </div>
           </DialogContent>
         </Dialog>
-      </div>
     </div>
   );
 };

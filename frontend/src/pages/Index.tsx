@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef, type ReactNode } from 'react';
 import { useFormStore } from '@/hooks/useFormStore';
 import { useSubmissionStore } from '@/hooks/useSubmissionStore';
 import { useClientStore } from '@/hooks/useClientStore';
@@ -31,25 +31,24 @@ import { useCategoryStore } from '@/hooks/useCategoryStore';
 import type { Category } from '@/types/category';
 import { Dashboard } from '@/components/dashboard/Dashboard';
 import { ViewAsSelector } from '@/components/admin/ViewAsSelector';
-import { AppHeader } from '@/components/layout/AppHeader';
+import { AppShell } from '@/components/layout/AppShell';
+import type { AppHeaderCta } from '@/components/layout/AppHeader';
 import { PermissionGuard } from '@/components/auth/PermissionGuard';
-import { VIEW_ENTRY_PERMISSIONS, type ShellView } from '@/auth/viewPermissions';
+import { type ShellView } from '@/auth/viewPermissions';
 import { userSeesAllClients } from '@/auth/userPermissions';
+import { QuotesView } from '@/components/quotes/QuotesView';
 import { RolesAdminPage } from '@/components/admin/RolesAdminPage';
 import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { LayoutDashboard, FileText, Users, UserCog, Bot, Settings, Receipt, ChevronDown, ShoppingBag, MapPin, ChartNoAxesCombined, Calendar, Boxes, Shield, Building2, BadgePercent } from 'lucide-react';
 import { User } from '@/types/user';
-import { Client } from '@/types/form';
+import { Client, CalendarEvent } from '@/types/form';
 import { Product } from '@/types/product';
 import type { Hotel } from '@/types/hotel';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
+import { useHeaderGlobalSearch } from '@/hooks/useHeaderGlobalSearch';
+import type { HeaderSearchSection } from '@/hooks/useHeaderGlobalSearch';
+import { countGroupsInOperation } from '@/lib/groupsInOperation';
+import { HEADER_SEARCHABLE_VIEWS } from '@/components/layout/shellNav';
 
 type View = ShellView;
 
@@ -74,6 +73,7 @@ const parseInitialClientNavigation = (): { initialView: View; initialClientId: s
     'commissions',
     'groups',
     'trips',
+    'quotes',
     'users',
     'roles',
     'chatbot',
@@ -144,6 +144,7 @@ const Index = () => {
   } = useFormStore();
 
   const { submissions, fetchSubmissions, getSubmissionStats } = useSubmissionStore();
+  const [submissionsReady, setSubmissionsReady] = useState(false);
 
   const {
     clients,
@@ -235,6 +236,14 @@ const Index = () => {
   const [editingHotel, setEditingHotel] = useState<Hotel | null>(null);
   const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
   const [selectedFilterCategories, setSelectedFilterCategories] = useState<string[]>([]);
+  const [headerSearch, setHeaderSearch] = useState('');
+  const [tripCreateSignal, setTripCreateSignal] = useState(0);
+  const pendingTripCreateRef = useRef(false);
+  const [focusClientId, setFocusClientId] = useState<string | null>(null);
+  const [focusTripId, setFocusTripId] = useState<string | null>(null);
+  const [focusQuoteId, setFocusQuoteId] = useState<string | null>(null);
+  const [groupsForDashboardReady, setGroupsForDashboardReady] = useState(false);
+  const [searchPanelDismissed, setSearchPanelDismissed] = useState(false);
   const [clientListQuery, setClientListQuery] = useState<{
     q?: string;
     status?: 'active' | 'inactive' | 'pending';
@@ -267,6 +276,8 @@ const Index = () => {
     participantCountUpcoming: number;
     occupancyRate: number;
   } | null>(null);
+  /** Agenda del dashboard: `null` si no hay `appointments.view` */
+  const [dashboardAgenda, setDashboardAgenda] = useState<CalendarEvent[] | null>(null);
   const { categories, fetchCategories, createCategory, updateCategory, deleteCategory } = useCategoryStore();
 
   const areClientQueriesEqual = (
@@ -360,9 +371,14 @@ const Index = () => {
       
       // Load submissions
       if (submissions.length === 0) {
-        fetchSubmissions().catch((error) => {
-          console.error('Failed to fetch submissions:', error);
-        });
+        fetchSubmissions()
+          .then(() => setSubmissionsReady(true))
+          .catch((error) => {
+            console.error('Failed to fetch submissions:', error);
+            setSubmissionsReady(false);
+          });
+      } else {
+        setSubmissionsReady(true);
       }
       
       // Load clients
@@ -486,6 +502,54 @@ const Index = () => {
       .catch(() => {
         if (!cancelled) setTripStats(null);
       });
+    fetchTrips(token).catch((error) => {
+      console.error('Failed to fetch trips for dashboard:', error);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, activeView, can, fetchTrips]);
+
+  useEffect(() => {
+    if (!token || activeView !== 'dashboard') {
+      setGroupsForDashboardReady(false);
+      return;
+    }
+    if (!can('groups.view') || !can('trips.view')) {
+      setGroupsForDashboardReady(false);
+      return;
+    }
+    let cancelled = false;
+    fetchGroups(token)
+      .then(() => {
+        if (!cancelled) setGroupsForDashboardReady(true);
+      })
+      .catch((error) => {
+        console.error('Failed to fetch groups for dashboard:', error);
+        if (!cancelled) setGroupsForDashboardReady(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, activeView, can, fetchGroups]);
+
+  useEffect(() => {
+    if (!token || activeView !== 'dashboard') return;
+    if (!can('appointments.view')) {
+      setDashboardAgenda(null);
+      return;
+    }
+    let cancelled = false;
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    api
+      .getCalendarEvents(today, today, token)
+      .then((data) => {
+        if (!cancelled) setDashboardAgenda(Array.isArray(data) ? data : []);
+      })
+      .catch(() => {
+        if (!cancelled) setDashboardAgenda([]);
+      });
     return () => {
       cancelled = true;
     };
@@ -515,7 +579,7 @@ const Index = () => {
 
   useEffect(() => {
     if (!token) return;
-    if (activeView !== 'trips' && activeView !== 'groups') return;
+    if (activeView !== 'trips' && activeView !== 'groups' && activeView !== 'quotes') return;
     const opts =
       viewingAs && !userSeesAllClients(viewingAs)
         ? { assignedUserId: viewingAs.id }
@@ -556,6 +620,11 @@ const Index = () => {
       fetchGroups(token).catch((error) => {
         console.error('Failed to fetch groups:', error);
       });
+      if (can('users.view')) {
+        fetchUsers(token).catch((error) => {
+          console.error('Failed to fetch users:', error);
+        });
+      }
     }
   }, [activeView, token]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -565,6 +634,11 @@ const Index = () => {
     if (can('trips.view')) {
       fetchTrips(token).catch((error) => {
         console.error('Failed to fetch trips:', error);
+      });
+    }
+    if (can('users.view')) {
+      fetchUsers(token).catch((error) => {
+        console.error('Failed to fetch users:', error);
       });
     }
     if (can('trips.office_admin')) {
@@ -703,6 +777,20 @@ const Index = () => {
     });
   }, []);
 
+  useEffect(() => {
+    if (activeView !== 'clients') return;
+    const timeout = window.setTimeout(() => {
+      handleClientFiltersChange({ q: headerSearch.trim() || undefined });
+    }, 350);
+    return () => window.clearTimeout(timeout);
+  }, [headerSearch, activeView, handleClientFiltersChange]);
+
+  useEffect(() => {
+    if (activeView !== 'clients') return;
+    const q = clientListQuery.q ?? '';
+    setHeaderSearch((prev) => (prev === q ? prev : q));
+  }, [clientListQuery.q, activeView]);
+
   const handleNavigate = useCallback(
     async (next: View) => {
       // If we're editing a form, the editor view "wins" over activeView in the render tree.
@@ -710,7 +798,7 @@ const Index = () => {
       if (currentForm && next !== 'forms') {
         if (editorHasUnsavedChanges) {
           const confirmed = window.confirm('Tienes cambios sin guardar. ¿Estás seguro de que quieres salir?');
-          if (!confirmed) return;
+          if (!confirmed) return false;
         }
 
         await selectForm(null);
@@ -721,182 +809,96 @@ const Index = () => {
       }
 
       setActiveView(next);
+      return true;
     },
     [currentForm, editorHasUnsavedChanges, selectForm, token, fetchForms]
   );
 
-  const NavigationButtons = ({ current }: { current: View }) => {
-    const adminNavActive = ['finance', 'paymentLogs', 'commissions', 'users', 'roles', 'chatbot', 'settings'].includes(current);
-    const showAdminMenu = canAny([
-      'nav.admin.view',
-      'nav.finance.view',
-      'nav.payment_logs.view',
-      'nav.commissions.view',
-      'nav.users.view',
-      'nav.chatbot.view',
-      'nav.settings.view',
-      'roles.view',
-    ]);
+  useEffect(() => {
+    if (activeView !== 'trips') return;
+    if (!pendingTripCreateRef.current) return;
+    pendingTripCreateRef.current = false;
+    setTripCreateSignal((n) => n + 1);
+  }, [activeView]);
 
-    return (
-      <>
-        {canAny(VIEW_ENTRY_PERMISSIONS.dashboard) && (
-          <Button
-            variant={current === 'dashboard' ? 'default' : 'ghost'}
-            size="sm"
-            onClick={() => handleNavigate('dashboard')}
-            className="h-8 gap-1.5 px-2 text-xs sm:text-sm"
-          >
-            <LayoutDashboard className="w-4 h-4 shrink-0" />
-            <span className="hidden sm:inline">Inicio</span>
-          </Button>
-        )}
-        {canAny(VIEW_ENTRY_PERMISSIONS.clients) && (
-          <Button
-            variant={current === 'clients' ? 'default' : 'ghost'}
-            size="sm"
-            onClick={() => handleNavigate('clients')}
-            className="h-8 gap-1.5 px-2 text-xs sm:text-sm"
-          >
-            <Users className="w-4 h-4 shrink-0" />
-            <span className="hidden sm:inline">Clientes</span>
-            {scopeClientStats !== null && scopeClientStats.total > 0 && (
-              <span className="px-1.5 py-0.5 text-xs rounded-full bg-secondary/20 text-secondary">
-                {scopeClientStats.total}
-              </span>
-            )}
-          </Button>
-        )}
-        {canAny(VIEW_ENTRY_PERMISSIONS.trips) && (
-          <Button
-            variant={current === 'trips' ? 'default' : 'ghost'}
-            size="sm"
-            onClick={() => handleNavigate('trips')}
-            className="h-8 gap-1.5 px-2 text-xs sm:text-sm"
-          >
-            <MapPin className="w-4 h-4 shrink-0" />
-            <span className="hidden sm:inline">Viajes</span>
-          </Button>
-        )}
-        {canAny(VIEW_ENTRY_PERMISSIONS.calendar) && (
-          <Button
-            variant={current === 'calendar' ? 'default' : 'ghost'}
-            size="sm"
-            onClick={() => handleNavigate('calendar')}
-            className="h-8 gap-1.5 px-2 text-xs sm:text-sm"
-          >
-            <Calendar className="w-4 h-4 shrink-0" />
-            <span className="hidden sm:inline">Calendario</span>
-          </Button>
-        )}
-        {canAny(VIEW_ENTRY_PERMISSIONS.forms) && (
-          <Button
-            variant={current === 'forms' ? 'default' : 'ghost'}
-            size="sm"
-            onClick={() => handleNavigate('forms')}
-            className="h-8 gap-1.5 px-2 text-xs sm:text-sm"
-          >
-            <FileText className="w-4 h-4 shrink-0" />
-            <span className="hidden sm:inline">Formularios</span>
-          </Button>
-        )}
-        {canAny(VIEW_ENTRY_PERMISSIONS.products) && (
-          <Button
-            variant={current === 'products' ? 'default' : 'ghost'}
-            size="sm"
-            onClick={() => handleNavigate('products')}
-            className="h-8 gap-1.5 px-2 text-xs sm:text-sm"
-          >
-            <ShoppingBag className="w-4 h-4 shrink-0" />
-            <span className="hidden sm:inline">Productos</span>
-          </Button>
-        )}
-        {canAny(VIEW_ENTRY_PERMISSIONS.hotels) && (
-          <Button
-            variant={current === 'hotels' ? 'default' : 'ghost'}
-            size="sm"
-            onClick={() => handleNavigate('hotels')}
-            className="h-8 gap-1.5 px-2 text-xs sm:text-sm"
-          >
-            <Building2 className="w-4 h-4 shrink-0" />
-            <span className="hidden sm:inline">Hoteles</span>
-          </Button>
-        )}
-        {canAny(VIEW_ENTRY_PERMISSIONS.groups) && (
-          <Button
-            variant={current === 'groups' ? 'default' : 'ghost'}
-            size="sm"
-            onClick={() => handleNavigate('groups')}
-            className="h-8 gap-1.5 px-2 text-xs sm:text-sm"
-          >
-            <Boxes className="w-4 h-4 shrink-0" />
-            <span className="hidden sm:inline">Grupos</span>
-          </Button>
-        )}
-        {showAdminMenu && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant={adminNavActive ? 'default' : 'ghost'}
-                size="sm"
-                className="h-8 gap-1.5 px-2 text-xs sm:text-sm"
-              >
-                <Settings className="w-4 h-4 shrink-0" />
-                <span className="hidden sm:inline">Administración</span>
-                <ChevronDown className="w-3.5 h-3.5 shrink-0 opacity-70" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-52">
-              {can('nav.finance.view') && (
-                <DropdownMenuItem onClick={() => handleNavigate('finance')} className="gap-2 cursor-pointer">
-                  <ChartNoAxesCombined className="w-4 h-4" />
-                  Finanzas
-                </DropdownMenuItem>
-              )}
-              {can('nav.payment_logs.view') && (
-                <DropdownMenuItem onClick={() => handleNavigate('paymentLogs')} className="gap-2 cursor-pointer">
-                  <Receipt className="w-4 h-4" />
-                  Logs de pagos
-                </DropdownMenuItem>
-              )}
-              {can('nav.commissions.view') && (
-                <DropdownMenuItem onClick={() => handleNavigate('commissions')} className="gap-2 cursor-pointer">
-                  <BadgePercent className="w-4 h-4" />
-                  Comisiones
-                </DropdownMenuItem>
-              )}
-              {can('nav.users.view') && (
-                <DropdownMenuItem onClick={() => handleNavigate('users')} className="gap-2 cursor-pointer">
-                  <UserCog className="w-4 h-4" />
-                  Usuarios
-                </DropdownMenuItem>
-              )}
-              {can('roles.view') && (
-                <DropdownMenuItem onClick={() => handleNavigate('roles')} className="gap-2 cursor-pointer">
-                  <Shield className="w-4 h-4" />
-                  Roles y permisos
-                </DropdownMenuItem>
-              )}
-              {can('nav.chatbot.view') && (
-                <DropdownMenuItem onClick={() => handleNavigate('chatbot')} className="gap-2 cursor-pointer">
-                  <Bot className="w-4 h-4" />
-                  Chatbot
-                </DropdownMenuItem>
-              )}
-              {can('nav.settings.view') && (
-                <DropdownMenuItem onClick={() => handleNavigate('settings')} className="gap-2 cursor-pointer">
-                  <Settings className="w-4 h-4" />
-                  Configuración
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
-      </>
-    );
+  const groupsInOperation = useMemo(() => {
+    if (!groupsForDashboardReady || !can('groups.view') || !can('trips.view')) return null;
+    return countGroupsInOperation(groups, trips);
+  }, [groupsForDashboardReady, groups, trips, can]);
+
+  const headerGlobalSearch = useHeaderGlobalSearch({
+    query: headerSearch,
+    token,
+    can,
+    canAny,
+    trips,
+    products,
+  });
+
+  useEffect(() => {
+    setSearchPanelDismissed(false);
+  }, [headerSearch]);
+
+  const handleSearchHit = useCallback(
+    (section: HeaderSearchSection, id: string) => {
+      setSearchPanelDismissed(true);
+      if (section.id === 'clients') {
+        setFocusClientId(id);
+        void handleNavigate('clients');
+        return;
+      }
+      if (section.id === 'trips') {
+        setFocusTripId(id);
+        void handleNavigate('trips');
+        return;
+      }
+      if (section.id === 'quotes') {
+        setFocusQuoteId(id);
+        void handleNavigate('quotes');
+        return;
+      }
+      void handleNavigate(section.view);
+    },
+    [handleNavigate],
+  );
+
+  const handleSearchSeeAll = useCallback(
+    (view: View) => {
+      setSearchPanelDismissed(true);
+      void handleNavigate(view);
+    },
+    [handleNavigate],
+  );
+
+  const searchPanel =
+    HEADER_SEARCHABLE_VIEWS.includes(activeView) && headerGlobalSearch.visible && !searchPanelDismissed
+      ? {
+          visible: true,
+          loading: headerGlobalSearch.loading,
+          empty: headerGlobalSearch.empty,
+          sections: headerGlobalSearch.sections,
+          onSelectHit: handleSearchHit,
+          onSeeAll: handleSearchSeeAll,
+        }
+      : null;
+
+  const buildHeaderCta = (view: View): AppHeaderCta | null => {
+    if (!(can('trips.create') || can('trips.office_admin'))) return null;
+    return {
+      label: 'Nuevo viaje',
+      onClick: () => {
+        if (view === 'trips') {
+          setTripCreateSignal((n) => n + 1);
+          return;
+        }
+        pendingTripCreateRef.current = true;
+        void handleNavigate('trips').then((ok) => {
+          if (!ok) pendingTripCreateRef.current = false;
+        });
+      },
+    };
   };
 
-  // Floating View As selector - always visible
   const FloatingViewAs = () =>
     can('session.view_as') ? (
       <ViewAsSelector
@@ -906,16 +908,29 @@ const Index = () => {
       />
     ) : null;
 
+  const renderShell = (current: View, body: ReactNode) => (
+    <>
+      <FloatingViewAs />
+      <AppShell
+        currentView={current}
+        viewingAs={Boolean(viewingAs)}
+        onNavigate={handleNavigate}
+        clientCount={scopeClientStats?.total ?? null}
+        searchValue={headerSearch}
+        onSearchChange={setHeaderSearch}
+        searchPanel={searchPanel}
+        cta={buildHeaderCta(current)}
+      >
+        {body}
+      </AppShell>
+    </>
+  );
+
   // Si estamos editando un formulario, mostramos el editor (solo quien puede editar formularios)
   if (currentForm && can('forms.update')) {
-    return (
-      <>
-        <FloatingViewAs />
-        <div className={`min-h-screen bg-background ${viewingAs ? 'pt-10' : ''}`}>
-          <AppHeader>
-            <NavigationButtons current="forms" />
-          </AppHeader>
-          <FormEditor
+    return renderShell(
+      'forms',
+      <FormEditor
             form={currentForm}
             onBack={async () => {
               await selectForm(null);
@@ -953,21 +968,14 @@ const Index = () => {
               await reorderQuestions(currentForm.id, sectionId, questions);
             }}
           />
-        </div>
-      </>
     );
   }
 
   // Vista de clientes
   if (activeView === 'clients') {
-    return (
-      <>
-        <FloatingViewAs />
-        <div className={`min-h-screen bg-background ${viewingAs ? 'pt-10' : ''}`}>
-          <AppHeader>
-            <NavigationButtons current="clients" />
-          </AppHeader>
-          <ClientList
+    return renderShell(
+      'clients',
+      <ClientList
             clients={filteredClients}
             products={products}
             stats={{
@@ -990,9 +998,9 @@ const Index = () => {
             initialQuery={clientListQuery}
             onFiltersChange={handleClientFiltersChange}
             onPageChange={handleClientPageChange}
+            focusClientId={focusClientId}
+            onFocusClientConsumed={() => setFocusClientId(null)}
           />
-        </div>
-      </>
     );
   }
 
@@ -1080,74 +1088,32 @@ const Index = () => {
       await fetchProducts(token);
     };
 
-    return (
+    const productQuery = headerSearch.trim().toLowerCase();
+    const listedProducts = productQuery
+      ? products.filter(
+          (p) =>
+            p.title.toLowerCase().includes(productQuery) ||
+            (p.description ?? '').toLowerCase().includes(productQuery),
+        )
+      : products;
+
+    return renderShell(
+      'products',
       <>
-        <FloatingViewAs />
-        <div className={viewingAs ? 'pt-10' : ''}>
-          <AppHeader>
-            <NavigationButtons current="products" />
-          </AppHeader>
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4 mb-4">
-            <div className="space-y-3">
-              <div className="flex flex-wrap gap-2 items-center">
-                <span className="text-sm font-medium text-muted-foreground">Filtrar por categoría:</span>
-                {categories.map((cat: Category) => {
-                  const active = selectedFilterCategories.includes(cat.key);
-                  return (
-                    <button
-                      key={cat.id}
-                      type="button"
-                      onClick={() => toggleFilterCategory(cat.key)}
-                      className={`text-xs px-2 py-1 rounded-full border ${
-                        active
-                          ? 'bg-primary text-primary-foreground border-primary'
-                          : 'bg-background text-foreground hover:bg-accent'
-                      }`}
-                    >
-                      {cat.name}
-                    </button>
-                  );
-                })}
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={applyFilters}
-                    disabled={!token}
-                  >
-                    Aplicar filtros
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={clearFilters}
-                    disabled={!token && selectedFilterCategories.length === 0}
-                  >
-                    Quitar filtros
-                  </Button>
-                </div>
-                {canAny(['categories.create', 'categories.update', 'categories.delete']) && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setCategoryManagerOpen(true)}
-                  >
-                    Gestionar categorías
-                  </Button>
-                )}
-              </div>
-            </div>
-          </div>
           <ProductsList
-            products={products}
+            products={listedProducts}
             readOnly={!canAny(['products.create', 'products.update', 'products.delete'])}
             onCreate={handleCreate}
             onEdit={handleEdit}
             onDelete={handleDelete}
+            categories={categories}
+            selectedFilterCategories={selectedFilterCategories}
+            onToggleFilterCategory={toggleFilterCategory}
+            onApplyFilters={applyFilters}
+            onClearFilters={clearFilters}
+            canManageCategories={canAny(['categories.create', 'categories.update', 'categories.delete'])}
+            onManageCategories={() => setCategoryManagerOpen(true)}
+            filtersReady={Boolean(token)}
             categoriesMap={categories.reduce<Record<string, Category>>((acc, cat) => {
               const normalizedKey = normalizeCategoryKey(cat.key);
               acc[cat.key] = cat;
@@ -1210,7 +1176,6 @@ const Index = () => {
               />
             </>
           )}
-        </div>
       </>
     );
   }
@@ -1244,13 +1209,9 @@ const Index = () => {
       }
     };
 
-    return (
+    return renderShell(
+      'hotels',
       <>
-        <FloatingViewAs />
-        <div className={viewingAs ? 'pt-10' : ''}>
-          <AppHeader>
-            <NavigationButtons current="hotels" />
-          </AppHeader>
           <HotelList
             hotels={hotels}
             readOnly={!canAny(['hotels.create', 'hotels.update', 'hotels.delete'])}
@@ -1266,23 +1227,20 @@ const Index = () => {
               onSubmit={handleSubmitHotel}
             />
           )}
-        </div>
       </>
     );
   }
 
   if (activeView === 'calendar') {
-    return (
-      <>
-        <FloatingViewAs />
-        <div className={`min-h-screen bg-background ${viewingAs ? 'pt-10' : ''}`}>
-          <AppHeader>
-            <NavigationButtons current="calendar" />
-          </AppHeader>
-          <CalendarPage />
-        </div>
-      </>
-    );
+    return renderShell('calendar', (
+      <CalendarPage
+        assignedUserId={viewingAs && !userSeesAllClients(viewingAs) ? viewingAs.id : undefined}
+        onOpenClient={(clientId) => {
+          setFocusClientId(clientId);
+          void handleNavigate('clients');
+        }}
+      />
+    ));
   }
 
   if (activeView === 'finance') {
@@ -1295,17 +1253,12 @@ const Index = () => {
           </div>
         }
       >
-        <>
-          <FloatingViewAs />
-          <div className={`min-h-screen bg-background ${viewingAs ? 'pt-10' : ''}`}>
-            <AppHeader>
-              <NavigationButtons current="finance" />
-            </AppHeader>
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-              <FinanceDashboard />
-            </div>
-          </div>
-        </>
+        {renderShell(
+          'finance',
+          <FinanceDashboard
+            pickerAssignedUserId={viewingAs && !userSeesAllClients(viewingAs) ? viewingAs.id : undefined}
+          />,
+        )}
       </PermissionGuard>
     );
   }
@@ -1320,18 +1273,7 @@ const Index = () => {
           </div>
         }
       >
-        <>
-          <FloatingViewAs />
-          <div className={`min-h-screen bg-background ${viewingAs ? 'pt-10' : ''}`}>
-            <AppHeader>
-              <NavigationButtons current="paymentLogs" />
-            </AppHeader>
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-              <h1 className="text-3xl font-bold text-primary mb-6">Logs de pagos</h1>
-              <PaymentLogsPage />
-            </div>
-          </div>
-        </>
+        {renderShell('paymentLogs', <PaymentLogsPage />)}
       </PermissionGuard>
     );
   }
@@ -1346,39 +1288,46 @@ const Index = () => {
           </div>
         }
       >
-        <>
-          <FloatingViewAs />
-          <div className={`min-h-screen bg-background ${viewingAs ? 'pt-10' : ''}`}>
-            <AppHeader>
-              <NavigationButtons current="commissions" />
-            </AppHeader>
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-              <CommissionsDashboard />
-            </div>
+        {renderShell('commissions', <CommissionsDashboard />)}
+      </PermissionGuard>
+    );
+  }
+
+  if (activeView === 'quotes') {
+    return (
+      <PermissionGuard
+        anyOf={['quotes.view', 'nav.quotes.view']}
+        fallback={
+          <div className="min-h-screen flex items-center justify-center">
+            <p className="text-muted-foreground">No tienes permisos para acceder a esta sección</p>
           </div>
-        </>
+        }
+      >
+        {renderShell(
+          'quotes',
+          <QuotesView
+            search={headerSearch}
+            onSearchChange={setHeaderSearch}
+            openQuoteId={focusQuoteId}
+            onOpenQuoteConsumed={() => setFocusQuoteId(null)}
+          />
+        )}
       </PermissionGuard>
     );
   }
 
   // Vista de grupos
   if (activeView === 'groups') {
-    return (
-      <>
-        <FloatingViewAs />
-        <div className={`min-h-screen bg-background ${viewingAs ? 'pt-10' : ''}`}>
-          <AppHeader>
-            <NavigationButtons current="groups" />
-          </AppHeader>
-          <GroupList
+    return renderShell(
+      'groups',
+      <GroupList
             groups={groups}
             availableClients={clientsForTripAndGroupPickers}
+            users={can('users.view') ? users : undefined}
             onCreate={async (data) => { await createGroup(data); }}
             onUpdate={async (id, data) => { await updateGroup(id, data); }}
             onDelete={deleteGroup}
           />
-        </div>
-      </>
     );
   }
 
@@ -1392,20 +1341,16 @@ const Index = () => {
       );
     }
     const tripReviewerMode = !can('trips.office_admin');
-    return (
-      <>
-        <FloatingViewAs />
-        <div className={`min-h-screen bg-background ${viewingAs ? 'pt-10' : ''}`}>
-          <AppHeader>
-            <NavigationButtons current="trips" />
-          </AppHeader>
-          <TripList
+    return renderShell(
+      'trips',
+      <TripList
             reviewerMode={tripReviewerMode}
             trips={trips}
             invitations={invitations}
             availableClients={clientsForTripAndGroupPickers}
             availableStaffMembers={staffMembers}
             companiesForInvite={companiesForTripShare}
+            users={can('users.view') ? users : []}
             onCreate={async (data) => {
               await createTrip(token!, data);
             }}
@@ -1504,9 +1449,12 @@ const Index = () => {
                   }
                 : undefined
             }
+            searchQuery={headerSearch}
+            onSearchChange={setHeaderSearch}
+            createOpenSignal={tripCreateSignal}
+            openTripId={focusTripId}
+            onOpenTripConsumed={() => setFocusTripId(null)}
           />
-        </div>
-      </>
     );
   }
 
@@ -1520,17 +1468,7 @@ const Index = () => {
           </div>
         }
       >
-        <>
-          <FloatingViewAs />
-          <div className={`min-h-screen bg-background ${viewingAs ? 'pt-10' : ''}`}>
-            <AppHeader>
-              <NavigationButtons current="roles" />
-            </AppHeader>
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-              <RolesAdminPage />
-            </div>
-          </div>
-        </>
+        {renderShell('roles', <RolesAdminPage />)}
       </PermissionGuard>
     );
   }
@@ -1545,18 +1483,7 @@ const Index = () => {
           </div>
         }
       >
-        <>
-          <FloatingViewAs />
-          <div className={`min-h-screen bg-background ${viewingAs ? 'pt-10' : ''}`}>
-            <AppHeader>
-              <NavigationButtons current="users" />
-            </AppHeader>
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-              <h1 className="text-3xl font-bold text-primary mb-6">Gestión de Usuarios</h1>
-              <UserList />
-            </div>
-          </div>
-        </>
+        {renderShell('users', <UserList />)}
       </PermissionGuard>
     );
   }
@@ -1571,18 +1498,7 @@ const Index = () => {
           </div>
         }
       >
-        <>
-          <FloatingViewAs />
-          <div className={`min-h-screen bg-background ${viewingAs ? 'pt-10' : ''}`}>
-            <AppHeader>
-              <NavigationButtons current="chatbot" />
-            </AppHeader>
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-              <h1 className="text-3xl font-bold text-primary mb-6">Configuración del Chatbot</h1>
-              <ChatbotSettings />
-            </div>
-          </div>
-        </>
+        {renderShell('chatbot', <ChatbotSettings />)}
       </PermissionGuard>
     );
   }
@@ -1603,17 +1519,7 @@ const Index = () => {
           </div>
         }
       >
-        <>
-          <FloatingViewAs />
-          <div className={`min-h-screen bg-background ${viewingAs ? 'pt-10' : ''}`}>
-            <AppHeader>
-              <NavigationButtons current="settings" />
-            </AppHeader>
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-              <SettingsPage />
-            </div>
-          </div>
-        </>
+        {renderShell('settings', <SettingsPage />)}
       </PermissionGuard>
     );
   }
@@ -1622,14 +1528,9 @@ const Index = () => {
   if (activeView === 'dashboard') {
     const submissionStats = getSubmissionStats();
 
-    return (
-      <>
-        <FloatingViewAs />
-        <div className={`min-h-screen bg-background ${viewingAs ? 'pt-10' : ''}`}>
-          <AppHeader>
-            <NavigationButtons current="dashboard" />
-          </AppHeader>
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    return renderShell(
+      'dashboard',
+      <div className="mx-auto max-w-[1600px] p-4 sm:p-6 lg:p-8">
             <Dashboard
               forms={forms}
               submissions={submissions}
@@ -1642,25 +1543,28 @@ const Index = () => {
               }}
               clientStats={dashboardClientStats ?? filteredClientStats}
               tripStats={can('trips.view') ? tripStats : null}
+              trips={can('trips.view') ? trips : undefined}
+              canViewTrips={can('trips.view')}
+              groupsInOperation={groupsInOperation}
+              agendaEvents={can('appointments.view') ? dashboardAgenda ?? [] : null}
+              canViewCalendar={can('nav.calendar.view')}
+              onNavigate={handleNavigate}
             />
           </div>
-        </div>
-      </>
     );
   }
 
   // Vista de formularios con navegación
-  return (
-    <>
-      <FloatingViewAs />
-      <div className={`min-h-screen bg-background ${viewingAs ? 'pt-10' : ''}`}>
-        <AppHeader>
-          <NavigationButtons current="forms" />
-        </AppHeader>
-
-        <FormList
+  return renderShell(
+    'forms',
+    <FormList
           forms={forms}
           readOnly={!canAny(['forms.update', 'forms.create', 'forms.delete'])}
+          submissions={
+            submissionsReady && canAny(['submissions.view_all', 'submissions.view_assigned'])
+              ? submissions
+              : undefined
+          }
           onSelectForm={async (formId) => {
             await selectForm(formId);
           }}
@@ -1681,8 +1585,6 @@ const Index = () => {
             }
           }}
         />
-      </div>
-    </>
   );
 };
 

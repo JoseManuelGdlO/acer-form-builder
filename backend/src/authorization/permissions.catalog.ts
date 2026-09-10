@@ -19,6 +19,7 @@ export const PERMISSION_KEYS = [
   'nav.chatbot.view',
   'nav.settings.view',
   'nav.groups.view',
+  'nav.quotes.view',
 
   // Clients CRM
   'clients.view_all',
@@ -167,6 +168,12 @@ export const PERMISSION_KEYS = [
   'conversations.update',
 
   'session.view_as',
+
+  // Quotes
+  'quotes.view',
+  'quotes.create',
+  'quotes.update',
+  'quotes.delete',
 ] as const;
 
 export type PermissionKey = (typeof PERMISSION_KEYS)[number];
@@ -187,6 +194,7 @@ const NAV_KEYS: PermissionKey[] = [
   'nav.chatbot.view',
   'nav.settings.view',
   'nav.groups.view',
+  'nav.quotes.view',
 ];
 
 export const PERMISSION_GROUPS: { id: string; label: string; keys: readonly PermissionKey[] }[] = [
@@ -336,6 +344,17 @@ export const PERMISSION_GROUPS: { id: string; label: string; keys: readonly Perm
       'faqs.delete',
       'bot_behavior.view',
       'bot_behavior.update',
+    ],
+  },
+  {
+    id: 'quotes',
+    label: 'Cotizaciones',
+    keys: [
+      'nav.quotes.view',
+      'quotes.view',
+      'quotes.create',
+      'quotes.update',
+      'quotes.delete',
     ],
   },
   {

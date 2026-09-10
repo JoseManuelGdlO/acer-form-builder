@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useState, useEffect, useMemo, useRef, type CSSProperties } from 'react';
+import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,70 +17,44 @@ import {
   hslStringToHex,
   hexToHslString,
   THEME_COLOR_KEYS,
+  DEFAULT_THEME,
   APP_BACKGROUND_IMAGE_KEY,
   DASHBOARD_CARD_OPACITY_KEY,
   DASHBOARD_CENTER_LOGO_IMAGE_KEY,
-  DEFAULT_DASHBOARD_CARD_OPACITY,
   getDashboardCardOpacity,
 } from '@/lib/theme';
 import { applyFavicon } from '@/lib/favicon';
 import { useTenant } from '@/contexts/TenantContext';
+import { SectionTitle } from '@/components/layout/SectionTitle';
 import {
-  Globe,
-  Palette,
-  Eye,
   ChevronDown,
   ChevronRight,
+  Palette,
   RotateCcw,
-  Image as ImageIcon,
-  Bookmark,
-  Wallpaper,
   Upload,
   X,
 } from 'lucide-react';
 
-/** Valores por defecto alineados con index.css y THEME_COLOR_KEYS. */
-const DEFAULT_THEME: Record<string, string> = {
-  primary: '234 66% 30%',
-  'primary-foreground': '0 0% 100%',
-  secondary: '0 67% 47%',
-  'secondary-foreground': '0 0% 100%',
-  background: '0 0% 100%',
-  foreground: '0 0% 18%',
-  card: '0 0% 100%',
-  'card-foreground': '0 0% 18%',
-  muted: '234 20% 95%',
-  'muted-foreground': '0 0% 45%',
-  accent: '230 45% 47%',
-  border: '234 20% 90%',
-  ring: '234 66% 30%',
-  radius: '0.75rem',
-  'sidebar-background': '234 66% 30%',
-  'sidebar-foreground': '0 0% 100%',
-  'sidebar-primary': '0 67% 47%',
-  'sidebar-primary-foreground': '0 0% 100%',
-  'sidebar-accent': '230 45% 47%',
-  'sidebar-accent-foreground': '0 0% 100%',
-  'sidebar-border': '234 50% 40%',
-  'sidebar-ring': '0 67% 47%',
-};
+const FEATURED_COLORS: { key: string; label: string }[] = [
+  { key: 'primary', label: 'Azul principal' },
+  { key: 'secondary', label: 'Amarillo secundario' },
+  { key: 'accent', label: 'Rojo de acento' },
+  { key: 'background', label: 'Fondo' },
+];
+
+const FEATURED_KEY_SET = new Set(FEATURED_COLORS.map((c) => c.key));
 
 const COLOR_GROUPS: { title: string; keys: { key: string; label: string }[] }[] = [
   {
     title: 'Colores principales',
     keys: [
-      { key: 'primary', label: 'Primario (botones, enlaces)' },
       { key: 'primary-foreground', label: 'Texto sobre primario' },
-      { key: 'secondary', label: 'Secundario' },
       { key: 'secondary-foreground', label: 'Texto sobre secundario' },
     ],
   },
   {
     title: 'Fondo y texto',
-    keys: [
-      { key: 'background', label: 'Fondo de página' },
-      { key: 'foreground', label: 'Texto principal' },
-    ],
+    keys: [{ key: 'foreground', label: 'Texto principal' }],
   },
   {
     title: 'Cards',
@@ -94,7 +68,6 @@ const COLOR_GROUPS: { title: string; keys: { key: string; label: string }[] }[] 
     keys: [
       { key: 'muted', label: 'Muted (fondos suaves)' },
       { key: 'muted-foreground', label: 'Texto secundario' },
-      { key: 'accent', label: 'Acento' },
     ],
   },
   {
@@ -105,7 +78,7 @@ const COLOR_GROUPS: { title: string; keys: { key: string; label: string }[] }[] 
     ],
   },
   {
-    title: 'Cabecera y barra lateral (tokens sidebar)',
+    title: 'Cabecera y barra lateral',
     keys: [
       { key: 'sidebar-background', label: 'Fondo barra lateral' },
       { key: 'sidebar-foreground', label: 'Texto barra lateral' },
@@ -118,6 +91,30 @@ const COLOR_GROUPS: { title: string; keys: { key: string; label: string }[] }[] 
     ],
   },
 ];
+
+function CompactColorPicker({
+  label,
+  hslValue,
+  onHexChange,
+}: {
+  label: string;
+  hslValue: string;
+  onHexChange: (hex: string) => void;
+}) {
+  const hex = hslValue ? hslStringToHex(hslValue) : hslStringToHex(DEFAULT_THEME.primary);
+  return (
+    <label className="flex items-center justify-between gap-3 rounded-md border p-3">
+      <span className="text-sm font-medium">{label}</span>
+      <input
+        type="color"
+        value={hex}
+        onChange={(e) => onHexChange(e.target.value)}
+        className="h-8 w-12 cursor-pointer rounded border-0 bg-transparent"
+        aria-label={label}
+      />
+    </label>
+  );
+}
 
 /** Redimensiona y exporta data URL; permite preservar transparencia con PNG/WebP. */
 function compressImageFileToDataUrl(
@@ -190,7 +187,7 @@ function radiusToNumber(value: string): number {
   const match = value.match(/^([\d.]+)rem$/);
   if (match) return parseFloat(match[1]) * 16;
   const num = parseFloat(value);
-  return Number.isNaN(num) ? 12 : num;
+  return Number.isNaN(num) ? 8 : num;
 }
 
 function numberToRadius(num: number): string {
@@ -198,7 +195,7 @@ function numberToRadius(num: number): string {
 }
 
 export function CompanyBrandingSettings() {
-  const { loadTenant } = useTenant();
+  const { tenant, loadTenant } = useTenant();
   const [domain, setDomain] = useState('');
   const [logoUrl, setLogoUrl] = useState('');
   const [faviconUrl, setFaviconUrl] = useState('');
@@ -207,6 +204,7 @@ export function CompanyBrandingSettings() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [hslOpen, setHslOpen] = useState(false);
   const [isCompressingBg, setIsCompressingBg] = useState(false);
   const [isCompressingCenterLogo, setIsCompressingCenterLogo] = useState(false);
   const bgFileInputRef = useRef<HTMLInputElement>(null);
@@ -216,6 +214,7 @@ export function CompanyBrandingSettings() {
   const appBackgroundImage = theme[APP_BACKGROUND_IMAGE_KEY] ?? '';
   const dashboardCenterLogoImage = theme[DASHBOARD_CENTER_LOGO_IMAGE_KEY] ?? '';
   const dashboardCardOpacity = getDashboardCardOpacity(theme);
+  const companyName = tenant?.company.name ?? 'Tu empresa';
 
   useEffect(() => {
     let cancelled = false;
@@ -294,7 +293,7 @@ export function CompanyBrandingSettings() {
     try {
       const dataUrl = await compressImageFileToDataUrl(file, { outputType: 'image/jpeg' });
       setTheme((t) => ({ ...t, [APP_BACKGROUND_IMAGE_KEY]: dataUrl }));
-      toast.success('Imagen preparada; pulsa «Guardar tema» para persistirla');
+      toast.success('Imagen preparada; pulsa «Guardar» para persistirla');
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Error al procesar la imagen');
     } finally {
@@ -333,7 +332,7 @@ export function CompanyBrandingSettings() {
         outputType: supportsAlpha ? 'image/png' : 'image/jpeg',
       });
       setTheme((t) => ({ ...t, [DASHBOARD_CENTER_LOGO_IMAGE_KEY]: dataUrl }));
-      toast.success('Logotipo preparado; pulsa «Guardar tema» para persistirlo');
+      toast.success('Logotipo preparado; pulsa «Guardar» para persistirlo');
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Error al procesar la imagen');
     } finally {
@@ -352,76 +351,44 @@ export function CompanyBrandingSettings() {
 
   if (isLoading) {
     return (
-      <Card>
-        <CardContent className="pt-6">
-          <p className="text-muted-foreground">Cargando...</p>
-        </CardContent>
+      <Card className="p-5">
+        <p className="text-sm text-muted-foreground">Cargando...</p>
       </Card>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Globe className="w-5 h-5 text-primary" />
-            <CardTitle>Visibilidad de clientes para asesores</CardTitle>
-          </div>
-          <CardDescription>
-            Define si los asesores ven solo sus clientes o todo el catálogo de la compañía.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            <Label htmlFor="advisor-client-access-mode">Modelo de acceso</Label>
-            <Select value={advisorClientAccessMode} onValueChange={(v: 'assigned_only' | 'company_wide') => setAdvisorClientAccessMode(v)}>
-              <SelectTrigger id="advisor-client-access-mode">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="bg-popover border">
-                <SelectItem value="assigned_only">Asignado por asesor</SelectItem>
-                <SelectItem value="company_wide">Todos los asesores ven/editan todo</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
+    <div className="space-y-4">
+      <Card className="p-5">
+        <SectionTitle title="Identidad visual" />
+        <div className="rounded-lg bg-sidebar p-5">
+          {logoUrl ? (
+            <img
+              src={logoUrl}
+              alt={`Vista previa del logotipo ${companyName}`}
+              className="h-14 w-52 object-contain object-left"
+            />
+          ) : (
+            <p className="font-display text-lg font-bold text-sidebar-foreground">{companyName}</p>
+          )}
+          <p className="mt-3 text-xs text-sidebar-foreground/60">Vista previa en navegación</p>
+        </div>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Globe className="w-5 h-5 text-primary" />
-            <CardTitle>Dominio</CardTitle>
-          </div>
-          <CardDescription>
-            Dominio personalizado para identificar tu empresa (ej. empresa-ejemplo.com).
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+        <div className="mt-5 space-y-2">
+          <Label htmlFor="company-domain" className="text-xs font-medium">
+            Dominio
+          </Label>
           <Input
             id="company-domain"
             placeholder="empresa-ejemplo.com"
             value={domain}
             onChange={(e) => setDomain(e.target.value)}
           />
-        </CardContent>
-      </Card>
+        </div>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <ImageIcon className="w-5 h-5 text-primary" />
-            <CardTitle>Logotipo y favicon</CardTitle>
-          </div>
-          <CardDescription>
-            URLs del logotipo (cabecera, login) y del favicon (pestaña del navegador). Pueden ser absolutas (https://...) o relativas (/uploads/...).
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="company-logo-url" className="flex items-center gap-2 text-sm font-medium">
-              <ImageIcon className="w-4 h-4" />
+            <Label htmlFor="company-logo-url" className="text-xs font-medium">
               Logotipo (URL)
             </Label>
             <Input
@@ -432,8 +399,7 @@ export function CompanyBrandingSettings() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="company-favicon-url" className="flex items-center gap-2 text-sm font-medium">
-              <Bookmark className="w-4 h-4" />
+            <Label htmlFor="company-favicon-url" className="text-xs font-medium">
               Favicon (URL)
             </Label>
             <Input
@@ -443,20 +409,168 @@ export function CompanyBrandingSettings() {
               onChange={(e) => setFaviconUrl(e.target.value)}
             />
           </div>
-        </CardContent>
-      </Card>
+        </div>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Wallpaper className="w-5 h-5 text-primary" />
-            <CardTitle>Imagen de fondo (toda la aplicación)</CardTitle>
+        <div className="mt-5 grid gap-4 sm:grid-cols-2">
+          {FEATURED_COLORS.map(({ key, label }) => (
+            <CompactColorPicker
+              key={key}
+              label={label}
+              hslValue={effectiveTheme[key] ?? ''}
+              onHexChange={(hex) => handleColorPickerChange(key, hex)}
+            />
+          ))}
+        </div>
+
+        <div
+          className="mt-5 flex min-h-[140px] gap-3 rounded-lg border p-4"
+          style={
+            {
+              '--background': effectiveTheme.background ?? undefined,
+              '--foreground': effectiveTheme.foreground ?? undefined,
+              '--card': effectiveTheme.card ?? undefined,
+              '--card-foreground': effectiveTheme['card-foreground'] ?? undefined,
+              '--dashboard-card-opacity': String(dashboardCardOpacity / 100),
+              '--primary': effectiveTheme.primary ? `hsl(${effectiveTheme.primary})` : undefined,
+              '--primary-foreground': effectiveTheme['primary-foreground']
+                ? `hsl(${effectiveTheme['primary-foreground']})`
+                : undefined,
+              '--secondary': effectiveTheme.secondary ? `hsl(${effectiveTheme.secondary})` : undefined,
+              '--muted': effectiveTheme.muted ? `hsl(${effectiveTheme.muted})` : undefined,
+              '--muted-foreground': effectiveTheme['muted-foreground']
+                ? `hsl(${effectiveTheme['muted-foreground']})`
+                : undefined,
+              '--accent': effectiveTheme.accent ? `hsl(${effectiveTheme.accent})` : undefined,
+              '--border': effectiveTheme.border ? `hsl(${effectiveTheme.border})` : undefined,
+              '--ring': effectiveTheme.ring ? `hsl(${effectiveTheme.ring})` : undefined,
+              '--radius': effectiveTheme.radius ?? undefined,
+              background: 'hsl(var(--background))',
+              color: 'hsl(var(--foreground))',
+            } as CSSProperties
+          }
+        >
+          <div
+            className="flex w-20 shrink-0 flex-col gap-2 rounded-md border p-2 text-[10px] leading-tight"
+            style={{
+              background: effectiveTheme['sidebar-background']
+                ? `hsl(${effectiveTheme['sidebar-background']})`
+                : undefined,
+              color: effectiveTheme['sidebar-foreground']
+                ? `hsl(${effectiveTheme['sidebar-foreground']})`
+                : undefined,
+              borderColor: effectiveTheme['sidebar-border']
+                ? `hsl(${effectiveTheme['sidebar-border']})`
+                : undefined,
+              borderRadius: effectiveTheme.radius ?? DEFAULT_THEME.radius,
+            }}
+          >
+            <span className="font-semibold">Barra</span>
+            <span
+              className="rounded px-1 py-0.5 text-center"
+              style={{
+                background: effectiveTheme['sidebar-primary']
+                  ? `hsl(${effectiveTheme['sidebar-primary']})`
+                  : undefined,
+                color: effectiveTheme['sidebar-primary-foreground']
+                  ? `hsl(${effectiveTheme['sidebar-primary-foreground']})`
+                  : undefined,
+              }}
+            >
+              Activo
+            </span>
           </div>
-          <CardDescription>
-            Se guarda en la base de datos como imagen JPEG comprimida (data URL con base64). Visible en todas las pantallas tras guardar.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+          <div className="min-w-0 flex-1 space-y-2">
+            <button
+              type="button"
+              className="inline-flex items-center rounded-md px-3 py-1.5 text-xs font-medium"
+              style={{
+                background: effectiveTheme.primary ? `hsl(${effectiveTheme.primary})` : undefined,
+                color: effectiveTheme['primary-foreground']
+                  ? `hsl(${effectiveTheme['primary-foreground']})`
+                  : undefined,
+                borderRadius: effectiveTheme.radius ?? DEFAULT_THEME.radius,
+              }}
+            >
+              Botón primario
+            </button>
+            <div
+              className="rounded-md border p-3 text-xs"
+              style={{ borderRadius: effectiveTheme.radius ?? DEFAULT_THEME.radius }}
+            >
+              <p className="font-medium">Tarjeta de ejemplo</p>
+              <p className="mt-1 text-muted-foreground">Opacidad {dashboardCardOpacity}%.</p>
+            </div>
+          </div>
+        </div>
+
+        <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen} className="mt-4">
+          <CollapsibleTrigger asChild>
+            <Button type="button" variant="ghost" size="sm" className="w-full justify-between px-0">
+              <span className="flex items-center gap-2">
+                {advancedOpen ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+                Más tokens de marca
+              </span>
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="space-y-5 pt-2">
+              {COLOR_GROUPS.map((group) => {
+                const keys = group.keys.filter((item) => !FEATURED_KEY_SET.has(item.key));
+                if (keys.length === 0) return null;
+                return (
+                  <div key={group.title} className="space-y-3">
+                    <h4 className="text-sm font-semibold text-foreground">{group.title}</h4>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {keys.map(({ key, label }) => (
+                        <CompactColorPicker
+                          key={key}
+                          label={label}
+                          hslValue={effectiveTheme[key] ?? ''}
+                          onHexChange={(hex) => handleColorPickerChange(key, hex)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+
+        <div className="mt-5 space-y-3">
+          <h4 className="text-sm font-semibold text-foreground">Intensidad de tarjetas</h4>
+          <div className="flex items-center gap-4">
+            <Slider
+              value={[dashboardCardOpacity]}
+              onValueChange={([v]) => updateDashboardCardOpacity(v)}
+              min={0}
+              max={100}
+              step={1}
+              className="flex-1"
+            />
+            <span className="w-16 text-sm tabular-nums text-muted-foreground">{dashboardCardOpacity}%</span>
+          </div>
+        </div>
+
+        <div className="mt-5 space-y-3">
+          <h4 className="text-sm font-semibold text-foreground">Radio de bordes</h4>
+          <div className="flex items-center gap-4">
+            <Slider
+              value={[radiusToNumber(effectiveTheme.radius)]}
+              onValueChange={([v]) => updateColor('radius', numberToRadius(v))}
+              min={0}
+              max={32}
+              step={1}
+              className="flex-1"
+            />
+            <span className="w-14 text-sm tabular-nums text-muted-foreground">
+              {effectiveTheme.radius || DEFAULT_THEME.radius}
+            </span>
+          </div>
+        </div>
+
+        <div className="mt-5 space-y-2">
+          <h4 className="text-sm font-semibold text-foreground">Imagen de fondo</h4>
           <input
             ref={bgFileInputRef}
             type="file"
@@ -472,37 +586,27 @@ export function CompanyBrandingSettings() {
               disabled={isCompressingBg}
               onClick={() => bgFileInputRef.current?.click()}
             >
-              <Upload className="w-4 h-4 mr-1" />
-              {isCompressingBg ? 'Procesando…' : 'Elegir imagen'}
+              <Upload />
+              {isCompressingBg ? 'Procesando…' : 'Cambiar fondo'}
             </Button>
             {appBackgroundImage ? (
               <Button type="button" variant="ghost" size="sm" onClick={clearBackgroundImage}>
-                <X className="w-4 h-4 mr-1" />
+                <X />
                 Quitar imagen
               </Button>
             ) : null}
           </div>
           {appBackgroundImage ? (
-            <div className="rounded-lg border overflow-hidden max-h-48 bg-muted">
-              <img src={appBackgroundImage} alt="Vista previa del fondo" className="w-full h-40 object-cover" />
+            <div className="overflow-hidden rounded-lg border bg-muted">
+              <img src={appBackgroundImage} alt="Vista previa del fondo" className="h-40 w-full object-cover" />
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground">Sin imagen de fondo; se usa solo el color de «Fondo de página».</p>
+            <p className="text-sm text-muted-foreground">Sin imagen de fondo; se usa el color de «Fondo».</p>
           )}
-        </CardContent>
-      </Card>
+        </div>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <ImageIcon className="w-5 h-5 text-primary" />
-            <CardTitle>Logotipo centrado en inicio</CardTitle>
-          </div>
-          <CardDescription>
-            Imagen independiente para la pantalla de inicio. Se muestra centrada y deja el contenido estadístico a los lados.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+        <div className="mt-5 space-y-2">
+          <h4 className="text-sm font-semibold text-foreground">Logotipo centrado en inicio</h4>
           <input
             ref={centerLogoInputRef}
             type="file"
@@ -518,18 +622,18 @@ export function CompanyBrandingSettings() {
               disabled={isCompressingCenterLogo}
               onClick={() => centerLogoInputRef.current?.click()}
             >
-              <Upload className="w-4 h-4 mr-1" />
-              {isCompressingCenterLogo ? 'Procesando…' : 'Elegir logotipo de inicio'}
+              <Upload />
+              {isCompressingCenterLogo ? 'Procesando…' : 'Cambiar logotipo de inicio'}
             </Button>
             {dashboardCenterLogoImage ? (
               <Button type="button" variant="ghost" size="sm" onClick={clearCenterLogoImage}>
-                <X className="w-4 h-4 mr-1" />
+                <X />
                 Quitar logotipo
               </Button>
             ) : null}
           </div>
           {dashboardCenterLogoImage ? (
-            <div className="rounded-lg border overflow-hidden max-h-72 p-4 flex items-center justify-center bg-transparent bg-[linear-gradient(45deg,hsl(var(--muted))_25%,transparent_25%,transparent_75%,hsl(var(--muted))_75%,hsl(var(--muted))),linear-gradient(45deg,hsl(var(--muted))_25%,transparent_25%,transparent_75%,hsl(var(--muted))_75%,hsl(var(--muted)))] bg-[length:20px_20px] bg-[position:0_0,10px_10px]">
+            <div className="flex max-h-72 items-center justify-center overflow-hidden rounded-lg border bg-muted/40 p-4">
               <img
                 src={dashboardCenterLogoImage}
                 alt="Vista previa del logotipo centrado de inicio"
@@ -538,232 +642,72 @@ export function CompanyBrandingSettings() {
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">
-              Sin logotipo central; el dashboard mostrará todas las cards sin reservar el centro.
+              Sin logotipo central; el dashboard no reserva el centro.
             </p>
           )}
-        </CardContent>
+        </div>
+
+        <Collapsible open={hslOpen} onOpenChange={setHslOpen} className="mt-4">
+          <CollapsibleTrigger asChild>
+            <Button type="button" variant="ghost" size="sm" className="w-full justify-between px-0">
+              <span className="flex items-center gap-2">
+                {hslOpen ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+                Valores HSL manuales
+              </span>
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="grid gap-2 pt-4 sm:grid-cols-2">
+              {THEME_COLOR_KEYS.map((key) => (
+                <div key={key} className="space-y-1">
+                  <Label htmlFor={`theme-${key}`} className="text-xs">
+                    {key}
+                  </Label>
+                  <Input
+                    id={`theme-${key}`}
+                    placeholder={DEFAULT_THEME[key] ?? 'ej. 203 82% 41%'}
+                    value={theme[key] ?? ''}
+                    onChange={(e) => setTheme((t) => ({ ...t, [key]: e.target.value }))}
+                    className="font-mono text-sm"
+                  />
+                </div>
+              ))}
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+
+        <div className="mt-5 flex flex-wrap gap-2">
+          <Button type="button" onClick={handleSave} disabled={isSaving}>
+            <Palette />
+            {isSaving ? 'Guardando...' : 'Aplicar tema'}
+          </Button>
+          <Button type="button" variant="outline" onClick={handleResetTheme}>
+            <RotateCcw />
+            Restaurar TravelUp
+          </Button>
+        </div>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              <Palette className="w-5 h-5 text-primary" />
-              <div>
-                <CardTitle>Tema visual</CardTitle>
-                <CardDescription>
-                  Ajusta los colores y el radio de bordes. Los cambios se ven en la vista previa al instante.
-                </CardDescription>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={handleResetTheme}>
-                <RotateCcw className="w-4 h-4 mr-1" />
-                Restablecer
-              </Button>
-              <Button onClick={handleSave} disabled={isSaving}>
-                {isSaving ? 'Guardando...' : 'Guardar tema'}
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-8">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 text-sm font-medium">
-              <Eye className="w-4 h-4" />
-              Vista previa
-            </div>
-            <div
-              className="rounded-xl border p-4 min-h-[200px] flex gap-3"
-              style={
-                {
-                  '--background': effectiveTheme.background ?? undefined,
-                  '--foreground': effectiveTheme.foreground ?? undefined,
-                  '--card': effectiveTheme.card ?? undefined,
-                  '--card-foreground': effectiveTheme['card-foreground'] ?? undefined,
-                  '--dashboard-card-opacity': String(dashboardCardOpacity / 100),
-                  '--primary': effectiveTheme.primary ? `hsl(${effectiveTheme.primary})` : undefined,
-                  '--primary-foreground': effectiveTheme['primary-foreground'] ? `hsl(${effectiveTheme['primary-foreground']})` : undefined,
-                  '--secondary': effectiveTheme.secondary ? `hsl(${effectiveTheme.secondary})` : undefined,
-                  '--muted': effectiveTheme.muted ? `hsl(${effectiveTheme.muted})` : undefined,
-                  '--muted-foreground': effectiveTheme['muted-foreground'] ? `hsl(${effectiveTheme['muted-foreground']})` : undefined,
-                  '--accent': effectiveTheme.accent ? `hsl(${effectiveTheme.accent})` : undefined,
-                  '--border': effectiveTheme.border ? `hsl(${effectiveTheme.border})` : undefined,
-                  '--ring': effectiveTheme.ring ? `hsl(${effectiveTheme.ring})` : undefined,
-                  '--radius': effectiveTheme.radius ?? undefined,
-                  background: 'hsl(var(--background))',
-                  color: 'hsl(var(--foreground))',
-                } as React.CSSProperties
-              }
-            >
-              <div
-                className="w-24 shrink-0 rounded-lg border p-2 flex flex-col gap-2 text-[10px] leading-tight"
-                style={{
-                  background: effectiveTheme['sidebar-background'] ? `hsl(${effectiveTheme['sidebar-background']})` : undefined,
-                  color: effectiveTheme['sidebar-foreground'] ? `hsl(${effectiveTheme['sidebar-foreground']})` : undefined,
-                  borderColor: effectiveTheme['sidebar-border'] ? `hsl(${effectiveTheme['sidebar-border']})` : undefined,
-                  borderRadius: effectiveTheme.radius ?? '0.75rem',
-                }}
-              >
-                <span className="font-semibold">Barra</span>
-                <span
-                  className="rounded px-1 py-0.5 text-center"
-                  style={{
-                    background: effectiveTheme['sidebar-primary'] ? `hsl(${effectiveTheme['sidebar-primary']})` : undefined,
-                    color: effectiveTheme['sidebar-primary-foreground']
-                      ? `hsl(${effectiveTheme['sidebar-primary-foreground']})`
-                      : undefined,
-                  }}
-                >
-                  Activo
-                </span>
-                <span
-                  className="rounded px-1 py-0.5 text-center opacity-90"
-                  style={{
-                    background: effectiveTheme['sidebar-accent'] ? `hsl(${effectiveTheme['sidebar-accent']})` : undefined,
-                    color: effectiveTheme['sidebar-accent-foreground']
-                      ? `hsl(${effectiveTheme['sidebar-accent-foreground']})`
-                      : undefined,
-                  }}
-                >
-                  Acento
-                </span>
-              </div>
-              <div className="flex-1 min-w-0 space-y-3">
-                <div className="flex flex-wrap items-center gap-3">
-                  <button
-                    type="button"
-                    className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow hover:opacity-90"
-                    style={{
-                      background: effectiveTheme.primary ? `hsl(${effectiveTheme.primary})` : undefined,
-                      color: effectiveTheme['primary-foreground'] ? `hsl(${effectiveTheme['primary-foreground']})` : undefined,
-                      borderRadius: effectiveTheme.radius ?? '0.75rem',
-                    }}
-                  >
-                    Botón primario
-                  </button>
-                  <button
-                    type="button"
-                    className="inline-flex items-center justify-center rounded-md border border-input bg-secondary px-4 py-2 text-sm font-medium text-secondary-foreground shadow-sm hover:bg-secondary/80"
-                    style={{
-                      background: effectiveTheme.secondary ? `hsl(${effectiveTheme.secondary})` : undefined,
-                      color: effectiveTheme['secondary-foreground'] ? `hsl(${effectiveTheme['secondary-foreground']})` : undefined,
-                      borderColor: effectiveTheme.border ? `hsl(${effectiveTheme.border})` : undefined,
-                      borderRadius: effectiveTheme.radius ?? '0.75rem',
-                    }}
-                  >
-                    Secundario
-                  </button>
-                </div>
-                <div
-                  className="rounded-lg border border-border p-4 max-w-sm bg-card text-card-foreground"
-                  style={{ borderRadius: effectiveTheme.radius ?? '0.75rem' }}
-                >
-                  <p className="font-medium">Tarjeta de ejemplo</p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Misma transparencia que en toda la app: {dashboardCardOpacity}%.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-6">
-            {COLOR_GROUPS.map((group) => (
-              <div key={group.title} className="space-y-3">
-                <h4 className="text-sm font-semibold text-foreground">{group.title}</h4>
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {group.keys.map(({ key, label }) => {
-                    const value = effectiveTheme[key] ?? '';
-                    const isRadius = key === 'radius';
-                    if (isRadius) return null;
-                    const hex = value ? hslStringToHex(value) : '#888888';
-                    return (
-                      <div key={key} className="flex items-center gap-3">
-                        <div className="relative flex-shrink-0">
-                          <input
-                            type="color"
-                            value={hex}
-                            onChange={(e) => handleColorPickerChange(key, e.target.value)}
-                            className="h-10 w-10 cursor-pointer rounded-lg border border-input bg-background p-0.5 [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:rounded [&::-webkit-color-swatch]:border-0"
-                            title={label}
-                          />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <Label className="text-xs text-muted-foreground">{label}</Label>
-                          <p className="font-mono text-xs text-foreground truncate" title={value}>
-                            {value || '—'}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-
-            <div className="space-y-3">
-              <h4 className="text-sm font-semibold text-foreground">Intensidad de tarjetas (toda la aplicación)</h4>
-              <div className="flex items-center gap-4 max-w-sm">
-                <Slider
-                  value={[dashboardCardOpacity]}
-                  onValueChange={([v]) => updateDashboardCardOpacity(v)}
-                  min={0}
-                  max={100}
-                  step={1}
-                  className="flex-1"
-                />
-                <span className="text-sm tabular-nums text-muted-foreground w-16">{dashboardCardOpacity}%</span>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <h4 className="text-sm font-semibold text-foreground">Radio de bordes</h4>
-              <div className="flex items-center gap-4 max-w-sm">
-                <Slider
-                  value={[radiusToNumber(effectiveTheme.radius)]}
-                  onValueChange={([v]) => updateColor('radius', numberToRadius(v))}
-                  min={0}
-                  max={32}
-                  step={1}
-                  className="flex-1"
-                />
-                <span className="text-sm tabular-nums text-muted-foreground w-14">
-                  {effectiveTheme.radius || '0.75rem'}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
-            <CollapsibleTrigger asChild>
-              <Button variant="ghost" size="sm" className="w-full justify-between px-0">
-                <span className="flex items-center gap-2">
-                  {advancedOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                  Valores HSL manuales
-                </span>
-              </Button>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 pt-4">
-                {THEME_COLOR_KEYS.map((key) => (
-                  <div key={key} className="space-y-1">
-                    <Label htmlFor={`theme-${key}`} className="text-xs">
-                      {key}
-                    </Label>
-                    <Input
-                      id={`theme-${key}`}
-                      placeholder={DEFAULT_THEME[key] ?? 'ej. 234 66% 30%'}
-                      value={theme[key] ?? ''}
-                      onChange={(e) => setTheme((t) => ({ ...t, [key]: e.target.value }))}
-                      className="font-mono text-sm"
-                    />
-                  </div>
-                ))}
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
-        </CardContent>
+      <Card className="p-5">
+        <SectionTitle title="Visibilidad de clientes para asesores" />
+        <p className="mb-3 text-xs text-muted-foreground">
+          Define si los asesores ven solo sus clientes o todo el catálogo de la compañía.
+        </p>
+        <Label htmlFor="advisor-client-access-mode" className="text-xs font-medium">
+          Modelo de acceso
+        </Label>
+        <Select
+          value={advisorClientAccessMode}
+          onValueChange={(v: 'assigned_only' | 'company_wide') => setAdvisorClientAccessMode(v)}
+        >
+          <SelectTrigger id="advisor-client-access-mode" className="mt-1.5">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="border bg-popover">
+            <SelectItem value="assigned_only">Asignado por asesor</SelectItem>
+            <SelectItem value="company_wide">Todos los asesores ven/editan todo</SelectItem>
+          </SelectContent>
+        </Select>
       </Card>
     </div>
   );

@@ -43,17 +43,18 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
-          <div className="flex items-center justify-center mb-4">
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+      <Card className="w-full max-w-md overflow-hidden shadow-card">
+        <div className="h-1.5 bg-secondary" aria-hidden />
+        <CardHeader className="space-y-1 pt-8">
+          <div className="mb-4 flex items-center justify-center">
             {logoUrl ? (
               <img src={logoUrl} alt={companyName} className="h-20 w-auto object-contain" />
             ) : (
-              <span className="text-2xl font-bold text-primary">{companyName}</span>
+              <span className="font-display text-2xl font-bold text-primary">{companyName}</span>
             )}
           </div>
-          <CardTitle className="text-2xl text-center">Iniciar Sesión</CardTitle>
+          <CardTitle className="text-center font-display text-2xl font-semibold">Iniciar Sesión</CardTitle>
           <CardDescription className="text-center">
             Ingresa tus credenciales para acceder al sistema
           </CardDescription>
@@ -84,7 +85,7 @@ const Login = () => {
                 disabled={isLoading}
               />
             </div>
-            <Button type="submit" className="w-full" disabled={isLoading}>
+            <Button type="submit" className="mt-2 w-full" size="lg" disabled={isLoading}>
               {isLoading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
             </Button>
           </form>

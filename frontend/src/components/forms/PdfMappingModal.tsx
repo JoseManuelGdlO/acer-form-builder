@@ -152,16 +152,16 @@ export const PdfMappingModal = ({ open, onOpenChange, question, template, value,
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[92vh] overflow-auto">
+      <DialogContent className="max-h-[92vh] max-w-5xl overflow-auto">
         <DialogHeader>
-          <DialogTitle>Setear campo PDF: {question.title}</DialogTitle>
+          <DialogTitle className="font-display">Setear campo PDF: {question.title}</DialogTitle>
           <DialogDescription>
             Clickea el PDF para colocar coordenadas. Usa la página actual ({currentPage}/{template.pageCount}).
           </DialogDescription>
         </DialogHeader>
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-4">
-          <div className="rounded-md border p-3 bg-muted/20 overflow-auto">
-            <div className="flex items-center justify-between mb-3">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_280px]">
+          <div className="overflow-auto rounded-md border bg-muted/20 p-3">
+            <div className="mb-3 flex items-center justify-between">
               <div className="text-sm text-muted-foreground">{isRendering ? 'Renderizando...' : template.fileName}</div>
               <div className="flex items-center gap-2">
                 <Button
@@ -182,14 +182,14 @@ export const PdfMappingModal = ({ open, onOpenChange, question, template, value,
                 </Button>
               </div>
             </div>
-            <canvas ref={canvasRef} className="max-w-full border rounded cursor-crosshair" onClick={handleCanvasClick} />
+            <canvas ref={canvasRef} className="max-w-full cursor-crosshair rounded-md border" onClick={handleCanvasClick} />
             {renderError && (
-              <p className="text-sm text-destructive mt-2">
+              <p className="mt-2 text-sm text-destructive">
                 No se pudo mostrar el PDF: {renderError}
               </p>
             )}
           </div>
-          <div className="space-y-3">
+          <div className="space-y-3 rounded-md border bg-muted/40 p-4">
             <div className="space-y-1">
               <Label>X</Label>
               <Input value={activePlacement?.x ?? 0} onChange={(e) => updatePlacement({ x: Number(e.target.value) || 0 })} />
@@ -213,11 +213,12 @@ export const PdfMappingModal = ({ open, onOpenChange, question, template, value,
                 onChange={(e) => updatePlacement({ fontSize: Number(e.target.value) || 10 })}
               />
             </div>
-            <div className="space-y-2">
-              <Button className="w-full" onClick={save}>
+            <div className="space-y-2 pt-2">
+              <Button type="button" className="w-full" onClick={save}>
                 Guardar mapeo
               </Button>
               <Button
+                type="button"
                 variant="outline"
                 className="w-full"
                 onClick={() =>

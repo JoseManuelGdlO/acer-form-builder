@@ -1,16 +1,17 @@
 import { useMemo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { 
-  Users, FileText, ClipboardList, CheckCircle2, Clock, 
-  TrendingUp, Activity, UserPlus, FileCheck, MessageSquare,
-  ArrowUpRight, ArrowDownRight, MapPin, Bus
-} from 'lucide-react';
-import { format, formatDistanceToNow } from 'date-fns';
+import { Card } from '@/components/ui/card';
+import { ArrowUpRight, Activity, FileCheck, FileText, UserPlus } from 'lucide-react';
+import { format, formatDistanceToNow, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Form, FormSubmission, Client } from '@/types/form';
+import { Form, FormSubmission, Client, Trip, CalendarEvent } from '@/types/form';
 import { useTenant } from '@/contexts/TenantContext';
 import { DASHBOARD_CENTER_LOGO_IMAGE_KEY } from '@/lib/theme';
+import { SectionTitle } from '@/components/layout/SectionTitle';
+import { StatusBadge } from '@/components/layout/StatusBadge';
+import { cn } from '@/lib/utils';
+import { sortCalendarEvents } from '@/lib/calendarEventSort';
+import { APPOINTMENT_TYPE_LABELS } from '@/lib/appointmentColors';
+import type { ShellView } from '@/auth/viewPermissions';
 
 interface DashboardProps {
   forms: Form[];
@@ -26,96 +27,121 @@ interface DashboardProps {
     participantCountUpcoming: number;
     occupancyRate: number;
   } | null;
+  /** Lista prefetch (GET /trips); no pasar si no hay `trips.view` */
+  trips?: Trip[];
+  canViewTrips?: boolean;
+  /** KPI aproximado; omitir si no hay groups.view + trips.view */
+  groupsInOperation?: { inOperation: number; catalogTotal: number } | null;
+  /** Eventos de hoy; `null` si no hay `appointments.view` (no mostrar ni pedir agenda) */
+  agendaEvents?: CalendarEvent[] | null;
+  canViewCalendar?: boolean;
+  onNavigate?: (view: ShellView) => void;
 }
 
-interface Activity {
+interface ActivityItem {
   id: string;
-  type: 'client_created' | 'form_submitted' | 'client_updated' | 'form_created';
+  type: 'client_created' | 'form_submitted' | 'form_created';
   title: string;
   description: string;
-  /** Línea extra (p. ej. asesor asignado en altas de cliente) */
   descriptionSecondary?: string;
   timestamp: Date;
-  icon: typeof Users;
-  color: string;
+  icon: typeof UserPlus;
 }
 
-const StatCard = ({ 
-  title, 
-  value, 
-  subtitle, 
-  icon: Icon, 
-  trend, 
-  trendValue,
-  color = 'primary',
-}: { 
-  title: string; 
-  value: number | string; 
-  subtitle?: string;
-  icon: typeof Users;
-  trend?: 'up' | 'down' | 'neutral';
-  trendValue?: string;
-  color?: 'primary' | 'secondary' | 'accent' | 'success' | 'warning';
-}) => {
-  const colorClasses = {
-    primary: 'bg-primary/10 text-primary',
-    secondary: 'bg-secondary/10 text-secondary',
-    accent: 'bg-accent/10 text-accent',
-    success: 'bg-green-500/10 text-green-600',
-    warning: 'bg-amber-500/10 text-amber-600',
-  };
+function localDateKey(date = new Date()): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
 
+function parseDateOnly(value: string): Date | null {
+  const key = value.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return null;
+  const parsed = parseISO(`${key}T00:00:00`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function KpiCard({
+  label,
+  value,
+  hint,
+  emphasized = false,
+  onClick,
+}: {
+  label: string;
+  value: number | string;
+  hint: string;
+  emphasized?: boolean;
+  onClick?: () => void;
+}) {
+  const inner = (
+    <>
+      <p className="text-[10px] font-semibold uppercase tracking-widest opacity-55">{label}</p>
+      <p className="mt-2 font-display text-3xl font-semibold">{value}</p>
+      <p className={cn('mt-2 text-xs', emphasized ? 'text-secondary' : 'text-success')}>{hint}</p>
+    </>
+  );
+  if (onClick) {
+    return (
+      <Card className={cn('p-0', emphasized && 'bg-foreground text-background')}>
+        <button type="button" onClick={onClick} className="w-full p-5 text-left">
+          {inner}
+        </button>
+      </Card>
+    );
+  }
   return (
-    <Card className="border-border/50 hover:shadow-md transition-shadow">
-      <CardContent className="p-6">
-        <div className="flex items-start justify-between">
-          <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">{title}</p>
-            <p className="text-3xl font-bold text-foreground">{value}</p>
-            {subtitle && (
-              <p className="text-xs text-muted-foreground">{subtitle}</p>
-            )}
-            {trend && trendValue && (
-              <div className={`flex items-center gap-1 text-xs ${
-                trend === 'up' ? 'text-green-600' : 
-                trend === 'down' ? 'text-red-500' : 'text-muted-foreground'
-              }`}>
-                {trend === 'up' ? (
-                  <ArrowUpRight className="w-3 h-3" />
-                ) : trend === 'down' ? (
-                  <ArrowDownRight className="w-3 h-3" />
-                ) : null}
-                <span>{trendValue}</span>
-              </div>
-            )}
-          </div>
-          <div className={`w-12 h-12 rounded-xl ${colorClasses[color]} flex items-center justify-center`}>
-            <Icon className="w-6 h-6" />
-          </div>
-        </div>
-      </CardContent>
+    <Card className={cn('p-5', emphasized && 'bg-foreground text-background')}>
+      {inner}
     </Card>
   );
-};
+}
 
-export const Dashboard = ({ 
-  forms, 
-  submissions, 
+export const Dashboard = ({
+  forms,
+  submissions,
   clients,
   submissionStats,
   clientStats,
   tripStats = null,
+  trips,
+  canViewTrips = false,
+  groupsInOperation = null,
+  agendaEvents = null,
+  canViewCalendar = false,
+  onNavigate,
 }: DashboardProps) => {
   const { tenant } = useTenant();
   const dashboardCenterLogoImage = tenant?.theme?.[DASHBOARD_CENTER_LOGO_IMAGE_KEY]?.trim() ?? '';
-  const hasCenterLogo = Boolean(dashboardCenterLogoImage);
+  const companyLogo = tenant?.company?.logoUrl?.trim() ?? '';
+  const heroLogo = dashboardCenterLogoImage || companyLogo;
+  const companyName = tenant?.company?.name?.trim() || 'operaciones';
 
-  // Generate recent activities from data
-  const recentActivities = useMemo<Activity[]>(() => {
-    const activities: Activity[] = [];
+  const completionRate =
+    submissionStats.total > 0
+      ? Math.round((submissionStats.completed / submissionStats.total) * 100)
+      : 0;
 
-    // Add client activities
-    clients.slice(0, 5).forEach(client => {
+  const todayKey = localDateKey();
+
+  const upcomingTrips = useMemo(() => {
+    if (!canViewTrips || !trips?.length) return [];
+    return [...trips]
+      .filter((trip) => (trip.returnDate || '').slice(0, 10) >= todayKey)
+      .sort((a, b) => (a.departureDate || '').localeCompare(b.departureDate || ''))
+      .slice(0, 3);
+  }, [canViewTrips, trips, todayKey]);
+
+  const todayAgenda = useMemo(() => {
+    if (!agendaEvents) return [];
+    return sortCalendarEvents(agendaEvents.filter((event) => event.date === todayKey));
+  }, [agendaEvents, todayKey]);
+
+  const recentActivities = useMemo<ActivityItem[]>(() => {
+    const activities: ActivityItem[] = [];
+
+    clients.slice(0, 5).forEach((client) => {
       activities.push({
         id: `client-${client.id}`,
         type: 'client_created',
@@ -124,12 +150,10 @@ export const Dashboard = ({
         descriptionSecondary: `Asesor: ${client.assignedUser?.name ?? 'Sin asignar'}`,
         timestamp: client.createdAt,
         icon: UserPlus,
-        color: 'bg-green-500',
       });
     });
 
-    // Add submission activities
-    submissions.slice(0, 5).forEach(submission => {
+    submissions.slice(0, 5).forEach((submission) => {
       activities.push({
         id: `submission-${submission.id}`,
         type: 'form_submitted',
@@ -137,12 +161,10 @@ export const Dashboard = ({
         description: `${submission.respondentName} - ${submission.formName}`,
         timestamp: submission.submittedAt,
         icon: FileCheck,
-        color: 'bg-primary',
       });
     });
 
-    // Add form activities
-    forms.slice(0, 3).forEach(form => {
+    forms.slice(0, 3).forEach((form) => {
       activities.push({
         id: `form-${form.id}`,
         type: 'form_created',
@@ -150,251 +172,267 @@ export const Dashboard = ({
         description: form.name,
         timestamp: form.createdAt,
         icon: FileText,
-        color: 'bg-accent',
       });
     });
 
-    // Sort by timestamp, most recent first
     return activities
       .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
       .slice(0, 8);
   }, [clients, submissions, forms]);
 
-  // Quick stats
-  const completionRate = submissionStats.total > 0 
-    ? Math.round((submissionStats.completed / submissionStats.total) * 100) 
-    : 0;
+  const kpis = canViewTrips
+    ? [
+        {
+          label: 'Viajes próximos',
+          value: tripStats ? tripStats.upcomingTrips : '—',
+          hint: tripStats
+            ? `${tripStats.departingIn30Days} salen en 30 días`
+            : 'Cargando métricas de viajes',
+        },
+        {
+          label: 'Clientes',
+          value: clientStats.total,
+          hint: `${clientStats.pending} pendientes`,
+        },
+        {
+          label: 'Envíos',
+          value: submissionStats.total,
+          hint:
+            submissionStats.pending > 0
+              ? `${submissionStats.pending} pendientes de revisión`
+              : `${submissionStats.completed} completados`,
+        },
+        {
+          label: 'Ocupación',
+          value: tripStats ? `${tripStats.occupancyRate}%` : '—',
+          hint: tripStats
+            ? `${tripStats.participantCountUpcoming} / ${tripStats.totalSeatsUpcoming} plazas`
+            : 'Cargando ocupación',
+          emphasized: true,
+        },
+        ...(groupsInOperation
+          ? [
+              {
+                label: 'Grupos en operación',
+                value: groupsInOperation.inOperation,
+                hint: `${groupsInOperation.inOperation} con viaje vigente / ${groupsInOperation.catalogTotal} grupos en catálogo`,
+                onClick: () => onNavigate?.('groups'),
+              },
+            ]
+          : []),
+      ]
+    : [
+        {
+          label: 'Clientes',
+          value: clientStats.total,
+          hint: `${clientStats.active} activos`,
+        },
+        {
+          label: 'Pendientes',
+          value: clientStats.pending,
+          hint: 'Por contactar',
+        },
+        {
+          label: 'Envíos',
+          value: submissionStats.total,
+          hint:
+            submissionStats.pending > 0
+              ? `${submissionStats.pending} pendientes de revisión`
+              : 'Al día',
+        },
+        {
+          label: 'Completado',
+          value: `${completionRate}%`,
+          hint: `${submissionStats.completed} envíos completados`,
+          emphasized: true,
+        },
+      ];
 
-  const activeClientRate = clientStats.total > 0
-    ? Math.round((clientStats.active / clientStats.total) * 100)
-    : 0;
+  const showAgenda = agendaEvents !== null;
 
   return (
-    <div className="space-y-8">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-foreground">Inicio</h1>
-        <p className="text-muted-foreground mt-1">
-          Resumen general del sistema • {format(new Date(), "EEEE, d 'de' MMMM yyyy", { locale: es })}
-        </p>
-      </div>
-
-      {/* Logotipo de inicio: solo esta franja; las estadísticas van debajo, sin superponer */}
-      {hasCenterLogo ? (
-        <div className="flex justify-center items-center px-4 py-4 md:py-8 min-h-[min(52vh,480px)]">
+    <div className="grid grid-cols-12 gap-4">
+      <Card className="col-span-12 flex flex-col items-center gap-6 bg-sidebar px-5 py-8 text-sidebar-foreground md:flex-row md:justify-between md:py-10">
+        {heroLogo ? (
           <img
-            src={dashboardCenterLogoImage}
-            alt="Logotipo principal del inicio"
-            className="w-full max-w-4xl max-h-[min(48vh,440px)] object-contain"
+            src={heroLogo}
+            alt={`Logotipo de ${companyName}`}
+            className="h-24 w-auto max-w-[420px] object-contain md:h-32"
           />
+        ) : (
+          <p className="font-display text-2xl font-semibold md:text-3xl">{companyName}</p>
+        )}
+        <div className="text-center md:text-right">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-sidebar-foreground/60">
+            Centro de operación
+          </p>
+          <h2 className="mt-2 font-display text-2xl font-semibold md:text-3xl">
+            Bienvenido al panel de {companyName}
+          </h2>
+          <p className="mt-2 text-sm text-sidebar-foreground/70">
+            {format(new Date(), "EEEE, d 'de' MMMM yyyy", { locale: es })}
+          </p>
         </div>
+      </Card>
+
+      {canViewTrips ? (
+        <Card className="col-span-12 p-5 xl:col-span-7">
+          <SectionTitle
+            title="Próximos viajes"
+            action="Ver todos"
+            onAction={() => onNavigate?.('trips')}
+          />
+          {upcomingTrips.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No hay viajes próximos.</p>
+          ) : (
+            <div className="space-y-2">
+              {upcomingTrips.map((trip) => {
+                const departure = parseDateOnly(trip.departureDate);
+                const pax = trip.participantCount ?? 0;
+                const seats = trip.totalSeats ?? 0;
+                const place = trip.destination?.trim();
+                return (
+                  <button
+                    key={trip.id}
+                    type="button"
+                    onClick={() => onNavigate?.('trips')}
+                    className="flex w-full items-center gap-3 rounded-md bg-muted/70 p-3 text-left hover:bg-muted"
+                  >
+                    <div className="w-11 shrink-0 rounded-md bg-foreground py-1.5 text-center text-background">
+                      <p className="font-display text-base font-semibold">
+                        {departure ? format(departure, 'd') : '—'}
+                      </p>
+                      <p className="text-[9px] uppercase">
+                        {departure ? format(departure, 'MMM', { locale: es }) : ''}
+                      </p>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold">{trip.title}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {pax} / {seats} plazas
+                        {place ? ` · ${place}` : ''}
+                      </p>
+                    </div>
+                    <StatusBadge tone={seats > 0 && pax >= seats ? 'warning' : 'neutral'}>
+                      {seats > 0 ? `${Math.round((pax / seats) * 100)}%` : 'Sin cupo'}
+                    </StatusBadge>
+                    <ArrowUpRight className="size-4 text-muted-foreground" />
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </Card>
       ) : null}
 
-      {/* Main Stats Grid — siempre debajo del logo (flujo normal) */}
-      <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        <StatCard
-          title="Total Clientes"
-          value={clientStats.total}
-          subtitle={`${clientStats.active} activos`}
-          icon={Users}
-          color="primary"
-          trend="up"
-          trendValue={`${activeClientRate}% activos`}
-        />
-        <StatCard
-          title="Respuestas"
-          value={submissionStats.total}
-          subtitle={`${submissionStats.pending} pendientes`}
-          icon={ClipboardList}
-          color="secondary"
-          trend={submissionStats.pending > 0 ? 'neutral' : 'up'}
-          trendValue={submissionStats.pending > 0 ? 'Requieren revisión' : 'Al día'}
-        />
-        <StatCard
-          title="Tasa de Completado"
-          value={`${completionRate}%`}
-          subtitle={`${submissionStats.completed} completados`}
-          icon={CheckCircle2}
-          color="success"
-        />
-        <StatCard
-          title="Viajes próximos"
-          value={tripStats ? tripStats.upcomingTrips : '—'}
-          subtitle={
-            tripStats
-              ? `Salidas en 30 días: ${tripStats.departingIn30Days}`
-              : 'Sin datos de viajes'
-          }
-          icon={MapPin}
-          color="accent"
-        />
-        <StatCard
-          title="Ocupación (viajes próximos)"
-          value={tripStats ? `${tripStats.occupancyRate}%` : '—'}
-          subtitle={
-            tripStats
-              ? `Plazas: ${tripStats.participantCountUpcoming} / ${tripStats.totalSeatsUpcoming}`
-              : 'Sin datos de viajes'
-          }
-          icon={Bus}
-          color="success"
-        />
-      </div>
+      <section
+        className={cn(
+          'col-span-12 grid grid-cols-2 gap-4',
+          canViewTrips && 'xl:col-span-5',
+        )}
+      >
+        {kpis.map((kpi) => (
+          <KpiCard
+            key={kpi.label}
+            label={kpi.label}
+            value={kpi.value}
+            hint={kpi.hint}
+            emphasized={'emphasized' in kpi ? kpi.emphasized : undefined}
+            onClick={'onClick' in kpi ? kpi.onClick : undefined}
+          />
+        ))}
+      </section>
 
-      {/* Secondary Stats */}
-      <div className="grid sm:grid-cols-3 gap-4">
-        <Card className="border-border/50">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center">
-                <Clock className="w-5 h-5 text-amber-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-foreground">{submissionStats.pending}</p>
-                <p className="text-sm text-muted-foreground">Pendientes de revisión</p>
-              </div>
+      {showAgenda ? (
+        <Card className="col-span-12 bg-foreground p-5 text-background lg:col-span-5">
+          <div className="flex justify-between gap-3">
+            <div>
+              <p className="text-[10px] uppercase tracking-widest opacity-55">Agenda · hoy</p>
+              <h2 className="mt-1 font-display text-lg font-semibold">
+                {format(new Date(), "EEEE d", { locale: es })}
+              </h2>
             </div>
-          </CardContent>
-        </Card>
-        <Card className="border-border/50">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                <TrendingUp className="w-5 h-5 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-foreground">{submissionStats.reviewed}</p>
-                <p className="text-sm text-muted-foreground">En proceso</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-border/50">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
-                <MessageSquare className="w-5 h-5 text-purple-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-foreground">{clientStats.pending}</p>
-                <p className="text-sm text-muted-foreground">Clientes por contactar</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Activity Feed & Distribution */}
-      <div className="grid lg:grid-cols-3 gap-6">
-        {/* Recent Activity */}
-        <Card className="lg:col-span-2 border-border/50">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Activity className="w-5 h-5 text-primary" />
-              Actividad Reciente
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {recentActivities.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <Activity className="w-10 h-10 mx-auto mb-2 opacity-40" />
-                <p>No hay actividad reciente</p>
-              </div>
+            <StatusBadge
+              tone="warning"
+              className="h-6 items-center justify-center bg-secondary leading-none text-secondary-foreground"
+            >
+              {todayAgenda.length} {todayAgenda.length === 1 ? 'bloque' : 'bloques'}
+            </StatusBadge>
+          </div>
+          {canViewCalendar ? (
+            <button
+              type="button"
+              onClick={() => onNavigate?.('calendar')}
+              className="mt-2 text-xs text-background/70 underline-offset-2 hover:underline"
+            >
+              Ver calendario
+            </button>
+          ) : null}
+          <div className="mt-4 space-y-4">
+            {todayAgenda.length === 0 ? (
+              <p className="text-sm opacity-70">No hay eventos para hoy.</p>
             ) : (
-              <div className="space-y-4">
-                {recentActivities.map((activity, index) => (
-                  <div 
-                    key={activity.id}
-                    className={`flex items-start gap-4 ${
-                      index !== recentActivities.length - 1 ? 'pb-4 border-b border-border/30' : ''
-                    }`}
-                  >
-                    <div className={`w-9 h-9 rounded-lg ${activity.color} bg-opacity-10 flex items-center justify-center flex-shrink-0`}>
-                      <activity.icon className={`w-4 h-4 ${activity.color.replace('bg-', 'text-')}`} />
+              todayAgenda.map((event, index) => {
+                const time =
+                  event.startTime && /^\d{2}:\d{2}$/.test(event.startTime)
+                    ? event.startTime
+                    : APPOINTMENT_TYPE_LABELS[event.type];
+                const detail = [event.clientName, event.branchName].filter(Boolean).join(' · ');
+                return (
+                  <div key={`${event.type}-${event.date}-${event.tripId ?? event.clientId ?? index}`} className="flex gap-3">
+                    <span
+                      className={cn(
+                        'w-1.5 rounded-full',
+                        event.type === 'office' ? 'bg-secondary' : 'bg-primary',
+                      )}
+                    />
+                    <div>
+                      <p className="text-sm font-medium">{event.title}</p>
+                      <p className="text-xs opacity-55">
+                        {time}
+                        {detail ? ` · ${detail}` : ''}
+                      </p>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground">{activity.title}</p>
-                      <p className="text-sm text-muted-foreground truncate">{activity.description}</p>
-                      {activity.descriptionSecondary ? (
-                        <p className="text-xs text-muted-foreground truncate mt-0.5">{activity.descriptionSecondary}</p>
-                      ) : null}
-                    </div>
-                    <span className="text-xs text-muted-foreground whitespace-nowrap">
-                      {formatDistanceToNow(activity.timestamp, { addSuffix: true, locale: es })}
-                    </span>
                   </div>
-                ))}
-              </div>
+                );
+              })
             )}
-          </CardContent>
+          </div>
         </Card>
+      ) : null}
 
-        {/* Status Distribution */}
-        <Card className="border-border/50">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Users className="w-5 h-5 text-primary" />
-              Estado de Clientes
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-green-500" />
-                  <span className="text-sm text-foreground">Activos</span>
-                </div>
-                <span className="text-sm font-medium text-foreground">{clientStats.active}</span>
-              </div>
-              <div className="w-full bg-muted/50 rounded-full h-2">
-                <div 
-                  className="bg-green-500 h-2 rounded-full transition-all"
-                  style={{ width: `${clientStats.total > 0 ? (clientStats.active / clientStats.total) * 100 : 0}%` }}
-                />
+      <Card className={cn('col-span-12 p-5', showAgenda ? 'lg:col-span-7' : 'lg:col-span-12')}>
+        <SectionTitle title="Actividad reciente" />
+        {recentActivities.length === 0 ? (
+          <div className="py-6 text-center text-muted-foreground">
+            <Activity className="mx-auto mb-2 h-10 w-10 opacity-40" />
+            <p className="text-sm">No hay actividad reciente</p>
+          </div>
+        ) : (
+          recentActivities.map((activity, index) => (
+            <div key={activity.id} className="mb-3 flex gap-3 text-xs">
+              <span
+                className={cn(
+                  'mt-1 size-2 rounded-full',
+                  index % 2 === 1 ? 'bg-secondary' : 'bg-primary',
+                )}
+              />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm text-foreground">{activity.title}</p>
+                <p className="truncate text-muted-foreground">{activity.description}</p>
+                {activity.descriptionSecondary ? (
+                  <p className="truncate text-[10px] text-muted-foreground">
+                    {activity.descriptionSecondary}
+                  </p>
+                ) : null}
+                <p className="text-[10px] text-muted-foreground">
+                  {formatDistanceToNow(activity.timestamp, { addSuffix: true, locale: es })}
+                </p>
               </div>
             </div>
-
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-amber-500" />
-                  <span className="text-sm text-foreground">Pendientes</span>
-                </div>
-                <span className="text-sm font-medium text-foreground">{clientStats.pending}</span>
-              </div>
-              <div className="w-full bg-muted/50 rounded-full h-2">
-                <div 
-                  className="bg-amber-500 h-2 rounded-full transition-all"
-                  style={{ width: `${clientStats.total > 0 ? (clientStats.pending / clientStats.total) * 100 : 0}%` }}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-gray-400" />
-                  <span className="text-sm text-foreground">Inactivos</span>
-                </div>
-                <span className="text-sm font-medium text-foreground">{clientStats.inactive}</span>
-              </div>
-              <div className="w-full bg-muted/50 rounded-full h-2">
-                <div 
-                  className="bg-gray-400 h-2 rounded-full transition-all"
-                  style={{ width: `${clientStats.total > 0 ? (clientStats.inactive / clientStats.total) * 100 : 0}%` }}
-                />
-              </div>
-            </div>
-
-            <div className="pt-4 border-t border-border/30">
-              <div className="text-center">
-                <p className="text-3xl font-bold text-primary">{activeClientRate}%</p>
-                <p className="text-xs text-muted-foreground">Tasa de clientes activos</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+          ))
+        )}
+      </Card>
     </div>
   );
 };

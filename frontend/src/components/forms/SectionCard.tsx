@@ -98,10 +98,10 @@ export const SectionCard = ({
       ref={setSortableRef}
       style={style}
       className={cn(
-        'bg-card rounded-xl border transition-all duration-200',
+        'rounded-md border bg-muted/40 transition-all duration-200',
         isDragging && 'opacity-50',
-        isActive ? 'border-primary shadow-md' : 'border-border',
-        (isDragOver || isOver) && 'border-primary border-2 bg-primary/5'
+        isActive ? 'border-primary shadow-sm' : 'border-border',
+        (isDragOver || isOver) && 'border-2 border-primary bg-primary/5'
       )}
       onClick={onSelect}
     >
@@ -151,7 +151,7 @@ export const SectionCard = ({
             />
           ) : (
             <h3
-              className="font-semibold text-foreground truncate cursor-text"
+              className="cursor-text truncate font-display font-semibold text-foreground"
               onClick={(e) => {
                 e.stopPropagation();
                 setIsEditingTitle(true);
@@ -215,7 +215,7 @@ export const SectionCard = ({
 
           {/* Add Question Area */}
           <div className={cn(
-            'border-2 border-dashed rounded-lg p-4 transition-all',
+            'rounded-md border-2 border-dashed p-4 transition-all',
             (isDragOver || isOver) ? 'border-primary bg-primary/10' : 'border-border'
           )}>
             {(isDragOver || isOver) ? (

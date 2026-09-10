@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, type ReactNode } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { Form, FormSection, Question, QUESTION_TYPE_CONFIG, QuestionVisibility } from '@/types/form';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import { StatusBadge } from '@/components/layout/StatusBadge';
 import { toast } from 'sonner';
 import { User, Mail, Phone, CheckCircle2, ArrowRight, ArrowLeft, Send, Loader2, Upload, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { format, getYear, getMonth } from 'date-fns';
@@ -76,16 +77,16 @@ const CustomHeader = ({
       type="button"
       onClick={decreaseMonth}
       disabled={prevMonthButtonDisabled}
-      className="p-1 hover:bg-muted rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+      className="rounded-md p-1 transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-30"
     >
-      <ChevronLeft className="w-5 h-5 text-foreground" />
+      <ChevronLeft className="h-5 w-5 text-foreground" />
     </button>
     
     <div className="flex gap-2">
       <select
         value={getYear(date)}
         onChange={({ target: { value } }) => changeYear(+value)}
-        className="px-2 py-1 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+        className="rounded-md border border-input bg-background px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
       >
         {years.map((option) => (
           <option key={option} value={option}>
@@ -99,7 +100,7 @@ const CustomHeader = ({
         onChange={({ target: { value } }) =>
           changeMonth(MONTHS.indexOf(value as (typeof MONTHS)[number]))
         }
-        className="px-2 py-1 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+        className="rounded-md border border-input bg-background px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
       >
         {MONTHS.map((option) => (
           <option key={option} value={option}>
@@ -113,12 +114,68 @@ const CustomHeader = ({
       type="button"
       onClick={increaseMonth}
       disabled={nextMonthButtonDisabled}
-      className="p-1 hover:bg-muted rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+      className="rounded-md p-1 transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-30"
     >
-      <ChevronRight className="w-5 h-5 text-foreground" />
+      <ChevronRight className="h-5 w-5 text-foreground" />
     </button>
   </div>
 );
+
+function FormBrandMark({
+  name,
+  logoUrl,
+  compact = false,
+}: {
+  name: string;
+  logoUrl: string | null;
+  compact?: boolean;
+}) {
+  return (
+    <div className="flex shrink-0 items-center gap-3">
+      {logoUrl ? (
+        <img
+          src={logoUrl}
+          alt={name}
+          className={cn('w-auto object-contain', compact ? 'h-8' : 'h-10')}
+        />
+      ) : null}
+      <p className="truncate font-display text-lg font-semibold leading-none text-primary">{name}</p>
+    </div>
+  );
+}
+
+function PublicStatusScreen({
+  brandName,
+  brandLogoUrl,
+  title,
+  description,
+  children,
+}: {
+  brandName: string;
+  brandLogoUrl: string | null;
+  title?: string;
+  description?: string;
+  children?: ReactNode;
+}) {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+      <Card className="w-full max-w-md overflow-hidden shadow-card">
+        <div className="h-1.5 bg-secondary" aria-hidden />
+        <CardContent className="p-8 text-center">
+          <div className="mb-6 flex justify-center">
+            <FormBrandMark name={brandName} logoUrl={brandLogoUrl} />
+          </div>
+          {children ?? (
+            <>
+              <h1 className="mb-2 font-display text-2xl font-semibold text-foreground">{title}</h1>
+              <p className="text-sm text-muted-foreground">{description}</p>
+            </>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
 
 export type FileAnswerValue = { fileName: string; mimeType: string; data: string };
 
@@ -794,10 +851,10 @@ export default function PublicFormView() {
               <label
                 key={option.id}
                 className={cn(
-                  'flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all',
+                  'flex cursor-pointer items-center gap-3 rounded-lg border p-4 transition-colors',
                   value === option.id
-                    ? 'border-primary bg-primary/5'
-                    : 'border-border hover:border-primary/50'
+                    ? 'border-primary bg-primary/10'
+                    : 'border-border hover:border-primary/50 hover:bg-muted/50'
                 )}
               >
                 <RadioGroupItem value={option.id} />
@@ -815,10 +872,10 @@ export default function PublicFormView() {
               <label
                 key={option.id}
                 className={cn(
-                  'flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all',
+                  'flex cursor-pointer items-center gap-3 rounded-lg border p-4 transition-colors',
                   selectedValues.includes(option.id)
-                    ? 'border-primary bg-primary/5'
-                    : 'border-border hover:border-primary/50'
+                    ? 'border-primary bg-primary/10'
+                    : 'border-border hover:border-primary/50 hover:bg-muted/50'
                 )}
               >
                 <Checkbox
@@ -878,11 +935,11 @@ export default function PublicFormView() {
               showMonthDropdown
               dropdownMode="select"
               className={cn(
-                'w-full h-12 px-4 rounded-lg border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary',
+                'h-12 w-full rounded-md border border-input bg-background px-4 text-foreground focus:outline-none focus:ring-2 focus:ring-ring',
                 error && 'border-destructive'
               )}
               wrapperClassName="w-full"
-              calendarClassName="shadow-lg rounded-lg border border-border"
+              calendarClassName="rounded-lg border border-border shadow-lg"
             />
           </div>
         );
@@ -901,10 +958,10 @@ export default function PublicFormView() {
                   saveProgress();
                 }}
                 className={cn(
-                  'w-12 h-12 rounded-lg border transition-all text-2xl',
+                  'h-12 w-12 rounded-md border text-2xl transition-colors',
                   parseInt(rating) >= star
-                    ? 'bg-primary text-primary-foreground border-primary'
-                    : 'border-border hover:border-primary/50'
+                    ? 'border-secondary bg-secondary text-secondary-foreground'
+                    : 'border-border hover:border-secondary/50'
                 )}
               >
                 ★
@@ -951,7 +1008,7 @@ export default function PublicFormView() {
         return (
           <div className="space-y-3">
             <label className={cn(
-              'flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-xl cursor-pointer transition-colors',
+              'flex h-32 w-full cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed transition-colors',
               error ? 'border-destructive bg-destructive/5' : 'border-border hover:border-primary/50 hover:bg-muted/50'
             )}>
               <input
@@ -966,7 +1023,7 @@ export default function PublicFormView() {
               </span>
             </label>
             {fileValue && (
-              <div className="flex items-center justify-between gap-2 p-3 rounded-lg bg-muted/50">
+              <div className="flex items-center justify-between gap-2 rounded-md bg-muted/50 p-3">
                 <span className="text-sm truncate">{fileValue.fileName}</span>
                 <Button
                   type="button"
@@ -1005,83 +1062,51 @@ export default function PublicFormView() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
-        <div className="flex items-center justify-center gap-3 mb-6">
-          {companyLogoUrl ? (
-            <img src={companyLogoUrl} alt={companyDisplayName} className="h-10 w-auto" />
-          ) : null}
-          <h1 className="text-lg font-bold text-primary leading-none">{companyDisplayName}</h1>
-        </div>
-        <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-primary" />
-          <p className="text-muted-foreground">Cargando formulario...</p>
-        </div>
-      </div>
+      <PublicStatusScreen brandName={companyDisplayName} brandLogoUrl={companyLogoUrl}>
+        <Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin text-primary" />
+        <p className="text-sm text-muted-foreground">Cargando formulario...</p>
+      </PublicStatusScreen>
     );
   }
 
   if (!sessionToken) {
     return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
-        <div className="flex items-center justify-center gap-3 mb-6">
-          {companyLogoUrl ? (
-            <img src={companyLogoUrl} alt={companyDisplayName} className="h-10 w-auto" />
-          ) : null}
-          <h1 className="text-lg font-bold text-primary leading-none">{companyDisplayName}</h1>
-        </div>
-        <div className="text-center max-w-md">
-          <h1 className="text-2xl font-bold text-foreground mb-2">Enlace no válido</h1>
-          <p className="text-muted-foreground">
-            Para contestar este formulario necesitas usar el enlace único que te compartieron. Cada enlace guarda tu progreso en la nube.
-          </p>
-        </div>
-      </div>
+      <PublicStatusScreen
+        brandName={companyDisplayName}
+        brandLogoUrl={companyLogoUrl}
+        title="Enlace no válido"
+        description="Para contestar este formulario necesitas usar el enlace único que te compartieron. Cada enlace guarda tu progreso en la nube."
+      />
     );
   }
 
   if (!form) {
     return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
-        <div className="flex items-center justify-center gap-3 mb-6">
-          {companyLogoUrl ? (
-            <img src={companyLogoUrl} alt={companyDisplayName} className="h-10 w-auto" />
-          ) : null}
-          <h1 className="text-lg font-bold text-primary leading-none">{companyDisplayName}</h1>
-        </div>
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-foreground mb-2">Formulario no encontrado</h1>
-          <p className="text-muted-foreground">El enlace que has seguido no es válido o ha expirado.</p>
-        </div>
-      </div>
+      <PublicStatusScreen
+        brandName={companyDisplayName}
+        brandLogoUrl={companyLogoUrl}
+        title="Formulario no encontrado"
+        description="El enlace que has seguido no es válido o ha expirado."
+      />
     );
   }
 
   if (step === 'success') {
     return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
-        <div className="flex items-center justify-center gap-3 mb-6">
-          {companyLogoUrl ? (
-            <img src={companyLogoUrl} alt={companyDisplayName} className="h-10 w-auto" />
-          ) : null}
-          <h1 className="text-lg font-bold text-primary leading-none">{companyDisplayName}</h1>
+      <PublicStatusScreen brandName={companyDisplayName} brandLogoUrl={companyLogoUrl}>
+        <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-success/10">
+          <CheckCircle2 className="h-10 w-10 text-success" />
         </div>
-        <Card className="max-w-md w-full">
-          <CardContent className="p-8 text-center">
-            <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-success/10 flex items-center justify-center">
-              <CheckCircle2 className="w-10 h-10 text-success" />
-            </div>
-            <h1 className="text-2xl font-bold text-foreground mb-2">
-              ¡Formulario enviado!
-            </h1>
-            <p className="text-muted-foreground mb-6">
-              Hemos recibido tu información. Nos pondremos en contacto contigo pronto.
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Puedes cerrar esta ventana.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+        <h1 className="mb-2 font-display text-2xl font-semibold text-foreground">
+          ¡Formulario enviado!
+        </h1>
+        <p className="mb-6 text-sm text-muted-foreground">
+          Hemos recibido tu información. Nos pondremos en contacto contigo pronto.
+        </p>
+        <p className="text-sm text-muted-foreground">
+          Puedes cerrar esta ventana.
+        </p>
+      </PublicStatusScreen>
     );
   }
 
@@ -1091,65 +1116,52 @@ export default function PublicFormView() {
 
   if (step === 'sections' && form.sections.length === 0) {
     return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
-        <div className="flex items-center justify-center gap-3 mb-6">
-          {companyLogoUrl ? (
-            <img src={companyLogoUrl} alt={companyDisplayName} className="h-10 w-auto" />
-          ) : null}
-          <h1 className="text-lg font-bold text-primary leading-none">{companyDisplayName}</h1>
-        </div>
-        <div className="text-center max-w-md">
-          <h1 className="text-2xl font-bold text-foreground mb-2">Formulario no disponible</h1>
-          <p className="text-muted-foreground">
-            Este formulario no tiene secciones configuradas. Solicita a tu asesor que vuelva a generar el enlace.
-          </p>
-        </div>
-      </div>
+      <PublicStatusScreen
+        brandName={companyDisplayName}
+        brandLogoUrl={companyLogoUrl}
+        title="Formulario no disponible"
+        description="Este formulario no tiene secciones configuradas. Solicita a tu asesor que vuelva a generar el enlace."
+      />
     );
   }
 
   const currentSection = form.sections[currentSectionIndex];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
-      {/* Header */}
-      <div className="border-b border-border/50 bg-card/80 backdrop-blur-sm sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto px-4 py-4">
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="flex items-center gap-3 shrink-0">
-              {companyLogoUrl ? (
-                <img src={companyLogoUrl} alt={companyDisplayName} className="h-8 w-auto" />
-              ) : null}
-              <h1 className="text-lg font-bold text-primary leading-none truncate">{companyDisplayName}</h1>
-            </div>
-            <h2 className="text-lg font-semibold text-foreground">{form.name}</h2>
+    <div className="min-h-screen bg-background">
+      <div className="sticky top-0 z-10 border-b border-border bg-card/80">
+        <div className="h-1 bg-secondary" aria-hidden />
+        <div className="mx-auto max-w-2xl px-4 py-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <FormBrandMark name={companyDisplayName} logoUrl={companyLogoUrl} compact />
+            <h2 className="font-display text-lg font-semibold text-foreground">{form.name}</h2>
           </div>
           {step === 'sections' && (
-            <div className="mt-2">
+            <div className="mt-3">
               {assignedClientName && (
-                <p className="text-sm text-muted-foreground mb-2">
-                  Cliente: <span className="font-medium text-foreground">{assignedClientName}</span>
-                </p>
+                <div className="mb-2">
+                  <StatusBadge tone="accent">Cliente: {assignedClientName}</StatusBadge>
+                </div>
               )}
-              <div className="flex items-center justify-between text-sm text-muted-foreground mb-1">
+              <div className="mb-1.5 flex items-center justify-between text-xs text-muted-foreground">
                 <span>Sección {currentSectionIndex + 1} de {form.sections.length}</span>
-                <span>{Math.round(progress)}%</span>
+                <span className="font-display font-semibold text-primary">{Math.round(progress)}%</span>
               </div>
-              <Progress value={progress} className="h-2" />
+              <Progress value={progress} className="h-1.5 bg-muted" />
             </div>
           )}
         </div>
       </div>
 
-      <div className="max-w-2xl mx-auto px-4 py-8">
+      <div className="mx-auto max-w-2xl px-4 py-8">
         {step === 'info' && !assignedClientName ? (
-          <Card>
+          <Card className="overflow-hidden shadow-card">
             <CardContent className="p-6 md:p-8">
-              <div className="text-center mb-8">
-                <h2 className="text-2xl font-bold text-foreground mb-2">
+              <div className="mb-8 text-center">
+                <h2 className="mb-2 font-display text-2xl font-semibold text-foreground">
                   Antes de comenzar
                 </h2>
-                <p className="text-muted-foreground">
+                <p className="text-sm text-muted-foreground">
                   Por favor ingresa tu información de contacto
                 </p>
               </div>
@@ -1260,50 +1272,49 @@ export default function PublicFormView() {
                 </div>
               </div>
 
-              <Button 
-                onClick={handleStartForm} 
-                className="w-full mt-8 h-12 text-lg gap-2"
+              <Button
+                onClick={handleStartForm}
+                className="mt-8 h-12 w-full gap-2 text-base"
+                size="lg"
               >
                 Comenzar formulario
-                <ArrowRight className="w-5 h-5" />
+                <ArrowRight className="h-5 w-5" />
               </Button>
             </CardContent>
           </Card>
         ) : (
-          <Card>
+          <Card className="overflow-hidden shadow-card">
             <CardContent className="p-6 md:p-8">
-              {/* Section Header */}
-              <div className="mb-8 pb-6 border-b border-border">
-                <div className="flex items-center gap-3 mb-2">
-                  <span className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-primary-foreground text-sm font-medium flex items-center justify-center">
+              <div className="mb-8 border-b border-border pb-6">
+                <div className="mb-2 flex items-center gap-3">
+                  <span className="grid size-8 shrink-0 place-items-center rounded-full bg-primary font-display text-sm font-semibold text-primary-foreground">
                     {currentSectionIndex + 1}
                   </span>
-                  <h2 className="text-xl font-bold text-foreground">
+                  <h2 className="font-display text-xl font-semibold text-foreground">
                     {currentSection.title}
                   </h2>
                 </div>
                 {currentSection.description && (
-                  <p className="text-muted-foreground ml-11">
+                  <p className="ml-11 text-sm text-muted-foreground">
                     {currentSection.description}
                   </p>
                 )}
               </div>
 
-              {/* Questions */}
               <div className="space-y-8">
                 {currentSection.questions
                   .filter(question => visibilityMap.get(question.id))
                   .map((question, index) => (
                   <div key={question.id} className="space-y-3">
                     <div>
-                      <h3 className="font-medium text-foreground">
+                      <h3 className="font-display font-semibold text-foreground">
                         {index + 1}. {question.title}
                         {question.required && (
-                          <span className="text-destructive ml-1">*</span>
+                          <span className="ml-1 text-destructive">*</span>
                         )}
                       </h3>
                       {question.description && (
-                        <p className="text-sm text-muted-foreground mt-1">
+                        <p className="mt-1 text-sm text-muted-foreground">
                           {question.description}
                         </p>
                       )}
@@ -1320,14 +1331,13 @@ export default function PublicFormView() {
                 ))}
               </div>
 
-              {/* Navigation */}
-              <div className="flex items-center justify-between gap-4 mt-10 pt-6 border-t border-border">
+              <div className="mt-10 flex items-center justify-between gap-4 border-t border-border pt-6">
                 <Button
                   variant="outline"
                   onClick={handleBack}
                   className="gap-2"
                 >
-                  <ArrowLeft className="w-4 h-4" />
+                  <ArrowLeft className="h-4 w-4" />
                   Atrás
                 </Button>
                 <Button
@@ -1337,12 +1347,12 @@ export default function PublicFormView() {
                   {currentSectionIndex === form.sections.length - 1 ? (
                     <>
                       Enviar
-                      <Send className="w-4 h-4" />
+                      <Send className="h-4 w-4" />
                     </>
                   ) : (
                     <>
                       Siguiente sección
-                      <ArrowRight className="w-4 h-4" />
+                      <ArrowRight className="h-4 w-4" />
                     </>
                   )}
                 </Button>

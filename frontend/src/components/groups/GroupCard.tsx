@@ -5,74 +5,113 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Users, MoreHorizontal, Eye, Pencil, Trash2, MapPin } from 'lucide-react';
+import { Users, MoreHorizontal, Eye, Pencil, Trash2 } from 'lucide-react';
+import type { MouseEvent } from 'react';
+import { resolveUserName } from '@/lib/resolveUserName';
 
 interface GroupCardProps {
   group: Group;
+  users?: Array<{ id: string; name: string }>;
   onView: () => void;
   onEdit: () => void;
   onDelete: () => void;
 }
 
-export const GroupCard = ({ group, onView, onEdit, onDelete }: GroupCardProps) => {
+export const GroupCard = ({ group, users, onView, onEdit, onDelete }: GroupCardProps) => {
   const clientCount = group.clients?.length ?? 0;
+  const responsibleName = users ? resolveUserName(group.assignedUserId, users) : null;
+  const showResponsible = users != null;
+  const tripLabel =
+    group.assignedTrips && group.assignedTrips.length > 0
+      ? group.assignedTrips.map((t) => t.title).join(', ')
+      : 'Sin viaje asignado';
+
+  const handleCardClick = (event: MouseEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement;
+    if (target.closest('[data-no-view="true"]')) return;
+    onView();
+  };
 
   return (
     <Card
-      className="group hover:shadow-card-hover transition-all duration-300 border-border/50 hover:border-primary/30 cursor-pointer"
-      onClick={onView}
+      className="group cursor-pointer overflow-hidden border-border p-0 shadow-sm transition-colors hover:border-primary/30"
+      onClick={handleCardClick}
     >
       <CardContent className="p-5">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
-                <Users className="w-6 h-6 text-primary" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-foreground text-lg">{group.title}</h3>
-                <p className="text-sm text-muted-foreground">
-                  {clientCount} cliente{clientCount === 1 ? '' : 's'}
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="grid size-10 shrink-0 place-items-center rounded-md bg-primary/15 text-primary">
+              <Users className="size-5" />
+            </div>
+            <div className="min-w-0">
+              <h2 className="font-display font-semibold">{group.title}</h2>
+              <p className="text-xs text-muted-foreground">
+                {clientCount} {clientCount === 1 ? 'integrante' : 'integrantes'}
+              </p>
+              {showResponsible ? (
+                <p className="text-xs text-muted-foreground">
+                  Responsable: {responsibleName ?? 'Sin asignar'}
                 </p>
-                {group.assignedTrips && group.assignedTrips.length > 0 && (
-                  <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                    <MapPin className="w-3 h-3 shrink-0" />
-                    En viaje(s): {group.assignedTrips.map(t => t.title).join(', ')}
-                  </p>
-                )}
-              </div>
+              ) : null}
             </div>
           </div>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
+                data-no-view="true"
+                type="button"
                 variant="ghost"
                 size="icon"
-                className="opacity-0 group-hover:opacity-100 transition-opacity"
+                className="shrink-0"
+                aria-label="Acciones del grupo"
                 onClick={(e) => e.stopPropagation()}
               >
-                <MoreHorizontal className="w-4 h-4" />
+                <MoreHorizontal className="size-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={onView} className="gap-2">
-                <Eye className="w-4 h-4" />
+            <DropdownMenuContent data-no-view="true" align="end" className="w-48">
+              <DropdownMenuItem data-no-view="true" onClick={onView}>
+                <Eye className="mr-2 size-4" />
                 Ver detalle
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={onEdit} className="gap-2">
-                <Pencil className="w-4 h-4" />
+              <DropdownMenuItem data-no-view="true" onClick={onEdit}>
+                <Pencil className="mr-2 size-4" />
                 Editar
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={onDelete} className="gap-2 text-destructive focus:text-destructive">
-                <Trash2 className="w-4 h-4" />
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                data-no-view="true"
+                onClick={onDelete}
+                className="text-destructive focus:text-destructive"
+              >
+                <Trash2 className="mr-2 size-4" />
                 Eliminar
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+
+        <div className="mt-5 rounded-md bg-muted p-3 text-xs">
+          <p className="text-muted-foreground">Viaje asignado</p>
+          <p className="mt-1 font-medium">{tripLabel}</p>
+        </div>
+
+        <Button
+          data-no-view="true"
+          type="button"
+          className="mt-4 w-full"
+          variant="outline"
+          onClick={(e) => {
+            e.stopPropagation();
+            onView();
+          }}
+        >
+          Administrar integrantes
+        </Button>
       </CardContent>
     </Card>
   );

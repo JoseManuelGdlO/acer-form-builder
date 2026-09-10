@@ -1,10 +1,9 @@
-import { useEffect, useState, type FormEvent } from 'react';
-import type { ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Loader2, TrendingUp, Wallet, Landmark, Percent, Receipt, RotateCcw, Trash2, FileDown } from 'lucide-react';
+import { Loader2, RotateCcw, Trash2, FileDown } from 'lucide-react';
 import { toast } from 'sonner';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -27,20 +26,13 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from '@/components/ui/chart';
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Line,
-  LineChart,
-  Pie,
-  PieChart,
-  XAxis,
-  YAxis,
-} from 'recharts';
+import { CartesianGrid, Cell, Line, LineChart, Pie, PieChart, XAxis, YAxis } from 'recharts';
 import { useAuth } from '@/contexts/AuthContext';
 import { exportFinanceOverviewPdf, formatDateRangeLabel, type FinancePdfFilterLabels } from '@/lib/financePdfExport';
+import { accountsReceivableFromClients } from '@/lib/accountsReceivable';
+import { useClientStore } from '@/hooks/useClientStore';
+import { SectionTitle } from '@/components/layout/SectionTitle';
+import { cn } from '@/lib/utils';
 
 const GRANULARITIES: Array<{ key: FinanceGranularity; label: string }> = [
   { key: 'hourly', label: 'Por hora' },
@@ -69,6 +61,15 @@ const PERIOD_TYPE_LABELS: Record<string, string> = {
   annual: 'Anual',
 };
 
+const PIE_COLORS = [
+  'hsl(var(--primary))',
+  'hsl(var(--success))',
+  'hsl(var(--secondary))',
+  'hsl(var(--accent))',
+  'hsl(var(--warning))',
+  'hsl(var(--info))',
+];
+
 const formatFinanceDate = (value: string | null | undefined): string => {
   if (!value) return '—';
   try {
@@ -92,7 +93,11 @@ const formatPayoutPeriod = (row: {
   return typeLabel ? `${typeLabel} (${dates})` : dates;
 };
 
-const pieColors = ['#2563eb', '#16a34a', '#f59e0b', '#9333ea', '#ef4444', '#06b6d4'];
+const formatSignedPct = (value: number): string => {
+  if (!Number.isFinite(value)) return '—';
+  const sign = value > 0 ? '+' : '';
+  return `${sign}${value}%`;
+};
 
 type LoadParams = {
   granularity?: FinanceGranularity;
@@ -104,8 +109,33 @@ type LoadParams = {
   branchId?: string;
 };
 
-export const FinanceDashboard = () => {
-  const { token } = useAuth();
+function KpiCard({
+  label,
+  value,
+  hint,
+  hintClassName,
+}: {
+  label: string;
+  value: string;
+  hint: string;
+  hintClassName?: string;
+}) {
+  return (
+    <Card className="p-5">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="mt-2 font-display text-2xl font-semibold">{value}</p>
+      <p className={cn('mt-1 text-xs', hintClassName ?? 'text-success')}>{hint}</p>
+    </Card>
+  );
+}
+
+type FinanceDashboardProps = {
+  pickerAssignedUserId?: string;
+};
+
+export const FinanceDashboard = ({ pickerAssignedUserId }: FinanceDashboardProps) => {
+  const { token, canAny } = useAuth();
+  const expenseConceptRef = useRef<HTMLInputElement>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [data, setData] = useState<FinanceOverviewResponse | null>(null);
   const [granularity, setGranularity] = useState<FinanceGranularity>(DEFAULT_GRANULARITY);
@@ -123,8 +153,28 @@ export const FinanceDashboard = () => {
   const [expenseDate, setExpenseDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [expenseNote, setExpenseNote] = useState('');
   const [isSavingExpense, setIsSavingExpense] = useState(false);
+  const { pickerClients, fetchClientsForPickers } = useClientStore();
+  const [receivableReady, setReceivableReady] = useState(false);
+  const canViewClients = canAny(['clients.view_all', 'clients.view_assigned']);
 
-  // Load product list for the product filter dropdown
+  useEffect(() => {
+    if (!token || !canViewClients) {
+      setReceivableReady(false);
+      return;
+    }
+    let cancelled = false;
+    fetchClientsForPickers(token, pickerAssignedUserId ? { assignedUserId: pickerAssignedUserId } : undefined)
+      .then(() => {
+        if (!cancelled) setReceivableReady(true);
+      })
+      .catch(() => {
+        if (!cancelled) setReceivableReady(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, canViewClients, pickerAssignedUserId, fetchClientsForPickers]);
+
   useEffect(() => {
     if (!token) return;
     api.getProducts(token).then((list) => {
@@ -159,7 +209,6 @@ export const FinanceDashboard = () => {
       .catch(() => setBranches([]));
   }, [token]);
 
-  // Core load function — accepts optional param overrides so reset can bypass stale state
   const loadOverview = async (overrides?: LoadParams) => {
     if (!token) return;
     setIsLoading(true);
@@ -194,7 +243,6 @@ export const FinanceDashboard = () => {
     }
   };
 
-  // Auto-load when granularity changes (other filters are applied manually)
   useEffect(() => {
     loadOverview();
   }, [token, granularity]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -219,6 +267,7 @@ export const FinanceDashboard = () => {
   };
 
   const kpis = data?.kpis;
+  const receivable = receivableReady ? accountsReceivableFromClients(pickerClients) : null;
   const timeSeriesData = data?.timeseries ?? [];
   const paymentTypesData = data?.breakdowns.paymentTypes ?? [];
   const productsBreakdown = data?.breakdowns.products ?? [];
@@ -228,6 +277,20 @@ export const FinanceDashboard = () => {
   const commissionsData = data?.commissions;
   const commissionPayouts = commissionsData?.payouts ?? [];
   const commissionPayoutsTotal = commissionPayouts.reduce((acc, row) => acc + row.amount, 0);
+
+  const productBars = useMemo(() => {
+    const rows = productsBreakdown.slice(0, 6);
+    const maxAmount = Math.max(...rows.map((row) => row.amount), 0);
+    return rows.map((row) => ({
+      ...row,
+      heightPct: maxAmount > 0 ? Math.max(8, (row.amount / maxAmount) * 100) : 8,
+    }));
+  }, [productsBreakdown]);
+
+  const sortedExpenses = useMemo(
+    () => [...manualExpenses].sort((a, b) => b.expenseDate.localeCompare(a.expenseDate)),
+    [manualExpenses]
+  );
 
   const handleCreateManualExpense = async (e: FormEvent) => {
     e.preventDefault();
@@ -294,21 +357,20 @@ export const FinanceDashboard = () => {
         ? branches.find((b) => b.id === data.meta.branchId)?.name ?? data.meta.branchId
         : 'Todas',
     };
-    exportFinanceOverviewPdf(data, labels, formatter);
+    exportFinanceOverviewPdf(data, labels, formatter, receivable);
     toast.success('PDF descargado');
   };
 
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-primary mb-1">Finanzas 360</h1>
-        <p className="text-muted-foreground text-sm">Ganancia neta, tendencias y estadisticas operativas de la empresa.</p>
-      </div>
+  const focusExpenseForm = () => {
+    expenseConceptRef.current?.focus();
+    expenseConceptRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
 
-      {/* Filtros */}
-      <Card className="border-border/50">
-        <CardHeader className="pb-3 flex flex-row flex-wrap items-center justify-between gap-2 space-y-0">
-          <CardTitle className="text-base">Filtros</CardTitle>
+  return (
+    <div className="mx-auto max-w-[1600px] space-y-4 p-4 sm:p-6 lg:p-8">
+      <Card className="p-5">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <SectionTitle title="Filtros" className="mb-0" />
           <Button
             type="button"
             variant="outline"
@@ -317,434 +379,437 @@ export const FinanceDashboard = () => {
             disabled={isLoading || !data?.kpis}
             className="shrink-0"
           >
-            <FileDown className="w-4 h-4 mr-2" />
+            <FileDown className="size-4" />
             Exportar PDF
           </Button>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Periodicidad */}
-          <div className="flex flex-wrap gap-2">
-            {GRANULARITIES.map((g) => (
-              <Button
-                key={g.key}
-                type="button"
-                size="sm"
-                variant={granularity === g.key ? 'default' : 'outline'}
-                onClick={() => setGranularity(g.key)}
-              >
-                {g.label}
-              </Button>
-            ))}
-          </div>
+        </div>
 
-          {/* Inputs de filtro */}
-          <div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3">
-            <input
-              type="date"
-              value={from}
-              onChange={(e) => setFrom(e.target.value)}
-              className="h-10 rounded-md border border-input bg-background px-3 text-sm col-span-1"
-              placeholder="Desde"
-            />
-            <input
-              type="date"
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-              className="h-10 rounded-md border border-input bg-background px-3 text-sm col-span-1"
-              placeholder="Hasta"
-            />
-            <select
-              value={paymentType}
-              onChange={(e) => setPaymentType(e.target.value)}
-              className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+        <div className="flex flex-wrap gap-2">
+          {GRANULARITIES.map((g) => (
+            <Button
+              key={g.key}
+              type="button"
+              size="sm"
+              variant={granularity === g.key ? 'default' : 'outline'}
+              onClick={() => setGranularity(g.key)}
             >
-              <option value="">Tipo de pago (todos)</option>
-              <option value="efectivo">Efectivo</option>
-              <option value="tarjeta">Tarjeta</option>
-              <option value="transferencia">Transferencia</option>
-            </select>
-            <select
-              value={productId}
-              onChange={(e) => setProductId(e.target.value)}
-              className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+              {g.label}
+            </Button>
+          ))}
+        </div>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7">
+          <input
+            type="date"
+            value={from}
+            onChange={(e) => setFrom(e.target.value)}
+            className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+            placeholder="Desde"
+          />
+          <input
+            type="date"
+            value={to}
+            onChange={(e) => setTo(e.target.value)}
+            className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+            placeholder="Hasta"
+          />
+          <select
+            value={paymentType}
+            onChange={(e) => setPaymentType(e.target.value)}
+            className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+          >
+            <option value="">Tipo de pago (todos)</option>
+            <option value="efectivo">Efectivo</option>
+            <option value="tarjeta">Tarjeta</option>
+            <option value="transferencia">Transferencia</option>
+          </select>
+          <select
+            value={productId}
+            onChange={(e) => setProductId(e.target.value)}
+            className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+          >
+            <option value="">Producto (todos)</option>
+            {products.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.title}
+              </option>
+            ))}
+          </select>
+          <select
+            value={assignedUserId}
+            onChange={(e) => setAssignedUserId(e.target.value)}
+            className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+          >
+            <option value="">Asesor (todos)</option>
+            {advisors.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+              </option>
+            ))}
+          </select>
+          <select
+            value={branchId}
+            onChange={(e) => setBranchId(e.target.value)}
+            className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+          >
+            <option value="">Sucursal (todas)</option>
+            {branches.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+              </option>
+            ))}
+          </select>
+          <div className="flex gap-2">
+            <Button type="button" onClick={() => loadOverview()} disabled={isLoading} className="flex-1">
+              Aplicar
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleReset}
+              disabled={isLoading}
+              title="Restablecer filtros"
+              className="px-3"
             >
-              <option value="">Producto (todos)</option>
-              {products.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.title}
-                </option>
-              ))}
-            </select>
-            <select
-              value={assignedUserId}
-              onChange={(e) => setAssignedUserId(e.target.value)}
-              className="h-10 rounded-md border border-input bg-background px-3 text-sm"
-            >
-              <option value="">Asesor (todos)</option>
-              {advisors.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name}
-                </option>
-              ))}
-            </select>
-            <select
-              value={branchId}
-              onChange={(e) => setBranchId(e.target.value)}
-              className="h-10 rounded-md border border-input bg-background px-3 text-sm"
-            >
-              <option value="">Sucursal (todas)</option>
-              {branches.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
-                </option>
-              ))}
-            </select>
-            <div className="flex gap-2">
-              <Button type="button" onClick={() => loadOverview()} disabled={isLoading} className="flex-1">
-                Aplicar
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleReset}
-                disabled={isLoading}
-                title="Restablecer filtros"
-                className="px-3"
-              >
-                <RotateCcw className="w-4 h-4" />
-              </Button>
-            </div>
+              <RotateCcw className="size-4" />
+            </Button>
           </div>
-        </CardContent>
+        </div>
       </Card>
 
       {isLoading ? (
         <div className="flex items-center justify-center py-16">
-          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          <Loader2 className="size-8 animate-spin text-primary" />
         </div>
       ) : !data || !kpis ? (
-        <Card>
-          <CardContent className="py-10 text-center text-muted-foreground">
-            No hay datos financieros para este rango.
-          </CardContent>
-        </Card>
+        <>
+          {receivable ? (
+            <Card className="p-5">
+              <p className="text-xs text-muted-foreground">Por cobrar</p>
+              <p className="mt-2 font-display text-2xl font-semibold">{formatter.format(receivable.amount)}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {receivable.accounts} {receivable.accounts === 1 ? 'cuenta con saldo' : 'cuentas con saldo'}
+              </p>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Saldo de expedientes, no del periodo seleccionado
+              </p>
+            </Card>
+          ) : null}
+          <Card className="p-5">
+            <p className="py-10 text-center text-sm text-muted-foreground">
+              No hay datos financieros para este rango.
+            </p>
+          </Card>
+        </>
       ) : (
         <>
-          {/* KPIs principales */}
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-            <StatCard title="Ganancia Neta" value={formatter.format(kpis.netProfit)} icon={<Wallet className="w-5 h-5" />} />
-            <StatCard title="Ingresos" value={formatter.format(kpis.totalIncome)} icon={<TrendingUp className="w-5 h-5" />} />
-            <StatCard
-              title="Egresos (manuales)"
-              value={formatter.format(kpis.totalExpense)}
-              icon={<Landmark className="w-5 h-5" />}
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <KpiCard
+              label="Ingresos"
+              value={formatter.format(kpis.totalIncome)}
+              hint="Pagos de clientes en el periodo"
+              hintClassName="text-muted-foreground"
             />
-            <StatCard title="Margen Neto" value={`${kpis.netMarginPct}%`} icon={<Percent className="w-5 h-5" />} />
-            <StatCard title="Ticket Promedio" value={formatter.format(kpis.averageTicket)} icon={<Receipt className="w-5 h-5" />} />
-            <StatCard title="Crecimiento" value={`${kpis.growthVsPreviousPct}%`} icon={<TrendingUp className="w-5 h-5" />} />
+            <KpiCard
+              label="Egresos"
+              value={formatter.format(kpis.totalExpense)}
+              hint="Egresos manuales de empresa"
+              hintClassName="text-muted-foreground"
+            />
+            <KpiCard
+              label="Utilidad"
+              value={formatter.format(kpis.netProfit)}
+              hint={`${kpis.netMarginPct}% margen · ${formatSignedPct(kpis.growthVsPreviousPct)} vs anterior`}
+              hintClassName={kpis.growthVsPreviousPct < 0 ? 'text-destructive' : 'text-success'}
+            />
+            <KpiCard
+              label="Ticket promedio"
+              value={formatter.format(kpis.averageTicket)}
+              hint="Promedio por pago cobrado"
+              hintClassName="text-muted-foreground"
+            />
           </div>
 
-          <Card className="border-border/50">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Egresos manuales</CardTitle>
-              <p className="text-sm text-muted-foreground font-normal">
-                Los gastos que registres en un viaje no se suman aquí. Usa este apartado para cargar egresos de la empresa con
-                concepto (operación, nómina, servicios, etc.).
+          {receivable ? (
+            <Card className="p-5">
+              <p className="text-xs text-muted-foreground">Por cobrar</p>
+              <p className="mt-2 font-display text-2xl font-semibold">{formatter.format(receivable.amount)}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {receivable.accounts} {receivable.accounts === 1 ? 'cuenta con saldo' : 'cuentas con saldo'}
               </p>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <form onSubmit={handleCreateManualExpense} className="grid sm:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
-                <div className="space-y-2 sm:col-span-2">
-                  <Label htmlFor="fin-exp-concept">Concepto</Label>
-                  <Input
-                    id="fin-exp-concept"
-                    value={expenseConcept}
-                    onChange={(ev) => setExpenseConcept(ev.target.value)}
-                    placeholder="Ej. Nómina, renta oficina"
-                    maxLength={255}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="fin-exp-amount">Monto</Label>
-                  <Input
-                    id="fin-exp-amount"
-                    type="text"
-                    inputMode="decimal"
-                    value={expenseAmount}
-                    onChange={(ev) => setExpenseAmount(ev.target.value)}
-                    placeholder="0.00"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="fin-exp-date">Fecha</Label>
-                  <Input
-                    id="fin-exp-date"
-                    type="date"
-                    value={expenseDate}
-                    onChange={(ev) => setExpenseDate(ev.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="fin-exp-note">Nota (opcional)</Label>
-                  <Input
-                    id="fin-exp-note"
-                    value={expenseNote}
-                    onChange={(ev) => setExpenseNote(ev.target.value)}
-                    placeholder="Referencia"
-                  />
-                </div>
-                <div className="sm:col-span-2 lg:col-span-5 flex justify-end">
-                  <Button type="submit" disabled={isSavingExpense}>
-                    {isSavingExpense ? 'Guardando…' : 'Registrar egreso'}
-                  </Button>
-                </div>
-              </form>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Saldo de expedientes, no del periodo seleccionado
+              </p>
+            </Card>
+          ) : null}
 
-              {manualExpenses.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-2">
-                  No hay egresos manuales en el periodo seleccionado. Ajusta las fechas en filtros o registra uno arriba.
+          <div className="grid gap-4 xl:grid-cols-[1.4fr_1fr]">
+            <Card className="p-5">
+              <SectionTitle title="Ingresos por producto" />
+              {productBars.length === 0 ? (
+                <p className="py-10 text-center text-sm text-muted-foreground">
+                  Sin datos de productos en este periodo.
                 </p>
               ) : (
-                <div className="border rounded-md overflow-hidden">
-                  <table className="w-full text-sm">
-                    <thead className="bg-muted/50">
-                      <tr className="text-left">
-                        <th className="p-3 font-medium">Fecha</th>
-                        <th className="p-3 font-medium">Concepto</th>
-                        <th className="p-3 font-medium text-right">Monto</th>
-                        <th className="p-3 font-medium hidden md:table-cell">Nota</th>
-                        <th className="p-3 w-12" />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {[...manualExpenses]
-                        .sort((a, b) => b.expenseDate.localeCompare(a.expenseDate))
-                        .map((row) => (
-                          <tr key={row.id} className="border-t border-border/60">
-                            <td className="p-3 whitespace-nowrap">{row.expenseDate}</td>
-                            <td className="p-3">{row.concept}</td>
-                            <td className="p-3 text-right font-medium text-red-600">{formatter.format(row.amount)}</td>
-                            <td className="p-3 text-muted-foreground hidden md:table-cell max-w-[200px] truncate">
-                              {row.note || '—'}
-                            </td>
-                            <td className="p-3">
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="text-destructive hover:text-destructive"
-                                title="Eliminar"
-                                onClick={() => handleDeleteManualExpense(row.id)}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </td>
-                          </tr>
-                        ))}
-                    </tbody>
-                  </table>
+                <div className="flex h-56 items-end gap-5 border-b border-border px-4">
+                  {productBars.map((row) => (
+                    <div key={row.key} className="flex min-w-0 flex-1 flex-col items-center gap-2">
+                      <span className="text-[10px] font-medium text-muted-foreground">
+                        {formatter.format(row.amount)}
+                      </span>
+                      <div
+                        className="w-full rounded-t bg-primary"
+                        style={{ height: `${row.heightPct}%` }}
+                        title={`${row.label}: ${formatter.format(row.amount)}`}
+                      />
+                      <span className="w-full truncate text-center text-[10px] text-muted-foreground">
+                        {row.label}
+                      </span>
+                    </div>
+                  ))}
                 </div>
               )}
-            </CardContent>
-          </Card>
-
-          {/* Grafico de tendencia + metodos de pago */}
-          <div className="grid lg:grid-cols-3 gap-6">
-            <Card className="lg:col-span-2 border-border/50">
-              <CardHeader className="pb-1">
-                <CardTitle className="text-base">Tendencia de Ingresos, Egresos y Neto</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ChartContainer
-                  className="h-[300px] w-full"
-                  config={{
-                    income: { label: 'Ingresos', color: '#16a34a' },
-                    expense: { label: 'Egresos', color: '#ef4444' },
-                    net: { label: 'Neto', color: '#2563eb' },
-                  }}
-                >
-                  <LineChart data={timeSeriesData}>
-                    <CartesianGrid vertical={false} />
-                    <XAxis dataKey="label" tickLine={false} axisLine={false} />
-                    <YAxis tickLine={false} axisLine={false} />
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    <ChartLegend content={<ChartLegendContent />} />
-                    <Line type="monotone" dataKey="income" stroke="var(--color-income)" strokeWidth={2} dot={false} />
-                    <Line type="monotone" dataKey="expense" stroke="var(--color-expense)" strokeWidth={2} dot={false} />
-                    <Line type="monotone" dataKey="net" stroke="var(--color-net)" strokeWidth={2} dot={false} />
-                  </LineChart>
-                </ChartContainer>
-              </CardContent>
             </Card>
 
-            <Card className="border-border/50">
-              <CardHeader className="pb-1">
-                <CardTitle className="text-base">Metodos de pago</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ChartContainer
-                  className="h-[300px] w-full"
-                  config={{ amount: { label: 'Monto', color: '#2563eb' } }}
-                >
-                  <PieChart>
-                    <Pie data={paymentTypesData} dataKey="amount" nameKey="label" innerRadius={50} outerRadius={95}>
-                      {paymentTypesData.map((_, idx) => (
-                        <Cell key={`cell-pay-${idx}`} fill={pieColors[idx % pieColors.length]} />
-                      ))}
-                    </Pie>
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    <ChartLegend
-                      content={
-                        <ChartLegendContent
-                          formatter={(value) =>
-                            PAYMENT_TYPE_LABELS[(String(value) as 'tarjeta' | 'transferencia' | 'efectivo') || 'efectivo'] || String(value)
-                          }
-                        />
-                      }
-                    />
-                  </PieChart>
-                </ChartContainer>
-              </CardContent>
+            <Card className="p-5">
+              <SectionTitle title="Egresos recientes" action="Registrar" onAction={focusExpenseForm} />
+              {sortedExpenses.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No hay egresos manuales en el periodo. Los gastos de un viaje no se suman aquí.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {sortedExpenses.slice(0, 6).map((row) => (
+                    <div key={row.id} className="flex items-center justify-between gap-3 rounded-md bg-muted p-3 text-xs">
+                      <div className="min-w-0">
+                        <span className="block truncate font-medium">{row.concept}</span>
+                        <span className="text-muted-foreground">{formatFinanceDate(row.expenseDate)}</span>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-1">
+                        <b className="text-destructive">{formatter.format(row.amount)}</b>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="size-8 text-destructive hover:text-destructive"
+                          title="Eliminar"
+                          onClick={() => handleDeleteManualExpense(row.id)}
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </Card>
           </div>
 
-          {/* Ingresos por producto */}
-          <Card className="border-border/50">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Ingresos por producto</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {productsBreakdown.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-4">Sin datos de productos en este periodo.</p>
-              ) : (
-                <ChartContainer
-                  className="h-[280px] w-full"
-                  config={{ amount: { label: 'Monto', color: '#9333ea' } }}
-                >
-                  <BarChart data={productsBreakdown.slice(0, 8)} layout="vertical" margin={{ left: 16, right: 16 }}>
-                    <CartesianGrid horizontal={false} />
-                    <XAxis type="number" hide />
-                    <YAxis dataKey="label" type="category" width={130} tickLine={false} axisLine={false} />
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    <Bar dataKey="amount" fill="var(--color-amount)" radius={6} />
-                  </BarChart>
-                </ChartContainer>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Comisiones */}
-          <Card className="border-border/50">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Comisiones</CardTitle>
-              <p className="text-sm text-muted-foreground font-normal">
-                Comisiones pagadas a usuarios según los periodos liquidados en Administración → Comisiones.
-                Respeta los filtros de fecha del periodo seleccionado.
-              </p>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {commissionsData && (
-                <StatCard
-                  title="Total comisiones pagadas"
-                  value={formatter.format(commissionsData.kpis.totalPaid)}
-                  icon={<Wallet className="w-5 h-5" />}
+          <Card className="p-5">
+            <SectionTitle title="Registrar egreso de empresa" />
+            <p className="mb-4 text-sm text-muted-foreground">
+              Los gastos que registres en un viaje no se suman aquí. Usa este apartado para cargar egresos de la empresa con
+              concepto (operación, nómina, servicios, etc.).
+            </p>
+            <form onSubmit={handleCreateManualExpense} className="grid items-end gap-4 sm:grid-cols-2 lg:grid-cols-5">
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="fin-exp-concept">Concepto</Label>
+                <Input
+                  ref={expenseConceptRef}
+                  id="fin-exp-concept"
+                  value={expenseConcept}
+                  onChange={(ev) => setExpenseConcept(ev.target.value)}
+                  placeholder="Ej. Nómina, renta oficina"
+                  maxLength={255}
+                  required
                 />
-              )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="fin-exp-amount">Monto</Label>
+                <Input
+                  id="fin-exp-amount"
+                  type="text"
+                  inputMode="decimal"
+                  value={expenseAmount}
+                  onChange={(ev) => setExpenseAmount(ev.target.value)}
+                  placeholder="0.00"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="fin-exp-date">Fecha</Label>
+                <Input
+                  id="fin-exp-date"
+                  type="date"
+                  value={expenseDate}
+                  onChange={(ev) => setExpenseDate(ev.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="fin-exp-note">Nota (opcional)</Label>
+                <Input
+                  id="fin-exp-note"
+                  value={expenseNote}
+                  onChange={(ev) => setExpenseNote(ev.target.value)}
+                  placeholder="Referencia"
+                />
+              </div>
+              <div className="flex justify-end sm:col-span-2 lg:col-span-5">
+                <Button type="submit" disabled={isSavingExpense}>
+                  {isSavingExpense ? 'Guardando…' : 'Registrar egreso'}
+                </Button>
+              </div>
+            </form>
+          </Card>
 
-              {commissionPayouts.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-4">
-                  No hay comisiones pagadas en este periodo.
-                </p>
-              ) : (
-                <div className="rounded-md border overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Fecha pago</TableHead>
-                        <TableHead>Usuario</TableHead>
-                        <TableHead>Periodo</TableHead>
-                        <TableHead>Concepto</TableHead>
-                        <TableHead className="text-right">Monto pagado</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {commissionPayouts.map((row) => (
-                        <TableRow key={row.id}>
-                          <TableCell className="whitespace-nowrap">{formatFinanceDate(row.payoutDate)}</TableCell>
-                          <TableCell>{row.advisorName}</TableCell>
-                          <TableCell className="whitespace-nowrap text-muted-foreground">
-                            {formatPayoutPeriod(row)}
-                          </TableCell>
-                          <TableCell>{row.concept}</TableCell>
-                          <TableCell className="text-right font-medium">{formatter.format(row.amount)}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                    <TableFooter>
-                      <TableRow>
-                        <TableCell className="font-semibold">Total</TableCell>
-                        <TableCell />
-                        <TableCell />
-                        <TableCell />
-                        <TableCell className="text-right font-semibold text-green-600">
-                          {formatter.format(commissionPayoutsTotal)}
+          <div className="grid gap-4 lg:grid-cols-3">
+            <Card className="p-5 lg:col-span-2">
+              <SectionTitle title="Tendencia de ingresos, egresos y neto" />
+              <ChartContainer
+                className="h-[300px] w-full"
+                config={{
+                  income: { label: 'Ingresos', color: 'hsl(var(--success))' },
+                  expense: { label: 'Egresos', color: 'hsl(var(--destructive))' },
+                  net: { label: 'Neto', color: 'hsl(var(--primary))' },
+                }}
+              >
+                <LineChart data={timeSeriesData}>
+                  <CartesianGrid vertical={false} />
+                  <XAxis dataKey="label" tickLine={false} axisLine={false} />
+                  <YAxis tickLine={false} axisLine={false} />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <ChartLegend content={<ChartLegendContent />} />
+                  <Line type="monotone" dataKey="income" stroke="var(--color-income)" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="expense" stroke="var(--color-expense)" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="net" stroke="var(--color-net)" strokeWidth={2} dot={false} />
+                </LineChart>
+              </ChartContainer>
+            </Card>
+
+            <Card className="p-5">
+              <SectionTitle title="Métodos de pago" />
+              <ChartContainer
+                className="h-[300px] w-full"
+                config={{ amount: { label: 'Monto', color: 'hsl(var(--primary))' } }}
+              >
+                <PieChart>
+                  <Pie data={paymentTypesData} dataKey="amount" nameKey="label" innerRadius={50} outerRadius={95}>
+                    {paymentTypesData.map((_, idx) => (
+                      <Cell key={`cell-pay-${idx}`} fill={PIE_COLORS[idx % PIE_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <ChartLegend
+                    content={
+                      <ChartLegendContent
+                        formatter={(value) =>
+                          PAYMENT_TYPE_LABELS[(String(value) as PaymentType) || 'efectivo'] || String(value)
+                        }
+                      />
+                    }
+                  />
+                </PieChart>
+              </ChartContainer>
+            </Card>
+          </div>
+
+          <Card className="p-5">
+            <SectionTitle title="Comisiones pagadas" />
+            <p className="mb-4 text-sm text-muted-foreground">
+              Comisiones liquidadas en Administración → Comisiones. Respeta los filtros de fecha del periodo seleccionado.
+            </p>
+            {commissionsData ? (
+              <p className="mb-4 font-display text-xl font-semibold">
+                {formatter.format(commissionsData.kpis.totalPaid)}
+                <span className="ml-2 text-xs font-normal text-muted-foreground">total pagado</span>
+              </p>
+            ) : null}
+
+            {commissionPayouts.length === 0 ? (
+              <p className="py-4 text-sm text-muted-foreground">No hay comisiones pagadas en este periodo.</p>
+            ) : (
+              <div className="overflow-x-auto rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Fecha pago</TableHead>
+                      <TableHead>Usuario</TableHead>
+                      <TableHead>Periodo</TableHead>
+                      <TableHead>Concepto</TableHead>
+                      <TableHead className="text-right">Monto pagado</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {commissionPayouts.map((row) => (
+                      <TableRow key={row.id}>
+                        <TableCell className="whitespace-nowrap">{formatFinanceDate(row.payoutDate)}</TableCell>
+                        <TableCell>{row.advisorName}</TableCell>
+                        <TableCell className="whitespace-nowrap text-muted-foreground">
+                          {formatPayoutPeriod(row)}
+                        </TableCell>
+                        <TableCell>{row.concept}</TableCell>
+                        <TableCell className="text-right font-medium text-success">
+                          {formatter.format(row.amount)}
                         </TableCell>
                       </TableRow>
-                    </TableFooter>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
+                    ))}
+                  </TableBody>
+                  <TableFooter>
+                    <TableRow>
+                      <TableCell className="font-semibold">Total</TableCell>
+                      <TableCell />
+                      <TableCell />
+                      <TableCell />
+                      <TableCell className="text-right font-semibold text-success">
+                        {formatter.format(commissionPayoutsTotal)}
+                      </TableCell>
+                    </TableRow>
+                  </TableFooter>
+                </Table>
+              </div>
+            )}
           </Card>
 
-          {/* Rankings */}
-          <div className="grid lg:grid-cols-2 gap-6">
-            <Card className="border-border/50">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">Top clientes por ingresos</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {topClients.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">Sin datos</p>
-                ) : (
-                  topClients.map((client) => (
-                    <div key={client.clientId} className="flex items-center justify-between border-b border-border/40 pb-2">
-                      <div>
-                        <span className="text-sm font-medium">{client.name}</span>
-                        <span className="ml-2 text-xs text-muted-foreground">{client.paymentsCount} pago{client.paymentsCount !== 1 ? 's' : ''}</span>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card className="p-5">
+              <SectionTitle title="Top clientes por ingresos" />
+              {topClients.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Sin datos</p>
+              ) : (
+                <div className="space-y-2">
+                  {topClients.map((client) => (
+                    <div key={client.clientId} className="flex items-center justify-between rounded-md bg-muted p-3 text-sm">
+                      <div className="min-w-0">
+                        <span className="font-medium">{client.name}</span>
+                        <span className="ml-2 text-xs text-muted-foreground">
+                          {client.paymentsCount} pago{client.paymentsCount !== 1 ? 's' : ''}
+                        </span>
                       </div>
-                      <span className="text-sm font-semibold text-green-600">{formatter.format(client.amount)}</span>
+                      <span className="font-semibold text-success">{formatter.format(client.amount)}</span>
                     </div>
-                  ))
-                )}
-              </CardContent>
+                  ))}
+                </div>
+              )}
             </Card>
 
-            <Card className="border-border/50">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">Top viajes por ingresos</CardTitle>
-                <p className="text-xs text-muted-foreground font-normal">
-                  Solo pagos de clientes asociados al viaje. Los egresos del módulo Viajes no afectan Finanzas.
-                </p>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {topTrips.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">Sin datos</p>
-                ) : (
-                  topTrips.map((trip) => (
-                    <div key={trip.tripId} className="flex items-center justify-between border-b border-border/40 pb-2">
-                      <div>
-                        <span className="text-sm font-medium">{trip.title}</span>
-                        <span className="ml-2 text-xs text-muted-foreground">Ingresos</span>
-                      </div>
-                      <span className="text-sm font-semibold text-green-600">{formatter.format(trip.income)}</span>
+            <Card className="p-5">
+              <SectionTitle title="Top viajes por ingresos" />
+              <p className="mb-4 text-xs text-muted-foreground">
+                Solo pagos de clientes asociados al viaje. Los egresos del módulo Viajes no afectan Finanzas.
+              </p>
+              {topTrips.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Sin datos</p>
+              ) : (
+                <div className="space-y-2">
+                  {topTrips.map((trip) => (
+                    <div key={trip.tripId} className="flex items-center justify-between rounded-md bg-muted p-3 text-sm">
+                      <span className="font-medium">{trip.title}</span>
+                      <span className="font-semibold text-success">{formatter.format(trip.income)}</span>
                     </div>
-                  ))
-                )}
-              </CardContent>
+                  ))}
+                </div>
+              )}
             </Card>
           </div>
         </>
@@ -752,17 +817,3 @@ export const FinanceDashboard = () => {
     </div>
   );
 };
-
-const StatCard = ({ title, value, icon }: { title: string; value: string; icon: ReactNode }) => (
-  <Card className="border-border/50">
-    <CardContent className="p-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-xs text-muted-foreground">{title}</p>
-          <p className="text-lg font-semibold">{value}</p>
-        </div>
-        <div className="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center">{icon}</div>
-      </div>
-    </CardContent>
-  </Card>
-);

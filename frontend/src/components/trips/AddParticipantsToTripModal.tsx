@@ -159,7 +159,7 @@ export const AddParticipantsToTripModal = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
         <DialogHeader className="shrink-0">
-          <DialogTitle className="text-xl">Agregar participantes a &quot;{tripTitle}&quot;</DialogTitle>
+          <DialogTitle className="font-display text-xl">Agregar participantes a &quot;{tripTitle}&quot;</DialogTitle>
         </DialogHeader>
         <p className="text-sm text-muted-foreground shrink-0">
           Plazas: {currentCount}/{totalSeats}. Al seleccionar un cliente principal, se incluiran automaticamente sus hijos.

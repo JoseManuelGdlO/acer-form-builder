@@ -1,5 +1,8 @@
-/** HSL string format used in CSS: "H S% L%" (e.g. "234 66% 30%"). */
+/** HSL string format used in CSS: "H S% L%" (e.g. "203 82% 41%"). */
 export type HslString = string;
+
+/** Fallback hex for invalid HSL (TravelUp primary #1379BE). */
+const FALLBACK_PRIMARY_HEX = '#1379be';
 
 /** Keys stored in company.theme that are not CSS color variables. */
 export const APP_BACKGROUND_IMAGE_KEY = 'appBackgroundImage' as const;
@@ -37,6 +40,52 @@ export const THEME_COLOR_KEYS = [
 ] as const;
 
 export type ThemeColorKey = (typeof THEME_COLOR_KEYS)[number];
+
+/**
+ * Default TravelUp theme. Values are HSL `"H S% L%"` except `radius`.
+ * Must stay in sync with `:root` in `index.css`. Used by Settings → Restaurar.
+ */
+export const DEFAULT_THEME: Record<ThemeColorKey, string> = {
+  primary: '204 82% 41%',
+  'primary-foreground': '0 0% 100%',
+  secondary: '43 98% 53%',
+  'secondary-foreground': '32 69% 11%',
+  background: '210 67% 97%',
+  foreground: '210 43% 14%',
+  card: '0 0% 100%',
+  'card-foreground': '210 43% 14%',
+  muted: '210 45% 94%',
+  'muted-foreground': '210 17% 40%',
+  accent: '357 75% 48%',
+  border: '213 29% 88%',
+  ring: '204 82% 41%',
+  radius: '0.5rem',
+  'sidebar-background': '211 100% 20%',
+  'sidebar-foreground': '211 100% 98%',
+  'sidebar-primary': '204 82% 41%',
+  'sidebar-primary-foreground': '0 0% 100%',
+  'sidebar-accent': '206 100% 22%',
+  'sidebar-accent-foreground': '211 100% 98%',
+  'sidebar-border': '208 53% 37%',
+  'sidebar-ring': '43 98% 53%',
+};
+
+/** Aproximaciones TravelUp anteriores; no pisan los HSL actuales del prototipo. */
+const SUPERSEDED_THEME_DEFAULTS: Partial<Record<ThemeColorKey, readonly string[]>> = {
+  primary: ['203 82% 41%'],
+  ring: ['203 82% 41%'],
+  'secondary-foreground': ['40 50% 18%'],
+  'muted-foreground': ['220 15% 42%'],
+  border: ['210 30% 88%'],
+  foreground: ['220 35% 18%'],
+  'card-foreground': ['220 35% 18%'],
+  'sidebar-background': ['220 50% 18%', '208 78% 22%', '234 66% 30%', '210 100% 19%'],
+  'sidebar-foreground': ['0 0% 98%', '0 0% 100%'],
+  'sidebar-primary': ['203 82% 41%'],
+  'sidebar-accent': ['220 40% 25%', '208 62% 26%', '230 45% 47%'],
+  'sidebar-accent-foreground': ['0 0% 98%', '0 0% 100%'],
+  'sidebar-border': ['220 30% 32%', '210 42% 38%', '234 50% 40%'],
+};
 
 const THEME_META_KEYS = new Set<string>([
   APP_BACKGROUND_IMAGE_KEY,
@@ -121,7 +170,7 @@ function hexToHsl(hex: string): [number, number, number] {
  */
 export function hslStringToHex(hslString: string): string {
   const parsed = parseHslString(hslString);
-  if (!parsed) return '#1a237e';
+  if (!parsed) return FALLBACK_PRIMARY_HEX;
   const [h, s, l] = parsed;
   return hslToHex(h, s, l);
 }
@@ -162,7 +211,7 @@ export function applyAppBackground(theme: Record<string, string> | null | undefi
 
 /**
  * Apply company theme (CSS variables) to the document.
- * Values are HSL without hsl() wrapper, e.g. "234 66% 30%", except `radius` which is e.g. "0.75rem".
+ * Values are HSL without hsl() wrapper, e.g. "203 82% 41%", except `radius` which is e.g. "0.5rem".
  * Ignores metadata keys such as appBackgroundImage.
  */
 export function applyTheme(theme: Record<string, string> | null): void {
@@ -179,6 +228,10 @@ export function applyTheme(theme: Record<string, string> | null): void {
   THEME_COLOR_KEYS.forEach((key) => {
     const value = theme[key];
     const prop = cssVarName(key);
+    if (value && SUPERSEDED_THEME_DEFAULTS[key]?.includes(value)) {
+      root.style.removeProperty(prop);
+      return;
+    }
     if (value != null && value !== '') {
       root.style.setProperty(prop, value);
     } else {

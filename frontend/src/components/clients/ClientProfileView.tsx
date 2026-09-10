@@ -1,23 +1,24 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Client, ClientPayment, AmountDueLogEntry, PaymentDeletedLogEntry, Form, InternalAppointment } from '@/types/form';
 import { User as UserOption } from '@/types/user';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { ClientStatusBadge } from './ClientStatusBadge';
 import { ClientChecklist, ChecklistItem } from './ClientChecklist';
 import { ClientChat, ChatMessage } from './ClientChat';
 import { ClientFormData, ClientFormSubmission } from './ClientFormData';
 import { ClientNotes, ClientNote } from './ClientNotes';
 import { ClientPaymentHistory } from './ClientPaymentHistory';
+import { ClientQuotes } from '@/components/quotes/ClientQuotes';
+import { TabBar, type TabBarItem } from '@/components/layout/TabBar';
+import { StatusBadge, type StatusBadgeTone } from '@/components/layout/StatusBadge';
 import { useSettingsStore } from '@/hooks/useSettingsStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
 import { 
-  User, Mail, Phone, Calendar, Clock, 
-  ArrowLeft, Edit2, FileText, UserCircle, ShoppingBag, Plus, ListChecks, NotebookPen, Wallet, Trash2, MapPin,
+  Mail, Phone, Calendar, Clock, 
+  ArrowLeft, Pencil, FileText, UserCircle, ShoppingBag, Plus, Trash2, MapPin,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -52,16 +53,22 @@ interface AssignedFormSession {
   createdAt: Date;
 }
 
-const contrastTextColor = (backgroundHex?: string | null): string => {
-  if (!backgroundHex) return '#ffffff';
-  const raw = backgroundHex.replace('#', '');
-  if (!/^[0-9A-Fa-f]{6}$/.test(raw)) return '#ffffff';
-  const r = parseInt(raw.slice(0, 2), 16) / 255;
-  const g = parseInt(raw.slice(2, 4), 16) / 255;
-  const b = parseInt(raw.slice(4, 6), 16) / 255;
-  const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-  return lum > 0.6 ? '#0f172a' : '#ffffff';
+type ProfileTabId = 'resumen' | 'checklist' | 'notas' | 'citas' | 'pagos' | 'formularios' | 'cotizaciones';
+
+const STATUS_META: Record<Client['status'], { label: string; tone: StatusBadgeTone }> = {
+  active: { label: 'Activo', tone: 'success' },
+  inactive: { label: 'Inactivo', tone: 'neutral' },
+  pending: { label: 'Pendiente', tone: 'warning' },
 };
+
+function initialsFromName(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  return parts
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? '')
+    .join('');
+}
 
 interface ClientProfileViewProps {
   client: Client;
@@ -143,10 +150,17 @@ export const ClientProfileView = ({
   const [familyMemberToRemove, setFamilyMemberToRemove] = useState<Pick<Client, 'id' | 'name'> | null>(null);
   const [isRemovingFamilyMember, setIsRemovingFamilyMember] = useState(false);
   const [updatingAdvisorForChildId, setUpdatingAdvisorForChildId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<ProfileTabId>('resumen');
 
   useEffect(() => {
     setClientSnapshot(client);
   }, [client]);
+
+  useEffect(() => {
+    if (isChildClient && activeTab === 'pagos') {
+      setActiveTab('resumen');
+    }
+  }, [isChildClient, activeTab]);
 
   // Load all data when component mounts
   useEffect(() => {
@@ -663,7 +677,7 @@ export const ClientProfileView = ({
         )
       );
     } catch (error: any) {
-      toast.error(error.message || 'Error al actualizar el checklist');
+      toast.error(error.message || 'Error al actualizar el seguimiento');
     }
   };
 
@@ -832,12 +846,30 @@ export const ClientProfileView = ({
   };
 
   const displayClient = clientSnapshot ?? client;
-  const accountStatusStyle =
-    displayClient.status === 'active'
-      ? { label: 'Activo', bg: '#16a34a' }
-      : displayClient.status === 'inactive'
-        ? { label: 'Inactivo', bg: '#64748b' }
-        : { label: 'Pendiente', bg: '#ca8a04' };
+  const statusMeta = STATUS_META[displayClient.status] ?? STATUS_META.pending;
+  const isTitular = !displayClient.parentClientId;
+  const contactLine = [
+    displayClient.email?.trim(),
+    displayClient.phone?.trim() ? formatPhoneOptional(displayClient.phone, '') : '',
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  const profileTabs: TabBarItem[] = [
+    { id: 'resumen', label: 'Resumen' },
+    { id: 'checklist', label: 'Seguimiento' },
+    { id: 'notas', label: 'Notas' },
+    { id: 'citas', label: 'Citas' },
+    ...(isTitular ? [{ id: 'pagos', label: 'Pagos' }] : []),
+    { id: 'formularios', label: 'Formularios' },
+    can('quotes.view')
+      ? { id: 'cotizaciones', label: 'Cotizaciones' }
+      : {
+          id: 'cotizaciones',
+          label: 'Cotizaciones',
+          disabled: true,
+          title: 'No tienes permiso para ver cotizaciones',
+        },
+  ];
   const formatYmdDate = (value?: string | null) => {
     if (!value) return 'Sin fecha';
     const normalized = value.length >= 10 ? value.slice(0, 10) : value;
@@ -917,9 +949,9 @@ export const ClientProfileView = ({
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="flex min-h-[40vh] items-center justify-center">
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent" />
           <p className="text-muted-foreground">Cargando datos del cliente...</p>
         </div>
       </div>
@@ -928,67 +960,54 @@ export const ClientProfileView = ({
 
   return (
     <>
-    <div className="min-h-screen bg-background">
-      <div className="max-w-7xl mx-auto p-6 space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={onBack}>
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-            <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center">
-                <User className="w-8 h-8 text-primary" />
+    <div className="mx-auto max-w-[1600px] p-4 sm:p-6 lg:p-8">
+      <Button type="button" variant="ghost" onClick={onBack} className="gap-2">
+        <ArrowLeft className="size-4" />
+        Volver a clientes
+      </Button>
+
+      <div className="mt-4 grid gap-4 xl:grid-cols-[1fr_360px]">
+        <div className="min-w-0 space-y-4">
+          <Card className="p-5">
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="grid size-14 shrink-0 place-items-center rounded-full bg-secondary/30 font-display text-lg font-bold text-secondary-foreground">
+                {initialsFromName(displayClient.name)}
               </div>
-              <div>
-                <h1 className="text-2xl font-bold text-foreground">
-                  {client.name}
-                </h1>
-                <Badge
-                  variant="secondary"
-                  className="gap-1.5 border-transparent"
-                  style={{
-                    backgroundColor: accountStatusStyle.bg,
-                    color: contrastTextColor(accountStatusStyle.bg),
-                  }}
-                >
-                  {accountStatusStyle.label}
-                </Badge>
-                {displayClient.parentClientId && (
-                  <p className="text-sm text-muted-foreground mt-2">
-                    Estas viendo un cliente hijo, no el cliente principal.
+              <div className="min-w-0">
+                <h2 className="font-display text-xl font-semibold">{displayClient.name}</h2>
+                {contactLine ? (
+                  <p className="mt-0.5 text-xs text-muted-foreground">{contactLine}</p>
+                ) : null}
+                {displayClient.parentClientId ? (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Estás viendo un cliente hijo, no el cliente principal.
                   </p>
-                )}
+                ) : null}
+              </div>
+              <StatusBadge tone={statusMeta.tone}>{statusMeta.label}</StatusBadge>
+              <div className="ml-auto flex flex-wrap items-center gap-2">
+                {isTitular ? (
+                  <Button type="button" onClick={onCreateChild} variant="outline" className="gap-2">
+                    <Plus className="size-4" />
+                    Agregar familiar
+                  </Button>
+                ) : null}
+                <Button type="button" onClick={onEdit} variant="outline" className="gap-2">
+                  <Pencil className="size-4" />
+                  Editar
+                </Button>
               </div>
             </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {!displayClient.parentClientId && (
-              <Button onClick={onCreateChild} variant="outline" className="gap-2">
-                <Plus className="w-4 h-4" />
-                Agregar familiar
-              </Button>
-            )}
-            <Button onClick={onEdit} variant="outline" className="gap-2">
-              <Edit2 className="w-4 h-4" />
-              Editar
-            </Button>
-          </div>
-        </div>
+          </Card>
 
-        {/* Main Content - Two Columns */}
-        <div className="grid lg:grid-cols-2 gap-6">
-          {/* Left Column - Info, checklist, notes, payments, forms */}
-          <div className="space-y-6">
-            <Accordion type="multiple" defaultValue={['info']} className="w-full rounded-lg border border-border/50 bg-card px-4 shadow-sm">
-              <AccordionItem value="info">
-                <AccordionTrigger className="text-base">
-                  <span className="flex items-center gap-2">
-                    <User className="w-5 h-5 text-primary" />
-                    Información del Cliente
-                  </span>
-                </AccordionTrigger>
-                <AccordionContent>
+          <TabBar
+            tabs={profileTabs}
+            value={activeTab}
+            onChange={(id) => setActiveTab(id as ProfileTabId)}
+          />
+
+          <div hidden={activeTab !== 'resumen'}>
+            <Card className="p-5">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
                     {infoItems.map((item, index) => (
                       <div
@@ -1106,50 +1125,28 @@ export const ClientProfileView = ({
                       </div>
                     </>
                   )}
-                </AccordionContent>
-              </AccordionItem>
+            </Card>
+          </div>
 
-              <AccordionItem value="checklist">
-                <AccordionTrigger className="text-base">
-                  <span className="flex items-center gap-2">
-                    <ListChecks className="w-5 h-5 text-primary" />
-                    Checklist
-                  </span>
-                </AccordionTrigger>
-                <AccordionContent>
-                  <ClientChecklist
-                    clientId={client.id}
-                    items={checklist}
-                    onToggle={handleToggleChecklist}
-                  />
-                </AccordionContent>
-              </AccordionItem>
+          <div hidden={activeTab !== 'checklist'}>
+            <ClientChecklist
+              clientId={client.id}
+              items={checklist}
+              onToggle={handleToggleChecklist}
+            />
+          </div>
 
-              <AccordionItem value="notes">
-                <AccordionTrigger className="text-base">
-                  <span className="flex items-center gap-2">
-                    <NotebookPen className="w-5 h-5 text-primary" />
-                    Notas del cliente
-                  </span>
-                </AccordionTrigger>
-                <AccordionContent>
-                  <ClientNotes
-                    clientId={client.id}
-                    notes={clientNotes}
-                    onAddNote={handleAddNote}
-                    onDeleteNote={handleDeleteNote}
-                  />
-                </AccordionContent>
-              </AccordionItem>
+          <div hidden={activeTab !== 'notas'}>
+            <ClientNotes
+              clientId={client.id}
+              notes={clientNotes}
+              onAddNote={handleAddNote}
+              onDeleteNote={handleDeleteNote}
+            />
+          </div>
 
-              <AccordionItem value="internal-appointments">
-                <AccordionTrigger className="text-base">
-                  <span className="flex items-center gap-2">
-                    <Calendar className="w-5 h-5 text-primary" />
-                    Proximas citas nuestras
-                  </span>
-                </AccordionTrigger>
-                <AccordionContent>
+          <div hidden={activeTab !== 'citas'}>
+            <Card className="p-5">
                   <div className="space-y-4">
                     <div className="rounded-lg border border-border/60 bg-card p-4 space-y-3 shadow-sm">
                       <p className="text-sm font-medium text-foreground">Agendar cita a oficina</p>
@@ -1260,42 +1257,28 @@ export const ClientProfileView = ({
                       )}
                     </div>
                   </div>
-                </AccordionContent>
-              </AccordionItem>
+            </Card>
+          </div>
 
-              {!displayClient.parentClientId && (
-                <AccordionItem value="payments">
-                  <AccordionTrigger className="text-base">
-                    <span className="flex items-center gap-2">
-                      <Wallet className="w-5 h-5 text-primary" />
-                      Pagos e historial
-                    </span>
-                  </AccordionTrigger>
-                  <AccordionContent>
-                    <ClientPaymentHistory
-                      clientId={client.id}
-                      totalAmountDue={clientSnapshot.totalAmountDue}
-                      onUpdateTotalAmountDue={handleUpdateTotalAmountDue}
-                      payments={payments}
-                      amountDueHistory={amountDueHistory}
-                      paymentDeletedHistory={paymentDeletedHistory}
-                      onAddPayment={handleAddPayment}
-                      onDeletePayment={canDeletePayments ? handleDeletePayment : undefined}
-                      onPaymentReceiptUpdated={handlePaymentReceiptUpdated}
-                      familyMembers={displayClient.children ?? []}
-                    />
-                  </AccordionContent>
-                </AccordionItem>
-              )}
+          {isTitular ? (
+            <div hidden={activeTab !== 'pagos'}>
+              <ClientPaymentHistory
+                clientId={client.id}
+                totalAmountDue={clientSnapshot.totalAmountDue}
+                onUpdateTotalAmountDue={handleUpdateTotalAmountDue}
+                payments={payments}
+                amountDueHistory={amountDueHistory}
+                paymentDeletedHistory={paymentDeletedHistory}
+                onAddPayment={handleAddPayment}
+                onDeletePayment={canDeletePayments ? handleDeletePayment : undefined}
+                onPaymentReceiptUpdated={handlePaymentReceiptUpdated}
+                familyMembers={displayClient.children ?? []}
+              />
+            </div>
+          ) : null}
 
-              <AccordionItem value="forms">
-                <AccordionTrigger className="text-base">
-                  <span className="flex items-center gap-2">
-                    <FileText className="w-5 h-5 text-primary" />
-                    Información de Formularios
-                  </span>
-                </AccordionTrigger>
-                <AccordionContent>
+          <div hidden={activeTab !== 'formularios'}>
+            <Card className="p-5">
                   <div className="space-y-4">
                     <div className="rounded-lg border border-border/60 bg-card p-4 space-y-3 shadow-sm">
                       <p className="text-sm font-medium text-foreground">Asignar formulario al cliente</p>
@@ -1344,21 +1327,27 @@ export const ClientProfileView = ({
 
                     <ClientFormData submissions={submissions} />
                   </div>
-                </AccordionContent>
-              </AccordionItem>
-            </Accordion>
+            </Card>
           </div>
 
-          {/* Right Column - Chat */}
-          <div className="lg:sticky lg:top-6 lg:h-[calc(100vh-7rem)]">
+          {can('quotes.view') ? (
+            <div hidden={activeTab !== 'cotizaciones'}>
+              <Card className="p-5">
+                <ClientQuotes clientId={displayClient.id} clientName={displayClient.name} />
+              </Card>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="flex h-[520px] min-h-0 flex-col xl:sticky xl:top-6 xl:h-[calc(100vh-8rem)]">
             {displayClient.parentClientId ? (
-              <Card className="border-border/50">
+              <Card className="h-full border-border/50">
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Chat no disponible</CardTitle>
+                  <CardTitle className="font-display text-base">Chat no disponible</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-muted-foreground">
-                    El chat solo esta disponible para clientes principales.
+                    El chat solo está disponible para clientes principales.
                   </p>
                 </CardContent>
               </Card>
@@ -1374,7 +1363,6 @@ export const ClientProfileView = ({
                 onToggleConversationPause={handleToggleConversationPause}
               />
             )}
-          </div>
         </div>
       </div>
     </div>

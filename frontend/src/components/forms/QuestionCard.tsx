@@ -130,7 +130,7 @@ export const QuestionCard = ({ question, sectionId, onUpdate, onDelete, allQuest
     if (!visibility) return null;
 
     return (
-      <div className="space-y-3 p-4 border border-border/50 rounded-xl bg-muted/20">
+      <div className="space-y-3 rounded-md border border-border/50 bg-muted/20 p-4">
         <div className="flex items-center justify-between gap-3">
           <div className="space-y-0.5">
             <p className="text-sm font-medium text-foreground">Mostrar si</p>
@@ -170,7 +170,7 @@ export const QuestionCard = ({ question, sectionId, onUpdate, onDelete, allQuest
               const parentQuestion = allQuestions.find(q => q.id === rule.dependsOnQuestionId) ?? null;
 
               return (
-                <div key={`${rule.dependsOnQuestionId}-${ruleIndex}`} className="space-y-3 p-3 rounded-lg border border-border/40 bg-background">
+                <div key={`${rule.dependsOnQuestionId}-${ruleIndex}`} className="space-y-3 rounded-md border border-border/40 bg-background p-3">
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <p className="text-xs text-muted-foreground mb-1">Pregunta padre</p>
@@ -216,7 +216,7 @@ export const QuestionCard = ({ question, sectionId, onUpdate, onDelete, allQuest
                           <label
                             key={opt.id}
                             className={cn(
-                              'flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-colors',
+                              'flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 transition-colors',
                               rule.optionIds.includes(opt.id)
                                 ? 'border-primary bg-primary/5'
                                 : 'border-border hover:border-primary/40'
@@ -289,9 +289,9 @@ export const QuestionCard = ({ question, sectionId, onUpdate, onDelete, allQuest
       ref={setNodeRef}
       style={style}
       className={cn(
-        'bg-card rounded-xl border border-border p-5 shadow-card transition-all duration-200',
-        'hover:shadow-card-hover hover:border-primary/30',
-        isDragging && 'opacity-50 shadow-xl scale-[1.02] z-50'
+        'rounded-md border border-border bg-card p-4 shadow-sm transition-all duration-200',
+        'hover:border-primary/30',
+        isDragging && 'z-50 scale-[1.02] opacity-50 shadow-lg'
       )}
     >
       <div className="flex items-start gap-4">

@@ -26,7 +26,7 @@ export const ClientChecklist = ({ clientId, items, onToggle }: ClientChecklistPr
         <div className="flex items-center justify-between">
           <CardTitle className="text-base flex items-center gap-2">
             <CheckSquare className="w-5 h-5 text-primary" />
-            Checklist de Acciones
+            Seguimiento de acciones
           </CardTitle>
           <span className="text-sm text-muted-foreground">
             {completedCount}/{items.length}

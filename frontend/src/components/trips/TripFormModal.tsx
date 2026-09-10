@@ -162,7 +162,7 @@ export const TripFormModal = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md max-h-[90vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle className="text-xl">{isEditing ? 'Editar viaje' : 'Nuevo viaje'}</DialogTitle>
+          <DialogTitle className="font-display text-xl">{isEditing ? 'Editar viaje' : 'Nuevo viaje'}</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 mt-4">

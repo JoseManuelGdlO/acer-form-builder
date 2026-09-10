@@ -6,8 +6,9 @@ import { api } from '@/lib/api';
 import { UserCard } from './UserCard';
 import { UserFormModal, type RoleOption } from './UserFormModal';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Plus, Search, Users, Shield, Eye } from 'lucide-react';
+import { Card } from '@/components/ui/card';
+import { Toolbar } from '@/components/layout/Toolbar';
+import { Plus, Users, Loader2 } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,7 +21,7 @@ import {
 } from '@/components/ui/alert-dialog';
 
 export function UserList() {
-  const { users, addUser, updateUser, deleteUser, toggleUserStatus, fetchUsers } = useUserStore();
+  const { users, addUser, updateUser, deleteUser, toggleUserStatus, fetchUsers, isLoading } = useUserStore();
   const { token } = useAuth();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -117,60 +118,61 @@ export function UserList() {
     }
   };
 
+  const openNew = () => {
+    setEditingUser(null);
+    setIsModalOpen(true);
+  };
+
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-card border rounded-lg p-4 flex items-center gap-3">
-          <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-            <Users className="h-5 w-5 text-primary" />
-          </div>
-          <div>
-            <p className="text-2xl font-bold">{users.length}</p>
-            <p className="text-sm text-muted-foreground">Total usuarios</p>
-          </div>
-        </div>
-        <div className="bg-card border rounded-lg p-4 flex items-center gap-3">
-          <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-            <Shield className="h-5 w-5 text-primary" />
-          </div>
-          <div>
-            <p className="text-2xl font-bold">{superAdminCount}</p>
-            <p className="text-sm text-muted-foreground">Super administradores</p>
-          </div>
-        </div>
-        <div className="bg-card border rounded-lg p-4 flex items-center gap-3">
-          <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center">
-            <Eye className="h-5 w-5 text-secondary-foreground" />
-          </div>
-          <div>
-            <p className="text-2xl font-bold">{reviewerCount}</p>
-            <p className="text-sm text-muted-foreground">Revisores (plantilla)</p>
-          </div>
-        </div>
+    <div className="mx-auto max-w-[1600px] p-4 sm:p-6 lg:p-8">
+      <div className="mb-5 grid gap-4 sm:grid-cols-3">
+        <Card className="p-5">
+          <p className="text-xs text-muted-foreground">Total usuarios</p>
+          <p className="mt-2 font-display text-2xl font-semibold">{users.length}</p>
+        </Card>
+        <Card className="p-5">
+          <p className="text-xs text-muted-foreground">Super administradores</p>
+          <p className="mt-2 font-display text-2xl font-semibold">{superAdminCount}</p>
+        </Card>
+        <Card className="p-5">
+          <p className="text-xs text-muted-foreground">Revisores (plantilla)</p>
+          <p className="mt-2 font-display text-2xl font-semibold">{reviewerCount}</p>
+        </Card>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-4 justify-between">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar usuarios..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
-          />
-        </div>
-        <Button onClick={() => setIsModalOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Nuevo Usuario
+      <Toolbar search={searchQuery} onSearchChange={setSearchQuery} placeholder="Buscar usuarios…">
+        <Button type="button" onClick={openNew}>
+          <Plus />
+          Nuevo usuario
         </Button>
-      </div>
+      </Toolbar>
 
-      {filteredUsers.length === 0 ? (
-        <div className="text-center py-12 text-muted-foreground">
-          {searchQuery ? 'No se encontraron usuarios' : 'No hay usuarios registrados'}
+      {isLoading && users.length === 0 ? (
+        <div className="flex justify-center py-16">
+          <Loader2 className="size-8 animate-spin text-primary" />
+        </div>
+      ) : filteredUsers.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-border py-16 text-center">
+          <div className="mx-auto mb-4 flex size-16 items-center justify-center rounded-full bg-muted/50">
+            <Users className="size-8 text-muted-foreground" />
+          </div>
+          <h3 className="mb-1 font-display text-lg font-semibold text-foreground">
+            {searchQuery ? 'Sin resultados' : 'No hay usuarios registrados'}
+          </h3>
+          <p className="mb-4 text-sm text-muted-foreground">
+            {searchQuery
+              ? 'No se encontraron usuarios con ese término'
+              : 'Crea el primero para dar acceso al equipo'}
+          </p>
+          {!searchQuery ? (
+            <Button type="button" onClick={openNew}>
+              <Plus />
+              Nuevo usuario
+            </Button>
+          ) : null}
         </div>
       ) : (
-        <div className="grid gap-4">
+        <div className="grid gap-4 md:grid-cols-2">
           {filteredUsers.map((user) => (
             <UserCard
               key={user.id}
@@ -195,7 +197,7 @@ export function UserList() {
       <AlertDialog open={!!deletingUserId} onOpenChange={() => setDeletingUserId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar usuario?</AlertDialogTitle>
+            <AlertDialogTitle className="font-display">¿Eliminar usuario?</AlertDialogTitle>
             <AlertDialogDescription>
               Esta acción no se puede deshacer. El usuario será eliminado permanentemente.
             </AlertDialogDescription>

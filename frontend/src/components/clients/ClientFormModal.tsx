@@ -228,7 +228,7 @@ export const ClientFormModal = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-xl">
+          <DialogTitle className="font-display text-xl font-semibold">
             {isEditing ? 'Editar Cliente' : isFamilyMode ? 'Nuevo Familiar' : 'Nuevo Cliente'}
           </DialogTitle>
         </DialogHeader>

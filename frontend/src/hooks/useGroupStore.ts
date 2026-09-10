@@ -37,6 +37,12 @@ function mapGroup(raw: any): Group {
     createdAt: new Date(raw.created_at ?? raw.createdAt ?? Date.now()),
     updatedAt: new Date(raw.updated_at ?? raw.updatedAt ?? Date.now()),
     clients,
+    assignedTrips: Array.isArray(raw.assignedTrips || raw.assigned_trips)
+      ? (raw.assignedTrips || raw.assigned_trips).map((trip: { id: string; title?: string }) => ({
+          id: trip.id,
+          title: trip.title ?? '',
+        }))
+      : [],
   };
 }
 

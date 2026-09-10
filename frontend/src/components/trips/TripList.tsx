@@ -1,24 +1,21 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { Trip, TripInvitation, Client, StaffMember, BusTemplate, TripIncome, TripExpense, TripFinanceSummary } from '@/types/form';
 import type { Hotel } from '@/types/hotel';
 import { TripCard } from './TripCard';
+import { TripCalendar } from './TripCalendar';
 import { TripDetailView } from './TripDetailView';
 import { TripFormModal, type TripFormSaveData } from './TripFormModal';
 import { BusTemplateList } from './BusTemplateList';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { MapPin, Plus, Search, Mail, Calendar as CalendarIcon, Check, X, List, CalendarDays, Bus, Users } from 'lucide-react';
+import { Card } from '@/components/ui/card';
+import { Toolbar } from '@/components/layout/Toolbar';
+import { SectionTitle } from '@/components/layout/SectionTitle';
+import { MapPin, Plus, Mail, Calendar as CalendarIcon, Check, X, Bus, BriefcaseBusiness } from 'lucide-react';
 import { toast } from 'sonner';
 import { SeatPickerModal } from './SeatPickerModal';
 import { StaffCatalogView } from './StaffCatalogView';
-import { format, startOfWeek, getDay, endOfDay, parseISO } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Calendar, dateFnsLocalizer } from 'react-big-calendar';
-import type { Event } from 'react-big-calendar';
-import 'react-big-calendar/lib/css/react-big-calendar.css';
-
-const localizer = dateFnsLocalizer({ format, startOfWeek, getDay, locales: { es } });
 
 interface TripListProps {
   trips: Trip[];
@@ -87,6 +84,13 @@ interface TripListProps {
   onDetachTripHotel?: (tripId: string, tripHotelId: string) => Promise<void>;
   onAssignTripHotelRoom?: (tripId: string, tripHotelId: string, roomId: string, participantId: string) => Promise<void>;
   onClearTripHotelRoomAssignment?: (tripId: string, tripHotelId: string, roomId: string, participantId: string) => Promise<void>;
+  searchQuery?: string;
+  onSearchChange?: (value: string) => void;
+  /** Incrementar desde el CTA del header para abrir TripFormModal. */
+  createOpenSignal?: number;
+  openTripId?: string | null;
+  onOpenTripConsumed?: () => void;
+  users?: Array<{ id: string; name: string }>;
 }
 
 export const TripList = ({
@@ -133,8 +137,17 @@ export const TripList = ({
   onDetachTripHotel,
   onAssignTripHotelRoom,
   onClearTripHotelRoomAssignment,
+  searchQuery: searchQueryProp,
+  onSearchChange,
+  createOpenSignal,
+  openTripId = null,
+  onOpenTripConsumed,
+  users = [],
 }: TripListProps) => {
-  const [searchQuery, setSearchQuery] = useState('');
+  const [internalSearchQuery, setInternalSearchQuery] = useState('');
+  const searchQuery = searchQueryProp ?? internalSearchQuery;
+  const setSearchQuery = onSearchChange ?? setInternalSearchQuery;
+  const lastCreateOpenSignal = useRef(createOpenSignal);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingTrip, setEditingTrip] = useState<Trip | null>(null);
   const [viewingTripId, setViewingTripId] = useState<string | null>(null);
@@ -142,6 +155,21 @@ export const TripList = ({
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
   const [showBusTemplates, setShowBusTemplates] = useState(false);
   const [showStaffCatalog, setShowStaffCatalog] = useState(false);
+
+  useEffect(() => {
+    if (createOpenSignal == null) return;
+    if (lastCreateOpenSignal.current === createOpenSignal) return;
+    lastCreateOpenSignal.current = createOpenSignal;
+    setEditingTrip(null);
+    setIsFormOpen(true);
+  }, [createOpenSignal]);
+
+  useEffect(() => {
+    if (!openTripId) return;
+    onFetchTrip?.(openTripId);
+    setViewingTripId(openTripId);
+    onOpenTripConsumed?.();
+  }, [openTripId, onFetchTrip, onOpenTripConsumed]);
 
   const filteredTrips = useMemo(() => {
     if (!searchQuery.trim()) return trips;
@@ -157,21 +185,6 @@ export const TripList = ({
     () => (viewingTripId ? trips.find(t => t.id === viewingTripId) ?? null : null),
     [trips, viewingTripId]
   );
-
-  const calendarEvents = useMemo((): Event<Trip>[] => {
-    const out: Event<Trip>[] = [];
-    for (const trip of filteredTrips) {
-      const titleBase = trip.destination ? `${trip.title} — ${trip.destination}` : trip.title;
-      out.push({
-        id: trip.id,
-        title: titleBase,
-        start: parseISO(trip.departureDate),
-        end: endOfDay(parseISO(trip.returnDate)),
-        resource: trip,
-      });
-    }
-    return out;
-  }, [filteredTrips]);
 
   const handleSaveTrip = async (data: TripFormSaveData) => {
     try {
@@ -220,6 +233,25 @@ export const TripList = ({
     setViewingTripId(tripId);
   };
 
+  const seatPicker = seatPickerTrip ? (
+    <SeatPickerModal
+      trip={trips.find(t => t.id === seatPickerTrip.id) ?? seatPickerTrip}
+      open={!!seatPickerTrip}
+      onOpenChange={open => { if (!open) setSeatPickerTrip(null); }}
+      onAssign={async (participantId, seat) => {
+        await onSetSeatAssignment(seatPickerTrip.id, participantId, seat);
+      }}
+      onClear={async (opts) => {
+        await onClearSeatAssignment(seatPickerTrip.id, opts);
+      }}
+      onReset={async () => {
+        await onResetSeatAssignments(seatPickerTrip.id);
+      }}
+      reviewerSeatMode={reviewerMode}
+      onUpdateTemplateSeatLabel={onUpdateTemplateSeatLabel && !reviewerMode ? (tripId, templateId, seatId, label) => onUpdateTemplateSeatLabel(tripId, templateId, seatId, label) : undefined}
+    />
+  ) : null;
+
   if (!reviewerMode && showBusTemplates && onCreateBusTemplate && onUpdateBusTemplate && onDeleteBusTemplate) {
     return (
       <BusTemplateList
@@ -253,6 +285,7 @@ export const TripList = ({
           companiesForInvite={companiesForInvite}
           changeLog={changeLog.filter(e => e.tripId === viewingTrip.id)}
           reviewerMode={reviewerMode}
+          users={users}
           onBack={() => {
             setViewingTripId(null);
             setSeatPickerTrip(null);
@@ -335,257 +368,195 @@ export const TripList = ({
               : undefined
           }
         />
-        {seatPickerTrip && (
-          <SeatPickerModal
-            trip={trips.find(t => t.id === seatPickerTrip.id) ?? seatPickerTrip}
-            open={!!seatPickerTrip}
-            onOpenChange={open => { if (!open) setSeatPickerTrip(null); }}
-            onAssign={async (participantId, seat) => {
-              await onSetSeatAssignment(seatPickerTrip.id, participantId, seat);
-            }}
-            onClear={async (opts) => {
-              await onClearSeatAssignment(seatPickerTrip.id, opts);
-            }}
-            onReset={async () => {
-              await onResetSeatAssignments(seatPickerTrip.id);
-            }}
-            reviewerSeatMode={reviewerMode}
-            onUpdateTemplateSeatLabel={onUpdateTemplateSeatLabel && !reviewerMode ? (tripId, templateId, seatId, label) => onUpdateTemplateSeatLabel(tripId, templateId, seatId, label) : undefined}
-          />
-        )}
+        {seatPicker}
       </>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-5xl mx-auto p-6 space-y-6">
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">Viajes</h1>
-            <p className="text-muted-foreground mt-1">
-              {reviewerMode
-                ? 'Consulta viajes, participantes y asientos'
-                : 'Gestiona viajes, invitaciones y asientos'}
-            </p>
-          </div>
-          {!reviewerMode && (
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setShowStaffCatalog(true)} className="gap-2">
-                <Users className="w-4 h-4" />
-                Staff
-              </Button>
-              <Button variant="outline" onClick={() => setShowBusTemplates(true)} className="gap-2">
-                <Bus className="w-4 h-4" />
-                Mis camiones
-              </Button>
-              <Button onClick={() => { setEditingTrip(null); setIsFormOpen(true); }} className="gap-2">
-                <Plus className="w-4 h-4" />
-                Nuevo viaje
-              </Button>
-            </div>
-          )}
-        </div>
-
-        {!reviewerMode && invitations.length > 0 && (
-          <Card className="border-primary/30">
-            <CardContent className="p-4">
-              <h2 className="font-semibold text-lg mb-3">Invitaciones pendientes</h2>
-              <div className="space-y-3">
-                {invitations.map(inv => (
-                  <div
-                    key={inv.id}
-                    className="flex items-center justify-between gap-4 p-3 rounded-lg bg-muted/40 border"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium">{inv.trip?.title ?? 'Viaje'}</p>
-                      {inv.trip?.destination && (
-                        <p className="text-sm text-muted-foreground flex items-center gap-1">
-                          <MapPin className="w-3.5 h-3.5" />
-                          {inv.trip.destination}
-                        </p>
-                      )}
-                      {inv.trip?.departureDate &&
-                        inv.trip?.returnDate && (
-                          <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
-                            <CalendarIcon className="w-3.5 h-3.5" />
-                            {format(parseISO(inv.trip.departureDate), 'd MMM yyyy', { locale: es })} –{' '}
-                            {format(parseISO(inv.trip.returnDate), 'd MMM yyyy', { locale: es })}
-                          </p>
-                        )}
-                      {inv.invitedBy && (
-                        <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
-                          <Mail className="w-3.5 h-3.5" />
-                          Invitado por: {inv.invitedBy.name}
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex gap-2 shrink-0">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="gap-1 text-destructive hover:text-destructive"
-                        onClick={async () => {
-                          try {
-                            await onRejectInvitation(inv.id);
-                            toast.success('Invitación rechazada');
-                          } catch (e: any) {
-                            toast.error(e.message);
-                          }
-                        }}
-                      >
-                        <X className="w-4 h-4" />
-                        Rechazar
-                      </Button>
-                      <Button
-                        size="sm"
-                        className="gap-1"
-                        onClick={async () => {
-                          try {
-                            await onAcceptInvitation(inv.id);
-                            toast.success('Invitación aceptada');
-                          } catch (e: any) {
-                            toast.error(e.message);
-                          }
-                        }}
-                      >
-                        <Check className="w-4 h-4" />
-                        Aceptar
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-            <Input
-              placeholder="Buscar por título o destino..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className="pl-10 h-12"
-            />
-          </div>
-          <div className="flex rounded-lg border p-1 bg-muted/30">
-            <Button
-              variant={viewMode === 'list' ? 'default' : 'ghost'}
-              size="sm"
-              className="gap-1.5"
-              onClick={() => setViewMode('list')}
-            >
-              <List className="w-4 h-4" />
-              Lista
-            </Button>
-            <Button
-              variant={viewMode === 'calendar' ? 'default' : 'ghost'}
-              size="sm"
-              className="gap-1.5"
-              onClick={() => setViewMode('calendar')}
-            >
-              <CalendarDays className="w-4 h-4" />
-              Calendario
-            </Button>
-          </div>
-        </div>
-
-        {viewMode === 'calendar' ? (
-          <div className="rounded-lg border bg-card overflow-hidden" style={{ height: 500 }}>
-            <Calendar
-              localizer={localizer}
-              events={calendarEvents}
-              startAccessor="start"
-              endAccessor="end"
-              onSelectEvent={(event) => handleViewTrip((event.resource as Trip).id)}
-              views={['month', 'agenda']}
-              defaultView="month"
-              messages={{
-                next: 'Sig',
-                previous: 'Ant',
-                today: 'Hoy',
-                month: 'Mes',
-                agenda: 'Agenda',
-                date: 'Fecha',
-                time: 'Hora',
-                event: 'Viaje',
-                noEventsInRange: 'No hay viajes en este rango',
-              }}
-            />
-          </div>
-        ) : filteredTrips.length === 0 ? (
-          <div className="text-center py-16">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted/50 flex items-center justify-center">
-              <MapPin className="w-8 h-8 text-muted-foreground" />
-            </div>
-            <h3 className="text-lg font-medium text-foreground mb-1">No hay viajes</h3>
-            <p className="text-muted-foreground mb-4">
-              {searchQuery
-                ? 'No se encontraron viajes con ese criterio'
-                : reviewerMode
-                  ? 'Aún no hay viajes registrados'
-                  : 'Crea un viaje para gestionar fechas, participantes y asientos'}
-            </p>
-            {!searchQuery && !reviewerMode && (
-              <Button onClick={() => { setEditingTrip(null); setIsFormOpen(true); }} className="gap-2">
-                <Plus className="w-4 h-4" />
-                Nuevo viaje
-              </Button>
-            )}
-          </div>
-        ) : (
+    <div className="mx-auto max-w-[1600px] p-4 sm:p-6 lg:p-8">
+      {!reviewerMode && invitations.length > 0 ? (
+        <Card className="mb-5 p-5">
+          <SectionTitle title="Invitaciones pendientes" />
           <div className="space-y-3">
-            {filteredTrips.map((trip) => (
-              <TripCard
-                key={trip.id}
-                trip={trip}
-                readOnly={reviewerMode}
-                onView={() => handleViewTrip(trip.id)}
-                onEdit={() => {
-                  setEditingTrip(trip);
-                  setIsFormOpen(true);
-                }}
-                onDelete={() => handleDelete(trip.id)}
-              />
+            {invitations.map((inv) => (
+              <div
+                key={inv.id}
+                className="flex flex-wrap items-center justify-between gap-4 rounded-md bg-muted/70 p-3"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="font-display font-semibold">{inv.trip?.title ?? 'Viaje'}</p>
+                  {inv.trip?.destination ? (
+                    <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+                      <MapPin className="size-3.5" />
+                      {inv.trip.destination}
+                    </p>
+                  ) : null}
+                  {inv.trip?.departureDate && inv.trip?.returnDate ? (
+                    <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                      <CalendarIcon className="size-3.5" />
+                      {format(parseISO(inv.trip.departureDate), 'd MMM yyyy', { locale: es })} –{' '}
+                      {format(parseISO(inv.trip.returnDate), 'd MMM yyyy', { locale: es })}
+                    </p>
+                  ) : null}
+                  {inv.invitedBy ? (
+                    <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                      <Mail className="size-3.5" />
+                      Invitado por: {inv.invitedBy.name}
+                    </p>
+                  ) : null}
+                </div>
+                <div className="flex shrink-0 gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="text-destructive hover:text-destructive"
+                    onClick={async () => {
+                      try {
+                        await onRejectInvitation(inv.id);
+                        toast.success('Invitación rechazada');
+                      } catch (e: any) {
+                        toast.error(e.message);
+                      }
+                    }}
+                  >
+                    <X />
+                    Rechazar
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={async () => {
+                      try {
+                        await onAcceptInvitation(inv.id);
+                        toast.success('Invitación aceptada');
+                      } catch (e: any) {
+                        toast.error(e.message);
+                      }
+                    }}
+                  >
+                    <Check />
+                    Aceptar
+                  </Button>
+                </div>
+              </div>
             ))}
           </div>
-        )}
+        </Card>
+      ) : null}
 
-        {!reviewerMode && (
-          <TripFormModal
-            trip={editingTrip}
-            open={isFormOpen}
-            onOpenChange={open => {
-              setIsFormOpen(open);
-              if (!open) setEditingTrip(null);
-            }}
-            onSave={handleSaveTrip}
-            companiesForInvite={companiesForInvite}
-            busTemplates={busTemplates}
-          />
-        )}
-
-        {seatPickerTrip && (
-          <SeatPickerModal
-            trip={trips.find(t => t.id === seatPickerTrip.id) ?? seatPickerTrip}
-            open={!!seatPickerTrip}
-            onOpenChange={open => { if (!open) setSeatPickerTrip(null); }}
-            onAssign={async (participantId, seat) => {
-              await onSetSeatAssignment(seatPickerTrip.id, participantId, seat);
-            }}
-            onClear={async (opts) => {
-              await onClearSeatAssignment(seatPickerTrip.id, opts);
-            }}
-            onReset={async () => {
-              await onResetSeatAssignments(seatPickerTrip.id);
-            }}
-            reviewerSeatMode={reviewerMode}
-            onUpdateTemplateSeatLabel={onUpdateTemplateSeatLabel && !reviewerMode ? (tripId, templateId, seatId, label) => onUpdateTemplateSeatLabel(tripId, templateId, seatId, label) : undefined}
-          />
-        )}
+      <div className="mb-5 flex flex-wrap gap-2">
+        <Button
+          type="button"
+          variant={viewMode === 'list' ? 'default' : 'outline'}
+          onClick={() => setViewMode('list')}
+        >
+          Lista
+        </Button>
+        <Button
+          type="button"
+          variant={viewMode === 'calendar' ? 'default' : 'outline'}
+          onClick={() => setViewMode('calendar')}
+        >
+          Calendario
+        </Button>
+        {!reviewerMode ? (
+          <>
+            <Button type="button" variant="outline" onClick={() => setShowStaffCatalog(true)}>
+              <BriefcaseBusiness />
+              Staff
+            </Button>
+            <Button type="button" variant="outline" onClick={() => setShowBusTemplates(true)}>
+              <Bus />
+              Mis camiones
+            </Button>
+          </>
+        ) : null}
       </div>
+
+      <Toolbar
+        search={searchQuery}
+        onSearchChange={setSearchQuery}
+        placeholder="Buscar por título o destino…"
+      >
+        {!reviewerMode ? (
+          <Button
+            type="button"
+            onClick={() => {
+              setEditingTrip(null);
+              setIsFormOpen(true);
+            }}
+          >
+            <Plus />
+            Nuevo viaje
+          </Button>
+        ) : null}
+      </Toolbar>
+
+      {viewMode === 'calendar' ? (
+        <TripCalendar trips={filteredTrips} onSelectTrip={handleViewTrip} />
+      ) : filteredTrips.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-border py-16 text-center">
+          <div className="mx-auto mb-4 flex size-16 items-center justify-center rounded-full bg-muted/50">
+            <MapPin className="size-8 text-muted-foreground" />
+          </div>
+          <h3 className="mb-1 font-display text-lg font-semibold text-foreground">
+            {searchQuery ? 'Sin resultados' : 'No hay viajes'}
+          </h3>
+          <p className="mb-4 text-sm text-muted-foreground">
+            {searchQuery
+              ? 'No se encontraron viajes con ese criterio'
+              : reviewerMode
+                ? 'Aún no hay viajes registrados'
+                : 'Crea un viaje para gestionar fechas, participantes y asientos'}
+          </p>
+          {!searchQuery && !reviewerMode ? (
+            <Button
+              type="button"
+              onClick={() => {
+                setEditingTrip(null);
+                setIsFormOpen(true);
+              }}
+            >
+              <Plus />
+              Nuevo viaje
+            </Button>
+          ) : null}
+        </div>
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {filteredTrips.map((trip) => (
+            <TripCard
+              key={trip.id}
+              trip={trip}
+              readOnly={reviewerMode}
+              onView={() => handleViewTrip(trip.id)}
+              onEdit={() => {
+                setEditingTrip(trip);
+                setIsFormOpen(true);
+              }}
+              onDelete={() => handleDelete(trip.id)}
+            />
+          ))}
+        </div>
+      )}
+
+      {!reviewerMode ? (
+        <TripFormModal
+          trip={editingTrip}
+          open={isFormOpen}
+          onOpenChange={open => {
+            setIsFormOpen(open);
+            if (!open) setEditingTrip(null);
+          }}
+          onSave={handleSaveTrip}
+          companiesForInvite={companiesForInvite}
+          busTemplates={busTemplates}
+        />
+      ) : null}
+
+      {seatPicker}
     </div>
   );
 };

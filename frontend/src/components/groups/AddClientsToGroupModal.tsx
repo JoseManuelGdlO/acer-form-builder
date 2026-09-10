@@ -93,8 +93,8 @@ export const AddClientsToGroupModal = ({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-md max-h-[90vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle className="text-xl flex items-center gap-2">
-            <UserPlus className="w-5 h-5" />
+          <DialogTitle className="flex items-center gap-2 font-display text-xl">
+            <UserPlus className="size-5" />
             Agregar clientes a {groupTitle}
           </DialogTitle>
         </DialogHeader>
@@ -118,12 +118,12 @@ export const AddClientsToGroupModal = ({
               : `${filteredCandidates.length} cliente(s) disponible(s)`}
           </div>
 
-          <ScrollArea className="border rounded-md flex-1 min-h-[160px] max-h-[280px]">
-            <div className="p-2 space-y-1">
+          <ScrollArea className="min-h-[160px] max-h-[280px] flex-1 rounded-md border border-border">
+            <div className="space-y-1 p-2">
               {filteredCandidates.map(client => (
                 <label
                   key={client.id}
-                  className="flex items-center gap-2 py-2 px-2 rounded hover:bg-muted/50 cursor-pointer"
+                  className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 hover:bg-muted/50"
                 >
                   <Checkbox
                     checked={selectedIds.has(client.id)}

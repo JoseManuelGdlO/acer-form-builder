@@ -470,6 +470,8 @@ export interface Trip {
   participantCount?: number;
   createdAt?: string;
   updatedAt?: string;
+  /** SUM de pagos con tripId; solo si GET /trips lo incluye (trip_finance.view) */
+  totalIncome?: number;
 }
 
 export interface TripInvitation {

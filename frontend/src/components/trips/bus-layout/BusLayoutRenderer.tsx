@@ -75,7 +75,7 @@ export function BusLayoutRenderer({
 
   return (
     <div
-      className="relative rounded-xl border-2 border-dashed bg-muted/20 mx-auto"
+      className="relative mx-auto rounded-md border border-border bg-muted/20"
       style={{ width: canvasWidth, height: canvasHeight }}
     >
       {(floor.elements ?? []).map((el) => {

@@ -94,7 +94,7 @@ export const GroupFormModal = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md max-h-[90vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle className="text-xl">
+          <DialogTitle className="font-display text-xl">
             {isEditing ? 'Editar grupo' : 'Nuevo grupo'}
           </DialogTitle>
         </DialogHeader>
@@ -125,8 +125,8 @@ export const GroupFormModal = ({
                 className="pl-8 h-9"
               />
             </div>
-            <ScrollArea className="border rounded-md flex-1 min-h-[120px] max-h-[200px]">
-              <div className="p-2 space-y-2">
+            <ScrollArea className="min-h-[120px] max-h-[200px] flex-1 rounded-md border border-border">
+              <div className="space-y-2 p-2">
                 {filteredAvailableClients.length === 0 ? (
                   <p className="text-sm text-muted-foreground py-2">
                     {availableClients.length === 0
@@ -137,7 +137,7 @@ export const GroupFormModal = ({
                   filteredAvailableClients.map(client => (
                     <label
                       key={client.id}
-                      className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-muted/50 cursor-pointer"
+                      className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted/50"
                     >
                       <Checkbox
                         checked={selectedClientIds.has(client.id)}
@@ -155,7 +155,7 @@ export const GroupFormModal = ({
           </div>
 
           {error && (
-            <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-md">
+            <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
               {error}
             </div>
           )}

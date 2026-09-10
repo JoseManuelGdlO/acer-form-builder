@@ -14,7 +14,8 @@ export default {
     },
     extend: {
       fontFamily: {
-        sans: ['Montserrat', 'system-ui', 'sans-serif'],
+        sans: ['Epilogue', 'system-ui', 'sans-serif'],
+        display: ['Urbanist', 'system-ui', 'sans-serif'],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -63,6 +64,12 @@ export default {
         info: {
           DEFAULT: "hsl(var(--info))",
           foreground: "hsl(var(--info-foreground))",
+        },
+        brand: {
+          primary: "hsl(var(--primary))",
+          secondary: "hsl(var(--secondary))",
+          accent: "hsl(var(--accent))",
+          canvas: "hsl(var(--background))",
         },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",

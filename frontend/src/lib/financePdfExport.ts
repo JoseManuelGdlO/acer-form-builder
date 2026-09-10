@@ -28,7 +28,8 @@ export type FinancePdfFilterLabels = {
 export function exportFinanceOverviewPdf(
   data: FinanceOverviewResponse,
   labels: FinancePdfFilterLabels,
-  currencyFormat: Intl.NumberFormat
+  currencyFormat: Intl.NumberFormat,
+  receivable?: { amount: number; accounts: number } | null,
 ): void {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -172,6 +173,15 @@ export function exportFinanceOverviewPdf(
     MARGIN,
     y
   );
+  if (receivable) {
+    y += LINE;
+    y = ensureSpace(doc, y, LINE);
+    doc.text(
+      `Cartera no incluida en el periodo: ${currencyFormat.format(receivable.amount)} (${receivable.accounts} cuenta${receivable.accounts === 1 ? '' : 's'})`,
+      MARGIN,
+      y
+    );
+  }
   doc.setTextColor(0);
 
   const safeName = `finanzas-${format(new Date(), 'yyyy-MM-dd-HHmm')}.pdf`;

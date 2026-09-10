@@ -28,6 +28,7 @@ import calendarRoutes from './calendar.routes';
 import rolesRoutes from './roles.routes';
 import staffRoutes from './staff.routes';
 import hotelsRoutes from './hotels.routes';
+import quotesRoutes from './quotes.routes';
 
 const router = Router();
 
@@ -51,6 +52,7 @@ router.use('/bot', botRoutes);
 router.use('/addChat', conversacionesChatRoutes);
 router.use('/products', productsRoutes);
 router.use('/hotels', hotelsRoutes);
+router.use('/quotes', quotesRoutes);
 router.use('/categories', categoriesRoutes);
 router.use('/notifications', notificationsRoutes);
 router.use('/finance', financeRoutes);
