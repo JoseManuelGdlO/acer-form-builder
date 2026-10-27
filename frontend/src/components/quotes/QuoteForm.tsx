@@ -4,7 +4,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import type { Quote, QuoteServiceType, QuoteTemplate, QuoteWritePayload } from '@/types/quote';
+import type {
+  Quote,
+  QuoteProposalTemplate,
+  QuoteServiceType,
+  QuoteTemplate,
+  QuoteWritePayload,
+} from '@/types/quote';
 import { linesToText, QUOTE_SERVICE_TYPES, QUOTE_TYPE_LABEL, textToLines } from '@/lib/quoteFormat';
 
 type QuoteFormProps = {
@@ -12,6 +18,7 @@ type QuoteFormProps = {
   lockedClientId?: string;
   advisorName: string;
   template: QuoteTemplate | null;
+  proposalTemplates: QuoteProposalTemplate[];
   quote?: Quote | null;
   submitting?: boolean;
   onSubmit: (data: QuoteWritePayload) => Promise<void>;
@@ -20,6 +27,7 @@ type QuoteFormProps = {
 
 type FormState = {
   clientId: string;
+  proposalTemplateId: string;
   title: string;
   type: QuoteServiceType;
   advisorName: string;
@@ -35,9 +43,18 @@ type FormState = {
   terms: string;
 };
 
-function toForm(quote: Quote | null | undefined, defaults: { clientId: string; advisorName: string; template: QuoteTemplate | null }): FormState {
+function toForm(
+  quote: Quote | null | undefined,
+  defaults: {
+    clientId: string;
+    advisorName: string;
+    template: QuoteTemplate | null;
+    proposalTemplateId: string;
+  }
+): FormState {
   return {
     clientId: quote?.clientId || defaults.clientId,
+    proposalTemplateId: quote?.proposalTemplateId || defaults.proposalTemplateId,
     title: quote?.title || '',
     type: quote?.type || 'lodging',
     advisorName: quote?.advisorName || defaults.advisorName,
@@ -66,26 +83,41 @@ export function QuoteForm({
   lockedClientId,
   advisorName,
   template,
+  proposalTemplates,
   quote,
   submitting = false,
   onSubmit,
   onCancel,
 }: QuoteFormProps) {
   const defaultClientId = lockedClientId || clients[0]?.id || '';
+  const defaultProposalId = quote?.proposalTemplateId || proposalTemplates[0]?.id || '';
   const [form, setForm] = useState<FormState>(() =>
-    toForm(quote, { clientId: defaultClientId, advisorName, template })
+    toForm(quote, {
+      clientId: defaultClientId,
+      advisorName,
+      template,
+      proposalTemplateId: defaultProposalId,
+    })
   );
 
   useEffect(() => {
-    setForm(toForm(quote, { clientId: lockedClientId || clients[0]?.id || '', advisorName, template }));
-  }, [quote, lockedClientId, clients, advisorName, template]);
+    setForm(
+      toForm(quote, {
+        clientId: lockedClientId || clients[0]?.id || '',
+        advisorName,
+        template,
+        proposalTemplateId: quote?.proposalTemplateId || proposalTemplates[0]?.id || '',
+      })
+    );
+  }, [quote, lockedClientId, clients, advisorName, template, proposalTemplates]);
 
   const set = (key: keyof FormState, value: string) => setForm((prev) => ({ ...prev, [key]: value }));
 
   const save = async () => {
-    if (!form.clientId) return;
+    if (!form.clientId || !form.proposalTemplateId) return;
     await onSubmit({
       clientId: form.clientId,
+      proposalTemplateId: form.proposalTemplateId,
       title: form.title.trim() || 'Nueva propuesta',
       type: form.type,
       hotel: form.hotel.trim() || null,
@@ -123,7 +155,7 @@ export function QuoteForm({
       </p>
 
       <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-        1 · Cliente y servicio
+        1 · Cliente, plantilla y servicio
       </p>
       <div className="grid gap-4 md:grid-cols-2">
         <div>
@@ -146,6 +178,27 @@ export function QuoteForm({
               Ligada al expediente de {lockedClient.name}
             </span>
           ) : null}
+        </div>
+        <div>
+          <Label className="mb-2 block text-xs font-medium">Plantilla de propuesta</Label>
+          <select
+            value={form.proposalTemplateId}
+            onChange={(e) => {
+              const id = e.target.value;
+              set('proposalTemplateId', id);
+              const selected = proposalTemplates.find((item) => item.id === id);
+              if (selected?.serviceType) set('type', selected.serviceType);
+            }}
+            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+          >
+            <option value="">Selecciona una plantilla…</option>
+            {proposalTemplates.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.name}
+                {item.isSystem ? ' (sistema)' : ''}
+              </option>
+            ))}
+          </select>
         </div>
         <div>
           <Label className="mb-2 block text-xs font-medium">Tipo de servicio</Label>
@@ -204,11 +257,15 @@ export function QuoteForm({
         </div>
       </div>
       <p className="text-xs text-muted-foreground">
-        Los textos de incluye, no incluye y condiciones vienen precargados de la plantilla PDF; puedes ajustarlos para
-        esta cotización.
+        Los textos de incluye, no incluye y condiciones vienen precargados de Cotizaciones → Agencia; la propuesta con
+        fotos se toma de Cotizaciones → Propuestas.
       </p>
       <div className="flex gap-2">
-        <Button type="button" onClick={() => void save()} disabled={submitting || !form.clientId}>
+        <Button
+          type="button"
+          onClick={() => void save()}
+          disabled={submitting || !form.clientId || !form.proposalTemplateId}
+        >
           <Save />
           Guardar cotización
         </Button>

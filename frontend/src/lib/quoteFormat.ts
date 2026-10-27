@@ -65,3 +65,4 @@ export async function downloadBlob(blob: Blob, filename: string): Promise<void> 
   anchor.remove();
   URL.revokeObjectURL(url);
 }
+

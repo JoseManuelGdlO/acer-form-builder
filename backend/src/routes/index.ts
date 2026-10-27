@@ -29,6 +29,7 @@ import rolesRoutes from './roles.routes';
 import staffRoutes from './staff.routes';
 import hotelsRoutes from './hotels.routes';
 import quotesRoutes from './quotes.routes';
+import quoteProposalTemplatesRoutes from './quote-proposal-templates.routes';
 
 const router = Router();
 
@@ -53,6 +54,7 @@ router.use('/addChat', conversacionesChatRoutes);
 router.use('/products', productsRoutes);
 router.use('/hotels', hotelsRoutes);
 router.use('/quotes', quotesRoutes);
+router.use('/quote-proposal-templates', quoteProposalTemplatesRoutes);
 router.use('/categories', categoriesRoutes);
 router.use('/notifications', notificationsRoutes);
 router.use('/finance', financeRoutes);

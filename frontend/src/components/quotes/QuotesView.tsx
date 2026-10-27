@@ -1,19 +1,23 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ClipboardList, FileText, Plus } from 'lucide-react';
+import { ClipboardList, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { TabBar } from '@/components/layout/TabBar';
 import { Toolbar } from '@/components/layout/Toolbar';
 import { useAuth } from '@/contexts/AuthContext';
 import { useClientStore } from '@/hooks/useClientStore';
+import { useQuoteProposalTemplatesStore } from '@/hooks/useQuoteProposalTemplatesStore';
 import { useQuotesStore } from '@/hooks/useQuotesStore';
-import { api } from '@/lib/api';
-import { downloadBlob, QUOTE_STATUS_LABEL } from '@/lib/quoteFormat';
+import { QUOTE_STATUS_LABEL } from '@/lib/quoteFormat';
 import type { Quote, QuoteStatus, QuoteWritePayload } from '@/types/quote';
 import { toast } from 'sonner';
+import {
+  QuoteTemplatesCatalogView,
+  type QuoteTemplatesSection,
+} from '@/components/quote-templates/QuoteTemplatesCatalogView';
 import { QuoteTable } from './QuoteTable';
 import { QuoteFormModal } from './QuoteFormModal';
 import { QuoteDetail } from './QuoteDetail';
-import { QuoteTemplateEditor } from './QuoteTemplateEditor';
 
 type QuotesViewProps = {
   search?: string;
@@ -23,14 +27,23 @@ type QuotesViewProps = {
   onOpenQuoteConsumed?: () => void;
 };
 
+type QuotesMainTab = 'list' | QuoteTemplatesSection;
+
 const STATUS_FILTERS: Array<'all' | QuoteStatus> = ['all', 'draft', 'registered', 'expired'];
 
-export function QuotesView({ search = '', onSearchChange, createOpenSignal = 0, openQuoteId = null, onOpenQuoteConsumed }: QuotesViewProps) {
+export function QuotesView({
+  search = '',
+  onSearchChange,
+  createOpenSignal = 0,
+  openQuoteId = null,
+  onOpenQuoteConsumed,
+}: QuotesViewProps) {
   const { token, user, can } = useAuth();
   const { pickerClients, fetchClientsForPickers } = useClientStore();
   const store = useQuotesStore();
+  const proposalsStore = useQuoteProposalTemplatesStore();
+  const [mainTab, setMainTab] = useState<QuotesMainTab>('list');
   const [filter, setFilter] = useState<'all' | QuoteStatus>('all');
-  const [tab, setTab] = useState<'list' | 'template'>('list');
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<Quote | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -43,6 +56,9 @@ export function QuotesView({ search = '', onSearchChange, createOpenSignal = 0, 
   useEffect(() => {
     if (!token) return;
     store.fetchTemplate(token).catch((error) => {
+      console.error(error);
+    });
+    proposalsStore.fetchTemplates(token).catch((error) => {
       console.error(error);
     });
     fetchClientsForPickers(token).catch(() => {});
@@ -63,7 +79,7 @@ export function QuotesView({ search = '', onSearchChange, createOpenSignal = 0, 
     if (createOpenSignal === lastCreateSignal.current) return;
     lastCreateSignal.current = createOpenSignal;
     if (!canCreate) return;
-    setTab('list');
+    setMainTab('list');
     setSelectedId(null);
     setEditing(null);
     setCreating(true);
@@ -71,7 +87,7 @@ export function QuotesView({ search = '', onSearchChange, createOpenSignal = 0, 
 
   useEffect(() => {
     if (!openQuoteId) return;
-    setTab('list');
+    setMainTab('list');
     setCreating(false);
     setEditing(null);
     setSelectedId(openQuoteId);
@@ -90,6 +106,7 @@ export function QuotesView({ search = '', onSearchChange, createOpenSignal = 0, 
 
   const selected = selectedId ? store.quotes.find((quote) => quote.id === selectedId) ?? null : null;
   const template = store.template;
+  const activeProposals = proposalsStore.templates.filter((item) => item.isActive);
 
   const handleCreate = async (data: QuoteWritePayload) => {
     if (!token) return;
@@ -98,9 +115,8 @@ export function QuotesView({ search = '', onSearchChange, createOpenSignal = 0, 
       const created = await store.createQuote(token, data);
       setCreating(false);
       setSelectedId(created.id);
-      toast.success('Cotización creada y ligada al cliente');
+      toast.success('Cotización creada');
     } catch (error) {
-      console.error(error);
       toast.error(error instanceof Error ? error.message : 'No se pudo crear la cotización');
     } finally {
       setSubmitting(false);
@@ -115,14 +131,13 @@ export function QuotesView({ search = '', onSearchChange, createOpenSignal = 0, 
       setEditing(null);
       toast.success('Cotización actualizada');
     } catch (error) {
-      console.error(error);
-      toast.error(error instanceof Error ? error.message : 'No se pudo guardar la cotización');
+      toast.error(error instanceof Error ? error.message : 'No se pudo actualizar');
     } finally {
       setSubmitting(false);
     }
   };
 
-  if (selected && template) {
+  if (selected && template && mainTab === 'list') {
     return (
       <div className="mx-auto max-w-[1600px] p-4 sm:p-6 lg:p-8">
         <QuoteDetail
@@ -150,6 +165,7 @@ export function QuotesView({ search = '', onSearchChange, createOpenSignal = 0, 
           clients={pickerClients}
           advisorName={user?.name || ''}
           template={template}
+          proposalTemplates={activeProposals}
           quote={editing}
           submitting={submitting}
           onSubmit={handleUpdate}
@@ -160,34 +176,18 @@ export function QuotesView({ search = '', onSearchChange, createOpenSignal = 0, 
 
   return (
     <div className="mx-auto max-w-[1600px] p-4 sm:p-6 lg:p-8">
-      <div className="mb-5 flex flex-wrap gap-2">
-        <Button type="button" variant={tab === 'list' ? 'default' : 'outline'} onClick={() => setTab('list')}>
-          <ClipboardList />
-          Cotizaciones
-        </Button>
-        <Button type="button" variant={tab === 'template' ? 'default' : 'outline'} onClick={() => setTab('template')}>
-          <FileText />
-          Plantilla PDF
-        </Button>
-      </div>
+      <TabBar
+        tabs={[
+          { id: 'list', label: 'Cotizaciones' },
+          { id: 'agencia', label: 'Agencia' },
+          { id: 'propuestas', label: 'Propuestas' },
+        ]}
+        value={mainTab}
+        onChange={(id) => setMainTab(id as QuotesMainTab)}
+      />
 
-      {tab === 'template' && template ? (
-        <QuoteTemplateEditor
-          template={template}
-          canUpdate={canUpdate}
-          onSave={async (draft) => {
-            if (!token || !canUpdate) return;
-            await store.saveTemplate(token, draft);
-            toast.success('Plantilla de cotización actualizada');
-          }}
-          onDownloadSample={async () => {
-            const blob = await api.getQuoteTemplatePdf(token);
-            await downloadBlob(blob, 'cotizacion-ejemplo.pdf');
-            toast.success('PDF de ejemplo descargado');
-          }}
-        />
-      ) : tab === 'template' ? (
-        <Card className="p-5 text-sm text-muted-foreground">Cargando plantilla…</Card>
+      {mainTab === 'agencia' || mainTab === 'propuestas' ? (
+        <QuoteTemplatesCatalogView section={mainTab} embedded />
       ) : (
         <>
           <div className="mb-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -239,6 +239,7 @@ export function QuotesView({ search = '', onSearchChange, createOpenSignal = 0, 
             clients={pickerClients}
             advisorName={user?.name || ''}
             template={template}
+            proposalTemplates={activeProposals}
             submitting={submitting}
             onSubmit={handleCreate}
           />

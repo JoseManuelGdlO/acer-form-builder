@@ -76,6 +76,22 @@ export function QuotePdfPreview({ quote, template }: QuotePdfPreviewProps) {
           <p className="text-[9px] font-semibold uppercase text-muted-foreground">Condiciones</p>
           <p className="whitespace-pre-line">{terms || '—'}</p>
         </div>
+        {quote?.proposalBlocks?.length ? (
+          <div className="space-y-3 border-t border-border pt-3">
+            <p className="text-[9px] font-semibold uppercase" style={{ color: template.accentColor }}>
+              Propuesta
+            </p>
+            {quote.proposalBlocks.map((block, index) => (
+              <div key={`${block.title}-${index}`} className="space-y-1">
+                <p className="font-semibold">{block.title}</p>
+                {block.body ? <p className="whitespace-pre-line text-muted-foreground">{block.body}</p> : null}
+                {block.imageUrl ? (
+                  <img src={block.imageUrl} alt="" className="max-h-36 rounded-md object-cover" />
+                ) : null}
+              </div>
+            ))}
+          </div>
+        ) : null}
       </div>
       <div className="border-t border-border px-5 py-3 text-[10px] text-muted-foreground">{template.footer}</div>
     </div>

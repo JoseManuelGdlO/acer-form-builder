@@ -672,9 +672,8 @@ export const createClient = [
       if (normalizedPhone && !parentClientId) {
         const existingClient = await Client.findOne({ where: { companyId, phone: normalizedPhone, parentClientId: null } });
         if (existingClient) {
-          res.status(200).json({
-            message: 'Cliente ya existe',
-            client: existingClient,
+          res.status(409).json({
+            error: 'Número de cliente registrado, utiliza otro número',
           });
           return;
         }
@@ -779,18 +778,10 @@ export const createClient = [
       console.error('Create client error:', error);
       const err = error as { name?: string; fields?: Record<string, unknown> };
       if (err?.name === 'SequelizeUniqueConstraintError' && err?.fields?.phone) {
-        const companyId = req.user?.companyId;
-        const normalizedPhone = typeof req.body.phone === 'string' ? req.body.phone.trim() : req.body.phone;
-        if (companyId && normalizedPhone) {
-          const existingClient = await Client.findOne({ where: { companyId, phone: normalizedPhone } });
-          if (existingClient) {
-            res.status(200).json({
-              message: 'Cliente ya existe',
-              client: existingClient,
-            });
-            return;
-          }
-        }
+        res.status(409).json({
+          error: 'Número de cliente registrado, utiliza otro número',
+        });
+        return;
       }
       res.status(500).json({ error: 'Internal server error' });
     }
@@ -921,7 +912,7 @@ export const updateClient = [
           },
         });
         if (conflict) {
-          res.status(400).json({ error: 'Phone already in use by another primary client' });
+          res.status(409).json({ error: 'Número de cliente registrado, utiliza otro número' });
           return;
         }
       }

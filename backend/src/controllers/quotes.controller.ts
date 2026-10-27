@@ -2,7 +2,15 @@ import { randomBytes } from 'crypto';
 import { Response } from 'express';
 import { Op, type WhereOptions } from 'sequelize';
 import { body, validationResult } from 'express-validator';
-import { Client, Company, Quote, QuoteEvent, QuoteTemplate } from '../models';
+import {
+  Client,
+  Company,
+  Quote,
+  QuoteEvent,
+  QuoteProposalBlock,
+  QuoteProposalTemplate,
+  QuoteTemplate,
+} from '../models';
 import type { QuoteOrigin, QuoteServiceType, QuoteStatus } from '../models/Quote';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { canAccessClientRecord, canViewAllClients } from '../authorization/policies';
@@ -18,6 +26,7 @@ import {
   QUOTE_SERVICE_TYPES,
   QUOTE_STATUSES,
 } from '../quotes/quote.constants';
+import { blocksToSnapshot, normalizeProposalBlocks } from '../quotes/proposal-snapshot';
 
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 const HEX_COLOR = /^#([0-9A-Fa-f]{6})$/;
@@ -109,6 +118,8 @@ function serializeQuote(quote: QuoteWithClient) {
     includes: Array.isArray(json.includes) ? json.includes : [],
     excludes: Array.isArray(json.excludes) ? json.excludes : [],
     terms: json.terms ?? '',
+    proposalTemplateId: json.proposalTemplateId ?? null,
+    proposalBlocks: normalizeProposalBlocks(json.proposalBlocksSnapshot),
     track: events.map((event) => ({
       id: event.id,
       label: event.label,
@@ -118,6 +129,15 @@ function serializeQuote(quote: QuoteWithClient) {
     createdAt: json.createdAt,
     updatedAt: json.updatedAt,
   };
+}
+
+async function loadUsableProposal(companyId: string, proposalTemplateId: string) {
+  const template = await QuoteProposalTemplate.findByPk(proposalTemplateId, {
+    include: [{ model: QuoteProposalBlock, as: 'blocks' }],
+  });
+  if (!template || !template.isActive) return null;
+  if (!template.isSystem && template.companyId !== companyId) return null;
+  return template as QuoteProposalTemplate & { blocks?: QuoteProposalBlock[] };
 }
 
 function serializeTemplate(template: QuoteTemplate) {
@@ -307,6 +327,7 @@ export const getQuoteById = async (req: AuthRequest, res: Response): Promise<voi
 
 export const createQuote = [
   body('clientId').notEmpty().withMessage('clientId is required'),
+  body('proposalTemplateId').notEmpty().withMessage('proposalTemplateId is required').isUUID(),
   body('title').optional().trim(),
   body('type').optional().isIn(QUOTE_SERVICE_TYPES),
   body('hotel').optional({ nullable: true }).trim(),
@@ -333,8 +354,20 @@ export const createQuote = [
         return;
       }
 
+      const proposal = await loadUsableProposal(companyId, String(req.body.proposalTemplateId));
+      if (!proposal) {
+        res.status(400).json({ error: 'Proposal template not found or inactive' });
+        return;
+      }
+
       const template = await getOrCreateTemplate(companyId);
-      const type = (QUOTE_SERVICE_TYPES.includes(req.body.type) ? req.body.type : 'lodging') as QuoteServiceType;
+      const type = (
+        QUOTE_SERVICE_TYPES.includes(req.body.type)
+          ? req.body.type
+          : proposal.serviceType && QUOTE_SERVICE_TYPES.includes(proposal.serviceType)
+            ? proposal.serviceType
+            : 'lodging'
+      ) as QuoteServiceType;
       const totalAmount = parseOptionalAmount(req.body.totalAmount);
       const advanceAmount = parseOptionalAmount(req.body.advanceAmount);
       if (req.body.totalAmount !== undefined && totalAmount === undefined) {
@@ -368,6 +401,8 @@ export const createQuote = [
       const folio = await generateFolio(companyId);
       const advisorName = (req.body.advisorName as string | undefined)?.trim() || req.user?.name || 'Asesor';
 
+      const proposalBlocksSnapshot = blocksToSnapshot(proposal.blocks || []);
+
       const quote = await Quote.create({
         companyId,
         clientId: client.id,
@@ -389,6 +424,8 @@ export const createQuote = [
         includes,
         excludes,
         terms,
+        proposalTemplateId: proposal.id,
+        proposalBlocksSnapshot,
         createdBy: req.user?.id || null,
       });
 
@@ -472,6 +509,23 @@ export const updateQuote = [
           return;
         }
         patch.clientId = client.id;
+      }
+
+      if (req.body.proposalTemplateId !== undefined) {
+        const nextId = String(req.body.proposalTemplateId || '');
+        if (!nextId) {
+          res.status(400).json({ error: 'proposalTemplateId is required' });
+          return;
+        }
+        if (nextId !== quote.proposalTemplateId) {
+          const proposal = await loadUsableProposal(quote.companyId, nextId);
+          if (!proposal) {
+            res.status(400).json({ error: 'Proposal template not found or inactive' });
+            return;
+          }
+          patch.proposalTemplateId = proposal.id;
+          patch.proposalBlocksSnapshot = blocksToSnapshot(proposal.blocks || []);
+        }
       }
 
       await quote.update(patch);
@@ -689,6 +743,7 @@ async function sendQuotePdf(
       includes,
       excludes,
       terms: quote?.terms || template.terms,
+      proposalBlocks: normalizeProposalBlocks(quote?.proposalBlocksSnapshot),
     },
   });
   res.setHeader('Content-Type', 'application/pdf');

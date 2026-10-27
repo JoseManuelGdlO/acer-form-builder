@@ -27,6 +27,12 @@ function mapQuote(raw: any): Quote {
     includes: Array.isArray(raw.includes) ? raw.includes : [],
     excludes: Array.isArray(raw.excludes) ? raw.excludes : [],
     terms: String(raw.terms ?? ''),
+    proposalTemplateId: raw.proposalTemplateId ?? raw.proposal_template_id ?? null,
+    proposalBlocks: Array.isArray(raw.proposalBlocks)
+      ? raw.proposalBlocks
+      : Array.isArray(raw.proposal_blocks)
+        ? raw.proposal_blocks
+        : [],
     track: Array.isArray(raw.track) ? raw.track : [],
     createdAt: raw.createdAt ?? raw.created_at,
     updatedAt: raw.updatedAt ?? raw.updated_at,

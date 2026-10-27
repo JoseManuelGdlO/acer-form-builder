@@ -179,7 +179,8 @@ export function QuoteDetail({
             <SectionTitle title="Vista previa del PDF" />
             <QuotePdfPreview quote={quote} template={template} />
             <p className="mt-3 text-xs text-muted-foreground">
-              El diseño proviene de la plantilla editable en Cotizaciones → Plantilla PDF.
+              El branding proviene de Cotizaciones → Agencia. Los bloques con fotos son un snapshot de la plantilla de
+              propuesta elegida al crear la cotización.
             </p>
           </Card>
         </div>

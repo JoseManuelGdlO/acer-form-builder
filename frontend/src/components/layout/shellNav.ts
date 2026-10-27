@@ -29,7 +29,10 @@ export const SHELL_VIEW_META: Record<ShellView, ShellViewMeta> = {
   dashboard: { title: 'Panel de operaciones', subtitle: 'Resumen del día y actividad reciente' },
   clients: { title: 'Clientes', subtitle: 'Expedientes, formularios, pagos y seguimiento' },
   trips: { title: 'Viajes', subtitle: 'Salidas, participantes, asientos y operación' },
-  quotes: { title: 'Cotizaciones', subtitle: 'Propuestas, vigencias, documentos y seguimiento' },
+  quotes: {
+    title: 'Cotizaciones',
+    subtitle: 'Propuestas, plantillas de agencia, vigencias y seguimiento',
+  },
   calendar: { title: 'Calendario', subtitle: 'Agenda de salidas y citas' },
   forms: { title: 'Formularios', subtitle: 'Plantillas, respuestas y documentos' },
   products: { title: 'Productos', subtitle: 'Paquetes y categorías comerciales' },
