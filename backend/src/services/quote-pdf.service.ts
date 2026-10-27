@@ -5,6 +5,7 @@ import { Company } from '../models';
 import { QuoteTemplate } from '../models/QuoteTemplate';
 import { config } from '../config/env';
 import { resolveCompanyLogoUrl } from '../utils/company-branding';
+import type { ProposalBlockSnapshot } from '../quotes/proposal-snapshot';
 
 type QuotePdfPayload = {
   folio: string;
@@ -18,6 +19,7 @@ type QuotePdfPayload = {
   includes: string[];
   excludes: string[];
   terms: string;
+  proposalBlocks?: ProposalBlockSnapshot[];
 };
 
 const uploadsBase = path.isAbsolute(config.uploadsDir)
@@ -235,6 +237,45 @@ export async function renderQuotePdf(params: {
   page.drawText('CONDICIONES', { x: 32, y, size: 8, font: fontBold, color: muted });
   y -= 14;
   y = drawWrapped(page, payload.terms || '—', font, 9, 32, y, 530, ink, 12);
+
+  const proposalBlocks = payload.proposalBlocks || [];
+  if (proposalBlocks.length) {
+    y -= 16;
+    page.drawText('PROPUESTA', { x: 32, y, size: 8, font: fontBold, color: accentColor });
+    y -= 14;
+    for (const block of proposalBlocks) {
+      if (y < 120) {
+        // Keep footer clear; truncate remaining blocks rather than overflow.
+        break;
+      }
+      page.drawText(block.title.slice(0, 80), { x: 32, y, size: 10, font: fontBold, color: ink });
+      y -= 14;
+      if (block.body) {
+        y = drawWrapped(page, block.body, font, 9, 32, y, 530, ink, 12);
+        y -= 6;
+      }
+      if (block.imageUrl) {
+        const img = await loadLogoBytes(block.imageUrl);
+        if (img) {
+          try {
+            const image =
+              img.kind === 'png' ? await pdf.embedPng(img.bytes) : await pdf.embedJpg(img.bytes);
+            const maxW = 320;
+            const maxH = 120;
+            const scale = Math.min(maxW / image.width, maxH / image.height, 1);
+            const width = image.width * scale;
+            const height = image.height * scale;
+            if (y - height < 60) break;
+            page.drawImage(image, { x: 32, y: y - height, width, height });
+            y -= height + 10;
+          } catch {
+            // skip broken image
+          }
+        }
+      }
+      y -= 8;
+    }
+  }
 
   page.drawLine({
     start: { x: 32, y: 48 },

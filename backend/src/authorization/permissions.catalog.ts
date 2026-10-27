@@ -20,6 +20,7 @@ export const PERMISSION_KEYS = [
   'nav.settings.view',
   'nav.groups.view',
   'nav.quotes.view',
+  'nav.quote_templates.view',
 
   // Clients CRM
   'clients.view_all',
@@ -195,6 +196,7 @@ const NAV_KEYS: PermissionKey[] = [
   'nav.settings.view',
   'nav.groups.view',
   'nav.quotes.view',
+  'nav.quote_templates.view',
 ];
 
 export const PERMISSION_GROUPS: { id: string; label: string; keys: readonly PermissionKey[] }[] = [
@@ -351,6 +353,7 @@ export const PERMISSION_GROUPS: { id: string; label: string; keys: readonly Perm
     label: 'Cotizaciones',
     keys: [
       'nav.quotes.view',
+      'nav.quote_templates.view',
       'quotes.view',
       'quotes.create',
       'quotes.update',

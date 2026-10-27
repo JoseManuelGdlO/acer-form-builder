@@ -3,6 +3,7 @@ import { ClipboardList, Link2, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/layout/StatusBadge';
 import { useAuth } from '@/contexts/AuthContext';
+import { useQuoteProposalTemplatesStore } from '@/hooks/useQuoteProposalTemplatesStore';
 import { useQuotesStore } from '@/hooks/useQuotesStore';
 import { api } from '@/lib/api';
 import { formatQuoteDate, formatQuoteMoney, QUOTE_STATUS_LABEL, quoteTone } from '@/lib/quoteFormat';
@@ -40,6 +41,8 @@ function mapLite(raw: Record<string, unknown>): Quote {
     includes: Array.isArray(raw.includes) ? (raw.includes as string[]) : [],
     excludes: Array.isArray(raw.excludes) ? (raw.excludes as string[]) : [],
     terms: String(raw.terms ?? ''),
+    proposalTemplateId: (raw.proposalTemplateId as string | null) ?? null,
+    proposalBlocks: Array.isArray(raw.proposalBlocks) ? (raw.proposalBlocks as Quote['proposalBlocks']) : [],
     track: Array.isArray(raw.track) ? (raw.track as Quote['track']) : [],
   };
 }
@@ -47,6 +50,7 @@ function mapLite(raw: Record<string, unknown>): Quote {
 export function ClientQuotes({ clientId, clientName }: ClientQuotesProps) {
   const { token, user, can } = useAuth();
   const store = useQuotesStore();
+  const proposalsStore = useQuoteProposalTemplatesStore();
   const [creating, setCreating] = useState(false);
   const [pick, setPick] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -73,7 +77,10 @@ export function ClientQuotes({ clientId, clientName }: ClientQuotesProps) {
     if (!token || !can('quotes.view')) return;
     void load();
     store.fetchTemplate(token).catch(() => {});
+    proposalsStore.fetchTemplates(token).catch(() => {});
   }, [token, clientId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const activeProposals = proposalsStore.templates.filter((item) => item.isActive);
 
   const own = useMemo(
     () => store.quotes.filter((quote) => quote.clientId === clientId),
@@ -133,6 +140,7 @@ export function ClientQuotes({ clientId, clientName }: ClientQuotesProps) {
           lockedClientId={clientId}
           advisorName={user?.name || ''}
           template={store.template}
+          proposalTemplates={activeProposals}
           quote={editing}
           submitting={submitting}
           onSubmit={async (data) => {
@@ -171,6 +179,7 @@ export function ClientQuotes({ clientId, clientName }: ClientQuotesProps) {
         lockedClientId={clientId}
         advisorName={user?.name || ''}
         template={store.template}
+        proposalTemplates={activeProposals}
         submitting={submitting}
         onSubmit={handleCreate}
       />

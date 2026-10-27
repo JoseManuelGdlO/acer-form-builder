@@ -384,8 +384,9 @@ export const ClientList = ({
       }
       setEditingClient(null);
     } catch (error: any) {
-      // Error is handled in ClientFormModal, just log here
+      // Error is handled in ClientFormModal; rethrow so the modal stays open
       console.error('Error in handleCreateOrUpdate:', error);
+      throw error;
     }
   };
 

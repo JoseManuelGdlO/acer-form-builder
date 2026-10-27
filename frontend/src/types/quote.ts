@@ -1,12 +1,36 @@
 export type QuoteStatus = 'draft' | 'registered' | 'expired';
 export type QuoteServiceType = 'lodging' | 'package' | 'flight' | 'circuit';
 export type QuoteOrigin = 'system' | 'uploaded';
+export type ProposalBlockType = 'section' | 'itinerary' | 'hotel' | 'activities' | 'custom';
 
 export type QuoteTrack = {
   id?: string;
   label: string;
   date: string;
   createdAt?: string;
+};
+
+export type QuoteProposalBlock = {
+  id?: string;
+  blockType: ProposalBlockType;
+  title: string;
+  body: string;
+  imageUrl: string | null;
+  sortOrder: number;
+};
+
+export type QuoteProposalTemplate = {
+  id: string;
+  companyId: string | null;
+  name: string;
+  description: string;
+  serviceType: QuoteServiceType | null;
+  isSystem: boolean;
+  isActive: boolean;
+  sortOrder: number;
+  blocks: QuoteProposalBlock[];
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 export type Quote = {
@@ -32,6 +56,8 @@ export type Quote = {
   includes: string[];
   excludes: string[];
   terms: string;
+  proposalTemplateId: string | null;
+  proposalBlocks: QuoteProposalBlock[];
   track: QuoteTrack[];
   createdAt?: string;
   updatedAt?: string;
@@ -53,6 +79,7 @@ export type QuoteTemplate = {
 
 export type QuoteWritePayload = {
   clientId: string;
+  proposalTemplateId: string;
   title?: string;
   type?: QuoteServiceType;
   hotel?: string | null;

@@ -212,8 +212,16 @@ export const ClientFormModal = ({
       onOpenChange(false);
     } catch (error: any) {
       console.error('Error saving client:', error);
-      setError(error.message || 'Error al guardar el cliente. Por favor, intenta nuevamente.');
-      toast.error(error.message || 'Error al guardar el cliente');
+      const message = error?.message || 'Error al guardar el cliente. Por favor, intenta nuevamente.';
+      const isDuplicatePhone =
+        typeof message === 'string' &&
+        (message.includes('Número de cliente registrado') ||
+          message.toLowerCase().includes('phone already in use'));
+      if (isDuplicatePhone) {
+        setPhoneError('Número de cliente registrado, utiliza otro número');
+      }
+      setError(message);
+      toast.error(isDuplicatePhone ? 'Número de cliente registrado, utiliza otro número' : message);
     } finally {
       setIsLoading(false);
     }

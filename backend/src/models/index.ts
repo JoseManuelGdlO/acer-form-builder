@@ -54,6 +54,8 @@ import { TripReminderSend } from './TripReminderSend';
 import { Quote } from './Quote';
 import { QuoteEvent } from './QuoteEvent';
 import { QuoteTemplate } from './QuoteTemplate';
+import { QuoteProposalTemplate } from './QuoteProposalTemplate';
+import { QuoteProposalBlock } from './QuoteProposalBlock';
 
 // Company relationships (multi-tenant)
 Company.hasMany(User, { foreignKey: 'companyId', as: 'users' });
@@ -110,6 +112,24 @@ Company.hasOne(QuoteTemplate, { foreignKey: 'companyId', as: 'quoteTemplate' });
 QuoteTemplate.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
 Company.hasMany(QuoteEvent, { foreignKey: 'companyId', as: 'quoteEvents' });
 QuoteEvent.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+Company.hasMany(QuoteProposalTemplate, { foreignKey: 'companyId', as: 'quoteProposalTemplates' });
+QuoteProposalTemplate.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+QuoteProposalTemplate.hasMany(QuoteProposalBlock, {
+  foreignKey: 'proposalTemplateId',
+  as: 'blocks',
+});
+QuoteProposalBlock.belongsTo(QuoteProposalTemplate, {
+  foreignKey: 'proposalTemplateId',
+  as: 'proposalTemplate',
+});
+Quote.belongsTo(QuoteProposalTemplate, {
+  foreignKey: 'proposalTemplateId',
+  as: 'proposalTemplate',
+});
+QuoteProposalTemplate.hasMany(Quote, {
+  foreignKey: 'proposalTemplateId',
+  as: 'quotes',
+});
 
 // Notifications relationships (multi-tenant)
 Company.hasMany(Notification, { foreignKey: 'companyId', as: 'notifications' });
@@ -412,4 +432,6 @@ export {
   Quote,
   QuoteEvent,
   QuoteTemplate,
+  QuoteProposalTemplate,
+  QuoteProposalBlock,
 };

@@ -5,7 +5,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import type { Quote, QuoteTemplate, QuoteWritePayload } from '@/types/quote';
+import type { Quote, QuoteProposalTemplate, QuoteTemplate, QuoteWritePayload } from '@/types/quote';
 import { QuoteForm } from './QuoteForm';
 
 type QuoteFormModalProps = {
@@ -15,6 +15,7 @@ type QuoteFormModalProps = {
   lockedClientId?: string;
   advisorName: string;
   template: QuoteTemplate | null;
+  proposalTemplates: QuoteProposalTemplate[];
   quote?: Quote | null;
   submitting?: boolean;
   onSubmit: (data: QuoteWritePayload) => Promise<void>;
@@ -27,6 +28,7 @@ export function QuoteFormModal({
   lockedClientId,
   advisorName,
   template,
+  proposalTemplates,
   quote,
   submitting,
   onSubmit,
@@ -50,6 +52,7 @@ export function QuoteFormModal({
             lockedClientId={lockedClientId}
             advisorName={advisorName}
             template={template}
+            proposalTemplates={proposalTemplates}
             quote={quote}
             submitting={submitting}
             onSubmit={onSubmit}

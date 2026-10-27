@@ -1,5 +1,6 @@
 import { DataTypes, Model, Optional } from 'sequelize';
 import sequelize from '../config/database';
+import type { ProposalBlockSnapshot } from '../quotes/proposal-snapshot';
 
 export type QuoteServiceType = 'lodging' | 'package' | 'flight' | 'circuit';
 export type QuoteStatus = 'draft' | 'registered' | 'expired';
@@ -27,6 +28,8 @@ interface QuoteAttributes {
   includes: string[] | null;
   excludes: string[] | null;
   terms: string | null;
+  proposalTemplateId: string | null;
+  proposalBlocksSnapshot: ProposalBlockSnapshot[];
   createdBy: string | null;
   createdAt?: Date;
   updatedAt?: Date;
@@ -50,6 +53,8 @@ interface QuoteCreationAttributes
     | 'includes'
     | 'excludes'
     | 'terms'
+    | 'proposalTemplateId'
+    | 'proposalBlocksSnapshot'
     | 'createdBy'
     | 'createdAt'
     | 'updatedAt'
@@ -77,6 +82,8 @@ export class Quote extends Model<QuoteAttributes, QuoteCreationAttributes> imple
   public includes!: string[] | null;
   public excludes!: string[] | null;
   public terms!: string | null;
+  public proposalTemplateId!: string | null;
+  public proposalBlocksSnapshot!: ProposalBlockSnapshot[];
   public createdBy!: string | null;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
@@ -178,6 +185,17 @@ Quote.init(
     terms: {
       type: DataTypes.TEXT,
       allowNull: true,
+    },
+    proposalTemplateId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      references: { model: 'quote_proposal_templates', key: 'id' },
+      onDelete: 'SET NULL',
+    },
+    proposalBlocksSnapshot: {
+      type: DataTypes.JSON,
+      allowNull: false,
+      defaultValue: [],
     },
     createdBy: {
       type: DataTypes.UUID,

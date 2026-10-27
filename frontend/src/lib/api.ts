@@ -2062,6 +2062,82 @@ class ApiClient {
       requireAuth: true,
     });
   }
+
+  async listQuoteProposalTemplates(params?: { includeInactive?: boolean }, token?: string | null) {
+    const query = params?.includeInactive ? '?includeInactive=1' : '';
+    return this.request<any[]>(`/quote-proposal-templates${query}`, {
+      method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async getQuoteProposalTemplate(id: string, token?: string | null) {
+    return this.request<any>(`/quote-proposal-templates/${id}`, {
+      method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async createQuoteProposalTemplate(data: Record<string, unknown>, token?: string | null) {
+    return this.request<any>('/quote-proposal-templates', {
+      method: 'POST',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateQuoteProposalTemplate(id: string, data: Record<string, unknown>, token?: string | null) {
+    return this.request<any>(`/quote-proposal-templates/${id}`, {
+      method: 'PUT',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+      body: JSON.stringify(data),
+    });
+  }
+
+  async cloneQuoteProposalTemplate(id: string, token?: string | null) {
+    return this.request<any>(`/quote-proposal-templates/${id}/clone`, {
+      method: 'POST',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+      body: JSON.stringify({}),
+    });
+  }
+
+  async deleteQuoteProposalTemplate(id: string, token?: string | null) {
+    return this.request<{ message: string; id: string }>(`/quote-proposal-templates/${id}`, {
+      method: 'DELETE',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
+
+  async uploadQuoteProposalBlockImage(
+    templateId: string,
+    blockId: string,
+    imageFile: File,
+    token?: string | null
+  ) {
+    const formData = new FormData();
+    formData.append('image', imageFile);
+    return this.request<any>(`/quote-proposal-templates/${templateId}/blocks/${blockId}/image`, {
+      method: 'POST',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+      body: formData,
+    });
+  }
+
+  async getQuoteProposalTemplatePdf(id: string, token?: string | null) {
+    return this.requestBlob(`/quote-proposal-templates/${id}/pdf`, {
+      method: 'GET',
+      token: token ?? this.getToken(),
+      requireAuth: true,
+    });
+  }
 }
 
 export const api = new ApiClient(API_URL);
