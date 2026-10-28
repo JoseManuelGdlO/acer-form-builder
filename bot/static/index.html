@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Monitor de citas</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Epilogue:wght@400;500;600;700&family=Urbanist:wght@500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --brand-primary: 204 82% 41%;
+      --brand-canvas: 210 67% 97%;
+      --background: 210 67% 97%;
+      --foreground: 210 43% 14%;
+      --card: 0 0% 100%;
+      --primary: 204 82% 41%;
+      --primary-foreground: 0 0% 100%;
+      --secondary: 43 98% 53%;
+      --secondary-foreground: 32 69% 11%;
+      --muted: 210 45% 94%;
+      --muted-foreground: 210 17% 40%;
+      --destructive: 357 75% 48%;
+      --destructive-foreground: 0 0% 100%;
+      --border: 213 29% 88%;
+      --input: 210 25% 82%;
+      --radius: 0.5rem;
+      --success: 150 50% 40%;
+      --success-foreground: 0 0% 100%;
+      --warning: 43 90% 48%;
+      --warning-foreground: 40 50% 18%;
+      --shadow-md: 0 4px 6px -1px hsl(var(--primary) / 0.1), 0 2px 4px -2px hsl(var(--primary) / 0.1);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: hsl(var(--background));
+      color: hsl(var(--foreground));
+      font-family: Epilogue, sans-serif;
+      line-height: 1.5;
+    }
+
+    h1, h2, .eyebrow { font-family: Urbanist, sans-serif; }
+
+    header, main { width: min(42rem, calc(100% - 2rem)); margin: 0 auto; }
+
+    header { padding: 2rem 0 0.5rem; }
+
+    .eyebrow {
+      margin: 0;
+      color: hsl(var(--primary));
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    h1 { margin: 0.2rem 0 0.4rem; font-size: 2rem; line-height: 1.15; }
+
+    h2 { margin: 0 0 0.8rem; font-size: 1.25rem; }
+
+    p { margin: 0; }
+
+    .lead { color: hsl(var(--muted-foreground)); max-width: 38rem; }
+
+    section {
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+      border-radius: calc(var(--radius) + 0.25rem);
+      box-shadow: var(--shadow-md);
+      margin: 1rem 0;
+      padding: 1.1rem;
+    }
+
+    form, .stack { display: grid; gap: 0.85rem; }
+
+    label { display: grid; gap: 0.3rem; font-size: 0.92rem; font-weight: 600; }
+
+    input, select {
+      width: 100%;
+      border: 1px solid hsl(var(--input));
+      border-radius: var(--radius);
+      background: hsl(var(--card));
+      color: hsl(var(--foreground));
+      font: inherit;
+      padding: 0.65rem 0.75rem;
+    }
+
+    .dates { display: grid; gap: 0.85rem; }
+    @media (min-width: 700px) {
+      .dates { grid-template-columns: repeat(3, 1fr); }
+    }
+
+    .check {
+      display: flex;
+      gap: 0.6rem;
+      align-items: flex-start;
+      font-weight: 500;
+    }
+
+    .check input { width: 1.1rem; height: 1.1rem; margin-top: 0.2rem; }
+    input:disabled, select:disabled { opacity: 0.55; }
+
+    .actions { display: flex; flex-wrap: wrap; gap: 0.6rem; }
+
+    button {
+      border: 0;
+      border-radius: var(--radius);
+      cursor: pointer;
+      font: inherit;
+      font-weight: 600;
+      padding: 0.7rem 1rem;
+    }
+
+    button:disabled { cursor: not-allowed; opacity: 0.45; }
+
+    .primary { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
+    .secondary { background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground)); }
+    .quiet { background: hsl(var(--muted)); color: hsl(var(--foreground)); }
+    .danger { background: hsl(var(--destructive)); color: hsl(var(--destructive-foreground)); }
+
+    .error {
+      color: hsl(var(--destructive));
+      font-weight: 600;
+      min-height: 1.2rem;
+    }
+
+    .person {
+      border: 1px solid hsl(var(--border));
+      border-radius: var(--radius);
+      display: grid;
+      gap: 0.7rem;
+      padding: 0.9rem;
+    }
+
+    .person + .person { margin-top: 0.7rem; }
+
+    .person header { display: flex; justify-content: space-between; gap: 0.8rem; align-items: flex-start; width: auto; margin: 0; padding: 0; }
+
+    .person h3 { margin: 0; font-family: Urbanist, sans-serif; font-size: 1.05rem; }
+
+    .meta { color: hsl(var(--muted-foreground)); font-size: 0.92rem; }
+
+    .badge {
+      border-radius: 999px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      padding: 0.2rem 0.6rem;
+      white-space: nowrap;
+    }
+
+    .badge.ready { background: hsl(var(--success)); color: hsl(var(--success-foreground)); }
+    .badge.wait { background: hsl(var(--warning)); color: hsl(var(--warning-foreground)); }
+
+    #session-dates { margin: 0.6rem 0 0; padding-left: 1.2rem; }
+    .empty { color: hsl(var(--muted-foreground)); }
+    footer { width: min(42rem, calc(100% - 2rem)); margin: 0 auto 2rem; color: hsl(var(--muted-foreground)); font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <p class="eyebrow">En esta computadora</p>
+    <h1>Monitor de citas</h1>
+    <p class="lead">Arma el grupo con el formulario. La consulta abre el navegador para que inicies sesión tú. Esta pantalla no confirma ni reprograma la cita.</p>
+  </header>
+  <main>
+    <section>
+      <h2>Grupo</h2>
+      <div class="stack">
+        <label for="group-name">Nombre del grupo
+          <input id="group-name" name="group-name" autocomplete="off" placeholder="Por ejemplo, camión Monterrey">
+        </label>
+        <div class="actions">
+          <button class="primary" id="save-group" type="button">Guardar nombre</button>
+        </div>
+        <p class="error" id="group-error" role="alert"></p>
+      </div>
+    </section>
+
+    <section>
+      <h2 id="form-title">Agregar persona</h2>
+      <form id="person-form">
+        <label for="applicant-id">Identificador
+          <input id="applicant-id" required placeholder="persona-001">
+        </label>
+        <label for="schedule-id">Número en la dirección del portal
+          <input id="schedule-id" inputmode="numeric" required placeholder="El número que va después de /schedule/">
+        </label>
+        <p class="meta">No es el número IVR. En el portal abre Continuar y copia el número de la barra de direcciones: .../schedule/12345678/...</p>
+        <label for="consulate">Consulado
+          <select id="consulate" required></select>
+        </label>
+        <label class="check" for="no-appointment">
+          <input id="no-appointment" type="checkbox">
+          <span>Aún no tiene cita</span>
+        </label>
+        <p class="meta">Si la marcas, no hace falta la fecha de la cita actual. La consulta muestra los días del rango.</p>
+        <div class="dates">
+          <label for="current-date">Cita actual
+            <input id="current-date" type="date" required>
+          </label>
+          <label for="earliest">Fecha más temprana
+            <input id="earliest" type="date" required>
+          </label>
+          <label for="latest">Fecha más tardía
+            <input id="latest" type="date" required>
+          </label>
+        </div>
+        <label class="check" for="consent">
+          <input id="consent" type="checkbox">
+          <span>Esta persona autorizó consultar su cita</span>
+        </label>
+        <div class="actions">
+          <button class="primary" id="submit-person" type="submit">Agregar al grupo</button>
+          <button class="quiet" id="cancel-edit" type="button" hidden>Cancelar</button>
+        </div>
+        <p class="error" id="form-error" role="alert"></p>
+      </form>
+    </section>
+
+    <section>
+      <h2>Personas <span id="count" class="meta"></span></h2>
+      <div id="people"><p class="empty">Todavía no hay personas en el grupo.</p></div>
+    </section>
+
+    <section id="session">
+      <h2>Consulta</h2>
+      <p id="session-message">Elige una persona que esté lista para consultar.</p>
+      <ul id="session-dates"></ul>
+      <div class="actions">
+        <button class="secondary" id="continue-login" type="button" hidden>Ya inicié sesión</button>
+        <button class="secondary" id="retry-read" type="button" hidden>Intentar de nuevo</button>
+        <button class="quiet" id="cancel-session" type="button" hidden>Cerrar consulta</button>
+      </div>
+      <p class="error" id="session-error" role="alert"></p>
+    </section>
+  </main>
+  <footer>Las fechas que aparecen son candidatas. Ninguna queda confirmada desde esta pantalla.</footer>
+  <script>
+    const STATUS = {
+      ready_for_manual_login: 'Lista para consultar',
+      consent_required: 'Falta autorización',
+    };
+    let editingId = null;
+    let busy = false;
+
+    const $ = (selector) => document.querySelector(selector);
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, (char) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+      }[char]));
+    }
+
+    function formatDate(iso) {
+      const [year, month, day] = iso.split('-').map(Number);
+      return new Date(year, month - 1, day).toLocaleDateString('es-MX', {
+        day: 'numeric', month: 'short', year: 'numeric',
+      });
+    }
+
+    async function api(method, path, body) {
+      const response = await fetch(path, {
+        method,
+        headers: body === undefined ? {} : { 'Content-Type': 'application/json' },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'No se pudo completar la acción.');
+      return data;
+    }
+
+    function show(selector, message) {
+      $(selector).textContent = message || '';
+    }
+
+    function personPayload() {
+      return {
+        applicant_id: $('#applicant-id').value.trim(),
+        schedule_id: $('#schedule-id').value.trim(),
+        consulate: $('#consulate').value,
+        current_date: $('#no-appointment').checked ? null : $('#current-date').value,
+        earliest: $('#earliest').value,
+        latest: $('#latest').value,
+        consent: $('#consent').checked,
+        no_appointment: $('#no-appointment').checked,
+      };
+    }
+
+    function syncNoAppointment() {
+      const none = $('#no-appointment').checked;
+      const current = $('#current-date');
+      current.disabled = none;
+      current.required = !none;
+      if (none) current.value = '';
+    }
+
+    function resetForm() {
+      editingId = null;
+      $('#person-form').reset();
+      $('#form-title').textContent = 'Agregar persona';
+      $('#submit-person').textContent = 'Agregar al grupo';
+      $('#cancel-edit').hidden = true;
+      syncNoAppointment();
+      show('#form-error', '');
+    }
+
+    function fillConsulates(consulates) {
+      const select = $('#consulate');
+      const current = select.value;
+      select.replaceChildren();
+      for (const item of consulates) {
+        const option = document.createElement('option');
+        option.value = item.id;
+        option.textContent = item.label;
+        select.append(option);
+      }
+      if (current) select.value = current;
+    }
+
+    function renderPeople(state) {
+      const box = $('#people');
+      const count = state.applicants.length;
+      $('#count').textContent = count ? `(${count} de 50)` : '';
+      if (!count) {
+        box.innerHTML = '<p class="empty">Todavía no hay personas en el grupo.</p>';
+        return;
+      }
+      const locked = ['opening', 'waiting_for_login', 'reading'].includes(state.session.status);
+      box.innerHTML = state.applicants.map((person) => {
+        const ready = person.status === 'ready_for_manual_login';
+        return `<article class="person">
+          <header>
+            <div>
+              <h3>${escapeHtml(person.applicant_id)}</h3>
+              <p class="meta">${escapeHtml(person.consulate_label)} · cita ${escapeHtml(person.schedule_id)}</p>
+            </div>
+            <span class="badge ${ready ? 'ready' : 'wait'}">${STATUS[person.status] || ''}</span>
+          </header>
+          <p class="meta">${person.no_appointment ? 'Aún no tiene cita' : `Actual ${formatDate(person.current_date)}`} · entre ${formatDate(person.earliest)} y ${formatDate(person.latest)}</p>
+          <div class="actions">
+            <button class="primary consult" type="button" data-id="${escapeHtml(person.applicant_id)}" ${ready && !locked ? '' : 'disabled'}>Consultar fechas</button>
+            <button class="quiet edit" type="button" data-id="${escapeHtml(person.applicant_id)}" ${locked ? 'disabled' : ''}>Editar</button>
+            <button class="danger remove" type="button" data-id="${escapeHtml(person.applicant_id)}" ${locked ? 'disabled' : ''}>Quitar</button>
+          </div>
+        </article>`;
+      }).join('');
+    }
+
+    function renderSession(session) {
+      const message = $('#session-message');
+      const dates = $('#session-dates');
+      message.textContent = session.message || 'Elige una persona que esté lista para consultar.';
+      dates.replaceChildren();
+      for (const day of session.dates || []) {
+        const item = document.createElement('li');
+        item.textContent = formatDate(day);
+        dates.append(item);
+      }
+      const waiting = session.status === 'waiting_for_login';
+      const recoverable = session.browser_open && (session.status === 'error' || session.status === 'done');
+      $('#continue-login').hidden = !waiting;
+      $('#retry-read').hidden = session.status !== 'error';
+      $('#cancel-session').hidden = !(waiting || recoverable);
+      $('#continue-login').disabled = false;
+      $('#retry-read').disabled = false;
+    }
+
+    async function refresh() {
+      const state = await api('GET', '/api/group');
+      if (document.activeElement !== $('#group-name')) {
+        $('#group-name').value = state.group_id || '';
+      }
+      fillConsulates(state.consulates || []);
+      renderPeople(state);
+      renderSession(state.session || {});
+      return state;
+    }
+
+    function editPerson(state, applicantId) {
+      const person = state.applicants.find((item) => item.applicant_id === applicantId);
+      if (!person) return;
+      editingId = applicantId;
+      $('#applicant-id').value = person.applicant_id;
+      $('#schedule-id').value = person.schedule_id;
+      $('#consulate').value = person.consulate;
+      $('#no-appointment').checked = person.no_appointment === true;
+      syncNoAppointment();
+      if (!person.no_appointment) $('#current-date').value = person.current_date || '';
+      $('#earliest').value = person.earliest;
+      $('#latest').value = person.latest;
+      $('#consent').checked = person.consent;
+      $('#form-title').textContent = 'Editar persona';
+      $('#submit-person').textContent = 'Guardar cambios';
+      $('#cancel-edit').hidden = false;
+      $('#form-title').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    $('#save-group').addEventListener('click', async () => {
+      show('#group-error', '');
+      try {
+        await api('PUT', '/api/group', { group_id: $('#group-name').value });
+        await refresh();
+      } catch (error) {
+        show('#group-error', error.message);
+      }
+    });
+
+    $('#person-form').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      show('#form-error', '');
+      try {
+        const payload = personPayload();
+        if (editingId) await api('PUT', `/api/applicants/${encodeURIComponent(editingId)}`, payload);
+        else await api('POST', '/api/applicants', payload);
+        resetForm();
+        await refresh();
+      } catch (error) {
+        show('#form-error', error.message);
+      }
+    });
+
+    $('#cancel-edit').addEventListener('click', resetForm);
+    $('#no-appointment').addEventListener('change', syncNoAppointment);
+
+    $('#people').addEventListener('click', async (event) => {
+      const button = event.target.closest('button');
+      if (!button || button.disabled) return;
+      const applicantId = button.dataset.id;
+      show('#session-error', '');
+      try {
+        if (button.classList.contains('consult')) {
+          busy = true;
+          button.disabled = true;
+          await api('POST', '/api/sessions', { applicant_id: applicantId });
+          busy = false;
+          await refresh();
+        } else if (button.classList.contains('edit')) {
+          const state = await api('GET', '/api/group');
+          editPerson(state, applicantId);
+        } else if (button.classList.contains('remove')) {
+          await api('DELETE', `/api/applicants/${encodeURIComponent(applicantId)}`);
+          if (editingId === applicantId) resetForm();
+          await refresh();
+        }
+      } catch (error) {
+        show('#session-error', error.message);
+        await refresh().catch(() => {});
+      } finally {
+        busy = false;
+      }
+    });
+
+    $('#continue-login').addEventListener('click', async () => {
+      show('#session-error', '');
+      busy = true;
+      $('#continue-login').disabled = true;
+      $('#session-message').textContent = 'Leyendo el calendario…';
+      try {
+        await api('POST', '/api/sessions/continue');
+      } catch (error) {
+        show('#session-error', error.message);
+      } finally {
+        busy = false;
+        await refresh().catch(() => {});
+      }
+    });
+
+    $('#retry-read').addEventListener('click', async () => {
+      show('#session-error', '');
+      busy = true;
+      $('#retry-read').disabled = true;
+      $('#session-message').textContent = 'Leyendo el calendario…';
+      try {
+        await api('POST', '/api/sessions/retry');
+      } catch (error) {
+        show('#session-error', error.message);
+      } finally {
+        busy = false;
+        await refresh().catch(() => {});
+      }
+    });
+
+    $('#cancel-session').addEventListener('click', async () => {
+      show('#session-error', '');
+      try {
+        await api('DELETE', '/api/sessions');
+        await refresh();
+      } catch (error) {
+        show('#session-error', error.message);
+      }
+    });
+
+    refresh().catch((error) => show('#form-error', error.message));
+  </script>
+</body>
+</html>

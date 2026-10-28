@@ -1,0 +1,12 @@
+[
+  {
+    "applicant_id": "persona-001",
+    "group_id": "camion-001",
+    "schedule_id": "123456",
+    "consulate": "Monterrey",
+    "current_date": "2027-08-20",
+    "earliest": "2026-11-01",
+    "latest": "2026-12-31",
+    "consent": false
+  }
+]
