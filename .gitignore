@@ -1,6 +1,7 @@
 # Dependencies
 node_modules/
 **/node_modules/
+**/.venv/
 
 # Environment variables
 .env
@@ -29,3 +30,6 @@ Thumbs.db
 
 # Uploads (product images, etc.) - en servidor con Docker se usa volumen ./uploads
 uploads/
+
+# Grupo local del monitor de citas
+bot/data/
