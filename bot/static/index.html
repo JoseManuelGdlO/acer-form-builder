@@ -127,6 +127,31 @@
       min-height: 1.2rem;
     }
 
+    .notice {
+      position: sticky;
+      top: 0.6rem;
+      z-index: 2;
+      background: hsl(var(--success));
+      color: hsl(var(--success-foreground));
+      border-radius: var(--radius);
+      padding: 0.7rem 0.9rem;
+      font-weight: 600;
+    }
+
+    .steps { margin-top: 0.6rem; }
+
+    dialog {
+      border: 1px solid hsl(var(--border));
+      border-radius: calc(var(--radius) + 0.25rem);
+      padding: 1.1rem;
+      max-width: 24rem;
+      color: hsl(var(--foreground));
+    }
+
+    dialog::backdrop { background: hsl(var(--foreground) / 0.35); }
+
+    dialog p { margin-bottom: 1rem; }
+
     .person {
       border: 1px solid hsl(var(--border));
       border-radius: var(--radius);
@@ -164,8 +189,10 @@
     <p class="eyebrow">En esta computadora</p>
     <h1>Monitor de citas</h1>
     <p class="lead">Arma el grupo con el formulario. La consulta abre el navegador para que inicies sesión tú. Esta pantalla no confirma ni reprograma la cita.</p>
+    <p class="meta steps">1. Guarda el nombre del grupo. 2. Agrega a la persona. 3. Pulsa Consultar fechas.</p>
   </header>
   <main>
+    <p id="notice" class="notice" role="status" hidden></p>
     <section>
       <h2>Grupo</h2>
       <div class="stack">
@@ -179,7 +206,7 @@
       </div>
     </section>
 
-    <section>
+    <section id="person-section">
       <h2 id="form-title">Agregar persona</h2>
       <form id="person-form">
         <label for="applicant-id">Identificador
@@ -190,7 +217,18 @@
         </label>
         <p class="meta">No es el número IVR. En el portal abre Continuar y copia el número de la barra de direcciones: .../schedule/12345678/...</p>
         <label for="consulate">Consulado
-          <select id="consulate" required></select>
+          <select id="consulate" required>
+            <option value="Ciudad Juarez">Ciudad Juárez</option>
+            <option value="Guadalajara">Guadalajara</option>
+            <option value="Hermosillo">Hermosillo</option>
+            <option value="Matamoros">Matamoros</option>
+            <option value="Merida">Mérida</option>
+            <option value="Mexico City">Ciudad de México</option>
+            <option value="Monterrey">Monterrey</option>
+            <option value="Nogales">Nogales</option>
+            <option value="Nuevo Laredo">Nuevo Laredo</option>
+            <option value="Tijuana">Tijuana</option>
+          </select>
         </label>
         <label class="check" for="no-appointment">
           <input id="no-appointment" type="checkbox">
@@ -220,8 +258,9 @@
       </form>
     </section>
 
-    <section>
+    <section id="people-section">
       <h2>Personas <span id="count" class="meta"></span></h2>
+      <p class="meta">La persona queda lista para consultar solo si marcaste la autorización.</p>
       <div id="people"><p class="empty">Todavía no hay personas en el grupo.</p></div>
     </section>
 
@@ -238,6 +277,15 @@
     </section>
   </main>
   <footer>Las fechas que aparecen son candidatas. Ninguna queda confirmada desde esta pantalla.</footer>
+  <dialog id="confirm-remove">
+    <form method="dialog">
+      <p id="confirm-text"></p>
+      <div class="actions">
+        <button class="quiet" value="cancel">Cancelar</button>
+        <button class="danger" value="ok">Quitar</button>
+      </div>
+    </form>
+  </dialog>
   <script>
     const STATUS = {
       ready_for_manual_login: 'Lista para consultar',
@@ -276,6 +324,26 @@
       $(selector).textContent = message || '';
     }
 
+    function notice(message) {
+      const el = $('#notice');
+      el.hidden = false;
+      el.textContent = message;
+    }
+
+    function scrollToSection(selector) {
+      $(selector).scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function askRemove(id) {
+      const dialog = $('#confirm-remove');
+      $('#confirm-text').textContent = `¿Quitar a ${id} del grupo? Deja de aparecer en la lista.`;
+      dialog.returnValue = '';
+      dialog.showModal();
+      return new Promise((resolve) => {
+        dialog.addEventListener('close', () => resolve(dialog.returnValue === 'ok'), { once: true });
+      });
+    }
+
     function personPayload() {
       return {
         applicant_id: $('#applicant-id').value.trim(),
@@ -308,7 +376,10 @@
     }
 
     function fillConsulates(consulates) {
+      if (!consulates.length) return;
       const select = $('#consulate');
+      const next = consulates.map((item) => `${item.id}:${item.label}`).join('|');
+      if (select.dataset.ids === next) return;
       const current = select.value;
       select.replaceChildren();
       for (const item of consulates) {
@@ -317,6 +388,7 @@
         option.textContent = item.label;
         select.append(option);
       }
+      select.dataset.ids = next;
       if (current) select.value = current;
     }
 
@@ -368,7 +440,17 @@
       $('#retry-read').disabled = false;
     }
 
-    async function refresh() {
+    let refreshTask = null;
+
+    function refresh() {
+      if (refreshTask) return refreshTask;
+      refreshTask = refreshNow().finally(() => {
+        refreshTask = null;
+      });
+      return refreshTask;
+    }
+
+    async function refreshNow() {
       const state = await api('GET', '/api/group');
       if (document.activeElement !== $('#group-name')) {
         $('#group-name').value = state.group_id || '';
@@ -403,6 +485,8 @@
       try {
         await api('PUT', '/api/group', { group_id: $('#group-name').value });
         await refresh();
+        notice('Nombre del grupo guardado.');
+        scrollToSection('#person-section');
       } catch (error) {
         show('#group-error', error.message);
       }
@@ -413,10 +497,14 @@
       show('#form-error', '');
       try {
         const payload = personPayload();
-        if (editingId) await api('PUT', `/api/applicants/${encodeURIComponent(editingId)}`, payload);
+        const editing = Boolean(editingId);
+        if (editing) await api('PUT', `/api/applicants/${encodeURIComponent(editingId)}`, payload);
         else await api('POST', '/api/applicants', payload);
         resetForm();
         await refresh();
+        const saved = editing ? 'Cambios guardados.' : `${payload.applicant_id} se agregó al grupo.`;
+        notice(payload.consent ? saved : `${saved} Falta la autorización para consultar.`);
+        scrollToSection('#people-section');
       } catch (error) {
         show('#form-error', error.message);
       }
@@ -441,9 +529,11 @@
           const state = await api('GET', '/api/group');
           editPerson(state, applicantId);
         } else if (button.classList.contains('remove')) {
+          if (!await askRemove(applicantId)) return;
           await api('DELETE', `/api/applicants/${encodeURIComponent(applicantId)}`);
           if (editingId === applicantId) resetForm();
           await refresh();
+          notice(`${applicantId} se quitó del grupo.`);
         }
       } catch (error) {
         show('#session-error', error.message);
@@ -494,6 +584,12 @@
     });
 
     refresh().catch((error) => show('#form-error', error.message));
+    setInterval(() => {
+      if (busy) return;
+      const active = document.activeElement;
+      if (active && ['INPUT', 'SELECT', 'TEXTAREA'].includes(active.tagName)) return;
+      refresh().catch(() => {});
+    }, 1500);
   </script>
 </body>
 </html>

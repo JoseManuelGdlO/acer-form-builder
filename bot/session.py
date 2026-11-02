@@ -79,12 +79,18 @@ class DateConsultation:
 
     def continue_after_login(self):
         with self._lock:
-            if self.status != 'waiting_for_login':
+            if self.status == 'reading':
+                already = True
+            elif self.status != 'waiting_for_login':
                 raise ConsultationError('No hay un inicio de sesión esperando.')
-            row = dict(self._find(self.applicant_id))
-            self.status = 'reading'
-            self.message = 'Leyendo el calendario…'
-            self._result.clear()
+            else:
+                already = False
+                row = dict(self._find(self.applicant_id))
+                self.status = 'reading'
+                self.message = 'Leyendo el calendario…'
+                self._result.clear()
+        if already:
+            return self._wait_result()
         self._commands.put(('read', row))
         return self._wait_result()
 
@@ -105,8 +111,12 @@ class DateConsultation:
     def cancel(self):
         with self._lock:
             if self._gateway is None:
-                return self.snapshot()
-            self._result.clear()
+                closed = True
+            else:
+                closed = False
+                self._result.clear()
+        if closed:
+            return self.snapshot()
         self._commands.put(('close', None))
         self._result.wait(10)
         return self.snapshot()
@@ -139,11 +149,29 @@ class DateConsultation:
         self._gateway = gateway
         self._set(
             status='waiting_for_login',
-            message='Se abrió el navegador. Inicia sesión, resuelve las verificaciones y pulsa Ya inicié sesión.',
+            message='Se abrió el navegador. Inicia sesión y resuelve las verificaciones. Al entrar, la consulta sigue sola. También puedes pulsar Ya inicié sesión.',
         )
         self._opened.set()
+        signed_in_checks = 0
         while True:
-            command, payload = self._commands.get()
+            try:
+                command, payload = self._commands.get(timeout=0.4)
+            except queue.Empty:
+                if self.snapshot()['status'] != 'waiting_for_login':
+                    signed_in_checks = 0
+                    continue
+                if not self._session_started(gateway):
+                    signed_in_checks = 0
+                    continue
+                signed_in_checks += 1
+                if signed_in_checks < 2:
+                    continue
+                current = self._find(self.applicant_id)
+                if current is None or not self._claim_read():
+                    continue
+                self._read(dict(current), gateway)
+                self._result.set()
+                continue
             if command == 'close':
                 self._close(gateway)
                 self._gateway = None
@@ -152,6 +180,24 @@ class DateConsultation:
                 return
             self._read(payload, gateway)
             self._result.set()
+
+    def _claim_read(self):
+        with self._lock:
+            if self.status != 'waiting_for_login':
+                return False
+            self.status = 'reading'
+            self.message = 'Leyendo el calendario…'
+            self._result.clear()
+            return True
+
+    def _session_started(self, gateway):
+        detect = getattr(gateway, 'session_started', None)
+        if detect is None:
+            return False
+        try:
+            return bool(detect())
+        except Exception:
+            return False
 
     def _read(self, row, gateway):
         try:

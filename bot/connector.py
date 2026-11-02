@@ -48,8 +48,18 @@ class AISBrowser:
         self.page.goto(BASE + '/users/sign_in', wait_until='domcontentloaded')
 
     def open_schedule(self):
-        self.page.goto(f'{BASE}/schedule/{quote(self.schedule_id)}/appointment', wait_until='domcontentloaded')
-        self.page.locator('#appointments_consulate_appointment_facility_id').wait_for(timeout=20000)
+        form = self.page.locator('#appointments_consulate_appointment_facility_id')
+        link = self.page.locator('a.button.primary[href*="/schedule/"], a[href*="/appointment"]')
+        for _ in range(3):
+            if form.count():
+                break
+            if not link.count():
+                break
+            link.first.click()
+            self.page.wait_for_load_state('domcontentloaded')
+        if not form.count():
+            self.page.goto(f'{BASE}/schedule/{quote(self.schedule_id)}/appointment', wait_until='domcontentloaded')
+        form.wait_for(timeout=20000)
 
     def select_location(self, location: str):
         if location not in FACILITIES:

@@ -79,6 +79,9 @@ def test_page_and_group_roundtrip(tmp_path):
         assert 'Esta persona autorizó consultar su cita' in html
         assert 'Aún no tiene cita' in html
         assert 'Ya inicié sesión' in html
+        assert 'Guarda el nombre del grupo' in html
+        assert 'confirm-remove' in html
+        assert 'se agregó al grupo' in html
         code, created = request(httpd, 'PUT', '/api/group', {'group_id': 'camion-001'})
         assert code == 200
         assert created['group_id'] == 'camion-001'

@@ -1,4 +1,5 @@
 from datetime import date
+import time
 
 import pytest
 from connector import PortalChanged
@@ -55,6 +56,31 @@ def ready_store(tmp_path, **overrides):
     saved.set_group_id('camion-001')
     saved.add(person(**overrides))
     return saved
+
+
+def test_login_continues_the_calendar_by_itself(tmp_path):
+    saved = ready_store(tmp_path)
+    portal = FakePortal(days=[date(2026, 11, 15), date(2026, 10, 1)])
+    portal.logged_in = False
+
+    def session_started():
+        return portal.logged_in
+
+    portal.session_started = session_started
+    consultation = DateConsultation(saved, lambda: portal)
+    waiting = consultation.start('persona-001')
+    assert waiting['status'] == 'waiting_for_login'
+    portal.logged_in = True
+    done = {}
+    for _ in range(40):
+        done = consultation.snapshot()
+        if done['status'] == 'done':
+            break
+        time.sleep(0.05)
+    assert done['status'] == 'done'
+    assert done['dates'] == ['2026-11-15']
+    assert portal.login_count == 1
+    assert portal.closed is False
 
 
 def test_start_requires_consent(tmp_path):

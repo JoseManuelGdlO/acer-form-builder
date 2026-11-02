@@ -24,6 +24,17 @@ class PlaywrightPortal:
     def open_login(self):
         self._bot.open_login()
 
+    def session_started(self):
+        page = self._page
+        if page is None:
+            return False
+        url = (page.url or '').split('?', 1)[0]
+        if not url.startswith('http'):
+            return False
+        if 'sign_in' not in url:
+            return True
+        return page.locator('#user_email').count() == 0
+
     def read_visible_days(self, location):
         from playwright.sync_api import TimeoutError as PlaywrightTimeout
         from connector import PortalChanged
