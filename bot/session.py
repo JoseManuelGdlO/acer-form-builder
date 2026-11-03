@@ -70,7 +70,7 @@ class DateConsultation:
                 reuse = False
         if reuse:
             return self._wait_result()
-        if not self._opened.wait(30):
+        if not self._opened.wait(180):  # shortcut: ~70 keystrokes at the login pace, raise this if the account is longer
             raise ConsultationError('No se pudo abrir el navegador.')
         current = self.snapshot()
         if current['status'] == 'error':

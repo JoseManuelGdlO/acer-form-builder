@@ -2,7 +2,7 @@ from datetime import date
 import os
 
 import pytest
-from connector import AISBrowser, calendar_step
+from connector import AISBrowser, STEP_DELAY_MS, TYPE_DELAY_MS, calendar_step
 from portal import MAX_READS, QUERY_CAP, PlaywrightPortal, PortalReadError, load_env
 
 FORM = '#appointments_consulate_appointment_facility_id'
@@ -135,8 +135,13 @@ def test_login_counts_when_the_form_is_gone():
 
 
 class _FillPage:
-    def __init__(self, email_field=True):
+    def __init__(self, email_field=True, ready=True):
         self.fills = []
+        self.typed = {}
+        self.values = {}
+        self.checked = False
+        self.ready = ready
+        self.pauses = []
         self.gone = None
         self.email_field = email_field
 
@@ -145,6 +150,9 @@ class _FillPage:
 
     def wait_for_load_state(self, state):
         return None
+
+    def wait_for_timeout(self, ms):
+        self.pauses.append(ms)
 
     def evaluate(self, script):
         self.fills.append('scroll')
@@ -159,14 +167,26 @@ class _FillPage:
             def count(self):
                 return 1 if present else 0
 
-            def fill(self, value):
-                page.fills.append(selector)
-
             def click(self):
+                if selector == 'label':
+                    page.checked = True
+                if selector not in ('#user_email', '#user_password'):
+                    page.fills.append(selector)
+
+            def press_sequentially(self, value, delay=0):
                 page.fills.append(selector)
+                page.typed[selector] = (value, delay)
+                page.values[selector] = value
 
             def check(self):
+                page.checked = True
                 page.fills.append(selector)
+
+            def input_value(self):
+                return page.values.get(selector, '') if page.ready else ''
+
+            def is_checked(self):
+                return page.ready and page.checked
 
             def scroll_into_view_if_needed(self):
                 return None
@@ -192,6 +212,17 @@ def test_open_login_fills_when_credentials_are_passed():
     page = _FillPage()
     AISBrowser(page, '123456').open_login('a@b.c', 'secret')
     assert page.fills == ['scroll', '#user_email', '#user_password', 'label', 'input[name="commit"]']
+    assert page.typed == {
+        '#user_email': ('a@b.c', TYPE_DELAY_MS),
+        '#user_password': ('secret', TYPE_DELAY_MS),
+    }
+    assert page.pauses == [STEP_DELAY_MS, STEP_DELAY_MS, STEP_DELAY_MS]
+
+
+def test_login_button_waits_until_the_form_is_complete():
+    page = _FillPage(ready=False)
+    AISBrowser(page, '123456').open_login('a@b.c', 'secret')
+    assert 'input[name="commit"]' not in page.fills
 
 
 class _CapBot:

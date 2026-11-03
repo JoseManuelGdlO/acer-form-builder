@@ -9,6 +9,8 @@ from urllib.parse import quote
 import re
 
 BASE = 'https://ais.usvisa-info.com/es-mx/niv'
+TYPE_DELAY_MS = 2500
+STEP_DELAY_MS = 6000
 FACILITIES = {
     'Ciudad Juarez': ('65', '76'), 'Guadalajara': ('66', '77'),
     'Hermosillo': ('67', '78'), 'Matamoros': ('68', '79'),
@@ -64,15 +66,25 @@ class AISBrowser:
             return
         self.page.evaluate('window.scrollTo(0, document.body.scrollHeight)')
         form.scroll_into_view_if_needed()
-        form.fill(email)
-        self.page.locator('#user_password').fill(password)
+        self._type_slowly(form, email)
+        self._type_slowly(self.page.locator('#user_password'), password)
         terms = self.page.locator('label').filter(has_text=re.compile(r'he le[ií]do y comprendido', re.I))
         if terms.count():
             terms.first.click()
         else:
             self.page.locator('#policy_confirmed').check()
-        self.page.locator('input[name="commit"]').click()
-        self.page.wait_for_load_state('domcontentloaded')
+        self.page.wait_for_timeout(STEP_DELAY_MS)
+        email_ok = self.page.locator('#user_email').input_value() == email
+        password_ok = self.page.locator('#user_password').input_value() == password
+        checked = self.page.locator('#policy_confirmed').is_checked()
+        if email_ok and password_ok and checked:
+            self.page.locator('input[name="commit"]').click()
+            self.page.wait_for_load_state('domcontentloaded')
+
+    def _type_slowly(self, field, text):
+        field.click()
+        field.press_sequentially(text, delay=TYPE_DELAY_MS)
+        self.page.wait_for_timeout(STEP_DELAY_MS)
 
     def open_schedule(self):
         form = self.page.locator('#appointments_consulate_appointment_facility_id')
