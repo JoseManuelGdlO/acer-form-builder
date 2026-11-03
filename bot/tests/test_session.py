@@ -4,6 +4,7 @@ import time
 import pytest
 from connector import PortalChanged
 from group_store import GroupStore
+from portal import QUERY_CAP, PortalReadError
 from session import ConsultationError, DateConsultation
 
 
@@ -41,7 +42,7 @@ class FakePortal:
         self.login_opened = True
         self.login_count += 1
 
-    def read_visible_days(self, location):
+    def read_visible_days(self, location, **_window):
         self.location = location
         if self.error:
             raise self.error
@@ -194,4 +195,16 @@ def test_next_person_reuses_the_same_login(tmp_path):
     assert portal.login_count == 1
     assert portal.schedule_id == '654321'
     assert portal.location == 'Tijuana'
+    assert portal.closed is False
+
+
+def test_query_cap_shows_on_the_page(tmp_path):
+    saved = ready_store(tmp_path)
+    portal = FakePortal(error=PortalReadError(QUERY_CAP))
+    consultation = DateConsultation(saved, lambda: portal)
+    consultation.start('persona-001')
+    done = consultation.continue_after_login()
+    assert done['status'] == 'error'
+    assert done['dates'] == []
+    assert done['message'] == QUERY_CAP
     assert portal.closed is False

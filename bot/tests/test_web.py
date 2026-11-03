@@ -22,7 +22,7 @@ class FakePortal:
     def open_login(self):
         self.login_opened = True
 
-    def read_visible_days(self, location):
+    def read_visible_days(self, location, **_window):
         from datetime import date
         self.location = location
         return [date(2026, 11, 15)]

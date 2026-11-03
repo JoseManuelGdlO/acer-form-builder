@@ -6,7 +6,7 @@ import threading
 
 from connector import PortalChanged
 from engine import Applicant
-from portal import PortalReadError
+from portal import QUERY_CAP, PortalReadError
 
 _READ_FAILURE = 'No se pudo leer el calendario. No se confirmó ninguna cita. La sesión sigue abierta.'
 _KEEP_OPEN = ' La sesión sigue abierta.'
@@ -202,10 +202,10 @@ class DateConsultation:
     def _read(self, row, gateway):
         try:
             gateway.open(row['schedule_id'])
-            visible = gateway.read_visible_days(row['consulate'])
             earliest = date.fromisoformat(row['earliest'])
             latest = date.fromisoformat(row['latest'])
             current = date.fromisoformat(row['current_date']) if row.get('current_date') else None
+            visible = gateway.read_visible_days(row['consulate'], earliest=earliest, latest=latest, current=current)
             chosen = sorted(
                 day for day in visible
                 if earliest <= day <= latest and (current is None or day < current)
@@ -218,7 +218,13 @@ class DateConsultation:
             )
             self._set(status='done', applicant_id=row['applicant_id'], dates=dates, message=message)
             self._record(row, 'dates_read', {'dates': dates, 'consulate': row['consulate']})
-        except (PortalChanged, PortalReadError):
+        except PortalReadError as exc:
+            if str(exc) == QUERY_CAP:
+                self._set(status='error', applicant_id=row['applicant_id'], dates=[], message=QUERY_CAP)
+                self._record(row, 'dates_read_failed', {'reason': 'cap'})
+                return
+            self._fail_read(row)
+        except PortalChanged:
             self._fail_read(row)
         except Exception as exc:
             print(f'Consulta fallida: {type(exc).__name__}', file=sys.stderr)
