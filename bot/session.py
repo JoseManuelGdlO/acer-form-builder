@@ -146,11 +146,25 @@ class DateConsultation:
             self._close(gateway)
             self._opened.set()
             return
+        locked = getattr(gateway, 'account_locked', None)
+        blocked = False
+        if callable(locked):
+            try:
+                blocked = bool(locked())
+            except Exception:
+                blocked = False
         self._gateway = gateway
-        self._set(
-            status='waiting_for_login',
-            message='Se abrió el navegador. Inicia sesión y resuelve las verificaciones. Al entrar, la consulta sigue sola. También puedes pulsar Ya inicié sesión.',
-        )
+        if blocked:
+            self._set(
+                status='error',
+                message='La cuenta del portal está bloqueada. Espera a que se desbloquee; no se reintenta el inicio de sesión.',
+                dates=[],
+            )
+        else:
+            self._set(
+                status='waiting_for_login',
+                message='Se abrió el navegador. Inicia sesión y resuelve las verificaciones. Al entrar, la consulta sigue sola. También puedes pulsar Ya inicié sesión.',
+            )
         self._opened.set()
         signed_in_checks = 0
         while True:

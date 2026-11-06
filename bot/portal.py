@@ -55,6 +55,9 @@ class PlaywrightPortal:
         if self.session_started():
             self._save_state()
 
+    def account_locked(self):
+        return bool(self._bot is not None and self._bot.account_locked())
+
     def session_started(self):
         page = self._page
         if page is None:
@@ -62,9 +65,13 @@ class PlaywrightPortal:
         url = (page.url or '').split('?', 1)[0]
         if not url.startswith('http'):
             return False
-        if 'sign_in' not in url:
-            return True
-        return page.locator('#user_email').count() == 0
+        if 'sign_in' in url:
+            return False
+        if self._bot is not None and self._bot._wall_up():
+            return False
+        if page.locator('.swal2-container, .swal2-shown').count():
+            return False
+        return True
 
     def read_visible_days(self, location, earliest=None, latest=None, current=None):
         from playwright.sync_api import TimeoutError as PlaywrightTimeout

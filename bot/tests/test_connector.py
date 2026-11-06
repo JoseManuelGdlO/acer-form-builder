@@ -20,9 +20,12 @@ class _Loc:
         self.page.clicks += 1
         self.page.phase += 1
 
-    def wait_for(self, timeout):
+    def wait_for(self, timeout=None, state=None):
         if not self.present():
             raise TimeoutError('form')
+
+    def filter(self, has_text=None):
+        return self
 
     @property
     def first(self):
@@ -39,7 +42,13 @@ class _Page:
     def locator(self, selector):
         if selector == FORM:
             return _Loc(self, lambda: self.phase >= 2)
+        if 'swal2' in selector or selector == 'button':
+            return _Loc(self, lambda: False)
         return _Loc(self, lambda: self.links and self.phase < 2)
+
+    @property
+    def url(self):
+        return self.gone or ''
 
     def wait_for_load_state(self, state):
         return None
@@ -87,7 +96,9 @@ class _EnterPage:
     def locator(self, selector):
         if selector == FORM:
             return _Loc(self, lambda: self.phase >= 2)
-        return _Loc(self, lambda: self.phase == 1)
+        if 'swal2' in selector or selector == 'button':
+            return _Loc(self, lambda: False)
+        return _Loc(self, lambda: self.phase >= 1)
 
     def get_by_text(self, pattern):
         return _Option(self)
@@ -97,6 +108,10 @@ class _EnterPage:
 
     def goto(self, url, wait_until):
         self.gone = url
+
+    @property
+    def url(self):
+        return self.gone or ''
 
 
 def test_clicks_schedule_option_then_enters():
@@ -122,6 +137,8 @@ class _LoginPage:
     def locator(self, selector):
         class _Count:
             def count(_self):
+                if 'swal' in selector:
+                    return 0
                 return self.email
         return _Count()
 
@@ -129,24 +146,32 @@ class _LoginPage:
 def test_login_counts_when_the_form_is_gone():
     portal = PlaywrightPortal()
     portal._page = _LoginPage('https://ais.usvisa-info.com/es-mx/niv/users/sign_in', email=0)
-    assert portal.session_started() is True
-    portal._page = _LoginPage('https://ais.usvisa-info.com/es-mx/niv/users/sign_in', email=1)
     assert portal.session_started() is False
+    portal._page = _LoginPage('https://ais.usvisa-info.com/es-mx/niv/groups', email=0)
+    assert portal.session_started() is True
 
 
 class _FillPage:
-    def __init__(self, email_field=True, ready=True):
+    def __init__(self, email_field=True, ready=True, stuck=False):
         self.fills = []
         self.typed = {}
         self.values = {}
         self.checked = False
         self.ready = ready
+        self.stuck = stuck
+        self.commits = 0
+        self.notice = ''
+        self.dialog = False
         self.pauses = []
         self.gone = None
         self.email_field = email_field
 
     def goto(self, url, wait_until):
         self.gone = url
+
+    @property
+    def url(self):
+        return self.gone or ''
 
     def wait_for_load_state(self, state):
         return None
@@ -165,13 +190,45 @@ class _FillPage:
 
         class Field:
             def count(self):
+                if '.alert' in selector or selector.startswith('body'):
+                    return 1 if page.notice else 0
+                if 'swal2' in selector:
+                    return 1 if page.dialog else 0
                 return 1 if present else 0
 
-            def click(self):
-                if selector == 'label':
+            def click(self, **_kwargs):
+                if 'swal2' in selector:
+                    page.dialog = False
+                    page.fills.append('OK')
+                    return
+                if 'iCheck' in selector or 'icheckbox' in selector or selector == '#policy_confirmed':
                     page.checked = True
+                if 'commit' in selector:
+                    page.commits += 1
+                    if page.stuck and page.commits == 1:
+                        page.dialog = True
+                        page.notice = 'You need to sign in or sign up before continuing.'
+                    else:
+                        page.gone = 'https://ais.usvisa-info.com/es-mx/niv/groups'
+                        page.notice = ''
+                        page.dialog = False
                 if selector not in ('#user_email', '#user_password'):
                     page.fills.append(selector)
+
+            def inner_text(self):
+                return page.notice
+
+            def fill(self, value):
+                if value == '':
+                    page.values[selector] = ''
+
+            def wait_for(self, state=None, timeout=None):
+                if 'swal2' in selector and not page.dialog and state != 'hidden':
+                    raise TimeoutError('modal')
+                return None
+
+            def is_visible(self):
+                return 'swal2' in selector and page.dialog
 
             def press_sequentially(self, value, delay=0):
                 page.fills.append(selector)
@@ -211,7 +268,10 @@ def test_open_login_skips_fill_without_credentials():
 def test_open_login_fills_when_credentials_are_passed():
     page = _FillPage()
     AISBrowser(page, '123456').open_login('a@b.c', 'secret')
-    assert page.fills == ['scroll', '#user_email', '#user_password', 'label', 'input[name="commit"]']
+    assert page.fills == [
+        'scroll', '#user_email', '#user_password',
+        '.iCheck-helper, .icheckbox', 'input[name="commit"]',
+    ]
     assert page.typed == {
         '#user_email': ('a@b.c', TYPE_DELAY_MS),
         '#user_password': ('secret', TYPE_DELAY_MS),
@@ -222,7 +282,59 @@ def test_open_login_fills_when_credentials_are_passed():
 def test_login_button_waits_until_the_form_is_complete():
     page = _FillPage(ready=False)
     AISBrowser(page, '123456').open_login('a@b.c', 'secret')
+    assert page.fills == ['scroll', '#user_email']
+    assert 'label' not in page.fills
     assert 'input[name="commit"]' not in page.fills
+
+
+def test_login_clicks_ok_and_does_not_submit_again():
+    page = _FillPage(stuck=True)
+    AISBrowser(page, '123456').open_login('a@b.c', 'secret')
+    assert page.commits == 1
+    assert page.fills.count('input[name="commit"]') == 1
+    assert 'OK' in page.fills
+    assert page.dialog is False
+    assert page.gone.endswith('/users/sign_in')
+    assert 'label' not in ''.join(page.fills)
+
+
+def test_login_stops_when_the_account_is_locked():
+    page = _FillPage()
+    page.notice = 'Your account is locked until 06 November, 2026, 11:57:41 CST.'
+    AISBrowser(page, '123456').open_login('a@b.c', 'secret')
+    assert page.commits == 0
+    assert AISBrowser(page, '123456').account_locked() is True
+
+
+def test_closes_extra_privacy_tab():
+    page = _FillPage(stuck=True)
+    extra = type('Tab', (), {'closed': False})()
+    extra.close = lambda: setattr(extra, 'closed', True)
+    page.context = type('Ctx', (), {'pages': [page, extra]})()
+    AISBrowser(page, '123456').open_login('a@b.c', 'secret')
+    assert extra.closed is True
+
+
+def test_opens_the_date_field_when_there_is_no_calendar_link():
+    class Page:
+        def __init__(self):
+            self.clicks = []
+
+        def locator(self, selector):
+            page = self
+
+            class Loc:
+                def count(self):
+                    return 0 if 'href="#select"' in selector else 1
+
+                def click(self):
+                    page.clicks.append(selector)
+
+            return Loc()
+
+    page = Page()
+    AISBrowser(page, '123456')._open_datepicker()
+    assert page.clicks == ['#appointments_consulate_appointment_date']
 
 
 class _CapBot:
