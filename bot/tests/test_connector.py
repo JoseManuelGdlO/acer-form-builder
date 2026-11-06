@@ -152,13 +152,14 @@ def test_login_counts_when_the_form_is_gone():
 
 
 class _FillPage:
-    def __init__(self, email_field=True, ready=True, stuck=False):
+    def __init__(self, email_field=True, ready=True, stuck=False, bounce=False):
         self.fills = []
         self.typed = {}
         self.values = {}
         self.checked = False
         self.ready = ready
         self.stuck = stuck
+        self.bounce = bounce
         self.commits = 0
         self.notice = ''
         self.dialog = False
@@ -208,6 +209,10 @@ class _FillPage:
                     if page.stuck and page.commits == 1:
                         page.dialog = True
                         page.notice = 'You need to sign in or sign up before continuing.'
+                    elif page.bounce and page.commits == 1:
+                        page.values = {}
+                        page.checked = False
+                        page.gone = 'https://ais.usvisa-info.com/es-mx/niv/users/sign_in'
                     else:
                         page.gone = 'https://ais.usvisa-info.com/es-mx/niv/groups'
                         page.notice = ''
@@ -285,6 +290,14 @@ def test_login_button_waits_until_the_form_is_complete():
     assert page.fills == ['scroll', '#user_email']
     assert 'label' not in page.fills
     assert 'input[name="commit"]' not in page.fills
+
+
+def test_login_refills_once_when_the_form_comes_back_empty():
+    page = _FillPage(bounce=True)
+    AISBrowser(page, '123456').open_login('a@b.c', 'secret')
+    assert page.commits == 2
+    assert page.fills.count('#user_email') == 2
+    assert page.gone.endswith('/groups')
 
 
 def test_login_clicks_ok_and_does_not_submit_again():

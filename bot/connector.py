@@ -61,24 +61,52 @@ class AISBrowser:
 
     def open_login(self, email='', password=''):
         self.page.goto(BASE + '/users/sign_in', wait_until='domcontentloaded')
-        form = self.page.locator('#user_email')
-        if not email or not password or not form.count():
+        if not self._fill_login(email, password):
             return
+        self._click_enter()
+        if self._wall_up():
+            self._dismiss_signin_wall()
+            return
+        if self.account_locked() or not self._bounced_to_login():
+            return
+        if not self._fill_login(email, password):
+            return
+        self._click_enter()
+        if self._wall_up():
+            self._dismiss_signin_wall()
+
+    def _fill_login(self, email, password):
+        if not email or not password or self.account_locked() or self._wall_up():
+            return False
+        form = self.page.locator('#user_email')
+        if not form.count():
+            return False
         self.page.evaluate('window.scrollTo(0, document.body.scrollHeight)')
         form.scroll_into_view_if_needed()
         form.wait_for(state='visible')
         if not self._type_slowly(form, email):
-            return
+            return False
         password_box = self.page.locator('#user_password')
         if not self._type_slowly(password_box, password):
-            return
-        if self.account_locked():
-            return
-        if not self._tick_policy():
-            return
-        self._click_enter()
-        if self._login_blocked() or self._wall_up():
-            self._dismiss_signin_wall()
+            return False
+        return self._tick_policy()
+
+    def _bounced_to_login(self):
+        for _ in range(10):
+            if self.account_locked() or self._wall_up():
+                return False
+            url = (self.page.url or '').split('?', 1)[0]
+            if 'sign_in' not in url:
+                return False
+            box = self.page.locator('#user_email')
+            try:
+                empty = box.count() and box.input_value() == ''
+            except Exception:
+                empty = False
+            if empty:
+                return True
+            self.page.wait_for_timeout(STEP_DELAY_MS)
+        return False
 
     def _click_enter(self):
         if self._wall_up() or self.account_locked():
@@ -127,16 +155,6 @@ class AISBrowser:
         except Exception:
             pass
         return True
-
-    def _login_blocked(self):
-        url = (self.page.url or '').split('?', 1)[0]
-        if 'sign_in' in url:
-            return True
-        notice = self.page.locator('.alert, .notice, #flash_notice')
-        if not notice.count():
-            return False
-        text = notice.first.inner_text() or ''
-        return bool(re.search(r'iniciar sesi[oó]n|sign in or sign up', text, re.I))
 
     def _tick_policy(self):
         box = self.page.locator('#policy_confirmed')
