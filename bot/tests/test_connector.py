@@ -2,7 +2,7 @@ from datetime import date
 import os
 
 import pytest
-from connector import AISBrowser, STEP_DELAY_MS, TYPE_DELAY_MS, calendar_step
+from connector import AISBrowser, STEP_DELAY_MS, TYPE_DELAY_MS, calendar_step, PortalChanged
 from portal import MAX_READS, QUERY_CAP, PlaywrightPortal, PortalReadError, load_env
 
 FORM = '#appointments_consulate_appointment_facility_id'
@@ -124,9 +124,18 @@ def test_clicks_schedule_option_then_enters():
 
 def test_opens_the_form_directly_when_there_is_no_link():
     page = _Page(links=False)
+    page.gone = 'https://ais.usvisa-info.com/es-mx/niv/groups'
     AISBrowser(page, '123456').open_schedule()
     assert page.clicks == 0
     assert page.gone.endswith('/schedule/123456/appointment')
+
+
+def test_open_schedule_does_not_open_appointment_from_home():
+    page = _Page(links=False)
+    page.gone = 'https://ais.usvisa-info.com/es-mx/niv'
+    with pytest.raises(PortalChanged):
+        AISBrowser(page, '123456').open_schedule()
+    assert page.gone.endswith('/niv')
 
 
 class _LoginPage:
@@ -149,17 +158,22 @@ def test_login_counts_when_the_form_is_gone():
     assert portal.session_started() is False
     portal._page = _LoginPage('https://ais.usvisa-info.com/es-mx/niv/groups', email=0)
     assert portal.session_started() is True
+    portal._page = _LoginPage('https://ais.usvisa-info.com/es-mx/niv', email=0)
+    assert portal.session_started() is False
+    portal._page = _LoginPage('https://ais.usvisa-info.com/es-mx/niv/groups', email=1)
+    assert portal.session_started() is False
+    portal._page = _LoginPage('https://ais.usvisa-info.com/es-mx/niv/schedule/123456/appointment', email=0)
+    assert portal.session_started() is True
 
 
 class _FillPage:
-    def __init__(self, email_field=True, ready=True, stuck=False, bounce=False):
+    def __init__(self, email_field=True, ready=True, stuck=False):
         self.fills = []
         self.typed = {}
         self.values = {}
         self.checked = False
         self.ready = ready
         self.stuck = stuck
-        self.bounce = bounce
         self.commits = 0
         self.notice = ''
         self.dialog = False
@@ -179,6 +193,16 @@ class _FillPage:
 
     def wait_for_timeout(self, ms):
         self.pauses.append(ms)
+
+    def expect_navigation(self, timeout=None):
+        class _Nav:
+            def __enter__(_self):
+                return _self
+
+            def __exit__(_self, *_args):
+                return False
+
+        return _Nav()
 
     def evaluate(self, script):
         self.fills.append('scroll')
@@ -209,10 +233,6 @@ class _FillPage:
                     if page.stuck and page.commits == 1:
                         page.dialog = True
                         page.notice = 'You need to sign in or sign up before continuing.'
-                    elif page.bounce and page.commits == 1:
-                        page.values = {}
-                        page.checked = False
-                        page.gone = 'https://ais.usvisa-info.com/es-mx/niv/users/sign_in'
                     else:
                         page.gone = 'https://ais.usvisa-info.com/es-mx/niv/groups'
                         page.notice = ''
@@ -290,14 +310,6 @@ def test_login_button_waits_until_the_form_is_complete():
     assert page.fills == ['scroll', '#user_email']
     assert 'label' not in page.fills
     assert 'input[name="commit"]' not in page.fills
-
-
-def test_login_refills_once_when_the_form_comes_back_empty():
-    page = _FillPage(bounce=True)
-    AISBrowser(page, '123456').open_login('a@b.c', 'secret')
-    assert page.commits == 2
-    assert page.fills.count('#user_email') == 2
-    assert page.gone.endswith('/groups')
 
 
 def test_login_clicks_ok_and_does_not_submit_again():

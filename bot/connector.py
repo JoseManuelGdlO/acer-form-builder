@@ -66,14 +66,6 @@ class AISBrowser:
         self._click_enter()
         if self._wall_up():
             self._dismiss_signin_wall()
-            return
-        if self.account_locked() or not self._bounced_to_login():
-            return
-        if not self._fill_login(email, password):
-            return
-        self._click_enter()
-        if self._wall_up():
-            self._dismiss_signin_wall()
 
     def _fill_login(self, email, password):
         if not email or not password or self.account_locked() or self._wall_up():
@@ -91,31 +83,26 @@ class AISBrowser:
             return False
         return self._tick_policy()
 
-    def _bounced_to_login(self):
-        for _ in range(10):
-            if self.account_locked() or self._wall_up():
-                return False
-            url = (self.page.url or '').split('?', 1)[0]
-            if 'sign_in' not in url:
-                return False
-            box = self.page.locator('#user_email')
-            try:
-                empty = box.count() and box.input_value() == ''
-            except Exception:
-                empty = False
-            if empty:
-                return True
-            self.page.wait_for_timeout(STEP_DELAY_MS)
-        return False
-
     def _click_enter(self):
         if self._wall_up() or self.account_locked():
             return
-        self.page.locator('input[name="commit"]').first.click()
+        button = self.page.locator('input[name="commit"]').first
+        expect = getattr(self.page, 'expect_navigation', None)
+        if expect is None:
+            button.click()
+            try:
+                self.page.wait_for_load_state('domcontentloaded')
+            except Exception:
+                pass
+            return
         try:
-            self.page.wait_for_load_state('domcontentloaded')
+            with expect(timeout=15000):
+                button.click()
         except Exception:
-            pass
+            try:
+                self.page.wait_for_load_state('domcontentloaded')
+            except Exception:
+                pass
 
     def _close_extra_pages(self):
         context = getattr(self.page, 'context', None)
@@ -194,6 +181,9 @@ class AISBrowser:
                 break
             self.page.wait_for_load_state('domcontentloaded')
         if not form.count():
+            url = (self.page.url or '').split('?', 1)[0]
+            if '/groups' not in url and '/schedule' not in url:
+                raise PortalChanged('not signed in')
             self.page.goto(f'{BASE}/schedule/{quote(self.schedule_id)}/appointment', wait_until='domcontentloaded')
         form.wait_for(timeout=20000)
 

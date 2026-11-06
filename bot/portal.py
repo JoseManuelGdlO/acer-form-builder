@@ -67,9 +67,13 @@ class PlaywrightPortal:
             return False
         if 'sign_in' in url:
             return False
+        if '/groups' not in url and '/schedule' not in url:
+            return False
         if self._bot is not None and self._bot._wall_up():
             return False
         if page.locator('.swal2-container, .swal2-shown').count():
+            return False
+        if page.locator('#user_email').count():
             return False
         return True
 
