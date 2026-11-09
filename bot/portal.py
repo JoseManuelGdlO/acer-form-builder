@@ -50,6 +50,8 @@ class PlaywrightPortal:
     def open_login(self):
         if self.session_started():
             return
+        if self._context is not None:
+            self._context.clear_cookies()
         load_env()
         self._bot.open_login(os.environ.get('VISA_EMAIL', ''), os.environ.get('VISA_PASSWORD', ''))
         if self.session_started():

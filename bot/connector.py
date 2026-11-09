@@ -61,6 +61,11 @@ class AISBrowser:
 
     def open_login(self, email='', password=''):
         self.page.goto(BASE + '/users/sign_in', wait_until='domcontentloaded')
+        token = self.page.locator('input[name="authenticity_token"], meta[name="csrf-token"]')
+        try:
+            token.first.wait_for(state='attached')
+        except Exception:
+            return
         if not self._fill_login(email, password):
             return
         self._click_enter()
@@ -145,13 +150,17 @@ class AISBrowser:
 
     def _tick_policy(self):
         box = self.page.locator('#policy_confirmed')
+        if box.count() and box.is_checked():
+            return True
         helper = self.page.locator('.iCheck-helper, .icheckbox')
         if helper.count():
             helper.first.click()
         elif box.count():
             box.check()
+        else:
+            return False
         self.page.wait_for_timeout(STEP_DELAY_MS)
-        return box.is_checked()
+        return bool(box.count() and box.is_checked())
 
     def _type_slowly(self, field, text):
         field.click()

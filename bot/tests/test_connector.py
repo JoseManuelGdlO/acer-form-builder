@@ -167,13 +167,14 @@ def test_login_counts_when_the_form_is_gone():
 
 
 class _FillPage:
-    def __init__(self, email_field=True, ready=True, stuck=False):
+    def __init__(self, email_field=True, ready=True, stuck=False, check_sticks=True):
         self.fills = []
         self.typed = {}
         self.values = {}
         self.checked = False
         self.ready = ready
         self.stuck = stuck
+        self.check_sticks = check_sticks
         self.commits = 0
         self.notice = ''
         self.dialog = False
@@ -227,7 +228,8 @@ class _FillPage:
                     page.fills.append('OK')
                     return
                 if 'iCheck' in selector or 'icheckbox' in selector or selector == '#policy_confirmed':
-                    page.checked = True
+                    if page.check_sticks:
+                        page.checked = True
                 if 'commit' in selector:
                     page.commits += 1
                     if page.stuck and page.commits == 1:
@@ -302,6 +304,45 @@ def test_open_login_fills_when_credentials_are_passed():
         '#user_password': ('secret', TYPE_DELAY_MS),
     }
     assert page.pauses == [STEP_DELAY_MS, STEP_DELAY_MS, STEP_DELAY_MS]
+
+
+def test_login_does_not_submit_when_policy_stays_unchecked():
+    page = _FillPage(check_sticks=False)
+    AISBrowser(page, '123456').open_login('a@b.c', 'secret')
+    assert page.commits == 0
+    assert 'input[name="commit"]' not in page.fills
+
+
+def test_login_skips_policy_click_when_already_checked():
+    page = _FillPage()
+    page.checked = True
+    AISBrowser(page, '123456').open_login('a@b.c', 'secret')
+    assert page.commits == 1
+    assert '.iCheck-helper, .icheckbox' not in page.fills
+
+
+def test_open_login_clears_cookies_when_not_signed_in(monkeypatch):
+    cleared = []
+    portal = PlaywrightPortal()
+    portal._context = type('Ctx', (), {'clear_cookies': lambda *a: cleared.append(True)})()
+    portal._page = _LoginPage('https://ais.usvisa-info.com/es-mx/niv/users/sign_in', email=1)
+    portal._bot = AISBrowser(_FillPage(), '123456')
+    monkeypatch.setenv('VISA_EMAIL', 'a@b.c')
+    monkeypatch.setenv('VISA_PASSWORD', 'secret')
+    portal.open_login()
+    assert cleared == [True]
+    assert portal._bot.page.commits == 1
+
+
+def test_open_login_keeps_cookies_when_already_signed_in():
+    cleared = []
+    portal = PlaywrightPortal()
+    portal._context = type('Ctx', (), {'clear_cookies': lambda *a: cleared.append(True)})()
+    portal._page = _LoginPage('https://ais.usvisa-info.com/es-mx/niv/groups', email=0)
+    portal._bot = AISBrowser(_FillPage(), '123456')
+    portal.open_login()
+    assert cleared == []
+    assert portal._bot.page.commits == 0
 
 
 def test_login_button_waits_until_the_form_is_complete():
