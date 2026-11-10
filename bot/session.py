@@ -226,7 +226,7 @@ class DateConsultation:
             )
             dates = [day.isoformat() for day in chosen]
             message = (
-                'Fechas candidatas. Ninguna está confirmada.' + _KEEP_OPEN
+                'Se eligió fecha en el rango y se pulsó Programar cita. Verifica en el navegador.' + _KEEP_OPEN
                 if dates else
                 'No hay fechas candidatas en ese rango. No se confirmó ninguna cita.' + _KEEP_OPEN
             )

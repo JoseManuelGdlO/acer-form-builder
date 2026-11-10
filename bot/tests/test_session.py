@@ -107,7 +107,7 @@ def test_start_waits_and_continue_filters_dates(tmp_path):
     done = consultation.continue_after_login()
     assert done['status'] == 'done'
     assert done['dates'] == ['2026-11-15', '2026-12-01']
-    assert 'no están confirmadas' in done['message'].lower() or 'Ninguna está confirmada' in done['message']
+    assert 'Programar cita' in done['message']
     assert portal.closed is False
     assert portal.location == 'Monterrey'
     assert portal.schedule_id == '123456'

@@ -200,11 +200,57 @@ class AISBrowser:
         if location not in FACILITIES:
             raise ValueError('Unknown location')
         consulate, asc = FACILITIES[location]
-        self.page.locator('#appointments_consulate_appointment_facility_id').select_option(consulate)
-        date_field = self.page.locator('#appointments_consulate_appointment_date')
-        if date_field.count():
-            date_field.wait_for(state='visible')
+        facility = self.page.locator('#appointments_consulate_appointment_facility_id')
+        self._see(facility)
+        facility.select_option(consulate)
+        self._wait_date_enabled()
         return consulate, asc
+
+    def complete_in_range(self, location, earliest, latest, current=None):
+        self.select_location(location)
+        days = self.pick_day_in_range(earliest, latest, current)
+        if not days:
+            return []
+        self._pick_first_time()
+        self._select_asc_if_needed(location)
+        self._click_schedule()
+        return days
+
+    def _see(self, loc):
+        target = loc.first if hasattr(loc, 'first') else loc
+        try:
+            target.evaluate("el => el.scrollIntoView({behavior: 'smooth', block: 'center'})")
+        except Exception:
+            try:
+                target.scroll_into_view_if_needed()
+            except Exception:
+                pass
+        self.page.wait_for_timeout(STEP_DELAY_MS)
+
+    def _wait_date_enabled(self):
+        self._wait_enabled(self.page.locator('#appointments_consulate_appointment_date'), 'date field')
+
+    def _wait_enabled(self, field, name):
+        if not field.count():
+            raise PortalChanged(name)
+        try:
+            field.wait_for(state='visible')
+        except Exception:
+            pass
+        for _ in range(19):
+            if not self._date_blocked(field):
+                return
+            self.page.wait_for_timeout(STEP_DELAY_MS)
+        raise PortalChanged(name)
+
+    def _date_blocked(self, field):
+        probe = getattr(field, 'is_disabled', None)
+        if probe is not None:
+            try:
+                return bool(probe())
+            except Exception:
+                return True
+        return field.get_attribute('disabled') is not None
 
     def visible_consulate_days(self) -> list[date]:
         """Read only days visible in the official datepicker; no private endpoints."""
@@ -212,7 +258,7 @@ class AISBrowser:
         return self._open_days()
 
     def pick_day_in_range(self, earliest, latest, current=None):
-        """Click the earliest open day in the saved window. Does not submit."""
+        """Click the earliest open day in the saved window."""
         self._open_datepicker()
         for _ in range(24):
             shown = self._shown_month()
@@ -232,14 +278,63 @@ class AISBrowser:
         return []
 
     def _open_datepicker(self):
+        label = self.page.locator('label[for="appointments_consulate_appointment_date"]')
+        if not label.count():
+            label = self.page.locator('label').filter(has_text=re.compile(r'Fecha de la cita', re.I))
         trigger = self.page.locator('#appointments_consulate_appointment_date_input a[href="#select"]')
         field = self.page.locator('#appointments_consulate_appointment_date')
-        if trigger.count():
+        if label.count():
+            self._see(label)
+            label.first.click()
+        elif trigger.count():
+            self._see(trigger)
             trigger.click()
         elif field.count():
+            self._see(field)
             field.click()
         else:
-            self.page.locator('#appointments_consulate_appointment_date_input').click()
+            wrap = self.page.locator('#appointments_consulate_appointment_date_input')
+            self._see(wrap)
+            wrap.click()
+        calendar = self.page.locator('#ui-datepicker-div')
+        try:
+            calendar.first.wait_for(state='visible', timeout=15000)
+        except Exception:
+            raise PortalChanged('datepicker')
+
+    def _pick_first_time(self):
+        box = self.page.locator('#appointments_consulate_appointment_time')
+        self._see(box)
+        self._wait_enabled(box, 'time')
+        options = box.locator('option')
+        for i in range(options.count()):
+            value = options.nth(i).get_attribute('value')
+            if value:
+                box.select_option(value)
+                self.page.wait_for_timeout(STEP_DELAY_MS)
+                return
+        raise PortalChanged('time')
+
+    def _select_asc_if_needed(self, location):
+        _, asc = FACILITIES[location]
+        box = self.page.locator('#appointments_asc_appointment_facility_id')
+        if not box.count() or self._date_blocked(box):
+            return
+        self._see(box)
+        box.select_option(asc)
+        self.page.wait_for_timeout(STEP_DELAY_MS)
+
+    def _click_schedule(self):
+        button = self.page.locator('#appointments_submit')
+        if not button.count():
+            button = self.page.locator('input[type="submit"], button').filter(has_text=re.compile(r'programe', re.I))
+        self._see(button)
+        self._wait_enabled(button, 'submit')
+        button.first.click()
+        try:
+            self.page.wait_for_load_state('domcontentloaded')
+        except Exception:
+            pass
 
     def _open_days(self):
         days = self.page.locator('#ui-datepicker-div td[data-handler="selectDay"]')

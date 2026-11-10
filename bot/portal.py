@@ -88,9 +88,9 @@ class PlaywrightPortal:
         try:
             self._save_state()
             self._bot.open_schedule()
-            self._bot.select_location(location)
             if earliest is not None and latest is not None:
-                return self._bot.pick_day_in_range(earliest, latest, current)
+                return self._bot.complete_in_range(location, earliest, latest, current)
+            self._bot.select_location(location)
             return self._bot.visible_consulate_days()
         except (PortalChanged, PlaywrightTimeout) as exc:
             raise PortalReadError('calendar') from exc

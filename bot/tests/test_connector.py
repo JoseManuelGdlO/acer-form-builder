@@ -391,16 +391,203 @@ def test_opens_the_date_field_when_there_is_no_calendar_link():
 
             class Loc:
                 def count(self):
+                    if 'href="#select"' in selector or selector.startswith('label'):
+                        return 0
+                    return 1
+
+                def click(self):
+                    page.clicks.append(selector)
+
+                def wait_for(self, state=None, timeout=None):
+                    return None
+
+                def filter(self, has_text=None):
+                    return self
+
+                @property
+                def first(self):
+                    return self
+
+            return Loc()
+
+        def wait_for_timeout(self, ms):
+            return None
+
+    page = Page()
+    AISBrowser(page, '123456')._open_datepicker()
+    assert page.clicks == ['#appointments_consulate_appointment_date']
+
+
+def test_opens_datepicker_from_date_label():
+    class Page:
+        def __init__(self):
+            self.clicks = []
+
+        def locator(self, selector):
+            page = self
+
+            class Loc:
+                def count(self):
                     return 0 if 'href="#select"' in selector else 1
 
                 def click(self):
                     page.clicks.append(selector)
 
+                def wait_for(self, state=None, timeout=None):
+                    return None
+
+                def filter(self, has_text=None):
+                    return self
+
+                @property
+                def first(self):
+                    return self
+
             return Loc()
+
+        def wait_for_timeout(self, ms):
+            return None
 
     page = Page()
     AISBrowser(page, '123456')._open_datepicker()
-    assert page.clicks == ['#appointments_consulate_appointment_date']
+    assert page.clicks[0] == 'label[for="appointments_consulate_appointment_date"]'
+
+
+class _LocationPage:
+    def __init__(self, enabled=True):
+        self.selected = None
+        self.enabled = enabled
+        self.waits = 0
+
+    def locator(self, selector):
+        page = self
+
+        class Loc:
+            def select_option(self, value):
+                page.selected = value
+
+            def count(self):
+                return 1
+
+            def wait_for(self, state=None, timeout=None):
+                return None
+
+            def is_disabled(self):
+                return not page.enabled
+
+            def get_attribute(self, name):
+                return None if page.enabled else 'disabled'
+
+            @property
+            def first(self):
+                return self
+
+        return Loc()
+
+    def wait_for_timeout(self, ms):
+        self.waits += 1
+
+
+def test_select_location_waits_for_enabled_date_field():
+    page = _LocationPage(enabled=True)
+    consulate, asc = AISBrowser(page, '123456').select_location('Tijuana')
+    assert page.selected == '74'
+    assert (consulate, asc) == ('74', '88')
+    assert page.waits == 1
+
+
+def test_select_location_stops_when_date_stays_disabled():
+    page = _LocationPage(enabled=False)
+    with pytest.raises(PortalChanged, match='date field'):
+        AISBrowser(page, '123456').select_location('Tijuana')
+    assert page.selected == '74'
+    assert page.waits == 20
+
+
+class _SlotPage:
+    def __init__(self, asc_enabled=True, times=('08:00',)):
+        self.actions = []
+        self.asc_enabled = asc_enabled
+        self.times = times
+        self.selected = {}
+
+    def locator(self, selector):
+        page = self
+
+        class Loc:
+            def count(self):
+                if selector == 'option':
+                    return len(page.times)
+                return 1
+
+            def click(self, **_kwargs):
+                page.actions.append(selector)
+
+            def wait_for(self, state=None, timeout=None):
+                return None
+
+            def is_disabled(self):
+                if 'asc' in selector:
+                    return not page.asc_enabled
+                return False
+
+            def get_attribute(self, name):
+                if selector == 'option':
+                    return page.times[0]
+                return None
+
+            def select_option(self, value):
+                page.selected[selector] = value
+                page.actions.append(selector)
+
+            def locator(self, inner):
+                return page.locator(inner)
+
+            def nth(self, index):
+                class Opt:
+                    def get_attribute(self, name):
+                        return page.times[index]
+                return Opt()
+
+            def filter(self, has_text=None):
+                return self
+
+            def evaluate(self, script):
+                page.actions.append('scroll')
+
+            @property
+            def first(self):
+                return self
+
+        return Loc()
+
+    def wait_for_timeout(self, ms):
+        return None
+
+    def wait_for_load_state(self, state):
+        return None
+
+
+def test_complete_in_range_picks_time_asc_and_submit(monkeypatch):
+    page = _SlotPage()
+    bot = AISBrowser(page, '123456')
+    monkeypatch.setattr(bot, 'select_location', lambda loc: ('65', '76'))
+    monkeypatch.setattr(bot, 'pick_day_in_range', lambda *a, **k: [date(2026, 12, 1)])
+    days = bot.complete_in_range('Ciudad Juarez', date(2026, 11, 1), date(2026, 12, 31))
+    assert days == [date(2026, 12, 1)]
+    assert page.selected['#appointments_consulate_appointment_time'] == '08:00'
+    assert page.selected['#appointments_asc_appointment_facility_id'] == '76'
+    assert '#appointments_submit' in page.actions
+
+
+def test_complete_in_range_skips_disabled_asc_and_stops_without_days(monkeypatch):
+    page = _SlotPage(asc_enabled=False)
+    bot = AISBrowser(page, '123456')
+    monkeypatch.setattr(bot, 'select_location', lambda loc: ('65', '76'))
+    monkeypatch.setattr(bot, 'pick_day_in_range', lambda *a, **k: [])
+    assert bot.complete_in_range('Ciudad Juarez', date(2026, 11, 1), date(2026, 12, 31)) == []
+    assert '#appointments_submit' not in page.actions
+    assert '#appointments_asc_appointment_facility_id' not in page.selected
 
 
 class _CapBot:
@@ -409,6 +596,9 @@ class _CapBot:
 
     def select_location(self, location):
         return None
+
+    def complete_in_range(self, location, earliest, latest, current=None):
+        return []
 
     def visible_consulate_days(self):
         return []
