@@ -50,10 +50,15 @@ class PlaywrightPortal:
     def open_login(self):
         if self.session_started():
             return
+        if self._context is not None:
+            self._context.clear_cookies()
         load_env()
         self._bot.open_login(os.environ.get('VISA_EMAIL', ''), os.environ.get('VISA_PASSWORD', ''))
         if self.session_started():
             self._save_state()
+
+    def account_locked(self):
+        return bool(self._bot is not None and self._bot.account_locked())
 
     def session_started(self):
         page = self._page
@@ -62,9 +67,17 @@ class PlaywrightPortal:
         url = (page.url or '').split('?', 1)[0]
         if not url.startswith('http'):
             return False
-        if 'sign_in' not in url:
-            return True
-        return page.locator('#user_email').count() == 0
+        if 'sign_in' in url:
+            return False
+        if '/groups' not in url and '/schedule' not in url:
+            return False
+        if self._bot is not None and self._bot._wall_up():
+            return False
+        if page.locator('.swal2-container, .swal2-shown').count():
+            return False
+        if page.locator('#user_email').count():
+            return False
+        return True
 
     def read_visible_days(self, location, earliest=None, latest=None, current=None):
         from playwright.sync_api import TimeoutError as PlaywrightTimeout
@@ -75,9 +88,9 @@ class PlaywrightPortal:
         try:
             self._save_state()
             self._bot.open_schedule()
-            self._bot.select_location(location)
             if earliest is not None and latest is not None:
-                return self._bot.pick_day_in_range(earliest, latest, current)
+                return self._bot.complete_in_range(location, earliest, latest, current)
+            self._bot.select_location(location)
             return self._bot.visible_consulate_days()
         except (PortalChanged, PlaywrightTimeout) as exc:
             raise PortalReadError('calendar') from exc

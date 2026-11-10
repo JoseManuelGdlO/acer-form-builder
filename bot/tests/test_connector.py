@@ -2,7 +2,7 @@ from datetime import date
 import os
 
 import pytest
-from connector import AISBrowser, calendar_step
+from connector import AISBrowser, STEP_DELAY_MS, TYPE_DELAY_MS, calendar_step, PortalChanged
 from portal import MAX_READS, QUERY_CAP, PlaywrightPortal, PortalReadError, load_env
 
 FORM = '#appointments_consulate_appointment_facility_id'
@@ -20,9 +20,12 @@ class _Loc:
         self.page.clicks += 1
         self.page.phase += 1
 
-    def wait_for(self, timeout):
+    def wait_for(self, timeout=None, state=None):
         if not self.present():
             raise TimeoutError('form')
+
+    def filter(self, has_text=None):
+        return self
 
     @property
     def first(self):
@@ -39,7 +42,13 @@ class _Page:
     def locator(self, selector):
         if selector == FORM:
             return _Loc(self, lambda: self.phase >= 2)
+        if 'swal2' in selector or selector == 'button':
+            return _Loc(self, lambda: False)
         return _Loc(self, lambda: self.links and self.phase < 2)
+
+    @property
+    def url(self):
+        return self.gone or ''
 
     def wait_for_load_state(self, state):
         return None
@@ -87,7 +96,9 @@ class _EnterPage:
     def locator(self, selector):
         if selector == FORM:
             return _Loc(self, lambda: self.phase >= 2)
-        return _Loc(self, lambda: self.phase == 1)
+        if 'swal2' in selector or selector == 'button':
+            return _Loc(self, lambda: False)
+        return _Loc(self, lambda: self.phase >= 1)
 
     def get_by_text(self, pattern):
         return _Option(self)
@@ -97,6 +108,10 @@ class _EnterPage:
 
     def goto(self, url, wait_until):
         self.gone = url
+
+    @property
+    def url(self):
+        return self.gone or ''
 
 
 def test_clicks_schedule_option_then_enters():
@@ -109,9 +124,18 @@ def test_clicks_schedule_option_then_enters():
 
 def test_opens_the_form_directly_when_there_is_no_link():
     page = _Page(links=False)
+    page.gone = 'https://ais.usvisa-info.com/es-mx/niv/groups'
     AISBrowser(page, '123456').open_schedule()
     assert page.clicks == 0
     assert page.gone.endswith('/schedule/123456/appointment')
+
+
+def test_open_schedule_does_not_open_appointment_from_home():
+    page = _Page(links=False)
+    page.gone = 'https://ais.usvisa-info.com/es-mx/niv'
+    with pytest.raises(PortalChanged):
+        AISBrowser(page, '123456').open_schedule()
+    assert page.gone.endswith('/niv')
 
 
 class _LoginPage:
@@ -122,6 +146,8 @@ class _LoginPage:
     def locator(self, selector):
         class _Count:
             def count(_self):
+                if 'swal' in selector:
+                    return 0
                 return self.email
         return _Count()
 
@@ -129,22 +155,55 @@ class _LoginPage:
 def test_login_counts_when_the_form_is_gone():
     portal = PlaywrightPortal()
     portal._page = _LoginPage('https://ais.usvisa-info.com/es-mx/niv/users/sign_in', email=0)
-    assert portal.session_started() is True
-    portal._page = _LoginPage('https://ais.usvisa-info.com/es-mx/niv/users/sign_in', email=1)
     assert portal.session_started() is False
+    portal._page = _LoginPage('https://ais.usvisa-info.com/es-mx/niv/groups', email=0)
+    assert portal.session_started() is True
+    portal._page = _LoginPage('https://ais.usvisa-info.com/es-mx/niv', email=0)
+    assert portal.session_started() is False
+    portal._page = _LoginPage('https://ais.usvisa-info.com/es-mx/niv/groups', email=1)
+    assert portal.session_started() is False
+    portal._page = _LoginPage('https://ais.usvisa-info.com/es-mx/niv/schedule/123456/appointment', email=0)
+    assert portal.session_started() is True
 
 
 class _FillPage:
-    def __init__(self, email_field=True):
+    def __init__(self, email_field=True, ready=True, stuck=False, check_sticks=True):
         self.fills = []
+        self.typed = {}
+        self.values = {}
+        self.checked = False
+        self.ready = ready
+        self.stuck = stuck
+        self.check_sticks = check_sticks
+        self.commits = 0
+        self.notice = ''
+        self.dialog = False
+        self.pauses = []
         self.gone = None
         self.email_field = email_field
 
     def goto(self, url, wait_until):
         self.gone = url
 
+    @property
+    def url(self):
+        return self.gone or ''
+
     def wait_for_load_state(self, state):
         return None
+
+    def wait_for_timeout(self, ms):
+        self.pauses.append(ms)
+
+    def expect_navigation(self, timeout=None):
+        class _Nav:
+            def __enter__(_self):
+                return _self
+
+            def __exit__(_self, *_args):
+                return False
+
+        return _Nav()
 
     def evaluate(self, script):
         self.fills.append('scroll')
@@ -157,16 +216,61 @@ class _FillPage:
 
         class Field:
             def count(self):
+                if '.alert' in selector or selector.startswith('body'):
+                    return 1 if page.notice else 0
+                if 'swal2' in selector:
+                    return 1 if page.dialog else 0
                 return 1 if present else 0
 
-            def fill(self, value):
-                page.fills.append(selector)
+            def click(self, **_kwargs):
+                if 'swal2' in selector:
+                    page.dialog = False
+                    page.fills.append('OK')
+                    return
+                if 'iCheck' in selector or 'icheckbox' in selector or selector == '#policy_confirmed':
+                    if page.check_sticks:
+                        page.checked = True
+                if 'commit' in selector:
+                    page.commits += 1
+                    if page.stuck and page.commits == 1:
+                        page.dialog = True
+                        page.notice = 'You need to sign in or sign up before continuing.'
+                    else:
+                        page.gone = 'https://ais.usvisa-info.com/es-mx/niv/groups'
+                        page.notice = ''
+                        page.dialog = False
+                if selector not in ('#user_email', '#user_password'):
+                    page.fills.append(selector)
 
-            def click(self):
+            def inner_text(self):
+                return page.notice
+
+            def fill(self, value):
+                if value == '':
+                    page.values[selector] = ''
+
+            def wait_for(self, state=None, timeout=None):
+                if 'swal2' in selector and not page.dialog and state != 'hidden':
+                    raise TimeoutError('modal')
+                return None
+
+            def is_visible(self):
+                return 'swal2' in selector and page.dialog
+
+            def press_sequentially(self, value, delay=0):
                 page.fills.append(selector)
+                page.typed[selector] = (value, delay)
+                page.values[selector] = value
 
             def check(self):
+                page.checked = True
                 page.fills.append(selector)
+
+            def input_value(self):
+                return page.values.get(selector, '') if page.ready else ''
+
+            def is_checked(self):
+                return page.ready and page.checked
 
             def scroll_into_view_if_needed(self):
                 return None
@@ -191,7 +295,299 @@ def test_open_login_skips_fill_without_credentials():
 def test_open_login_fills_when_credentials_are_passed():
     page = _FillPage()
     AISBrowser(page, '123456').open_login('a@b.c', 'secret')
-    assert page.fills == ['scroll', '#user_email', '#user_password', 'label', 'input[name="commit"]']
+    assert page.fills == [
+        'scroll', '#user_email', '#user_password',
+        '.iCheck-helper, .icheckbox', 'input[name="commit"]',
+    ]
+    assert page.typed == {
+        '#user_email': ('a@b.c', TYPE_DELAY_MS),
+        '#user_password': ('secret', TYPE_DELAY_MS),
+    }
+    assert page.pauses == [STEP_DELAY_MS, STEP_DELAY_MS, STEP_DELAY_MS]
+
+
+def test_login_does_not_submit_when_policy_stays_unchecked():
+    page = _FillPage(check_sticks=False)
+    AISBrowser(page, '123456').open_login('a@b.c', 'secret')
+    assert page.commits == 0
+    assert 'input[name="commit"]' not in page.fills
+
+
+def test_login_skips_policy_click_when_already_checked():
+    page = _FillPage()
+    page.checked = True
+    AISBrowser(page, '123456').open_login('a@b.c', 'secret')
+    assert page.commits == 1
+    assert '.iCheck-helper, .icheckbox' not in page.fills
+
+
+def test_open_login_clears_cookies_when_not_signed_in(monkeypatch):
+    cleared = []
+    portal = PlaywrightPortal()
+    portal._context = type('Ctx', (), {'clear_cookies': lambda *a: cleared.append(True)})()
+    portal._page = _LoginPage('https://ais.usvisa-info.com/es-mx/niv/users/sign_in', email=1)
+    portal._bot = AISBrowser(_FillPage(), '123456')
+    monkeypatch.setenv('VISA_EMAIL', 'a@b.c')
+    monkeypatch.setenv('VISA_PASSWORD', 'secret')
+    portal.open_login()
+    assert cleared == [True]
+    assert portal._bot.page.commits == 1
+
+
+def test_open_login_keeps_cookies_when_already_signed_in():
+    cleared = []
+    portal = PlaywrightPortal()
+    portal._context = type('Ctx', (), {'clear_cookies': lambda *a: cleared.append(True)})()
+    portal._page = _LoginPage('https://ais.usvisa-info.com/es-mx/niv/groups', email=0)
+    portal._bot = AISBrowser(_FillPage(), '123456')
+    portal.open_login()
+    assert cleared == []
+    assert portal._bot.page.commits == 0
+
+
+def test_login_button_waits_until_the_form_is_complete():
+    page = _FillPage(ready=False)
+    AISBrowser(page, '123456').open_login('a@b.c', 'secret')
+    assert page.fills == ['scroll', '#user_email']
+    assert 'label' not in page.fills
+    assert 'input[name="commit"]' not in page.fills
+
+
+def test_login_clicks_ok_and_does_not_submit_again():
+    page = _FillPage(stuck=True)
+    AISBrowser(page, '123456').open_login('a@b.c', 'secret')
+    assert page.commits == 1
+    assert page.fills.count('input[name="commit"]') == 1
+    assert 'OK' in page.fills
+    assert page.dialog is False
+    assert page.gone.endswith('/users/sign_in')
+    assert 'label' not in ''.join(page.fills)
+
+
+def test_login_stops_when_the_account_is_locked():
+    page = _FillPage()
+    page.notice = 'Your account is locked until 06 November, 2026, 11:57:41 CST.'
+    AISBrowser(page, '123456').open_login('a@b.c', 'secret')
+    assert page.commits == 0
+    assert AISBrowser(page, '123456').account_locked() is True
+
+
+def test_closes_extra_privacy_tab():
+    page = _FillPage(stuck=True)
+    extra = type('Tab', (), {'closed': False})()
+    extra.close = lambda: setattr(extra, 'closed', True)
+    page.context = type('Ctx', (), {'pages': [page, extra]})()
+    AISBrowser(page, '123456').open_login('a@b.c', 'secret')
+    assert extra.closed is True
+
+
+def test_opens_the_date_field_when_there_is_no_calendar_link():
+    class Page:
+        def __init__(self):
+            self.clicks = []
+
+        def locator(self, selector):
+            page = self
+
+            class Loc:
+                def count(self):
+                    if 'href="#select"' in selector or selector.startswith('label'):
+                        return 0
+                    return 1
+
+                def click(self):
+                    page.clicks.append(selector)
+
+                def wait_for(self, state=None, timeout=None):
+                    return None
+
+                def filter(self, has_text=None):
+                    return self
+
+                @property
+                def first(self):
+                    return self
+
+            return Loc()
+
+        def wait_for_timeout(self, ms):
+            return None
+
+    page = Page()
+    AISBrowser(page, '123456')._open_datepicker()
+    assert page.clicks == ['#appointments_consulate_appointment_date']
+
+
+def test_opens_datepicker_from_date_label():
+    class Page:
+        def __init__(self):
+            self.clicks = []
+
+        def locator(self, selector):
+            page = self
+
+            class Loc:
+                def count(self):
+                    return 0 if 'href="#select"' in selector else 1
+
+                def click(self):
+                    page.clicks.append(selector)
+
+                def wait_for(self, state=None, timeout=None):
+                    return None
+
+                def filter(self, has_text=None):
+                    return self
+
+                @property
+                def first(self):
+                    return self
+
+            return Loc()
+
+        def wait_for_timeout(self, ms):
+            return None
+
+    page = Page()
+    AISBrowser(page, '123456')._open_datepicker()
+    assert page.clicks[0] == 'label[for="appointments_consulate_appointment_date"]'
+
+
+class _LocationPage:
+    def __init__(self, enabled=True):
+        self.selected = None
+        self.enabled = enabled
+        self.waits = 0
+
+    def locator(self, selector):
+        page = self
+
+        class Loc:
+            def select_option(self, value):
+                page.selected = value
+
+            def count(self):
+                return 1
+
+            def wait_for(self, state=None, timeout=None):
+                return None
+
+            def is_disabled(self):
+                return not page.enabled
+
+            def get_attribute(self, name):
+                return None if page.enabled else 'disabled'
+
+            @property
+            def first(self):
+                return self
+
+        return Loc()
+
+    def wait_for_timeout(self, ms):
+        self.waits += 1
+
+
+def test_select_location_waits_for_enabled_date_field():
+    page = _LocationPage(enabled=True)
+    consulate, asc = AISBrowser(page, '123456').select_location('Tijuana')
+    assert page.selected == '74'
+    assert (consulate, asc) == ('74', '88')
+    assert page.waits == 1
+
+
+def test_select_location_stops_when_date_stays_disabled():
+    page = _LocationPage(enabled=False)
+    with pytest.raises(PortalChanged, match='date field'):
+        AISBrowser(page, '123456').select_location('Tijuana')
+    assert page.selected == '74'
+    assert page.waits == 20
+
+
+class _SlotPage:
+    def __init__(self, asc_enabled=True, times=('08:00',)):
+        self.actions = []
+        self.asc_enabled = asc_enabled
+        self.times = times
+        self.selected = {}
+
+    def locator(self, selector):
+        page = self
+
+        class Loc:
+            def count(self):
+                if selector == 'option':
+                    return len(page.times)
+                return 1
+
+            def click(self, **_kwargs):
+                page.actions.append(selector)
+
+            def wait_for(self, state=None, timeout=None):
+                return None
+
+            def is_disabled(self):
+                if 'asc' in selector:
+                    return not page.asc_enabled
+                return False
+
+            def get_attribute(self, name):
+                if selector == 'option':
+                    return page.times[0]
+                return None
+
+            def select_option(self, value):
+                page.selected[selector] = value
+                page.actions.append(selector)
+
+            def locator(self, inner):
+                return page.locator(inner)
+
+            def nth(self, index):
+                class Opt:
+                    def get_attribute(self, name):
+                        return page.times[index]
+                return Opt()
+
+            def filter(self, has_text=None):
+                return self
+
+            def evaluate(self, script):
+                page.actions.append('scroll')
+
+            @property
+            def first(self):
+                return self
+
+        return Loc()
+
+    def wait_for_timeout(self, ms):
+        return None
+
+    def wait_for_load_state(self, state):
+        return None
+
+
+def test_complete_in_range_picks_time_asc_and_submit(monkeypatch):
+    page = _SlotPage()
+    bot = AISBrowser(page, '123456')
+    monkeypatch.setattr(bot, 'select_location', lambda loc: ('65', '76'))
+    monkeypatch.setattr(bot, 'pick_day_in_range', lambda *a, **k: [date(2026, 12, 1)])
+    days = bot.complete_in_range('Ciudad Juarez', date(2026, 11, 1), date(2026, 12, 31))
+    assert days == [date(2026, 12, 1)]
+    assert page.selected['#appointments_consulate_appointment_time'] == '08:00'
+    assert page.selected['#appointments_asc_appointment_facility_id'] == '76'
+    assert '#appointments_submit' in page.actions
+
+
+def test_complete_in_range_skips_disabled_asc_and_stops_without_days(monkeypatch):
+    page = _SlotPage(asc_enabled=False)
+    bot = AISBrowser(page, '123456')
+    monkeypatch.setattr(bot, 'select_location', lambda loc: ('65', '76'))
+    monkeypatch.setattr(bot, 'pick_day_in_range', lambda *a, **k: [])
+    assert bot.complete_in_range('Ciudad Juarez', date(2026, 11, 1), date(2026, 12, 31)) == []
+    assert '#appointments_submit' not in page.actions
+    assert '#appointments_asc_appointment_facility_id' not in page.selected
 
 
 class _CapBot:
@@ -200,6 +596,9 @@ class _CapBot:
 
     def select_location(self, location):
         return None
+
+    def complete_in_range(self, location, earliest, latest, current=None):
+        return []
 
     def visible_consulate_days(self):
         return []

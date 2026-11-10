@@ -70,7 +70,7 @@ class DateConsultation:
                 reuse = False
         if reuse:
             return self._wait_result()
-        if not self._opened.wait(30):
+        if not self._opened.wait(180):  # shortcut: ~70 keystrokes at the login pace, raise this if the account is longer
             raise ConsultationError('No se pudo abrir el navegador.')
         current = self.snapshot()
         if current['status'] == 'error':
@@ -146,11 +146,25 @@ class DateConsultation:
             self._close(gateway)
             self._opened.set()
             return
+        locked = getattr(gateway, 'account_locked', None)
+        blocked = False
+        if callable(locked):
+            try:
+                blocked = bool(locked())
+            except Exception:
+                blocked = False
         self._gateway = gateway
-        self._set(
-            status='waiting_for_login',
-            message='Se abrió el navegador. Inicia sesión y resuelve las verificaciones. Al entrar, la consulta sigue sola. También puedes pulsar Ya inicié sesión.',
-        )
+        if blocked:
+            self._set(
+                status='error',
+                message='La cuenta del portal está bloqueada. Espera a que se desbloquee; no se reintenta el inicio de sesión.',
+                dates=[],
+            )
+        else:
+            self._set(
+                status='waiting_for_login',
+                message='Se abrió el navegador. Inicia sesión y resuelve las verificaciones. Al entrar, la consulta sigue sola. También puedes pulsar Ya inicié sesión.',
+            )
         self._opened.set()
         signed_in_checks = 0
         while True:
@@ -212,7 +226,7 @@ class DateConsultation:
             )
             dates = [day.isoformat() for day in chosen]
             message = (
-                'Fechas candidatas. Ninguna está confirmada.' + _KEEP_OPEN
+                'Se eligió fecha en el rango y se pulsó Programar cita. Verifica en el navegador.' + _KEEP_OPEN
                 if dates else
                 'No hay fechas candidatas en ese rango. No se confirmó ninguna cita.' + _KEEP_OPEN
             )
